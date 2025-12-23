@@ -7,6 +7,9 @@ use App\Models\Vehicle;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+use setasign\Fpdi\Fpdi;
 
 class VehicleController extends Controller
 {
@@ -139,7 +142,7 @@ class VehicleController extends Controller
     {
         $vehicle = Vehicle::where('license_plate', $identifier)
             ->orWhere('renavam', $identifier)
-            ->with(['maintenances.items', 'maintenances.invoices', 'maintenances.checklists'])
+            ->with(['maintenances.items', 'maintenances.invoices', 'maintenances.checklists', 'maintenances.workshop'])
             ->first();
 
         if (!$vehicle) {
@@ -162,7 +165,7 @@ class VehicleController extends Controller
     {
         $vehicle = Vehicle::findOrFail($id);
         $maintenances = $vehicle->maintenances()
-            ->with(['items', 'invoices', 'checklists', 'user'])
+            ->with(['items', 'invoices', 'checklists', 'user', 'workshop'])
             ->orderBy('maintenance_date', 'desc')
             ->get();
 
@@ -175,18 +178,105 @@ class VehicleController extends Controller
     /**
      * Export vehicle maintenance history to PDF
      */
-    public function exportPdf(string $id): JsonResponse
+    public function exportPdf(string $id)
     {
-        $vehicle = Vehicle::with(['maintenances.items', 'maintenances.invoices', 'maintenances.checklists', 'maintenances.user'])
-            ->findOrFail($id);
+        try {
+            $vehicle = Vehicle::with([
+                'maintenances.items',
+                'maintenances.invoices',
+                'maintenances.checklists',
+                'maintenances.user',
+                'maintenances.workshop'
+            ])
+                ->findOrFail($id);
 
-        // TODO: Implement PDF generation using a library like dompdf or barryvdh/laravel-dompdf
-        // For now, return the data that would be used for PDF generation
-        return response()->json([
-            'success' => true,
-            'message' => 'PDF export functionality will be implemented',
-            'data' => $vehicle,
-        ]);
+            // Order maintenances by date (most recent first)
+            $vehicle->maintenances = $vehicle->maintenances->sortByDesc('maintenance_date')->values();
+
+            // Generate the main PDF from the Blade template
+            $pdf = Pdf::loadView('pdfs.vehicle_maintenance_export', [
+                'vehicle' => $vehicle,
+            ]);
+
+            // Set PDF options
+            $pdf->setPaper('a4', 'portrait');
+            $pdf->setOption('enable-local-file-access', true);
+
+            // Get the main PDF content
+            $mainPdfContent = $pdf->output();
+
+            // Collect all invoice PDFs
+            $invoicePdfs = [];
+            foreach ($vehicle->maintenances as $maintenance) {
+                if ($maintenance->invoices && $maintenance->invoices->count() > 0) {
+                    foreach ($maintenance->invoices as $invoice) {
+                        $invoicePath = Storage::disk('public')->path($invoice->file_path);
+                        if (file_exists($invoicePath)) {
+                            $invoicePdfs[] = $invoicePath;
+                        }
+                    }
+                }
+            }
+
+            // If there are invoice PDFs, merge them with the main PDF
+            if (count($invoicePdfs) > 0) {
+                $mergedPdf = new Fpdi();
+                
+                // Save main PDF to temp file for FPDI
+                $tempMainPdf = tempnam(sys_get_temp_dir(), 'main_pdf_');
+                file_put_contents($tempMainPdf, $mainPdfContent);
+                
+                // Import the main PDF
+                $pageCount = $mergedPdf->setSourceFile($tempMainPdf);
+                for ($i = 1; $i <= $pageCount; $i++) {
+                    $mergedPdf->AddPage();
+                    $tplId = $mergedPdf->importPage($i);
+                    $mergedPdf->useTemplate($tplId);
+                }
+                
+                // Clean up temp file
+                unlink($tempMainPdf);
+
+                // Import and append invoice PDFs
+                foreach ($invoicePdfs as $invoicePath) {
+                    try {
+                        $invoicePageCount = $mergedPdf->setSourceFile($invoicePath);
+                        
+                        for ($i = 1; $i <= $invoicePageCount; $i++) {
+                            $mergedPdf->AddPage();
+                            $tplId = $mergedPdf->importPage($i);
+                            $mergedPdf->useTemplate($tplId);
+                        }
+                    } catch (\Exception $e) {
+                        // Skip invoice if it can't be merged (corrupted or incompatible)
+                        continue;
+                    }
+                }
+
+                $finalPdfContent = $mergedPdf->Output('', 'S');
+            } else {
+                // No invoices to merge, use main PDF as is
+                $finalPdfContent = $mainPdfContent;
+            }
+
+            // Generate filename
+            $filename = sprintf(
+                'historico_manutencoes_%s_%s_%s.pdf',
+                $vehicle->license_plate,
+                $vehicle->brand,
+                now()->format('Y-m-d')
+            );
+
+            // Return PDF as download
+            return response($finalPdfContent, 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao gerar PDF: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

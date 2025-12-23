@@ -5,8 +5,10 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\WorkshopController;
+use App\Http\Controllers\Api\UserFcmTokenController;
 
-Route::prefix('api/v1')->group(function () {
+Route::prefix('v1')->group(function () {
     // Public routes (authentication)
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
@@ -15,6 +17,10 @@ Route::prefix('api/v1')->group(function () {
     
     // Search vehicle by license plate or RENAVAM (public for checking vehicle history)
     Route::get('/vehicles/search/{identifier}', [VehicleController::class, 'search']);
+    
+    // Workshop routes (public - visible to all users)
+    Route::get('/workshops', [WorkshopController::class, 'index']);
+    Route::get('/workshops/{id}', [WorkshopController::class, 'show']);
     
     // Protected routes (require authentication)
     Route::middleware('auth:sanctum')->group(function () {
@@ -50,6 +56,16 @@ Route::prefix('api/v1')->group(function () {
         Route::post('/invoices/upload', [InvoiceController::class, 'upload']);
         Route::get('/invoices/{id}/download', [InvoiceController::class, 'download']);
         Route::delete('/invoices/{id}', [InvoiceController::class, 'destroy']);
+        
+        // Workshop routes (create, update, delete require authentication)
+        Route::post('/workshops', [WorkshopController::class, 'store']);
+        Route::put('/workshops/{id}', [WorkshopController::class, 'update']);
+        Route::delete('/workshops/{id}', [WorkshopController::class, 'destroy']);
+        
+        // FCM Token routes
+        Route::get('/fcm-tokens', [UserFcmTokenController::class, 'index']);
+        Route::post('/fcm-tokens', [UserFcmTokenController::class, 'store']);
+        Route::delete('/fcm-tokens/{token}', [UserFcmTokenController::class, 'destroy']);
     });
 });
 

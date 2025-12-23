@@ -20,7 +20,7 @@ class MaintenanceController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Maintenance::with(['vehicle', 'user', 'items', 'invoices', 'checklists']);
+        $query = Maintenance::with(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop']);
 
         if ($request->vehicle_id) {
             $query->where('vehicle_id', $request->vehicle_id);
@@ -48,16 +48,26 @@ class MaintenanceController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        // Get user_id from authenticated user or request
+        $userId = $request->user()?->id ?? $request->user_id;
+        
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
         $validator = Validator::make($request->all(), [
             'vehicle_id' => 'required|exists:vehicles,id',
-            'user_id' => 'required|exists:users,id',
+            'workshop_id' => 'nullable|exists:workshops,id',
             'maintenance_type' => 'required|string|max:100',
             'description' => 'nullable|string',
             'workshop_name' => 'nullable|string|max:255',
             'maintenance_date' => 'required|date',
-            'kilometers' => 'required|integer|min:0',
+            'kilometers' => 'nullable|integer|min:0',
             'service_category' => 'required|in:mechanical,electrical,suspension,painting,finishing,interior,other',
-            'is_manufacturer_required' => 'boolean',
+            'is_manufacturer_required' => 'nullable|boolean',
             'items' => 'nullable|array',
             'items.*.name' => 'required_with:items|string|max:255',
             'items.*.description' => 'nullable|string',
@@ -66,12 +76,7 @@ class MaintenanceController extends Controller
             'items.*.total_price' => 'nullable|numeric|min:0',
             'items.*.part_number' => 'nullable|string|max:100',
             'invoices' => 'nullable|array',
-            'invoices.*.file' => 'required_with:invoices|file|mimes:pdf|max:10240',
-            'invoices.*.invoice_type' => 'required_with:invoices|in:item,general',
-            'invoices.*.maintenance_item_id' => 'nullable|exists:maintenance_items,id',
-            'invoices.*.invoice_number' => 'nullable|string|max:100',
-            'invoices.*.invoice_date' => 'nullable|date',
-            'invoices.*.total_amount' => 'nullable|numeric|min:0',
+            'invoices.*' => 'file|mimes:pdf|max:10240',
             'checklists' => 'nullable|array',
             'checklists.*.checklist_type' => 'required_with:checklists|in:initial,final',
             'checklists.*.items' => 'required_with:checklists|array',
@@ -88,16 +93,40 @@ class MaintenanceController extends Controller
         try {
             DB::beginTransaction();
 
+            // Convert is_manufacturer_required to boolean
+            // Accepts: boolean, int (0/1), string ("true"/"false", "1"/"0")
+            $isManufacturerRequired = false;
+            if ($request->has('is_manufacturer_required')) {
+                $value = $request->is_manufacturer_required;
+                if (is_string($value)) {
+                    $isManufacturerRequired = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
+                } elseif (is_int($value)) {
+                    $isManufacturerRequired = $value === 1;
+                } else {
+                    $isManufacturerRequired = (bool) $value;
+                }
+            }
+
+            // If workshop_id is provided, get workshop name automatically
+            $workshopName = $request->workshop_name;
+            if ($request->workshop_id) {
+                $workshop = \App\Models\Workshop::find($request->workshop_id);
+                if ($workshop) {
+                    $workshopName = $workshop->name;
+                }
+            }
+
             $maintenance = Maintenance::create([
                 'vehicle_id' => $request->vehicle_id,
-                'user_id' => $request->user_id,
+                'user_id' => $userId,
+                'workshop_id' => $request->workshop_id,
                 'maintenance_type' => $request->maintenance_type,
                 'description' => $request->description,
-                'workshop_name' => $request->workshop_name,
+                'workshop_name' => $workshopName,
                 'maintenance_date' => $request->maintenance_date,
-                'kilometers' => $request->kilometers,
+                'kilometers' => $request->kilometers ?? null,
                 'service_category' => $request->service_category,
-                'is_manufacturer_required' => $request->is_manufacturer_required ?? false,
+                'is_manufacturer_required' => $isManufacturerRequired,
             ]);
 
             // Create maintenance items
@@ -116,22 +145,29 @@ class MaintenanceController extends Controller
             }
 
             // Handle invoice file uploads
-            if ($request->has('invoices') && is_array($request->invoices)) {
-                foreach ($request->invoices as $invoiceData) {
-                    if (isset($invoiceData['file']) && $invoiceData['file']->isValid()) {
-                        $file = $invoiceData['file'];
+            // Frontend sends files as 'invoices[]' (array of UploadedFile)
+            // Laravel receives them as array when using [] notation
+            $invoiceFiles = $request->file('invoices');
+            if ($invoiceFiles) {
+                // If single file, convert to array
+                if (!is_array($invoiceFiles)) {
+                    $invoiceFiles = [$invoiceFiles];
+                }
+                
+                foreach ($invoiceFiles as $file) {
+                    if ($file && $file->isValid()) {
                         $fileName = time() . '_' . $file->getClientOriginalName();
                         $filePath = $file->storeAs('invoices', $fileName, 'public');
 
                         Invoice::create([
                             'maintenance_id' => $maintenance->id,
-                            'maintenance_item_id' => $invoiceData['maintenance_item_id'] ?? null,
-                            'invoice_type' => $invoiceData['invoice_type'],
+                            'maintenance_item_id' => null,
+                            'invoice_type' => 'general', // Default to 'general' if not specified
                             'file_path' => $filePath,
                             'file_name' => $file->getClientOriginalName(),
-                            'invoice_number' => $invoiceData['invoice_number'] ?? null,
-                            'invoice_date' => $invoiceData['invoice_date'] ?? null,
-                            'total_amount' => $invoiceData['total_amount'] ?? null,
+                            'invoice_number' => null,
+                            'invoice_date' => null,
+                            'total_amount' => null,
                         ]);
                     }
                 }
@@ -151,7 +187,7 @@ class MaintenanceController extends Controller
 
             DB::commit();
 
-            $maintenance->load(['items', 'invoices', 'checklists', 'vehicle', 'user']);
+            $maintenance->load(['items', 'invoices', 'checklists', 'vehicle', 'user', 'workshop']);
 
             return response()->json([
                 'success' => true,
@@ -172,7 +208,7 @@ class MaintenanceController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $maintenance = Maintenance::with(['vehicle', 'user', 'items', 'invoices', 'checklists'])
+        $maintenance = Maintenance::with(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop'])
             ->findOrFail($id);
 
         return response()->json([
@@ -192,6 +228,7 @@ class MaintenanceController extends Controller
         // For now, we'll allow updates but this should be restricted based on business rules
 
         $validator = Validator::make($request->all(), [
+            'workshop_id' => 'nullable|exists:workshops,id',
             'maintenance_type' => 'sometimes|required|string|max:100',
             'description' => 'nullable|string',
             'workshop_name' => 'nullable|string|max:255',
@@ -208,11 +245,21 @@ class MaintenanceController extends Controller
             ], 422);
         }
 
-        $maintenance->update($validator->validated());
+        $data = $validator->validated();
+        
+        // If workshop_id is provided, get workshop name automatically
+        if (isset($data['workshop_id'])) {
+            $workshop = \App\Models\Workshop::find($data['workshop_id']);
+            if ($workshop) {
+                $data['workshop_name'] = $workshop->name;
+            }
+        }
+
+        $maintenance->update($data);
 
         return response()->json([
             'success' => true,
-            'data' => $maintenance->fresh(['vehicle', 'user', 'items', 'invoices', 'checklists']),
+            'data' => $maintenance->fresh(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop']),
             'message' => 'Maintenance updated successfully',
         ]);
     }

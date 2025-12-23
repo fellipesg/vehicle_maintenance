@@ -12,7 +12,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // CORS está habilitado automaticamente pelo Laravel
+        // Configuração em config/cors.php
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

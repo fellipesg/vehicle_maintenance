@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends Controller
 {
@@ -66,18 +67,25 @@ class InvoiceController extends Controller
     /**
      * Download invoice file
      */
-    public function download(string $id): \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
+    public function download(string $id): StreamedResponse|JsonResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        try {
+            $invoice = Invoice::findOrFail($id);
 
-        if (!Storage::disk('public')->exists($invoice->file_path)) {
+            if (!Storage::disk('public')->exists($invoice->file_path)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invoice file not found',
+                ], 404);
+            }
+
+            return Storage::disk('public')->download($invoice->file_path, $invoice->file_name);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invoice file not found',
-            ], 404);
+                'message' => 'Error downloading invoice: ' . $e->getMessage(),
+            ], 500);
         }
-
-        return Storage::disk('public')->download($invoice->file_path, $invoice->file_name);
     }
 
     /**

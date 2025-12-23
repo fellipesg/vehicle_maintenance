@@ -59,6 +59,33 @@ docker compose exec app php artisan migrate
 docker compose exec app php artisan db:seed
 ```
 
+8. (Opcional) Configure OAuth para login social:
+   - Adicione as credenciais OAuth no arquivo `.env`:
+   ```env
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   GOOGLE_REDIRECT_URI=http://localhost:8080/api/v1/auth/google/callback
+   
+   FACEBOOK_CLIENT_ID=your_facebook_client_id
+   FACEBOOK_CLIENT_SECRET=your_facebook_client_secret
+   FACEBOOK_REDIRECT_URI=http://localhost:8080/api/v1/auth/facebook/callback
+   
+   TWITTER_CLIENT_ID=your_twitter_client_id
+   TWITTER_CLIENT_SECRET=your_twitter_client_secret
+   TWITTER_REDIRECT_URI=http://localhost:8080/api/v1/auth/twitter/callback
+   ```
+   
+   **Para Google OAuth:**
+   1. Acesse [Google Cloud Console](https://console.cloud.google.com/)
+   2. Crie um novo projeto ou selecione um existente
+   3. Ative a API "Google+ API"
+   4. Vá em "Credenciais" → "Criar credenciais" → "ID do cliente OAuth 2.0"
+   5. Configure os tipos de aplicativo (Web application)
+   6. Adicione as URLs de redirecionamento autorizadas:
+      - `http://localhost:8080/api/v1/auth/google/callback` (desenvolvimento)
+      - `https://yourdomain.com/api/v1/auth/google/callback` (produção)
+   7. Copie o Client ID e Client Secret para o arquivo `.env`
+
 ## 🧪 Testes
 
 Execute os testes com PHPUnit:

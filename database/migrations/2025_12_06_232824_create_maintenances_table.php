@@ -19,7 +19,7 @@ return new class extends Migration
             $table->text('description')->nullable()->comment('Descrição dos serviços executados');
             $table->string('workshop_name', 255)->nullable()->comment('Nome da oficina');
             $table->date('maintenance_date')->comment('Data da finalização da revisão');
-            $table->integer('kilometers')->comment('Quilometragem do veículo');
+            $table->integer('kilometers')->nullable()->comment('Quilometragem do veículo');
             $table->enum('service_category', [
                 'mechanical',
                 'electrical',

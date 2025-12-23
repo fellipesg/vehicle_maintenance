@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\FcmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,6 +23,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'user_type' => 'required|in:user,workshop',
             'phone' => 'nullable|string|max:20',
             'postal_code' => 'nullable|string|max:10',
             'street' => 'nullable|string|max:255',
@@ -43,6 +45,7 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'user_type' => $request->user_type,
             'phone' => $request->phone,
             'postal_code' => $request->postal_code,
             'street' => $request->street,
@@ -54,6 +57,23 @@ class AuthController extends Controller
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Send welcome notification (async, don't wait for it)
+        try {
+            $fcmService = new FcmService();
+            $fcmService->sendToUser(
+                $user->id,
+                'Bem-vindo ao Vehicle Maintenance! 🚗',
+                "Olá {$user->name}! Sua conta foi criada com sucesso. Comece a gerenciar suas manutenções!",
+                [
+                    'type' => 'welcome',
+                    'user_id' => (string)$user->id,
+                ]
+            );
+        } catch (\Exception $e) {
+            // Don't fail registration if notification fails
+            \Log::warning('Failed to send welcome notification: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -92,6 +112,23 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->firstOrFail();
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Send welcome notification (async, don't wait for it)
+        try {
+            $fcmService = new FcmService();
+            $fcmService->sendToUser(
+                $user->id,
+                'Bem-vindo de volta! 👋',
+                "Olá {$user->name}! Você entrou no Vehicle Maintenance.",
+                [
+                    'type' => 'welcome',
+                    'user_id' => (string)$user->id,
+                ]
+            );
+        } catch (\Exception $e) {
+            // Don't fail login if notification fails
+            \Log::warning('Failed to send welcome notification: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -145,14 +182,43 @@ class AuthController extends Controller
             ], 400);
         }
 
-        $redirectUrl = Socialite::driver($provider)->stateless()->redirect()->getTargetUrl();
+        // Check if OAuth credentials are configured
+        $clientId = config("services.{$provider}.client_id");
+        $clientSecret = config("services.{$provider}.client_secret");
+        $redirectUri = config("services.{$provider}.redirect");
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'redirect_url' => $redirectUrl,
-            ],
-        ]);
+        if (empty($clientId) || empty($clientSecret) || empty($redirectUri)) {
+            return response()->json([
+                'success' => false,
+                'message' => ucfirst($provider) . ' OAuth credentials not configured. Please set ' . strtoupper($provider) . '_CLIENT_ID, ' . strtoupper($provider) . '_CLIENT_SECRET, and ' . strtoupper($provider) . '_REDIRECT_URI in your .env file.',
+                'error_code' => 'OAUTH_NOT_CONFIGURED',
+            ], 500);
+        }
+
+        try {
+            // Get the redirect URI from config
+            $redirectUri = config("services.{$provider}.redirect");
+            
+            // Use Socialite with explicit redirect URI to ensure consistency
+            $redirectUrl = Socialite::driver($provider)
+                ->stateless()
+                ->redirectUrl($redirectUri)
+                ->redirect()
+                ->getTargetUrl();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'redirect_url' => $redirectUrl,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating OAuth URL: ' . $e->getMessage(),
+                'error_code' => 'OAUTH_ERROR',
+            ], 500);
+        }
     }
 
     /**
@@ -170,13 +236,31 @@ class AuthController extends Controller
         }
 
         try {
-            $socialUser = Socialite::driver($provider)->stateless()->user();
+            // Use the same redirect URI from config that was used in the initial authorization URL
+            // This is critical - Google requires the redirect_uri to match exactly
+            $redirectUri = config("services.{$provider}.redirect");
+            
+            // Log for debugging
+            \Log::info('OAuth callback', [
+                'provider' => $provider,
+                'redirect_uri' => $redirectUri,
+                'request_url' => request()->fullUrl(),
+                'has_code' => request()->has('code'),
+            ]);
+            
+            // Use Socialite with the same redirect URI from config
+            $socialUser = Socialite::driver($provider)
+                ->stateless()
+                ->redirectUrl($redirectUri)
+                ->user();
 
             // Find or create user
             $user = User::where('provider', $provider)
                 ->where('provider_id', $socialUser->getId())
                 ->first();
 
+            $isNewUser = false;
+            
             if (!$user) {
                 // Check if user exists with this email
                 $user = User::where('email', $socialUser->getEmail())->first();
@@ -198,6 +282,7 @@ class AuthController extends Controller
                         'avatar' => $socialUser->getAvatar(),
                         'password' => Hash::make(uniqid()), // Random password for SSO users
                     ]);
+                    $isNewUser = true;
                 }
             } else {
                 // Update avatar if changed
@@ -207,6 +292,35 @@ class AuthController extends Controller
             }
 
             $token = $user->createToken('auth_token')->plainTextToken;
+
+            // Send welcome notification (async, don't wait for it)
+            try {
+                $fcmService = new FcmService();
+                if ($isNewUser) {
+                    $fcmService->sendToUser(
+                        $user->id,
+                        'Bem-vindo ao Vehicle Maintenance! 🚗',
+                        "Olá {$user->name}! Sua conta foi criada com sucesso. Comece a gerenciar suas manutenções!",
+                        [
+                            'type' => 'welcome',
+                            'user_id' => (string)$user->id,
+                        ]
+                    );
+                } else {
+                    $fcmService->sendToUser(
+                        $user->id,
+                        'Bem-vindo de volta! 👋',
+                        "Olá {$user->name}! Você entrou no Vehicle Maintenance.",
+                        [
+                            'type' => 'welcome',
+                            'user_id' => (string)$user->id,
+                        ]
+                    );
+                }
+            } catch (\Exception $e) {
+                // Don't fail login if notification fails
+                \Log::warning('Failed to send welcome notification: ' . $e->getMessage());
+            }
 
             return response()->json([
                 'success' => true,

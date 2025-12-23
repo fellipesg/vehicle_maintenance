@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'user_type',
         'phone',
         'postal_code',
         'street',
@@ -75,5 +76,29 @@ class User extends Authenticatable
     public function currentVehicles(): BelongsToMany
     {
         return $this->vehicles()->wherePivot('is_current_owner', true);
+    }
+
+    /**
+     * Get FCM tokens for push notifications
+     */
+    public function fcmTokens()
+    {
+        return $this->hasMany(UserFcmToken::class);
+    }
+
+    /**
+     * Check if user is a workshop
+     */
+    public function isWorkshop(): bool
+    {
+        return $this->user_type === 'workshop';
+    }
+
+    /**
+     * Get workshop associated with this user (if user_type is workshop)
+     */
+    public function workshop()
+    {
+        return $this->hasOne(Workshop::class, 'user_id');
     }
 }

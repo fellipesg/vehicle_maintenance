@@ -13,6 +13,7 @@ class Maintenance extends Model
     protected $fillable = [
         'vehicle_id',
         'user_id',
+        'workshop_id',
         'maintenance_type',
         'description',
         'workshop_name',
@@ -65,5 +66,13 @@ class Maintenance extends Model
     public function checklists(): HasMany
     {
         return $this->hasMany(Checklist::class);
+    }
+
+    /**
+     * Get the workshop for this maintenance
+     */
+    public function workshop(): BelongsTo
+    {
+        return $this->belongsTo(Workshop::class);
     }
 }
