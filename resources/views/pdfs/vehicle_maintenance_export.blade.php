@@ -16,13 +16,14 @@
             font-size: 10pt;
             line-height: 1.4;
             color: #333;
+            padding: 0 18px 18px;
         }
         
         .header {
             background-color: #1e40af;
             color: white;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 20px 18px;
+            margin: 0 -18px 18px;
         }
         
         .header h1 {
@@ -38,7 +39,7 @@
         .vehicle-info {
             background-color: #f3f4f6;
             padding: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             border-radius: 5px;
         }
         
@@ -68,23 +69,52 @@
             color: #333;
             font-size: 10pt;
         }
+
+        .maintenances-wrapper {
+            margin-top: 4px;
+        }
+
+        .maintenances-wrapper > h2 {
+            font-size: 14pt;
+            margin: 0 0 12px;
+            color: #1e40af;
+            page-break-after: avoid;
+        }
         
         .maintenance-section {
-            margin-bottom: 30px;
+            margin-bottom: 14px;
             page-break-inside: avoid;
         }
         
         .maintenance-header {
             background-color: #3b82f6;
             color: white;
-            padding: 12px;
+            padding: 10px 12px;
             border-radius: 5px 5px 0 0;
             margin-bottom: 0;
         }
-        
-        .maintenance-header h3 {
-            font-size: 12pt;
-            margin-bottom: 5px;
+
+        .maintenance-title {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .maintenance-title td {
+            vertical-align: middle;
+            padding: 0;
+            color: white;
+            font-size: 11pt;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+
+        .maintenance-title .title-sep {
+            padding: 0 6px;
+            white-space: nowrap;
+        }
+
+        .maintenance-title .title-text {
+            white-space: nowrap;
         }
         
         .maintenance-content {
@@ -152,10 +182,12 @@
         
         .badge {
             display: inline-block;
-            padding: 4px 8px;
+            padding: 3px 8px;
             border-radius: 3px;
             font-size: 8pt;
             font-weight: bold;
+            line-height: 1.2;
+            vertical-align: middle;
         }
         
         .badge-preventive {
@@ -179,16 +211,12 @@
         }
         
         .footer {
-            margin-top: 30px;
-            padding-top: 15px;
+            margin-top: 24px;
+            padding-top: 12px;
             border-top: 1px solid #e5e7eb;
             text-align: center;
             font-size: 8pt;
             color: #666;
-        }
-        
-        .page-break {
-            page-break-before: always;
         }
     </style>
 </head>
@@ -229,9 +257,15 @@
                 <span class="info-value">{{ $vehicle->chassis }}</span>
             </div>
             @endif
+            @if($vehicle->motorization)
+            <div class="info-item">
+                <span class="info-label">Motorização:</span>
+                <span class="info-value">{{ $vehicle->motorization }}</span>
+            </div>
+            @endif
             @if($vehicle->engine)
             <div class="info-item">
-                <span class="info-label">Motor:</span>
+                <span class="info-label">Código do motor:</span>
                 <span class="info-value">{{ $vehicle->engine }}</span>
             </div>
             @endif
@@ -239,24 +273,42 @@
     </div>
     
     @if($vehicle->maintenances->count() > 0)
-        <h2 style="font-size: 14pt; margin-bottom: 15px; color: #1e40af;">Manutenções Realizadas ({{ $vehicle->maintenances->count() }})</h2>
+        <div class="maintenances-wrapper">
+            <h2>Manutenções Realizadas ({{ $vehicle->maintenances->count() }})</h2>
         
-        @foreach($vehicle->maintenances as $index => $maintenance)
-            <div class="maintenance-section {{ $index > 0 ? 'page-break' : '' }}">
-                <div class="maintenance-header">
-                    <h3>
-                        @if($maintenance->maintenance_type === 'preventive')
-                            <span class="badge badge-preventive">PREVENTIVA</span>
-                        @elseif($maintenance->maintenance_type === 'corrective')
-                            <span class="badge badge-corrective">CORRETIVA</span>
-                        @elseif($maintenance->maintenance_type === 'inspection')
-                            <span class="badge badge-inspection">INSPEÇÃO</span>
-                        @else
-                            <span class="badge badge-other">OUTRA</span>
-                        @endif
-                        - {{ \Carbon\Carbon::parse($maintenance->maintenance_date)->format('d/m/Y') }}
-                    </h3>
-                </div>
+            @foreach($vehicle->maintenances as $index => $maintenance)
+                <div class="maintenance-section">
+                    @php
+                        $workshopName = $maintenance->workshop?->name ?: $maintenance->workshop_name;
+                        $typeLabel = match ($maintenance->maintenance_type) {
+                            'preventive' => 'PREVENTIVA',
+                            'corrective' => 'CORRETIVA',
+                            'inspection' => 'INSPEÇÃO',
+                            default => strtoupper((string) $maintenance->maintenance_type),
+                        };
+                        $badgeClass = match ($maintenance->maintenance_type) {
+                            'preventive' => 'badge-preventive',
+                            'corrective' => 'badge-corrective',
+                            'inspection' => 'badge-inspection',
+                            default => 'badge-other',
+                        };
+                    @endphp
+                    <div class="maintenance-header">
+                        <table class="maintenance-title">
+                            <tr>
+                                <td style="width: 1%; white-space: nowrap;">
+                                    <span class="badge {{ $badgeClass }}">{{ $typeLabel }}</span>
+                                </td>
+                                @if($workshopName)
+                                    <td class="title-sep">-</td>
+                                    <td class="title-text">{{ $workshopName }}</td>
+                                @endif
+                                <td class="title-sep">-</td>
+                                <td class="title-text">{{ \Carbon\Carbon::parse($maintenance->maintenance_date)->format('d/m/Y') }}</td>
+                                <td style="width: 99%;"></td>
+                            </tr>
+                        </table>
+                    </div>
                 
                 <div class="maintenance-content">
                     <div class="maintenance-details">
@@ -402,7 +454,8 @@
                     @endif
                 </div>
             </div>
-        @endforeach
+            @endforeach
+        </div>
     @else
         <div style="text-align: center; padding: 40px; color: #666;">
             <p>Nenhuma manutenção registrada para este veículo.</p>

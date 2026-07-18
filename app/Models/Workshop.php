@@ -13,6 +13,7 @@ class Workshop extends Model
 
     protected $fillable = [
         'user_id',
+        'tenant_id',
         'name',
         'phone',
         'whatsapp',
@@ -34,6 +35,11 @@ class Workshop extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
     }
 
     /**

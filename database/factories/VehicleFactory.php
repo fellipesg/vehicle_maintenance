@@ -31,7 +31,8 @@ class VehicleFactory extends Factory
             'year' => $this->faker->numberBetween(2010, date('Y')),
             'color' => $this->faker->randomElement($colors),
             'chassis' => $this->faker->optional()->bothify('?????????????????'),
-            'engine' => $this->faker->optional()->bothify('?##?##?'),
+            'motorization' => $this->faker->optional()->randomElement(['1.0', '1.4', '1.6', '1.6 Turbo', '2.0 Turbo']),
+            'engine' => $this->faker->optional()->bothify('?##?##?########'),
         ];
     }
 }

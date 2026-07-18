@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Maintenance;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -9,11 +10,6 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class MaintenanceFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         $maintenanceTypes = [
@@ -26,7 +22,7 @@ class MaintenanceFactory extends Factory
             'Revisão elétrica',
             'Pintura',
         ];
-        
+
         $workshops = [
             'Oficina Central',
             'Auto Service',
@@ -34,7 +30,7 @@ class MaintenanceFactory extends Factory
             'Oficina Premium',
             null,
         ];
-        
+
         return [
             'vehicle_id' => \App\Models\Vehicle::factory(),
             'user_id' => \App\Models\User::factory(),
@@ -54,5 +50,17 @@ class MaintenanceFactory extends Factory
             ]),
             'is_manufacturer_required' => $this->faker->boolean(70),
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterMaking(function (Maintenance $maintenance) {
+            if ($maintenance->user_id && ! $maintenance->tenant_id) {
+                $user = \App\Models\User::find($maintenance->user_id);
+                if ($user?->tenant_id) {
+                    $maintenance->tenant_id = $user->tenant_id;
+                }
+            }
+        });
     }
 }

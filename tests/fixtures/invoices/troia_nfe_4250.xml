@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+    <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+        <infNFe Id="NFe35230729264347000123550020000042501629292919" versao="4.00">
+            <ide>
+                <nNF>4250</nNF>
+                <dhEmi>2023-07-12T16:00:00-03:00</dhEmi>
+            </ide>
+            <det nItem="1">
+                <prod>
+                    <cProd>2059</cProd>
+                    <xProd>Óleo Lubrificante 0w20 Idemitsu</xProd>
+                    <qCom>4.0000</qCom>
+                    <vUnCom>65.6700000000</vUnCom>
+                    <vProd>262.68</vProd>
+                </prod>
+            </det>
+            <det nItem="2">
+                <prod>
+                    <cProd>1010</cProd>
+                    <xProd>Filtro De Óleo Mahle - OC600</xProd>
+                    <qCom>1.0000</qCom>
+                    <vUnCom>0.0000000000</vUnCom>
+                    <vProd>0.00</vProd>
+                </prod>
+            </det>
+            <det nItem="3">
+                <prod>
+                    <cProd>1004</cProd>
+                    <xProd>Filtro Cabine Mahle - Civic 2007/2016 - LA1171</xProd>
+                    <qCom>1.0000</qCom>
+                    <vUnCom>26.7300000000</vUnCom>
+                    <vProd>26.73</vProd>
+                </prod>
+            </det>
+            <det nItem="4">
+                <prod>
+                    <cProd>1137</cProd>
+                    <xProd>Filtro Combustível Mann - Civic 2012/2016 - WK58/1</xProd>
+                    <qCom>1.0000</qCom>
+                    <vUnCom>31.9300000000</vUnCom>
+                    <vProd>31.93</vProd>
+                </prod>
+            </det>
+            <det nItem="5">
+                <prod>
+                    <cProd>1002</cProd>
+                    <xProd>Filtro De Ar Motor Mann - C24021 - Civic 2012/2016</xProd>
+                    <qCom>1.0000</qCom>
+                    <vUnCom>69.3400000000</vUnCom>
+                    <vProd>69.34</vProd>
+                </prod>
+            </det>
+            <total>
+                <ICMSTot>
+                    <vNF>240.68</vNF>
+                </ICMSTot>
+            </total>
+        </infNFe>
+    </NFe>
+</nfeProc>

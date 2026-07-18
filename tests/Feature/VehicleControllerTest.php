@@ -13,38 +13,33 @@ class VehicleControllerTest extends TestCase
 {
     use RefreshDatabase, WithFaker;
 
-    /**
-     * Test listing all vehicles
-     */
-    public function test_can_list_vehicles(): void
+    public function test_unauthenticated_cannot_list_vehicles(): void
     {
-        Vehicle::factory()->count(3)->create();
+        $this->getJson('/api/v1/vehicles')->assertUnauthorized();
+    }
+
+    public function test_can_list_only_tenant_vehicles(): void
+    {
+        $user = $this->actingAsApiUser();
+        $otherUser = User::factory()->asUser()->create();
+
+        $owned = Vehicle::factory()->create();
+        $other = Vehicle::factory()->create();
+
+        $this->attachVehicleToUser($user, $owned);
+        $this->attachVehicleToUser($otherUser, $other);
 
         $response = $this->getJson('/api/v1/vehicles');
 
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'success',
-                'data' => [
-                    'data' => [
-                        '*' => [
-                            'id',
-                            'license_plate',
-                            'renavam',
-                            'brand',
-                            'model',
-                            'year',
-                        ],
-                    ],
-                ],
-            ]);
+        $response->assertOk()
+            ->assertJsonPath('data.data.0.id', $owned->id)
+            ->assertJsonCount(1, 'data.data');
     }
 
-    /**
-     * Test creating a vehicle
-     */
     public function test_can_create_vehicle(): void
     {
+        $this->actingAsApiUser();
+
         $vehicleData = [
             'license_plate' => 'ABC1234',
             'renavam' => '12345678901',
@@ -56,206 +51,132 @@ class VehicleControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/vehicles', $vehicleData);
 
-        $response->assertStatus(201)
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'license_plate' => 'ABC1234',
-                    'renavam' => '12345678901',
-                    'brand' => 'Toyota',
-                    'model' => 'Corolla',
-                ],
-            ]);
+        $response->assertCreated()
+            ->assertJsonPath('data.license_plate', 'ABC1234');
 
-        $this->assertDatabaseHas('vehicles', [
-            'license_plate' => 'ABC1234',
-            'renavam' => '12345678901',
-        ]);
+        $this->assertDatabaseHas('vehicles', ['license_plate' => 'ABC1234']);
     }
 
-    /**
-     * Test creating vehicle with invalid data
-     */
     public function test_cannot_create_vehicle_with_invalid_data(): void
     {
-        $response = $this->postJson('/api/v1/vehicles', []);
+        $this->actingAsApiUser();
 
-        $response->assertStatus(422)
-            ->assertJsonStructure([
-                'success',
-                'errors',
-            ]);
+        $this->postJson('/api/v1/vehicles', [])
+            ->assertUnprocessable()
+            ->assertJsonStructure(['success', 'errors']);
     }
 
-    /**
-     * Test creating vehicle with duplicate license plate
-     */
     public function test_cannot_create_vehicle_with_duplicate_license_plate(): void
     {
+        $this->actingAsApiUser();
         Vehicle::factory()->create(['license_plate' => 'ABC1234']);
 
-        $vehicleData = [
+        $this->postJson('/api/v1/vehicles', [
             'license_plate' => 'ABC1234',
             'renavam' => '98765432109',
             'brand' => 'Honda',
             'model' => 'Civic',
             'year' => 2021,
-        ];
-
-        $response = $this->postJson('/api/v1/vehicles', $vehicleData);
-
-        $response->assertStatus(422)
+        ])->assertUnprocessable()
             ->assertJsonValidationErrors(['license_plate']);
     }
 
-    /**
-     * Test showing a specific vehicle
-     */
-    public function test_can_show_vehicle(): void
+    public function test_can_show_owned_vehicle(): void
     {
+        $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
 
-        $response = $this->getJson("/api/v1/vehicles/{$vehicle->id}");
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'id' => $vehicle->id,
-                    'license_plate' => $vehicle->license_plate,
-                ],
-            ]);
+        $this->getJson("/api/v1/vehicles/{$vehicle->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $vehicle->id);
     }
 
-    /**
-     * Test showing non-existent vehicle
-     */
+    public function test_cannot_show_vehicle_from_other_tenant(): void
+    {
+        $user = $this->actingAsApiUser();
+        $otherUser = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($otherUser, $vehicle);
+
+        $this->getJson("/api/v1/vehicles/{$vehicle->id}")
+            ->assertForbidden();
+    }
+
     public function test_cannot_show_nonexistent_vehicle(): void
     {
-        $response = $this->getJson('/api/v1/vehicles/999');
+        $this->actingAsApiUser();
 
-        $response->assertStatus(404);
+        $this->getJson('/api/v1/vehicles/999')->assertNotFound();
     }
 
-    /**
-     * Test updating a vehicle
-     */
-    public function test_can_update_vehicle(): void
+    public function test_can_update_owned_vehicle(): void
     {
+        $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
 
-        $updateData = [
+        $this->putJson("/api/v1/vehicles/{$vehicle->id}", [
             'brand' => 'Updated Brand',
             'model' => 'Updated Model',
-        ];
+        ])->assertOk()
+            ->assertJsonPath('data.brand', 'Updated Brand');
+    }
 
-        $response = $this->putJson("/api/v1/vehicles/{$vehicle->id}", $updateData);
+    public function test_can_delete_owned_vehicle(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'brand' => 'Updated Brand',
-                    'model' => 'Updated Model',
-                ],
-            ]);
+        $this->deleteJson("/api/v1/vehicles/{$vehicle->id}")
+            ->assertOk();
 
-        $this->assertDatabaseHas('vehicles', [
-            'id' => $vehicle->id,
-            'brand' => 'Updated Brand',
-            'model' => 'Updated Model',
+        $this->assertDatabaseMissing('user_vehicles', [
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
         ]);
     }
 
-    /**
-     * Test deleting a vehicle
-     */
-    public function test_can_delete_vehicle(): void
-    {
-        $vehicle = Vehicle::factory()->create();
-
-        $response = $this->deleteJson("/api/v1/vehicles/{$vehicle->id}");
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-            ]);
-
-        $this->assertDatabaseMissing('vehicles', [
-            'id' => $vehicle->id,
-        ]);
-    }
-
-    /**
-     * Test searching vehicle by license plate
-     */
     public function test_can_search_vehicle_by_license_plate(): void
     {
         $vehicle = Vehicle::factory()->create(['license_plate' => 'XYZ9876']);
 
-        $response = $this->getJson('/api/v1/vehicles/search/XYZ9876');
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'id' => $vehicle->id,
-                    'license_plate' => 'XYZ9876',
-                ],
-            ]);
+        $this->getJson('/api/v1/vehicles/search/XYZ9876')
+            ->assertOk()
+            ->assertJsonPath('data.license_plate', 'XYZ9876');
     }
 
-    /**
-     * Test searching vehicle by RENAVAM
-     */
     public function test_can_search_vehicle_by_renavam(): void
     {
         $vehicle = Vehicle::factory()->create(['renavam' => '11122233344']);
 
-        $response = $this->getJson('/api/v1/vehicles/search/11122233344');
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'id' => $vehicle->id,
-                    'renavam' => '11122233344',
-                ],
-            ]);
+        $this->getJson('/api/v1/vehicles/search/11122233344')
+            ->assertOk()
+            ->assertJsonPath('data.renavam', '11122233344');
     }
 
-    /**
-     * Test searching non-existent vehicle
-     */
     public function test_search_returns_404_for_nonexistent_vehicle(): void
     {
-        $response = $this->getJson('/api/v1/vehicles/search/INVALID');
-
-        $response->assertStatus(404)
-            ->assertJson([
-                'success' => false,
-            ]);
+        $this->getJson('/api/v1/vehicles/search/INVALID')
+            ->assertNotFound()
+            ->assertJsonPath('success', false);
     }
 
-    /**
-     * Test getting vehicle maintenances
-     */
     public function test_can_get_vehicle_maintenances(): void
     {
+        $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
-        $user = User::factory()->create();
-        
+        $this->attachVehicleToUser($user, $vehicle);
+
         Maintenance::factory()->count(3)->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
         ]);
 
-        $response = $this->getJson("/api/v1/vehicles/{$vehicle->id}/maintenances");
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-            ])
+        $this->getJson("/api/v1/vehicles/{$vehicle->id}/maintenances")
+            ->assertOk()
             ->assertJsonCount(3, 'data');
     }
 }

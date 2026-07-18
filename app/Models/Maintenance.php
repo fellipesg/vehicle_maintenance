@@ -13,6 +13,7 @@ class Maintenance extends Model
     protected $fillable = [
         'vehicle_id',
         'user_id',
+        'tenant_id',
         'workshop_id',
         'maintenance_type',
         'description',
@@ -42,6 +43,11 @@ class Maintenance extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
     }
 
     /**

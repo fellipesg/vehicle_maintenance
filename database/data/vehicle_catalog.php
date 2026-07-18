@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'Audi' => ['A1', 'A3', 'A4', 'A5', 'A6', 'Q3', 'Q5', 'Q7', 'Q8', 'TT', 'e-tron'],
+    'BMW' => ['Série 1', 'Série 2', 'Série 3', 'Série 4', 'Série 5', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'Z4', 'i3', 'i4', 'iX'],
+    'BYD' => ['Dolphin', 'Dolphin Mini', 'Han', 'King', 'Seal', 'Song Plus', 'Tan', 'Yuan Plus'],
+    'Chevrolet' => ['Agile', 'Astra', 'Blazer', 'Camaro', 'Captiva', 'Celta', 'Classic', 'Cobalt', 'Corsa', 'Cruze', 'Equinox', 'Joy', 'Malibu', 'Meriva', 'Montana', 'Onix', 'Onix Plus', 'Prisma', 'S10', 'Spin', 'Tracker', 'Trailblazer', 'Vectra', 'Zafira'],
+    'Citroën' => ['Aircross', 'Berlingo', 'C3', 'C4 Cactus', 'C4 Lounge', 'C4 Picasso', 'Jumper', 'Jumpy', 'Xsara Picasso'],
+    'Fiat' => ['Argo', 'Bravo', 'Cronos', 'Doblo', 'Ducato', 'Fastback', 'Fiorino', 'Grand Siena', 'Idea', 'Linea', 'Mobi', 'Palio', 'Pulse', 'Punto', 'Siena', 'Stilo', 'Strada', 'Toro', 'Uno', 'Weekend'],
+    'Ford' => ['Bronco Sport', 'Courier', 'EcoSport', 'Edge', 'Escort', 'Fiesta', 'Focus', 'Fusion', 'Ka', 'Maverick', 'Mustang', 'Ranger', 'Territory', 'Transit'],
+    'Honda' => ['Accord', 'City', 'Civic', 'CR-V', 'Fit', 'HR-V', 'Odyssey', 'WR-V', 'ZR-V'],
+    'Hyundai' => ['Azera', 'Creta', 'Elantra', 'HB20', 'HB20S', 'HB20X', 'HR', 'i30', 'ix35', 'Palisade', 'Santa Fe', 'Sonata', 'Tucson', 'Veloster'],
+    'Jeep' => ['Cherokee', 'Commander', 'Compass', 'Gladiator', 'Grand Cherokee', 'Renegade', 'Wrangler'],
+    'Kia' => ['Bongo', 'Cadenza', 'Carens', 'Carnival', 'Cerato', 'EV6', 'Niro', 'Optima', 'Picanto', 'Seltos', 'Sorento', 'Soul', 'Sportage', 'Stinger'],
+    'Land Rover' => ['Defender', 'Discovery', 'Discovery Sport', 'Evoque', 'Freelander', 'Range Rover', 'Range Rover Sport', 'Range Rover Velar'],
+    'Mercedes-Benz' => ['A 200', 'A 250', 'AMG GT', 'C 180', 'C 200', 'C 250', 'C 300', 'CLA 200', 'CLA 250', 'CLC 200', 'CLK 320', 'CLS 400', 'E 200', 'E 250', 'E 300', 'E 350', 'GLA 200', 'GLA 250', 'GLB 200', 'GLC 300', 'GLE 400', 'GLK 280', 'ML 350', 'S 500', 'SLK 200', 'Sprinter'],
+    'Mitsubishi' => ['ASX', 'Eclipse Cross', 'L200', 'Lancer', 'Outlander', 'Pajero', 'Pajero Dakar', 'Pajero Full', 'Pajero Sport', 'TR4'],
+    'Nissan' => ['Frontier', 'Grand Livina', 'Kicks', 'Leaf', 'Livina', 'March', 'Sentra', 'Tiida', 'Versa', 'X-Trail'],
+    'Peugeot' => ['2008', '206', '207', '208', '3008', '307', '308', '408', '5008', 'Boxer', 'Expert', 'Partner', 'RCZ'],
+    'Porsche' => ['718 Boxster', '718 Cayman', '911', 'Cayenne', 'Macan', 'Panamera', 'Taycan'],
+    'Renault' => ['Captur', 'Clio', 'Duster', 'Fluence', 'Kangoo', 'Kardian', 'Kwid', 'Logan', 'Master', 'Megane', 'Oroch', 'Sandero', 'Scenic', 'Symbol', 'Twingo'],
+    'Toyota' => ['Bandeirante', 'Camry', 'Corolla', 'Corolla Cross', 'Etios', 'Fielder', 'Hilux', 'Land Cruiser', 'Prius', 'RAV4', 'SW4', 'Yaris', 'Yaris Cross'],
+    'Volkswagen' => ['Amarok', 'Bora', 'CrossFox', 'Fox', 'Fusca', 'Gol', 'Golf', 'Jetta', 'Kombi', 'Nivus', 'Passat', 'Polo', 'Saveiro', 'SpaceFox', 'T-Cross', 'Taos', 'Tiguan', 'Touareg', 'Up!', 'Virtus', 'Voyage'],
+    'Volvo' => ['C30', 'C40', 'S40', 'S60', 'S90', 'V40', 'V60', 'XC40', 'XC60', 'XC90'],
+];

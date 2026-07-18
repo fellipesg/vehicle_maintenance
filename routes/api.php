@@ -17,13 +17,15 @@ Route::prefix('v1')->group(function () {
     
     // Search vehicle by license plate or RENAVAM (public for checking vehicle history)
     Route::get('/vehicles/search/{identifier}', [VehicleController::class, 'search']);
+    Route::get('/vehicle-catalog/brands', [VehicleController::class, 'catalogBrands']);
+    Route::get('/vehicle-catalog/models', [VehicleController::class, 'catalogModels']);
     
     // Workshop routes (public - visible to all users)
     Route::get('/workshops', [WorkshopController::class, 'index']);
     Route::get('/workshops/{id}', [WorkshopController::class, 'show']);
     
     // Protected routes (require authentication)
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         // Auth routes
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);

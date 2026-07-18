@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\FcmService;
+use App\Services\TenantService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +24,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'user_type' => 'required|in:user,workshop',
+            'user_type' => 'required|in:user,workshop,garage',
             'phone' => 'nullable|string|max:20',
             'postal_code' => 'nullable|string|max:10',
             'street' => 'nullable|string|max:255',
@@ -55,6 +56,9 @@ class AuthController extends Controller
             'state' => $request->state,
             'country' => $request->country ?? 'Brasil',
         ]);
+
+        (new TenantService())->createForUser($user);
+        $user->refresh();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -280,8 +284,10 @@ class AuthController extends Controller
                         'provider' => $provider,
                         'provider_id' => $socialUser->getId(),
                         'avatar' => $socialUser->getAvatar(),
-                        'password' => Hash::make(uniqid()), // Random password for SSO users
+                        'password' => Hash::make(uniqid()),
                     ]);
+                    (new TenantService())->createForUser($user);
+                    $user->refresh();
                     $isNewUser = true;
                 }
             } else {

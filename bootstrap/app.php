@@ -12,8 +12,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // CORS está habilitado automaticamente pelo Laravel
-        // Configuração em config/cors.php
+        $middleware->trustProxies(at: '*');
+
+        $middleware->alias([
+            'user.type' => \App\Http\Middleware\EnsureUserType::class,
+            'tenant' => \App\Http\Middleware\SetTenantContext::class,
+            'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

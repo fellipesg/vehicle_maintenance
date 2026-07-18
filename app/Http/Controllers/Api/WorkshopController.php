@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Workshop;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 
@@ -41,6 +42,8 @@ class WorkshopController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        Gate::authorize('create', Workshop::class);
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
@@ -69,6 +72,8 @@ class WorkshopController extends Controller
         $whatsapp = $request->whatsapp ?? $request->phone;
 
         $workshop = Workshop::create([
+            'user_id' => $request->user()->id,
+            'tenant_id' => $request->user()->tenant_id,
             'name' => $request->name,
             'phone' => $request->phone,
             'whatsapp' => $whatsapp,
@@ -118,12 +123,14 @@ class WorkshopController extends Controller
     {
         $workshop = Workshop::find($id);
 
-        if (!$workshop) {
+        if (! $workshop) {
             return response()->json([
                 'success' => false,
                 'message' => 'Oficina não encontrada',
             ], 404);
         }
+
+        Gate::authorize('update', $workshop);
 
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|required|string|max:255',
@@ -181,18 +188,19 @@ class WorkshopController extends Controller
     /**
      * Remove the specified workshop
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
         $workshop = Workshop::find($id);
 
-        if (!$workshop) {
+        if (! $workshop) {
             return response()->json([
                 'success' => false,
                 'message' => 'Oficina não encontrada',
             ], 404);
         }
 
-        // Check if workshop has maintenances
+        Gate::authorize('delete', $workshop);
+
         if ($workshop->maintenances()->count() > 0) {
             return response()->json([
                 'success' => false,

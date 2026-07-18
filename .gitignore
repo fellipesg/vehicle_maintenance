@@ -41,3 +41,13 @@ Thumbs.db
 
 # Docker volumes
 /docker/nginx/.gitkeep
+
+# Local SQLite / binary DB dumps
+/database/*.sqlite
+/database/*.sqlite-journal
+/vehicle_maintenance
+*.sqlite
+
+# Built frontend assets (gerar com npm run build)
+/public/build
+/public/hot

@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Models\Maintenance;
+use App\Rules\InvoiceFile;
+use App\Services\Invoice\InvoiceUploadProcessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -13,14 +17,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class InvoiceController extends Controller
 {
     /**
-     * Upload and process invoice PDF
-     * This endpoint will receive a PDF file and attempt to extract data from it
-     * TODO: Implement PDF parsing using a library like smalot/pdfparser or similar
+     * Upload and process invoice PDF or XML, extracting NF-e items when possible.
      */
     public function upload(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:pdf|max:10240',
+            'file' => ['required', 'file', new InvoiceFile, 'max:10240'],
             'maintenance_id' => 'required|exists:maintenances,id',
             'maintenance_item_id' => 'nullable|exists:maintenance_items,id',
             'invoice_type' => 'required|in:item,general',
@@ -34,12 +36,19 @@ class InvoiceController extends Controller
         }
 
         try {
+            $maintenance = Maintenance::findOrFail($request->maintenance_id);
+
+            if (! $request->user()->can('update', $maintenance)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized',
+                ], 403);
+            }
+
             $file = $request->file('file');
             $fileName = time() . '_' . $file->getClientOriginalName();
             $filePath = $file->storeAs('invoices', $fileName, 'public');
 
-            // TODO: Implement PDF parsing to extract invoice data
-            // For now, we'll just store the file
             $invoice = Invoice::create([
                 'maintenance_id' => $request->maintenance_id,
                 'maintenance_item_id' => $request->maintenance_item_id,
@@ -51,11 +60,29 @@ class InvoiceController extends Controller
                 'total_amount' => $request->total_amount ?? null,
             ]);
 
-            return response()->json([
+            $result = app(InvoiceUploadProcessor::class)->processStoredPath(
+                $maintenance,
+                $invoice,
+                $filePath,
+                $file->getClientOriginalName(),
+            );
+
+            $invoice->refresh();
+
+            $response = [
                 'success' => true,
-                'data' => $invoice,
-                'message' => 'Invoice uploaded successfully. PDF parsing will be implemented.',
-            ], 201);
+                'data' => $invoice->load('maintenance.items'),
+                'parsed_items_count' => $result['items_created'],
+                'message' => $result['items_created'] > 0
+                    ? "Nota fiscal salva e {$result['items_created']} itens importados da NF-e."
+                    : 'Nota fiscal salva com sucesso.',
+            ];
+
+            if ($result['parse_warning'] ?? null) {
+                $response['parse_warning'] = $result['parse_warning'];
+            }
+
+            return response()->json($response, 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -70,9 +97,10 @@ class InvoiceController extends Controller
     public function download(string $id): StreamedResponse|JsonResponse
     {
         try {
-            $invoice = Invoice::findOrFail($id);
+            $invoice = Invoice::with('maintenance')->findOrFail($id);
+            Gate::authorize('view', $invoice);
 
-            if (!Storage::disk('public')->exists($invoice->file_path)) {
+            if (! Storage::disk('public')->exists($invoice->file_path)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invoice file not found',
@@ -93,7 +121,8 @@ class InvoiceController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        $invoice = Invoice::with('maintenance')->findOrFail($id);
+        Gate::authorize('delete', $invoice);
 
         if (Storage::disk('public')->exists($invoice->file_path)) {
             Storage::disk('public')->delete($invoice->file_path);

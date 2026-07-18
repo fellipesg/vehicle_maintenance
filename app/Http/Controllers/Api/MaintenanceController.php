@@ -5,29 +5,36 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
-use App\Models\Invoice;
 use App\Models\Checklist;
+use App\Rules\InvoiceFile;
+use App\Services\Invoice\InvoiceUploadProcessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 
 class MaintenanceController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request): JsonResponse
     {
+        Gate::authorize('viewAny', Maintenance::class);
+
+        $user = $request->user();
         $query = Maintenance::with(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop']);
+
+        if ($user->isWorkshop() && $user->workshop) {
+            $query->where(function ($q) use ($user) {
+                $q->where('tenant_id', $user->tenant_id)
+                    ->orWhere('workshop_id', $user->workshop->id);
+            });
+        } else {
+            $query->where('tenant_id', $user->tenant_id);
+        }
 
         if ($request->vehicle_id) {
             $query->where('vehicle_id', $request->vehicle_id);
-        }
-
-        if ($request->user_id) {
-            $query->where('user_id', $request->user_id);
         }
 
         if ($request->service_category) {
@@ -43,20 +50,12 @@ class MaintenanceController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request): JsonResponse
     {
-        // Get user_id from authenticated user or request
-        $userId = $request->user()?->id ?? $request->user_id;
-        
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not authenticated',
-            ], 401);
-        }
+        Gate::authorize('create', Maintenance::class);
+
+        $user = $request->user();
+        $userId = $user->id;
 
         $validator = Validator::make($request->all(), [
             'vehicle_id' => 'required|exists:vehicles,id',
@@ -76,7 +75,7 @@ class MaintenanceController extends Controller
             'items.*.total_price' => 'nullable|numeric|min:0',
             'items.*.part_number' => 'nullable|string|max:100',
             'invoices' => 'nullable|array',
-            'invoices.*' => 'file|mimes:pdf|max:10240',
+            'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
             'checklists' => 'nullable|array',
             'checklists.*.checklist_type' => 'required_with:checklists|in:initial,final',
             'checklists.*.items' => 'required_with:checklists|array',
@@ -90,11 +89,12 @@ class MaintenanceController extends Controller
             ], 422);
         }
 
+        $vehicle = \App\Models\Vehicle::findOrFail($request->vehicle_id);
+        Gate::authorize('view', $vehicle);
+
         try {
             DB::beginTransaction();
 
-            // Convert is_manufacturer_required to boolean
-            // Accepts: boolean, int (0/1), string ("true"/"false", "1"/"0")
             $isManufacturerRequired = false;
             if ($request->has('is_manufacturer_required')) {
                 $value = $request->is_manufacturer_required;
@@ -107,7 +107,6 @@ class MaintenanceController extends Controller
                 }
             }
 
-            // If workshop_id is provided, get workshop name automatically
             $workshopName = $request->workshop_name;
             if ($request->workshop_id) {
                 $workshop = \App\Models\Workshop::find($request->workshop_id);
@@ -119,6 +118,7 @@ class MaintenanceController extends Controller
             $maintenance = Maintenance::create([
                 'vehicle_id' => $request->vehicle_id,
                 'user_id' => $userId,
+                'tenant_id' => $user->tenant_id,
                 'workshop_id' => $request->workshop_id,
                 'maintenance_type' => $request->maintenance_type,
                 'description' => $request->description,
@@ -129,7 +129,6 @@ class MaintenanceController extends Controller
                 'is_manufacturer_required' => $isManufacturerRequired,
             ]);
 
-            // Create maintenance items
             if ($request->has('items') && is_array($request->items)) {
                 foreach ($request->items as $itemData) {
                     MaintenanceItem::create([
@@ -144,36 +143,13 @@ class MaintenanceController extends Controller
                 }
             }
 
-            // Handle invoice file uploads
-            // Frontend sends files as 'invoices[]' (array of UploadedFile)
-            // Laravel receives them as array when using [] notation
+            $uploadResult = ['items_created' => 0, 'warnings' => []];
+
             $invoiceFiles = $request->file('invoices');
             if ($invoiceFiles) {
-                // If single file, convert to array
-                if (!is_array($invoiceFiles)) {
-                    $invoiceFiles = [$invoiceFiles];
-                }
-                
-                foreach ($invoiceFiles as $file) {
-                    if ($file && $file->isValid()) {
-                        $fileName = time() . '_' . $file->getClientOriginalName();
-                        $filePath = $file->storeAs('invoices', $fileName, 'public');
-
-                        Invoice::create([
-                            'maintenance_id' => $maintenance->id,
-                            'maintenance_item_id' => null,
-                            'invoice_type' => 'general', // Default to 'general' if not specified
-                            'file_path' => $filePath,
-                            'file_name' => $file->getClientOriginalName(),
-                            'invoice_number' => null,
-                            'invoice_date' => null,
-                            'total_amount' => null,
-                        ]);
-                    }
-                }
+                $uploadResult = app(InvoiceUploadProcessor::class)->processForMaintenance($maintenance, $invoiceFiles);
             }
 
-            // Create checklists
             if ($request->has('checklists') && is_array($request->checklists)) {
                 foreach ($request->checklists as $checklistData) {
                     Checklist::create([
@@ -189,13 +165,24 @@ class MaintenanceController extends Controller
 
             $maintenance->load(['items', 'invoices', 'checklists', 'vehicle', 'user', 'workshop']);
 
-            return response()->json([
+            $response = [
                 'success' => true,
                 'data' => $maintenance,
                 'message' => 'Maintenance created successfully',
-            ], 201);
+            ];
+
+            if ($uploadResult['items_created'] > 0) {
+                $response['parsed_items_count'] = $uploadResult['items_created'];
+            }
+
+            if ($uploadResult['warnings'] !== []) {
+                $response['parse_warnings'] = $uploadResult['warnings'];
+            }
+
+            return response()->json($response, 201);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error creating maintenance: ' . $e->getMessage(),
@@ -203,13 +190,12 @@ class MaintenanceController extends Controller
         }
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(string $id): JsonResponse
     {
         $maintenance = Maintenance::with(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop'])
             ->findOrFail($id);
+
+        Gate::authorize('view', $maintenance);
 
         return response()->json([
             'success' => true,
@@ -217,15 +203,10 @@ class MaintenanceController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, string $id): JsonResponse
     {
         $maintenance = Maintenance::findOrFail($id);
-
-        // Note: In a real scenario, you might want to prevent editing past maintenances
-        // For now, we'll allow updates but this should be restricted based on business rules
+        Gate::authorize('update', $maintenance);
 
         $validator = Validator::make($request->all(), [
             'workshop_id' => 'nullable|exists:workshops,id',
@@ -246,8 +227,7 @@ class MaintenanceController extends Controller
         }
 
         $data = $validator->validated();
-        
-        // If workshop_id is provided, get workshop name automatically
+
         if (isset($data['workshop_id'])) {
             $workshop = \App\Models\Workshop::find($data['workshop_id']);
             if ($workshop) {
@@ -264,14 +244,11 @@ class MaintenanceController extends Controller
         ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id): JsonResponse
     {
         $maintenance = Maintenance::findOrFail($id);
-        
-        // Delete associated invoices files
+        Gate::authorize('delete', $maintenance);
+
         foreach ($maintenance->invoices as $invoice) {
             if (Storage::disk('public')->exists($invoice->file_path)) {
                 Storage::disk('public')->delete($invoice->file_path);

@@ -1,152 +1,166 @@
-# Vehicle Maintenance - Backend API
+# Vehicle Maintenance — Backend
 
-API Laravel para gerenciamento de manutenções e histórico veicular.
+API e portal web Laravel para histórico de manutenções veiculares, importação de CRLV-e, notas fiscais (PDF/XML) e exportação de relatórios.
 
-## 🚀 Tecnologias
+> App mobile: [`vehicle_maintenance_frontend`](https://github.com/fellipesg/vehicle_maintenance_frontend)
 
-- **Laravel 12** (PHP 8.4)
-- **MySQL 8.0**
-- **Redis 7**
-- **Laravel Sanctum** (Autenticação)
-- **Laravel Socialite** (OAuth)
-- **Docker** & **Docker Compose**
-- **Xdebug 3.4** (Debugging)
-- **Laravel Telescope** (Observabilidade)
-- **Laravel Debugbar** (Debugging)
-- **Rector** (Refatoração de código)
+## Stack
 
-## 📋 Pré-requisitos
+| Camada | Tecnologia |
+|--------|------------|
+| Runtime | PHP 8.2+ · Laravel 12 |
+| Auth | Laravel Sanctum · Socialite (OAuth) |
+| DB | SQLite (dev) · MySQL 8 (Docker) |
+| Cache / queue | Redis · database queue |
+| PDF | DomPDF · PDF Parser · FPDI |
+| Push | Firebase Admin (kreait/firebase-php) |
+| Front web | Blade · Vite · Tailwind |
 
-- Docker e Docker Compose
-- Git
+## Pré-requisitos
 
-## 🔧 Instalação
+- PHP 8.2+ com extensões comuns do Laravel (`pdo_sqlite` ou `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`, `fileinfo`, `gd`)
+- [Composer](https://getcomposer.org/) 2.x
+- Node.js 20+ e npm (assets Vite)
+- **Ou** Docker + Docker Compose (MySQL + Redis + app)
 
-1. Clone o repositório:
+## Início rápido (local sem Docker)
+
 ```bash
 git clone https://github.com/fellipesg/vehicle_maintenance.git
 cd vehicle_maintenance
+
+composer install
+cp .env.example .env
+php artisan key:generate
+
+# SQLite (padrão do .env.example)
+touch database/database.sqlite
+
+php artisan migrate
+# opcional: php artisan db:seed
+
+npm install
+npm run build
+
+composer run dev
 ```
 
-2. Execute o script de setup:
-```bash
-chmod +x docker-setup.sh
-./docker-setup.sh
-```
+O script `composer run dev` sobe, em paralelo:
 
-3. Inicie os containers:
-```bash
-docker compose up -d
-```
+- `php artisan serve` (API + portal)
+- queue worker
+- Vite (`npm run dev`)
+- logs (`pail`)
 
-4. Instale as dependências:
+App: [http://127.0.0.1:8000](http://127.0.0.1:8000)  
+API: `http://127.0.0.1:8000/api/v1`
+
+> Em alguns ambientes a porta `8000` já está ocupada. Use `php artisan serve --port=8080` e ajuste `APP_URL`.
+
+## Docker
+
 ```bash
+cp .env.example .env
+# Ajuste DB_* para MySQL do compose, por exemplo:
+# DB_CONNECTION=mysql
+# DB_HOST=db
+# DB_PORT=3306
+# DB_DATABASE=vehicle_maintenance
+# DB_USERNAME=vehicle_user
+# DB_PASSWORD=root
+
+docker compose up -d --build
 docker compose exec app composer install
-```
-
-5. Gere a chave da aplicação:
-```bash
 docker compose exec app php artisan key:generate
-```
-
-6. Execute as migrations:
-```bash
 docker compose exec app php artisan migrate
 ```
 
-7. (Opcional) Execute os seeders:
+Serviços típicos do `docker-compose.yml`: app, MySQL 8, Redis 7, Nginx (conforme configuração do projeto).
+
+## Variáveis de ambiente
+
+Copie `.env.example` → `.env`. Principais chaves:
+
+| Variável | Descrição |
+|----------|-----------|
+| `APP_KEY` | Gerada por `php artisan key:generate` |
+| `APP_URL` | URL pública (importante para OAuth e links) |
+| `DB_*` | Conexão SQLite ou MySQL |
+| `FILESYSTEM_DISK` | `local` ou `s3` |
+| `AWS_*` | Credenciais S3 (se usar storage remoto) |
+| `GOOGLE_*` / `FACEBOOK_*` / `TWITTER_*` | OAuth Socialite |
+| Firebase credentials | Conta de serviço para FCM (fora do git) |
+
+**Nunca** committe `.env`, chaves privadas ou JSON de service account.
+
+## Testes
+
 ```bash
-docker compose exec app php artisan db:seed
+composer test
+# ou
+php artisan test
 ```
 
-8. (Opcional) Configure OAuth para login social:
-   - Adicione as credenciais OAuth no arquivo `.env`:
-   ```env
-   GOOGLE_CLIENT_ID=your_google_client_id
-   GOOGLE_CLIENT_SECRET=your_google_client_secret
-   GOOGLE_REDIRECT_URI=http://localhost:8080/api/v1/auth/google/callback
-   
-   FACEBOOK_CLIENT_ID=your_facebook_client_id
-   FACEBOOK_CLIENT_SECRET=your_facebook_client_secret
-   FACEBOOK_REDIRECT_URI=http://localhost:8080/api/v1/auth/facebook/callback
-   
-   TWITTER_CLIENT_ID=your_twitter_client_id
-   TWITTER_CLIENT_SECRET=your_twitter_client_secret
-   TWITTER_REDIRECT_URI=http://localhost:8080/api/v1/auth/twitter/callback
-   ```
-   
-   **Para Google OAuth:**
-   1. Acesse [Google Cloud Console](https://console.cloud.google.com/)
-   2. Crie um novo projeto ou selecione um existente
-   3. Ative a API "Google+ API"
-   4. Vá em "Credenciais" → "Criar credenciais" → "ID do cliente OAuth 2.0"
-   5. Configure os tipos de aplicativo (Web application)
-   6. Adicione as URLs de redirecionamento autorizadas:
-      - `http://localhost:8080/api/v1/auth/google/callback` (desenvolvimento)
-      - `https://yourdomain.com/api/v1/auth/google/callback` (produção)
-   7. Copie o Client ID e Client Secret para o arquivo `.env`
+Com Docker:
 
-## 🧪 Testes
-
-Execute os testes com PHPUnit:
 ```bash
 docker compose exec app php artisan test
 ```
 
-## 📚 Documentação
+## Portal web
 
-- [DEVELOPMENT.md](../DEVELOPMENT.md) - Guia de desenvolvimento
-- [TESTING.md](../TESTING.md) - Guia de testes
+Além da API REST, o backend inclui rotas Blade para:
 
-## 🔗 Endpoints da API
+- **Usuário** — veículos, manutenções, importação CRLV, exportação PDF
+- **Oficina / Garage** — fluxos de oficina e consignação
+- **Admin** — catálogo de marcas/modelos
 
-### Autenticação
-- `POST /api/v1/register` - Registrar novo usuário
-- `POST /api/v1/login` - Login
-- `POST /api/v1/logout` - Logout
-- `GET /api/v1/me` - Dados do usuário autenticado
+Após login no browser, navegue pelas rotas em `routes/web.php`.
 
-### Veículos
-- `GET /api/v1/vehicles` - Listar veículos
-- `POST /api/v1/vehicles` - Criar veículo
-- `GET /api/v1/vehicles/{id}` - Detalhes do veículo
-- `PUT /api/v1/vehicles/{id}` - Atualizar veículo
-- `DELETE /api/v1/vehicles/{id}` - Deletar veículo
-- `GET /api/v1/vehicles/{id}/maintenances` - Manutenções do veículo
-- `GET /api/v1/vehicles/{id}/export-pdf` - Exportar PDF
+## API (visão geral)
 
-### Manutenções
-- `GET /api/v1/maintenances` - Listar manutenções
-- `POST /api/v1/maintenances` - Criar manutenção
-- `GET /api/v1/maintenances/{id}` - Detalhes da manutenção
-- `PUT /api/v1/maintenances/{id}` - Atualizar manutenção
-- `DELETE /api/v1/maintenances/{id}` - Deletar manutenção
+Prefixo: `/api/v1`
 
-### Faturas
-- `POST /api/v1/invoices/upload` - Upload de fatura
-- `GET /api/v1/invoices/{id}/download` - Download de fatura
-- `DELETE /api/v1/invoices/{id}` - Deletar fatura
+| Recurso | Exemplos |
+|---------|----------|
+| Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me` |
+| Vehicles | CRUD + `GET /vehicles/{id}/maintenances` + export PDF |
+| Maintenances | CRUD |
+| Invoices | upload / download |
+| Workshops | listagem e gestão |
 
-## 🛠️ Ferramentas de Desenvolvimento
+Autenticação: Bearer token (Sanctum).
 
-### Xdebug
-- Porta: 9003
-- Configure seu IDE para escutar na porta 9003
-- Logs: `storage/logs/xdebug.log`
+## Estrutura
 
-### Laravel Telescope
-- Acesse: http://localhost:8080/telescope
-- Explore requisições, queries, jobs, etc.
-
-### Rector
-```bash
-# Ver mudanças propostas
-docker compose exec app vendor/bin/rector process --dry-run
-
-# Aplicar refatorações
-docker compose exec app vendor/bin/rector process
+```
+app/
+  Http/Controllers/Api/   # API REST
+  Http/Controllers/Web/   # Portal Blade
+  Services/               # CRLV, NF-e, ownership, catálogo
+  Models/
+database/migrations/
+resources/views/          # Blade + PDF
+routes/api.php
+routes/web.php
+tests/
 ```
 
-## 📝 Licença
+## Scripts úteis
+
+```bash
+composer run setup   # install + .env + migrate + npm build
+composer run dev     # serve + queue + vite + logs
+composer run test
+vendor/bin/pint      # estilo de código
+```
+
+## Segurança
+
+- `.env`, caches e `vendor/` estão no `.gitignore`
+- Não versionar dumps SQLite locais nem `storage/logs`
+- Credenciais Firebase/OAuth apenas em ambiente local ou secrets de CI
+
+## Licença
 
 MIT
