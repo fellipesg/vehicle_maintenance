@@ -34,7 +34,7 @@ class AppStorage
     }
 
     /**
-     * @return array{path: string, temporary: bool}|null
+     * @return array{path: string, temporary: bool, content?: string}|null
      */
     public static function localCopy(string $storagePath): ?array
     {
@@ -51,13 +51,8 @@ class AppStorage
             ];
         }
 
-        try {
-            $contents = $disk->get($storagePath);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        if (! is_string($contents) || $contents === '') {
+        $contents = self::contents($storagePath);
+        if ($contents === null) {
             return null;
         }
 
@@ -74,7 +69,43 @@ class AppStorage
         return [
             'path' => $tmp,
             'temporary' => true,
+            'content' => $contents,
         ];
+    }
+
+    /**
+     * Read object bytes from the app disk, falling back to a short-lived signed URL fetch.
+     */
+    public static function contents(string $storagePath): ?string
+    {
+        try {
+            $contents = self::disk()->get($storagePath);
+            if (is_string($contents) && $contents !== '') {
+                return $contents;
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        if (! self::isRemote()) {
+            return null;
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(60)
+                ->get(self::url($storagePath, now()->addMinutes(10)));
+
+            if ($response->successful()) {
+                $body = $response->body();
+                if (is_string($body) && $body !== '') {
+                    return $body;
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return null;
     }
 
     public static function url(string $path, ?\DateTimeInterface $expiresAt = null): string

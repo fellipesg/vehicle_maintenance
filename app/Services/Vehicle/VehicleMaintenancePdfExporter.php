@@ -15,7 +15,8 @@ class VehicleMaintenancePdfExporter
      * @return array{
      *     content: string,
      *     filename: string,
-     *     invoices: list<array{filename: string, storage_path: string, disk: string, mime: string}>,
+     *     invoices: list<array{filename: string, content: string, mime: string}>,
+     *     invoice_links: list<array{filename: string, url: string}>,
      *     temps: list<string>
      * }
      */
@@ -41,7 +42,6 @@ class VehicleMaintenancePdfExporter
 
         $mainPdfContent = $pdf->output();
         $temps = [];
-        $invoices = $this->attachmentMetaFromVehicle($vehicle);
 
         try {
             $copies = $this->collectInvoiceCopies($vehicle, $temps);
@@ -52,6 +52,7 @@ class VehicleMaintenancePdfExporter
             $content = $invoicePdfs === []
                 ? $mainPdfContent
                 : $this->mergePdfs($mainPdfContent, array_column($invoicePdfs, 'path'));
+            [$invoices, $invoiceLinks] = $this->attachmentsAndLinks($vehicle, $copies);
         } catch (\Throwable $e) {
             $this->cleanupTemps($temps);
 
@@ -67,6 +68,7 @@ class VehicleMaintenancePdfExporter
                 now()->format('Y-m-d')
             ),
             'invoices' => $invoices,
+            'invoice_links' => $invoiceLinks,
             'temps' => $temps,
         ];
     }
@@ -99,7 +101,7 @@ class VehicleMaintenancePdfExporter
 
     /**
      * @param  list<string>  $temps
-     * @return list<array{invoice: Invoice, path: string}>
+     * @return list<array{invoice: Invoice, path: string, content?: string}>
      */
     private function collectInvoiceCopies(Vehicle $vehicle, array &$temps): array
     {
@@ -119,6 +121,7 @@ class VehicleMaintenancePdfExporter
                 $copies[] = [
                     'invoice' => $invoice,
                     'path' => $copy['path'],
+                    'content' => $copy['content'] ?? null,
                 ];
             }
         }
@@ -127,39 +130,72 @@ class VehicleMaintenancePdfExporter
     }
 
     /**
-     * @return list<array{filename: string, storage_path: string, disk: string, mime: string}>
+     * @param  list<array{invoice: Invoice, path: string, content?: string|null}>  $copies
+     * @return array{
+     *     0: list<array{filename: string, content: string, mime: string}>,
+     *     1: list<array{filename: string, url: string}>
+     * }
      */
-    private function attachmentMetaFromVehicle(Vehicle $vehicle): array
+    private function attachmentsAndLinks(Vehicle $vehicle, array $copies): array
     {
         $attachments = [];
+        $links = [];
         $usedNames = [];
-        $disk = AppStorage::diskName();
+        $attachedIds = [];
+
+        foreach ($copies as $copy) {
+            $content = $copy['content'] ?? null;
+            if (! is_string($content) || $content === '') {
+                $content = is_file($copy['path']) ? file_get_contents($copy['path']) : false;
+            }
+            if (! is_string($content) || $content === '') {
+                continue;
+            }
+
+            $filename = $this->uniqueAttachmentName(
+                (string) $copy['invoice']->file_name,
+                (string) $copy['invoice']->file_path,
+                $usedNames
+            );
+
+            $attachments[] = [
+                'filename' => $filename,
+                'content' => $content,
+                'mime' => str_ends_with(strtolower($filename), '.pdf')
+                    ? 'application/pdf'
+                    : 'application/octet-stream',
+            ];
+            $attachedIds[$copy['invoice']->id] = true;
+        }
 
         foreach ($vehicle->maintenances as $maintenance) {
             foreach ($maintenance->invoices ?? [] as $invoice) {
-                $storagePath = (string) $invoice->file_path;
-                if ($storagePath === '') {
+                if (isset($attachedIds[$invoice->id])) {
                     continue;
                 }
 
-                $filename = $this->uniqueAttachmentName(
-                    (string) $invoice->file_name,
-                    $storagePath,
-                    $usedNames
-                );
+                $storagePath = (string) $invoice->file_path;
+                if ($storagePath === '' || ! AppStorage::isRemote()) {
+                    continue;
+                }
 
-                $attachments[] = [
-                    'filename' => $filename,
-                    'storage_path' => $storagePath,
-                    'disk' => $disk,
-                    'mime' => str_ends_with(strtolower($filename), '.pdf')
-                        ? 'application/pdf'
-                        : 'application/octet-stream',
-                ];
+                try {
+                    $filename = $this->uniqueAttachmentName(
+                        (string) $invoice->file_name,
+                        $storagePath,
+                        $usedNames
+                    );
+                    $links[] = [
+                        'filename' => $filename,
+                        'url' => AppStorage::url($storagePath, now()->addDays(6)),
+                    ];
+                } catch (\Throwable) {
+                    continue;
+                }
             }
         }
 
-        return $attachments;
+        return [$attachments, $links];
     }
 
     /**

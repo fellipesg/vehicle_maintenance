@@ -18,8 +18,10 @@ class VehicleMaintenancePdfMail extends Mailable
         public Vehicle $vehicle,
         public string $pdfContent,
         public string $filename,
-        /** @var list<array{filename: string, storage_path: string, disk: string, mime: string}> */
+        /** @var list<array{filename: string, content: string, mime: string}> */
         public array $invoiceAttachments = [],
+        /** @var list<array{filename: string, url: string}> */
+        public array $invoiceLinks = [],
     ) {}
 
     public function envelope(): Envelope
@@ -47,8 +49,12 @@ class VehicleMaintenancePdfMail extends Mailable
         ];
 
         foreach ($this->invoiceAttachments as $invoice) {
-            $attachments[] = Attachment::fromStorageDisk($invoice['disk'], $invoice['storage_path'])
-                ->as($invoice['filename'])
+            $content = $invoice['content'];
+            if (! is_string($content) || $content === '') {
+                continue;
+            }
+
+            $attachments[] = Attachment::fromData(fn () => $content, $invoice['filename'])
                 ->withMime($invoice['mime']);
         }
 
