@@ -77,12 +77,12 @@ class AppStorage
         ];
     }
 
-    public static function url(string $path): string
+    public static function url(string $path, ?\DateTimeInterface $expiresAt = null): string
     {
         $driver = config('filesystems.disks.'.self::diskName().'.driver');
 
         if ($driver === 's3') {
-            return self::disk()->temporaryUrl($path, now()->addMinutes(60));
+            return self::disk()->temporaryUrl($path, $expiresAt ?? now()->addMinutes(60));
         }
 
         return asset('storage/'.$path);

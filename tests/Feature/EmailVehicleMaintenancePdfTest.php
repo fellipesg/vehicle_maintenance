@@ -47,9 +47,13 @@ class EmailVehicleMaintenancePdfTest extends TestCase
         (new EmailVehicleMaintenancePdf($user, $vehicle))->handle(app(\App\Services\Vehicle\VehicleMaintenancePdfExporter::class));
 
         Mail::assertSent(VehicleMaintenancePdfMail::class, function (VehicleMaintenancePdfMail $mail) use ($user, $vehicle) {
+            $names = collect($mail->attachments())->map(fn ($attachment) => $attachment->as);
+
             return $mail->hasTo($user->email)
                 && $mail->vehicle->is($vehicle)
-                && str_contains($mail->filename, 'ABC1D23');
+                && str_contains($mail->filename, 'ABC1D23')
+                && $names->contains('historico_manutencoes_ABC1D23_Honda_'.now()->format('Y-m-d').'.pdf')
+                && $names->contains('nota.xml');
         });
 
         Storage::disk('public')->assertExists($xmlPath);

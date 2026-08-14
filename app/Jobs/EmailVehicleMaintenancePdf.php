@@ -31,6 +31,7 @@ class EmailVehicleMaintenancePdf implements ShouldQueue
             $this->vehicle,
             $file['content'],
             $file['filename'],
+            $file['invoices'],
         ));
     }
 }
