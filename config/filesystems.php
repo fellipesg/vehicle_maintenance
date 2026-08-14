@@ -73,6 +73,23 @@ return [
             ],
         ],
 
+        // Previous bucket, kept only so `storage:migrate-legacy` can copy files
+        // out of it. Unset in environments that already use the current bucket.
+        'legacy_s3' => [
+            'driver' => 's3',
+            'key' => env('LEGACY_AWS_ACCESS_KEY_ID'),
+            'secret' => env('LEGACY_AWS_SECRET_ACCESS_KEY'),
+            'region' => env('LEGACY_AWS_DEFAULT_REGION', 'us-east-2'),
+            'bucket' => env('LEGACY_AWS_BUCKET'),
+            'endpoint' => env('LEGACY_AWS_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => true,
+            'requestChecksumCalculation' => 'when_required',
+            'responseChecksumValidation' => 'when_required',
+        ],
+
     ],
 
     /*
