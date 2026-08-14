@@ -32,14 +32,28 @@ class DiagnoseInvoiceStorage extends Command
         $this->newLine();
         $this->line('network:');
         $storageHost = parse_url((string) ($config['endpoint'] ?? ''), PHP_URL_HOST);
-        if (is_string($storageHost) && $storageHost !== '') {
-            $this->probeDns($storageHost);
-            $this->probeTcp($storageHost);
-        }
         // Control hosts: if these connect and the storage host does not, egress
         // is fine and the storage endpoint itself is unreachable from here.
         $this->probeTcp('s3.us-east-2.amazonaws.com');
         $this->probeTcp('api.github.com');
+
+        $publicIps = [];
+
+        if (is_string($storageHost) && $storageHost !== '') {
+            $localIp = $this->probeDns($storageHost);
+            $this->probeTcp($storageHost);
+
+            $publicIps = $this->publicDnsAnswer($storageHost);
+            $this->line('  dns (public resolver): '.($publicIps === [] ? 'no answer' : implode(', ', $publicIps)));
+
+            if ($localIp !== null && $publicIps !== [] && ! in_array($localIp, $publicIps, true)) {
+                $this->warn('  resolver mismatch: this host resolves the endpoint differently than the public DNS');
+            }
+
+            foreach ($publicIps as $ip) {
+                $this->probeTcp($ip);
+            }
+        }
 
         $invoices = Invoice::query()
             ->whereNotNull('file_path')
@@ -74,6 +88,8 @@ class DiagnoseInvoiceStorage extends Command
                 $this->error('  get() failed: '.$e::class.': '.$e->getMessage());
             }
 
+            $url = null;
+
             try {
                 $url = AppStorage::url($path, now()->addMinutes(10));
                 $this->line('  signed host: '.parse_url($url, PHP_URL_HOST));
@@ -82,22 +98,66 @@ class DiagnoseInvoiceStorage extends Command
             } catch (\Throwable $e) {
                 $this->error('  http failed: '.$e::class.': '.$e->getMessage());
             }
+
+            // Same request with the connection pinned to the public IP. Success
+            // here while the plain request fails means DNS/routing is the cause.
+            if ($url !== null && $publicIps !== [] && is_string($storageHost)) {
+                foreach ($publicIps as $ip) {
+                    try {
+                        $response = Http::timeout(30)
+                            ->withOptions(['curl' => [CURLOPT_RESOLVE => ["{$storageHost}:443:{$ip}"]]])
+                            ->get($url);
+                        $this->line("  http via {$ip}: ".$response->status().' bytes: '.strlen($response->body()));
+                    } catch (\Throwable $e) {
+                        $this->error("  http via {$ip} failed: ".$e::class.': '.$e->getMessage());
+                    }
+                }
+            }
         }
 
         return self::SUCCESS;
     }
 
-    private function probeDns(string $host): void
+    private function probeDns(string $host): ?string
     {
         $ip = gethostbyname($host);
 
         if ($ip === $host) {
             $this->error("  dns {$host}: FAILED to resolve");
 
-            return;
+            return null;
         }
 
-        $this->line("  dns {$host}: {$ip}");
+        $this->line("  dns {$host} (local resolver): {$ip}");
+
+        return $ip;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function publicDnsAnswer(string $host): array
+    {
+        try {
+            $response = Http::timeout(10)
+                ->withHeaders(['Accept' => 'application/dns-json'])
+                ->get('https://cloudflare-dns.com/dns-query', ['name' => $host, 'type' => 'A']);
+
+            if (! $response->successful()) {
+                return [];
+            }
+
+            return collect($response->json('Answer') ?? [])
+                ->where('type', 1)
+                ->pluck('data')
+                ->filter(fn ($ip) => is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP))
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            $this->error('  public dns lookup failed: '.$e->getMessage());
+
+            return [];
+        }
     }
 
     private function probeTcp(string $host, int $port = 443): void
