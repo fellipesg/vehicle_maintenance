@@ -9,7 +9,7 @@ use App\Models\Vehicle;
 use App\Models\Workshop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -207,7 +207,7 @@ class UserPortalTest extends TestCase
 
     public function test_user_can_request_vehicle_maintenance_pdf_by_email(): void
     {
-        Bus::fake();
+        Queue::fake();
 
         $vehicle = Vehicle::factory()->create();
         $this->user->vehicles()->attach($vehicle->id, [
@@ -223,7 +223,7 @@ class UserPortalTest extends TestCase
             ->assertSessionHas('success', fn (string $message) => str_contains($message, $this->user->email)
                 && str_contains($message, 'processado'));
 
-        Bus::assertDispatchedAfterResponse(EmailVehicleMaintenancePdf::class, function (EmailVehicleMaintenancePdf $job) use ($vehicle) {
+        Queue::assertPushed(EmailVehicleMaintenancePdf::class, function (EmailVehicleMaintenancePdf $job) use ($vehicle) {
             return $job->user->is($this->user) && $job->vehicle->is($vehicle);
         });
     }

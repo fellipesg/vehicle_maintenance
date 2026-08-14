@@ -29,6 +29,18 @@ class DiagnoseInvoiceStorage extends Command
         $this->line('key set: '.(($config['key'] ?? '') !== '' ? 'yes' : 'NO'));
         $this->line('secret set: '.(($config['secret'] ?? '') !== '' ? 'yes' : 'NO'));
 
+        $this->newLine();
+        $this->line('network:');
+        $storageHost = parse_url((string) ($config['endpoint'] ?? ''), PHP_URL_HOST);
+        if (is_string($storageHost) && $storageHost !== '') {
+            $this->probeDns($storageHost);
+            $this->probeTcp($storageHost);
+        }
+        // Control hosts: if these connect and the storage host does not, egress
+        // is fine and the storage endpoint itself is unreachable from here.
+        $this->probeTcp('s3.us-east-2.amazonaws.com');
+        $this->probeTcp('api.github.com');
+
         $invoices = Invoice::query()
             ->whereNotNull('file_path')
             ->latest('id')
@@ -73,5 +85,36 @@ class DiagnoseInvoiceStorage extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    private function probeDns(string $host): void
+    {
+        $ip = gethostbyname($host);
+
+        if ($ip === $host) {
+            $this->error("  dns {$host}: FAILED to resolve");
+
+            return;
+        }
+
+        $this->line("  dns {$host}: {$ip}");
+    }
+
+    private function probeTcp(string $host, int $port = 443): void
+    {
+        $errno = 0;
+        $error = '';
+        $start = microtime(true);
+        $socket = @fsockopen('tcp://'.$host, $port, $errno, $error, 10);
+        $ms = (int) round((microtime(true) - $start) * 1000);
+
+        if ($socket === false) {
+            $this->error("  tcp {$host}:{$port} FAILED after {$ms}ms [{$errno}] {$error}");
+
+            return;
+        }
+
+        fclose($socket);
+        $this->info("  tcp {$host}:{$port} ok in {$ms}ms");
     }
 }
