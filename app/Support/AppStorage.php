@@ -82,7 +82,14 @@ class AppStorage
         $driver = config('filesystems.disks.'.self::diskName().'.driver');
 
         if ($driver === 's3') {
-            return self::disk()->temporaryUrl($path, $expiresAt ?? now()->addMinutes(60));
+            $expiresAt ??= now()->addMinutes(60);
+            // SigV4 presigned URLs must expire in less than 7 days.
+            $maxExpiry = now()->addDays(7)->subMinute();
+            if ($expiresAt > $maxExpiry) {
+                $expiresAt = $maxExpiry;
+            }
+
+            return self::disk()->temporaryUrl($path, $expiresAt);
         }
 
         return asset('storage/'.$path);

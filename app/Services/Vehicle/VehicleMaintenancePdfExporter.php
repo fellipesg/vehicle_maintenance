@@ -92,7 +92,11 @@ class VehicleMaintenancePdfExporter
 
         foreach ($vehicle->maintenances as $maintenance) {
             foreach ($maintenance->invoices ?? [] as $invoice) {
-                $urls[$invoice->id] = AppStorage::url((string) $invoice->file_path, now()->addDays(30));
+                try {
+                    $urls[$invoice->id] = AppStorage::url((string) $invoice->file_path, now()->addDays(6));
+                } catch (\Throwable) {
+                    continue;
+                }
             }
         }
 
