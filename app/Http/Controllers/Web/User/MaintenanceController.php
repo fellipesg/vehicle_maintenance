@@ -15,6 +15,7 @@ use Illuminate\View\View;
 class MaintenanceController extends Controller
 {
     use StoresMaintenanceInvoices;
+
     public function index(Request $request): View
     {
         $maintenances = Maintenance::where('tenant_id', $request->user()->tenant_id)
@@ -68,12 +69,11 @@ class MaintenanceController extends Controller
 
         $uploadResult = ['items_created' => 0, 'warnings' => []];
 
-        $maintenance = DB::transaction(function () use ($request, $data, &$uploadResult) {
-            $maintenance = Maintenance::create($data);
-            $uploadResult = $this->processMaintenanceInvoices($request, $maintenance);
-
-            return $maintenance;
-        });
+        // Keep the DB transaction short. S3 upload + DNS pinning must not run
+        // inside it: a failed query on the same Postgres connection aborts the
+        // whole block (SQLSTATE 25P02), even when PHP catches the exception.
+        $maintenance = DB::transaction(fn () => Maintenance::create($data));
+        $uploadResult = $this->processMaintenanceInvoices($request, $maintenance);
 
         return $this->redirectWithInvoiceFeedback(
             redirect()->route('user.maintenances.show', $maintenance),

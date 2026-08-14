@@ -3,17 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Checklist;
 use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
-use App\Models\Checklist;
 use App\Rules\InvoiceFile;
 use App\Services\Invoice\InvoiceUploadProcessor;
 use App\Support\AppStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 
 class MaintenanceController extends Controller
 {
@@ -144,11 +144,7 @@ class MaintenanceController extends Controller
             }
 
             $uploadResult = ['items_created' => 0, 'warnings' => []];
-
             $invoiceFiles = $request->file('invoices');
-            if ($invoiceFiles) {
-                $uploadResult = app(InvoiceUploadProcessor::class)->processForMaintenance($maintenance, $invoiceFiles);
-            }
 
             if ($request->has('checklists') && is_array($request->checklists)) {
                 foreach ($request->checklists as $checklistData) {
@@ -162,6 +158,11 @@ class MaintenanceController extends Controller
             }
 
             DB::commit();
+
+            // After commit: S3 upload must not share the open Postgres transaction.
+            if ($invoiceFiles) {
+                $uploadResult = app(InvoiceUploadProcessor::class)->processForMaintenance($maintenance, $invoiceFiles);
+            }
 
             $maintenance->load(['items', 'invoices', 'checklists', 'vehicle', 'user', 'workshop']);
 
@@ -185,7 +186,7 @@ class MaintenanceController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error creating maintenance: ' . $e->getMessage(),
+                'message' => 'Error creating maintenance: '.$e->getMessage(),
             ], 500);
         }
     }

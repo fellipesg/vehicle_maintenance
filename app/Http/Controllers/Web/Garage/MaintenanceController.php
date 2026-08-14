@@ -15,6 +15,7 @@ use Illuminate\View\View;
 class MaintenanceController extends Controller
 {
     use StoresMaintenanceInvoices;
+
     public function index(Request $request): View
     {
         $maintenances = Maintenance::where('tenant_id', $request->user()->tenant_id)
@@ -64,10 +65,8 @@ class MaintenanceController extends Controller
 
         $uploadResult = ['items_created' => 0, 'warnings' => []];
 
-        DB::transaction(function () use ($request, $data, &$uploadResult) {
-            $maintenance = Maintenance::create($data);
-            $uploadResult = $this->processMaintenanceInvoices($request, $maintenance);
-        });
+        $maintenance = DB::transaction(fn () => Maintenance::create($data));
+        $uploadResult = $this->processMaintenanceInvoices($request, $maintenance);
 
         return $this->redirectWithInvoiceFeedback(
             redirect()->route('garage.maintenances.index'),

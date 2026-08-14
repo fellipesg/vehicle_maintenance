@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -10,15 +9,19 @@ use Illuminate\Support\Facades\Http;
  * route to the bucket, so every request hangs until it times out. When that is
  * detected, connections are pinned to the addresses from public DNS (the
  * equivalent of `curl --resolve`), which keeps the hostname for TLS and signing.
+ *
+ * IPs are memoized in-process only. Never touch the database cache here: upload
+ * and report flows often run inside a Postgres transaction, and a failed cache
+ * query aborts that transaction even when PHP catches the exception (SQLSTATE
+ * 25P02).
  */
 class StorageEndpointResolver
 {
-    private const CACHE_KEY = 'storage:public-ips:';
-
-    private const CACHE_TTL_MINUTES = 360;
-
     /** @var array<string, string|null> */
     private static array $memo = [];
+
+    /** @var array<string, list<string>> */
+    private static array $ipMemo = [];
 
     /**
      * Adds pinned resolution to an s3 disk config when needed.
@@ -81,8 +84,6 @@ class StorageEndpointResolver
             return self::$memo[$memoKey];
         }
 
-        // Deciding whether to pin is a local lookup, so it is never cached: a
-        // stale decision would keep the app pinned (or unpinned) for hours.
         if (! $forced && ! self::resolvesToPrivateAddress($host)) {
             return self::$memo[$memoKey] = null;
         }
@@ -124,29 +125,11 @@ class StorageEndpointResolver
             return self::onlyValidIps(explode(',', $configured));
         }
 
-        // Only successful lookups are cached, so a DNS hiccup cannot pin the
-        // app to an empty answer.
-        try {
-            $cached = Cache::get(self::CACHE_KEY.$host);
-
-            if (is_array($cached) && $cached !== []) {
-                return self::onlyValidIps($cached);
-            }
-        } catch (\Throwable $e) {
-            report($e);
+        if (isset(self::$ipMemo[$host])) {
+            return self::$ipMemo[$host];
         }
 
-        $ips = self::lookup($host);
-
-        if ($ips !== []) {
-            try {
-                Cache::put(self::CACHE_KEY.$host, $ips, now()->addMinutes(self::CACHE_TTL_MINUTES));
-            } catch (\Throwable $e) {
-                report($e);
-            }
-        }
-
-        return $ips;
+        return self::$ipMemo[$host] = self::lookup($host);
     }
 
     /**
