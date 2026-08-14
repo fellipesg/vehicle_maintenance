@@ -22,12 +22,13 @@ return [
     |
     | Some hosting providers resolve the storage hostname to a private address
     | with no route to the bucket, which makes every request hang until it
-    | times out. When enabled, connections are pinned to the addresses from
-    | public DNS. Set "public_ips" to skip the lookup and use a fixed list.
+    | times out. On "auto" this is detected and connections are pinned to the
+    | addresses from public DNS. Use true to force it and false to disable it.
+    | Set "public_ips" to skip the lookup and use a fixed list.
     |
     */
 
-    'pin_public_dns' => env('AWS_PIN_PUBLIC_DNS', false),
+    'pin_public_dns' => env('AWS_PIN_PUBLIC_DNS', 'auto'),
 
     'public_ips' => env('AWS_PUBLIC_IPS'),
 

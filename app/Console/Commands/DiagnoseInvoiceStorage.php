@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Invoice;
 use App\Support\AppStorage;
+use App\Support\StorageEndpointResolver;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -53,6 +54,14 @@ class DiagnoseInvoiceStorage extends Command
             foreach ($publicIps as $ip) {
                 $this->probeTcp($ip);
             }
+
+            $this->newLine();
+            $this->line('pinning:');
+            $this->line('  mode: '.var_export(config('filesystems.pin_public_dns'), true));
+            $this->line('  endpoint resolves to a private address: '
+                .var_export(StorageEndpointResolver::resolvesToPrivateAddress($storageHost), true));
+            $entry = StorageEndpointResolver::resolveEntry($config['endpoint'] ?? null);
+            $this->line('  active: '.($entry === null ? 'no' : "yes -> {$entry}"));
         }
 
         $invoices = Invoice::query()

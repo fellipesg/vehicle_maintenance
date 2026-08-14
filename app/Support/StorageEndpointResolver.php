@@ -6,10 +6,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Laravel Cloud resolves `*.neon.tech` to a private address that has no route to
- * Object Storage, so the SDK never connects. Pinning the connection to the
- * public addresses (the equivalent of `curl --resolve`) keeps the hostname for
- * TLS and signing while bypassing the internal resolver.
+ * Some platforms resolve the storage hostname to a private address that has no
+ * route to the bucket, so every request hangs until it times out. When that is
+ * detected, connections are pinned to the addresses from public DNS (the
+ * equivalent of `curl --resolve`), which keeps the hostname for TLS and signing.
  */
 class StorageEndpointResolver
 {
@@ -17,8 +17,11 @@ class StorageEndpointResolver
 
     private const CACHE_TTL_MINUTES = 360;
 
+    /** @var array<string, string|null> */
+    private static array $memo = [];
+
     /**
-     * Adds pinned resolution to an s3 disk config when enabled.
+     * Adds pinned resolution to an s3 disk config when needed.
      *
      * @param  array<string, mixed>  $config
      * @return array<string, mixed>
@@ -54,11 +57,13 @@ class StorageEndpointResolver
     }
 
     /**
-     * A single `host:port:ip1,ip2` entry, or null when pinning is off.
+     * A single `host:port:ip1,ip2` entry, or null when pinning is not needed.
      */
-    private static function resolveEntry(mixed $endpoint): ?string
+    public static function resolveEntry(mixed $endpoint): ?string
     {
-        if (! config('filesystems.pin_public_dns', false) || ! is_string($endpoint) || $endpoint === '') {
+        $mode = config('filesystems.pin_public_dns', 'auto');
+
+        if ($mode === false || $mode === 'false' || ! is_string($endpoint) || $endpoint === '') {
             return null;
         }
 
@@ -68,15 +73,50 @@ class StorageEndpointResolver
         }
 
         $port = parse_url($endpoint, PHP_URL_PORT) ?: 443;
+        $forced = $mode === true || $mode === 'true';
+
+        $memoKey = $host.':'.$port.':'.var_export($mode, true);
+
+        if (array_key_exists($memoKey, self::$memo)) {
+            return self::$memo[$memoKey];
+        }
+
+        // Deciding whether to pin is a local lookup, so it is never cached: a
+        // stale decision would keep the app pinned (or unpinned) for hours.
+        if (! $forced && ! self::resolvesToPrivateAddress($host)) {
+            return self::$memo[$memoKey] = null;
+        }
+
         $ips = self::publicIps($host);
 
-        return $ips === [] ? null : $host.':'.$port.':'.implode(',', $ips);
+        return self::$memo[$memoKey] = $ips === []
+            ? null
+            : $host.':'.$port.':'.implode(',', $ips);
+    }
+
+    /**
+     * True when the platform's own resolver points the host at an address that
+     * cannot reach the public internet, which is what breaks the connection.
+     */
+    public static function resolvesToPrivateAddress(string $host): bool
+    {
+        $ip = gethostbyname($host);
+
+        if ($ip === $host || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return false;
+        }
+
+        return filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) === false;
     }
 
     /**
      * @return list<string>
      */
-    private static function publicIps(string $host): array
+    public static function publicIps(string $host): array
     {
         $configured = config('filesystems.public_ips');
 
@@ -84,17 +124,29 @@ class StorageEndpointResolver
             return self::onlyValidIps(explode(',', $configured));
         }
 
+        // Only successful lookups are cached, so a DNS hiccup cannot pin the
+        // app to an empty answer.
         try {
-            return Cache::remember(
-                self::CACHE_KEY.$host,
-                now()->addMinutes(self::CACHE_TTL_MINUTES),
-                fn () => self::lookup($host)
-            );
+            $cached = Cache::get(self::CACHE_KEY.$host);
+
+            if (is_array($cached) && $cached !== []) {
+                return self::onlyValidIps($cached);
+            }
         } catch (\Throwable $e) {
             report($e);
-
-            return self::lookup($host);
         }
+
+        $ips = self::lookup($host);
+
+        if ($ips !== []) {
+            try {
+                Cache::put(self::CACHE_KEY.$host, $ips, now()->addMinutes(self::CACHE_TTL_MINUTES));
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $ips;
     }
 
     /**
