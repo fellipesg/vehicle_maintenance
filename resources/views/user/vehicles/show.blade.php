@@ -17,7 +17,10 @@
             <p class="text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->color ?? '—' }} · {{ $vehicle->license_plate }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
-            <a href="{{ route('user.vehicles.export-pdf', $vehicle) }}" class="btn-secondary">📄 Exportar PDF</a>
+            <form method="POST" action="{{ route('user.vehicles.export-pdf', $vehicle) }}">
+                @csrf
+                <button type="submit" class="btn-secondary">📄 Exportar PDF</button>
+            </form>
             <a href="{{ route('user.vehicles.edit', $vehicle) }}" class="btn-secondary">Editar</a>
             <a href="{{ route('user.maintenances.create') }}?vehicle_id={{ $vehicle->id }}" class="btn-primary">+ Manutenção</a>
         </div>

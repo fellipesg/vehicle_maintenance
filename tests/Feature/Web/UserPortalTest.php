@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Web;
 
-use App\Models\Invoice;
+use App\Jobs\EmailVehicleMaintenancePdf;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Workshop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -165,47 +166,9 @@ class UserPortalTest extends TestCase
                 && str_contains($message, 'XML'));
     }
 
-    public function test_user_can_export_vehicle_maintenance_pdf(): void
+    public function test_user_can_request_vehicle_maintenance_pdf_by_email(): void
     {
-        Storage::fake('public');
-
-        $vehicle = Vehicle::factory()->create([
-            'license_plate' => 'ABC1D23',
-            'brand' => 'Honda',
-        ]);
-        $this->user->vehicles()->attach($vehicle->id, [
-            'is_current_owner' => true,
-            'purchase_date' => now(),
-            'tenant_id' => $this->user->tenant_id,
-        ]);
-
-        $maintenance = Maintenance::factory()->create([
-            'vehicle_id' => $vehicle->id,
-            'user_id' => $this->user->id,
-            'tenant_id' => $this->user->tenant_id,
-            'maintenance_type' => 'Revisão',
-        ]);
-
-        $invoicePath = 'invoices/nota-fiscal.pdf';
-        Storage::disk('public')->put($invoicePath, "%PDF-1.4\n%EOF");
-
-        Invoice::factory()->create([
-            'maintenance_id' => $maintenance->id,
-            'file_path' => $invoicePath,
-            'file_name' => 'nota-fiscal.pdf',
-        ]);
-
-        $this->actingAs($this->user)
-            ->get(route('user.vehicles.export-pdf', $vehicle))
-            ->assertOk()
-            ->assertHeader('content-type', 'application/pdf');
-
-        Storage::disk('public')->assertExists($invoicePath);
-    }
-
-    public function test_pdf_export_skips_xml_and_missing_invoices(): void
-    {
-        Storage::fake('public');
+        Queue::fake();
 
         $vehicle = Vehicle::factory()->create();
         $this->user->vehicles()->attach($vehicle->id, [
@@ -214,34 +177,16 @@ class UserPortalTest extends TestCase
             'tenant_id' => $this->user->tenant_id,
         ]);
 
-        $maintenance = Maintenance::factory()->create([
-            'vehicle_id' => $vehicle->id,
-            'user_id' => $this->user->id,
-            'tenant_id' => $this->user->tenant_id,
-            'maintenance_type' => 'Revisão',
-        ]);
-
-        $xmlPath = 'invoices/nota.xml';
-        Storage::disk('public')->put($xmlPath, '<nfe/>');
-
-        Invoice::factory()->create([
-            'maintenance_id' => $maintenance->id,
-            'file_path' => $xmlPath,
-            'file_name' => 'nota.xml',
-        ]);
-
-        Invoice::factory()->create([
-            'maintenance_id' => $maintenance->id,
-            'file_path' => 'invoices/missing.pdf',
-            'file_name' => 'missing.pdf',
-        ]);
-
         $this->actingAs($this->user)
-            ->get(route('user.vehicles.export-pdf', $vehicle))
-            ->assertOk()
-            ->assertHeader('content-type', 'application/pdf');
+            ->from(route('user.vehicles.show', $vehicle))
+            ->post(route('user.vehicles.export-pdf', $vehicle))
+            ->assertRedirect(route('user.vehicles.show', $vehicle))
+            ->assertSessionHas('success', fn (string $message) => str_contains($message, $this->user->email)
+                && str_contains($message, 'processado'));
 
-        Storage::disk('public')->assertExists($xmlPath);
+        Queue::assertPushed(EmailVehicleMaintenancePdf::class, function (EmailVehicleMaintenancePdf $job) use ($vehicle) {
+            return $job->user->is($this->user) && $job->vehicle->is($vehicle);
+        });
     }
 
     public function test_user_can_view_workshops_directory(): void

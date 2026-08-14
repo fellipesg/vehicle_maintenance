@@ -1,0 +1,47 @@
+<?php
+
+namespace App\Mail;
+
+use App\Models\Vehicle;
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
+
+class VehicleMaintenancePdfMail extends Mailable
+{
+    use Queueable, SerializesModels;
+
+    public function __construct(
+        public Vehicle $vehicle,
+        public string $pdfContent,
+        public string $filename,
+    ) {}
+
+    public function envelope(): Envelope
+    {
+        return new Envelope(
+            subject: "Histórico de manutenções — {$this->vehicle->brand} {$this->vehicle->model}",
+        );
+    }
+
+    public function content(): Content
+    {
+        return new Content(
+            view: 'emails.vehicle-maintenance-pdf',
+        );
+    }
+
+    /**
+     * @return array<int, Attachment>
+     */
+    public function attachments(): array
+    {
+        return [
+            Attachment::fromData(fn () => $this->pdfContent, $this->filename)
+                ->withMime('application/pdf'),
+        ];
+    }
+}

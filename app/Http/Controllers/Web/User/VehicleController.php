@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\User;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Web\Concerns\ImportsVehicleFromCrlv;
 use App\Http\Controllers\Web\Concerns\RegistersVehicleWithOwnership;
+use App\Jobs\EmailVehicleMaintenancePdf;
 use App\Models\Vehicle;
 use App\Rules\CrlvPdfFile;
 use App\Services\Crlv\CrlvExerciseValidator;
@@ -252,10 +253,16 @@ class VehicleController extends Controller
             ->with('success', 'Veículo atualizado com sucesso!');
     }
 
-    public function exportPdf(Vehicle $vehicle)
+    public function exportPdf(Vehicle $vehicle): RedirectResponse
     {
-        return app(\App\Http\Controllers\Api\VehicleController::class)
-            ->exportPdf(request(), (string) $vehicle->id);
+        $user = request()->user();
+
+        EmailVehicleMaintenancePdf::dispatch($user, $vehicle);
+
+        return back()->with(
+            'success',
+            "O relatório será processado e enviado para {$user->email}."
+        );
     }
 
     /**

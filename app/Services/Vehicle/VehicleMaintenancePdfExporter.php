@@ -11,7 +11,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class VehicleMaintenancePdfExporter
 {
-    public function download(Vehicle $vehicle): Response
+    /**
+     * @return array{content: string, filename: string}
+     */
+    public function generate(Vehicle $vehicle): array
     {
         $vehicle->load([
             'maintenances.items',
@@ -47,16 +50,24 @@ class VehicleMaintenancePdfExporter
             }
         }
 
-        $filename = sprintf(
-            'historico_manutencoes_%s_%s_%s.pdf',
-            $vehicle->license_plate,
-            $vehicle->brand,
-            now()->format('Y-m-d')
-        );
+        return [
+            'content' => $content,
+            'filename' => sprintf(
+                'historico_manutencoes_%s_%s_%s.pdf',
+                $vehicle->license_plate,
+                $vehicle->brand,
+                now()->format('Y-m-d')
+            ),
+        ];
+    }
 
-        return response($content, 200, [
+    public function download(Vehicle $vehicle): Response
+    {
+        $file = $this->generate($vehicle);
+
+        return response($file['content'], 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Disposition' => 'attachment; filename="'.$file['filename'].'"',
         ]);
     }
 

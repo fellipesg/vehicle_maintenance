@@ -53,7 +53,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/veiculos/{vehicle}/editar', [UserVehicleController::class, 'edit'])->name('vehicles.edit');
         Route::post('/veiculos/{vehicle}/importar-crlv', [UserVehicleController::class, 'importCrlvForEdit'])->name('vehicles.import-crlv.edit');
         Route::put('/veiculos/{vehicle}', [UserVehicleController::class, 'update'])->name('vehicles.update');
-        Route::get('/veiculos/{vehicle}/pdf', [UserVehicleController::class, 'exportPdf'])->name('vehicles.export-pdf');
+        Route::post('/veiculos/{vehicle}/pdf', [UserVehicleController::class, 'exportPdf'])->name('vehicles.export-pdf');
         Route::get('/manutencoes', [UserMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [UserMaintenanceController::class, 'create'])->name('maintenances.create');
         Route::post('/manutencoes', [UserMaintenanceController::class, 'store'])->name('maintenances.store');
