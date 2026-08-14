@@ -93,7 +93,9 @@ class AppStorage
         }
 
         try {
-            $response = Http::timeout(60)->get(self::url($storagePath, now()->addMinutes(10)));
+            $response = Http::timeout(120)
+                ->withOptions(['force_ip_resolve' => 'v4', 'connect_timeout' => 20])
+                ->get(self::url($storagePath, now()->addMinutes(10)));
 
             if ($response->successful() && $response->body() !== '') {
                 return $response->body();

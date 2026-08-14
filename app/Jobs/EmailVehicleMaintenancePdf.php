@@ -25,6 +25,10 @@ class EmailVehicleMaintenancePdf implements ShouldQueue
 
     public function handle(VehicleMaintenancePdfExporter $exporter): void
     {
+        if (function_exists('set_time_limit')) {
+            set_time_limit($this->timeout);
+        }
+
         $file = $exporter->generate($this->vehicle);
 
         try {

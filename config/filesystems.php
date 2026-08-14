@@ -62,12 +62,14 @@ return [
             'requestChecksumCalculation' => 'when_required',
             'responseChecksumValidation' => 'when_required',
             'http' => [
-                'connect_timeout' => 5,
-                'timeout' => 60,
+                'connect_timeout' => 20,
+                'timeout' => 120,
+                // Prefer IPv4 when dual-stack DNS is present (avoids long hangs).
+                'force_ip_resolve' => 'v4',
             ],
             'retries' => [
                 'mode' => 'standard',
-                'max_attempts' => 2,
+                'max_attempts' => 3,
             ],
         ],
 

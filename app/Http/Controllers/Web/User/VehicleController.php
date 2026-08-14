@@ -257,7 +257,9 @@ class VehicleController extends Controller
     {
         $user = request()->user();
 
-        EmailVehicleMaintenancePdf::dispatch($user, $vehicle);
+        // Managed queue workers cannot open TCP to Neon Object Storage
+        // (cURL 28). Run on the app after the response so S3/mail still work.
+        EmailVehicleMaintenancePdf::dispatchAfterResponse($user, $vehicle);
 
         return back()->with(
             'success',
