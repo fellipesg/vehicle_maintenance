@@ -4,14 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
+use App\Services\Vehicle\VehicleMaintenancePdfExporter;
 use App\Services\VehicleCatalogService;
-use App\Support\AppStorage;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
-use setasign\Fpdi\Fpdi;
 
 class VehicleController extends Controller
 {
@@ -197,94 +195,11 @@ class VehicleController extends Controller
         Gate::authorize('view', $vehicle);
 
         try {
-            $vehicle = Vehicle::with([
-                'maintenances.items',
-                'maintenances.invoices',
-                'maintenances.checklists',
-                'maintenances.user',
-                'maintenances.workshop',
-            ])->findOrFail($id);
-
-            $vehicle->maintenances = $vehicle->maintenances->sortByDesc('maintenance_date')->values();
-
-            $pdf = Pdf::loadView('pdfs.vehicle_maintenance_export', [
-                'vehicle' => $vehicle,
-            ]);
-
-            $pdf->setPaper('a4', 'portrait');
-            $pdf->setOption('enable-local-file-access', true);
-
-            $mainPdfContent = $pdf->output();
-
-            $invoicePdfs = [];
-            $tempInvoiceFiles = [];
-            foreach ($vehicle->maintenances as $maintenance) {
-                if ($maintenance->invoices && $maintenance->invoices->count() > 0) {
-                    foreach ($maintenance->invoices as $invoice) {
-                        if (! AppStorage::disk()->exists($invoice->file_path)) {
-                            continue;
-                        }
-
-                        $invoicePath = AppStorage::localPath($invoice->file_path);
-                        $tempInvoiceFiles[] = $invoicePath;
-                        $invoicePdfs[] = $invoicePath;
-                    }
-                }
-            }
-
-            if (count($invoicePdfs) > 0) {
-                $mergedPdf = new Fpdi();
-
-                $tempMainPdf = tempnam(sys_get_temp_dir(), 'main_pdf_');
-                file_put_contents($tempMainPdf, $mainPdfContent);
-
-                $pageCount = $mergedPdf->setSourceFile($tempMainPdf);
-                for ($i = 1; $i <= $pageCount; $i++) {
-                    $mergedPdf->AddPage();
-                    $tplId = $mergedPdf->importPage($i);
-                    $mergedPdf->useTemplate($tplId);
-                }
-
-                unlink($tempMainPdf);
-
-                foreach ($invoicePdfs as $invoicePath) {
-                    try {
-                        $invoicePageCount = $mergedPdf->setSourceFile($invoicePath);
-
-                        for ($i = 1; $i <= $invoicePageCount; $i++) {
-                            $mergedPdf->AddPage();
-                            $tplId = $mergedPdf->importPage($i);
-                            $mergedPdf->useTemplate($tplId);
-                        }
-                    } catch (\Exception $e) {
-                        continue;
-                    }
-                }
-
-                $finalPdfContent = $mergedPdf->Output('', 'S');
-                foreach ($tempInvoiceFiles as $tempInvoiceFile) {
-                    if (is_file($tempInvoiceFile)) {
-                        unlink($tempInvoiceFile);
-                    }
-                }
-            } else {
-                $finalPdfContent = $mainPdfContent;
-            }
-
-            $filename = sprintf(
-                'historico_manutencoes_%s_%s_%s.pdf',
-                $vehicle->license_plate,
-                $vehicle->brand,
-                now()->format('Y-m-d')
-            );
-
-            return response($finalPdfContent, 200)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+            return app(VehicleMaintenancePdfExporter::class)->download($vehicle);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erro ao gerar PDF: ' . $e->getMessage(),
+                'message' => 'Erro ao gerar PDF: '.$e->getMessage(),
             ], 500);
         }
     }

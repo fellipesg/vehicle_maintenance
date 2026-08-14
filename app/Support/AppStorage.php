@@ -17,13 +17,48 @@ class AppStorage
         return Storage::disk(self::diskName());
     }
 
+    public static function isRemote(): bool
+    {
+        return config('filesystems.disks.'.self::diskName().'.driver') === 's3';
+    }
+
     public static function localPath(string $storagePath): string
     {
-        $disk = self::disk();
-        $driver = config('filesystems.disks.'.self::diskName().'.driver');
+        $copy = self::localCopy($storagePath);
 
-        if ($driver === 'local') {
-            return $disk->path($storagePath);
+        if ($copy === null) {
+            throw new \RuntimeException("Arquivo não encontrado: {$storagePath}");
+        }
+
+        return $copy['path'];
+    }
+
+    /**
+     * @return array{path: string, temporary: bool}|null
+     */
+    public static function localCopy(string $storagePath): ?array
+    {
+        $disk = self::disk();
+
+        if (! self::isRemote()) {
+            if (! $disk->exists($storagePath)) {
+                return null;
+            }
+
+            return [
+                'path' => $disk->path($storagePath),
+                'temporary' => false,
+            ];
+        }
+
+        try {
+            $contents = $disk->get($storagePath);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! is_string($contents) || $contents === '') {
+            return null;
         }
 
         $extension = pathinfo($storagePath, PATHINFO_EXTENSION);
@@ -34,9 +69,12 @@ class AppStorage
             $tmp = $named;
         }
 
-        file_put_contents($tmp, $disk->get($storagePath));
+        file_put_contents($tmp, $contents);
 
-        return $tmp;
+        return [
+            'path' => $tmp,
+            'temporary' => true,
+        ];
     }
 
     public static function url(string $path): string

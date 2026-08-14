@@ -61,6 +61,14 @@ return [
             'report' => false,
             'requestChecksumCalculation' => 'when_required',
             'responseChecksumValidation' => 'when_required',
+            'http' => [
+                'connect_timeout' => 5,
+                'timeout' => 20,
+            ],
+            'retries' => [
+                'mode' => 'standard',
+                'max_attempts' => 2,
+            ],
         ],
 
     ],

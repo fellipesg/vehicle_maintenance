@@ -7,6 +7,7 @@ use App\Models\Vehicle;
 use App\Models\Maintenance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class VehicleControllerTest extends TestCase
@@ -178,5 +179,24 @@ class VehicleControllerTest extends TestCase
         $this->getJson("/api/v1/vehicles/{$vehicle->id}/maintenances")
             ->assertOk()
             ->assertJsonCount(3, 'data');
+    }
+
+    public function test_can_export_vehicle_maintenance_pdf(): void
+    {
+        Storage::fake('public');
+
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+        ]);
+
+        $this->get("/api/v1/vehicles/{$vehicle->id}/export-pdf")
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
     }
 }
