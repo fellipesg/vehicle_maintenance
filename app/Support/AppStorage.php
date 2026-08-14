@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 class AppStorage
@@ -74,12 +75,12 @@ class AppStorage
     }
 
     /**
-     * Read object bytes from the app disk, falling back to a short-lived signed URL fetch.
+     * Read object bytes, falling back to a short-lived signed URL fetch.
      */
     public static function contents(string $storagePath): ?string
     {
         try {
-            $contents = self::disk()->get($storagePath);
+            $contents = self::readableDisk()->get($storagePath);
             if (is_string($contents) && $contents !== '') {
                 return $contents;
             }
@@ -92,20 +93,31 @@ class AppStorage
         }
 
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(60)
-                ->get(self::url($storagePath, now()->addMinutes(10)));
+            $response = Http::timeout(60)->get(self::url($storagePath, now()->addMinutes(10)));
 
-            if ($response->successful()) {
-                $body = $response->body();
-                if (is_string($body) && $body !== '') {
-                    return $body;
-                }
+            if ($response->successful() && $response->body() !== '') {
+                return $response->body();
             }
         } catch (\Throwable $e) {
             report($e);
         }
 
         return null;
+    }
+
+    /**
+     * The app disk swallows read errors (`throw => false`), which hides the real
+     * S3 failure. Reads go through a disk that raises instead.
+     */
+    private static function readableDisk(): Filesystem
+    {
+        $config = config('filesystems.disks.'.self::diskName());
+
+        if (! is_array($config)) {
+            return self::disk();
+        }
+
+        return Storage::build(array_merge($config, ['throw' => true, 'report' => true]));
     }
 
     public static function url(string $path, ?\DateTimeInterface $expiresAt = null): string

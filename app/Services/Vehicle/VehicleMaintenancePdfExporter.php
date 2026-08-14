@@ -16,7 +16,6 @@ class VehicleMaintenancePdfExporter
      *     content: string,
      *     filename: string,
      *     invoices: list<array{filename: string, content: string, mime: string}>,
-     *     invoice_links: list<array{filename: string, url: string}>,
      *     temps: list<string>
      * }
      */
@@ -52,7 +51,7 @@ class VehicleMaintenancePdfExporter
             $content = $invoicePdfs === []
                 ? $mainPdfContent
                 : $this->mergePdfs($mainPdfContent, array_column($invoicePdfs, 'path'));
-            [$invoices, $invoiceLinks] = $this->attachmentsAndLinks($vehicle, $copies);
+            $invoices = $this->invoiceAttachments($vehicle, $copies);
         } catch (\Throwable $e) {
             $this->cleanupTemps($temps);
 
@@ -68,7 +67,6 @@ class VehicleMaintenancePdfExporter
                 now()->format('Y-m-d')
             ),
             'invoices' => $invoices,
-            'invoice_links' => $invoiceLinks,
             'temps' => $temps,
         ];
     }
@@ -131,15 +129,11 @@ class VehicleMaintenancePdfExporter
 
     /**
      * @param  list<array{invoice: Invoice, path: string, content?: string|null}>  $copies
-     * @return array{
-     *     0: list<array{filename: string, content: string, mime: string}>,
-     *     1: list<array{filename: string, url: string}>
-     * }
+     * @return list<array{filename: string, content: string, mime: string}>
      */
-    private function attachmentsAndLinks(Vehicle $vehicle, array $copies): array
+    private function invoiceAttachments(Vehicle $vehicle, array $copies): array
     {
         $attachments = [];
-        $links = [];
         $usedNames = [];
         $attachedIds = [];
 
@@ -168,34 +162,23 @@ class VehicleMaintenancePdfExporter
             $attachedIds[$copy['invoice']->id] = true;
         }
 
+        $missing = [];
+
         foreach ($vehicle->maintenances as $maintenance) {
             foreach ($maintenance->invoices ?? [] as $invoice) {
-                if (isset($attachedIds[$invoice->id])) {
-                    continue;
-                }
-
-                $storagePath = (string) $invoice->file_path;
-                if ($storagePath === '' || ! AppStorage::isRemote()) {
-                    continue;
-                }
-
-                try {
-                    $filename = $this->uniqueAttachmentName(
-                        (string) $invoice->file_name,
-                        $storagePath,
-                        $usedNames
-                    );
-                    $links[] = [
-                        'filename' => $filename,
-                        'url' => AppStorage::url($storagePath, now()->addDays(6)),
-                    ];
-                } catch (\Throwable) {
-                    continue;
+                if (! isset($attachedIds[$invoice->id]) && (string) $invoice->file_path !== '') {
+                    $missing[] = (string) ($invoice->file_name ?: $invoice->file_path);
                 }
             }
         }
 
-        return [$attachments, $links];
+        if ($missing !== []) {
+            throw new \RuntimeException(
+                'Não foi possível baixar as notas fiscais do storage: '.implode(', ', $missing)
+            );
+        }
+
+        return $attachments;
     }
 
     /**

@@ -33,7 +33,6 @@ class EmailVehicleMaintenancePdf implements ShouldQueue
                 $file['content'],
                 $file['filename'],
                 $file['invoices'],
-                $file['invoice_links'],
             ));
         } finally {
             $exporter->cleanupTemps($file['temps']);

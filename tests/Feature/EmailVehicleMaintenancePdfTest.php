@@ -55,8 +55,7 @@ class EmailVehicleMaintenancePdfTest extends TestCase
                 && str_contains($mail->filename, 'ABC1D23')
                 && $names->contains('historico_manutencoes_ABC1D23_Honda_'.now()->format('Y-m-d').'.pdf')
                 && $invoiceNames->contains('nota.xml')
-                && $names->contains('nota.xml')
-                && $mail->invoiceLinks === [];
+                && $names->contains('nota.xml');
         });
 
         Storage::disk('public')->assertExists($xmlPath);

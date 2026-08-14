@@ -20,8 +20,6 @@ class VehicleMaintenancePdfMail extends Mailable
         public string $filename,
         /** @var list<array{filename: string, content: string, mime: string}> */
         public array $invoiceAttachments = [],
-        /** @var list<array{filename: string, url: string}> */
-        public array $invoiceLinks = [],
     ) {}
 
     public function envelope(): Envelope
