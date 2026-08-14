@@ -63,7 +63,7 @@ return [
             'responseChecksumValidation' => 'when_required',
             'http' => [
                 'connect_timeout' => 5,
-                'timeout' => 20,
+                'timeout' => 60,
             ],
             'retries' => [
                 'mode' => 'standard',

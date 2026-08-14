@@ -48,11 +48,13 @@ class EmailVehicleMaintenancePdfTest extends TestCase
 
         Mail::assertSent(VehicleMaintenancePdfMail::class, function (VehicleMaintenancePdfMail $mail) use ($user, $vehicle) {
             $names = collect($mail->attachments())->map(fn ($attachment) => $attachment->as);
+            $invoiceNames = collect($mail->invoiceAttachments)->pluck('filename');
 
             return $mail->hasTo($user->email)
                 && $mail->vehicle->is($vehicle)
                 && str_contains($mail->filename, 'ABC1D23')
                 && $names->contains('historico_manutencoes_ABC1D23_Honda_'.now()->format('Y-m-d').'.pdf')
+                && $invoiceNames->contains('nota.xml')
                 && $names->contains('nota.xml');
         });
 

@@ -27,11 +27,15 @@ class EmailVehicleMaintenancePdf implements ShouldQueue
     {
         $file = $exporter->generate($this->vehicle);
 
-        Mail::to($this->user)->send(new VehicleMaintenancePdfMail(
-            $this->vehicle,
-            $file['content'],
-            $file['filename'],
-            $file['invoices'],
-        ));
+        try {
+            Mail::to($this->user)->send(new VehicleMaintenancePdfMail(
+                $this->vehicle,
+                $file['content'],
+                $file['filename'],
+                $file['invoices'],
+            ));
+        } finally {
+            $exporter->cleanupTemps($file['temps']);
+        }
     }
 }

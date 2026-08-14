@@ -12,7 +12,12 @@ use Symfony\Component\HttpFoundation\Response;
 class VehicleMaintenancePdfExporter
 {
     /**
-     * @return array{content: string, filename: string, invoices: list<array{filename: string, content: string, mime: string}>}
+     * @return array{
+     *     content: string,
+     *     filename: string,
+     *     invoices: list<array{filename: string, path: string, mime: string}>,
+     *     temps: list<string>
+     * }
      */
     public function generate(Vehicle $vehicle): array
     {
@@ -31,13 +36,11 @@ class VehicleMaintenancePdfExporter
 
         $pdf = Pdf::loadView('pdfs.vehicle_maintenance_export', [
             'vehicle' => $vehicle,
-            'invoiceDownloadUrls' => $this->invoiceDownloadUrls($vehicle),
         ]);
         $pdf->setPaper('a4', 'portrait');
 
         $mainPdfContent = $pdf->output();
         $temps = [];
-        $invoices = [];
 
         try {
             $copies = $this->collectInvoiceCopies($vehicle, $temps);
@@ -48,13 +51,11 @@ class VehicleMaintenancePdfExporter
             $content = $invoicePdfs === []
                 ? $mainPdfContent
                 : $this->mergePdfs($mainPdfContent, array_column($invoicePdfs, 'path'));
-            $invoices = $this->attachmentsFromCopies($copies);
-        } finally {
-            foreach ($temps as $temp) {
-                if (is_file($temp)) {
-                    unlink($temp);
-                }
-            }
+            $invoices = $this->attachmentMetaFromCopies($copies);
+        } catch (\Throwable $e) {
+            $this->cleanupTemps($temps);
+
+            throw $e;
         }
 
         return [
@@ -66,6 +67,7 @@ class VehicleMaintenancePdfExporter
                 now()->format('Y-m-d')
             ),
             'invoices' => $invoices,
+            'temps' => $temps,
         ];
     }
 
@@ -73,34 +75,26 @@ class VehicleMaintenancePdfExporter
     {
         $file = $this->generate($vehicle);
 
-        return response($file['content'], 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$file['filename'].'"',
-        ]);
+        try {
+            return response($file['content'], 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="'.$file['filename'].'"',
+            ]);
+        } finally {
+            $this->cleanupTemps($file['temps']);
+        }
     }
 
     /**
-     * @return array<int, string>
+     * @param  list<string>  $temps
      */
-    private function invoiceDownloadUrls(Vehicle $vehicle): array
+    public function cleanupTemps(array $temps): void
     {
-        if (! AppStorage::isRemote()) {
-            return [];
-        }
-
-        $urls = [];
-
-        foreach ($vehicle->maintenances as $maintenance) {
-            foreach ($maintenance->invoices ?? [] as $invoice) {
-                try {
-                    $urls[$invoice->id] = AppStorage::url((string) $invoice->file_path, now()->addDays(6));
-                } catch (\Throwable) {
-                    continue;
-                }
+        foreach ($temps as $temp) {
+            if (is_file($temp)) {
+                unlink($temp);
             }
         }
-
-        return $urls;
     }
 
     /**
@@ -134,23 +128,22 @@ class VehicleMaintenancePdfExporter
 
     /**
      * @param  list<array{invoice: Invoice, path: string}>  $copies
-     * @return list<array{filename: string, content: string, mime: string}>
+     * @return list<array{filename: string, path: string, mime: string}>
      */
-    private function attachmentsFromCopies(array $copies): array
+    private function attachmentMetaFromCopies(array $copies): array
     {
         $attachments = [];
         $usedNames = [];
 
         foreach ($copies as $copy) {
-            $content = file_get_contents($copy['path']);
-            if (! is_string($content) || $content === '') {
+            if (! is_file($copy['path']) || filesize($copy['path']) === 0) {
                 continue;
             }
 
             $filename = $this->uniqueAttachmentName((string) $copy['invoice']->file_name, $copy['path'], $usedNames);
             $attachments[] = [
                 'filename' => $filename,
-                'content' => $content,
+                'path' => $copy['path'],
                 'mime' => str_ends_with(strtolower($filename), '.pdf')
                     ? 'application/pdf'
                     : 'application/octet-stream',

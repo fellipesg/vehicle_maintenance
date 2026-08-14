@@ -176,10 +176,8 @@
             padding-left: 12px;
         }
         
-        .invoice-item a {
+        .invoice-item strong {
             color: #1e40af;
-            text-decoration: underline;
-            font-weight: bold;
         }
         
         .badge {
@@ -440,14 +438,8 @@
                             <h4>Notas Fiscais</h4>
                             @foreach($maintenance->invoices as $invoice)
                                 <div class="invoice-item">
-                                    @php $invoiceHref = ($invoiceDownloadUrls ?? [])[$invoice->id] ?? null; @endphp
-                                    @if($invoiceHref)
-                                        <a href="{{ $invoiceHref }}">{{ $invoice->file_name }}</a>
-                                    @else
-                                        <strong>{{ $invoice->file_name }}</strong>
-                                    @endif
-                                    <br>
-                                    <small>DANFE nas páginas seguintes deste PDF.</small><br>
+                                    <strong>{{ $invoice->file_name }}</strong><br>
+                                    <small>DANFE nas páginas seguintes deste PDF e em anexo no e-mail.</small><br>
                                     @if($invoice->invoice_number)
                                         <small>Número: {{ $invoice->invoice_number }}</small><br>
                                     @endif
