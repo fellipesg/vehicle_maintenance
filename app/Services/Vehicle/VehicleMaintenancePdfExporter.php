@@ -15,7 +15,7 @@ class VehicleMaintenancePdfExporter
      * @return array{
      *     content: string,
      *     filename: string,
-     *     invoices: list<array{filename: string, path: string, mime: string}>,
+     *     invoices: list<array{filename: string, storage_path: string, disk: string, mime: string}>,
      *     temps: list<string>
      * }
      */
@@ -41,6 +41,7 @@ class VehicleMaintenancePdfExporter
 
         $mainPdfContent = $pdf->output();
         $temps = [];
+        $invoices = $this->attachmentMetaFromVehicle($vehicle);
 
         try {
             $copies = $this->collectInvoiceCopies($vehicle, $temps);
@@ -51,7 +52,6 @@ class VehicleMaintenancePdfExporter
             $content = $invoicePdfs === []
                 ? $mainPdfContent
                 : $this->mergePdfs($mainPdfContent, array_column($invoicePdfs, 'path'));
-            $invoices = $this->attachmentMetaFromCopies($copies);
         } catch (\Throwable $e) {
             $this->cleanupTemps($temps);
 
@@ -127,27 +127,36 @@ class VehicleMaintenancePdfExporter
     }
 
     /**
-     * @param  list<array{invoice: Invoice, path: string}>  $copies
-     * @return list<array{filename: string, path: string, mime: string}>
+     * @return list<array{filename: string, storage_path: string, disk: string, mime: string}>
      */
-    private function attachmentMetaFromCopies(array $copies): array
+    private function attachmentMetaFromVehicle(Vehicle $vehicle): array
     {
         $attachments = [];
         $usedNames = [];
+        $disk = AppStorage::diskName();
 
-        foreach ($copies as $copy) {
-            if (! is_file($copy['path']) || filesize($copy['path']) === 0) {
-                continue;
+        foreach ($vehicle->maintenances as $maintenance) {
+            foreach ($maintenance->invoices ?? [] as $invoice) {
+                $storagePath = (string) $invoice->file_path;
+                if ($storagePath === '') {
+                    continue;
+                }
+
+                $filename = $this->uniqueAttachmentName(
+                    (string) $invoice->file_name,
+                    $storagePath,
+                    $usedNames
+                );
+
+                $attachments[] = [
+                    'filename' => $filename,
+                    'storage_path' => $storagePath,
+                    'disk' => $disk,
+                    'mime' => str_ends_with(strtolower($filename), '.pdf')
+                        ? 'application/pdf'
+                        : 'application/octet-stream',
+                ];
             }
-
-            $filename = $this->uniqueAttachmentName((string) $copy['invoice']->file_name, $copy['path'], $usedNames);
-            $attachments[] = [
-                'filename' => $filename,
-                'path' => $copy['path'],
-                'mime' => str_ends_with(strtolower($filename), '.pdf')
-                    ? 'application/pdf'
-                    : 'application/octet-stream',
-            ];
         }
 
         return $attachments;
