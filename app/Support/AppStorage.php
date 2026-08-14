@@ -94,7 +94,10 @@ class AppStorage
 
         try {
             $response = Http::timeout(120)
-                ->withOptions(['force_ip_resolve' => 'v4', 'connect_timeout' => 20])
+                ->withOptions(array_merge(
+                    ['connect_timeout' => 20],
+                    StorageEndpointResolver::httpOptions()
+                ))
                 ->get(self::url($storagePath, now()->addMinutes(10)));
 
             if ($response->successful() && $response->body() !== '') {

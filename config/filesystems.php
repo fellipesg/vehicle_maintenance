@@ -17,6 +17,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Pin The Storage Endpoint To Its Public Addresses
+    |--------------------------------------------------------------------------
+    |
+    | Some hosting providers resolve the storage hostname to a private address
+    | with no route to the bucket, which makes every request hang until it
+    | times out. When enabled, connections are pinned to the addresses from
+    | public DNS. Set "public_ips" to skip the lookup and use a fixed list.
+    |
+    */
+
+    'pin_public_dns' => env('AWS_PIN_PUBLIC_DNS', false),
+
+    'public_ips' => env('AWS_PUBLIC_IPS'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

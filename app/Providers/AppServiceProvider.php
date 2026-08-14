@@ -10,7 +10,9 @@ use App\Policies\InvoicePolicy;
 use App\Policies\MaintenancePolicy;
 use App\Policies\VehiclePolicy;
 use App\Policies\WorkshopPolicy;
+use App\Support\StorageEndpointResolver;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Maintenance::class, MaintenancePolicy::class);
         Gate::policy(Workshop::class, WorkshopPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
+
+        Storage::extend('s3', fn ($app, array $config) => $app['filesystem']->createS3Driver(
+            StorageEndpointResolver::apply($config)
+        ));
     }
 
     private function requestIsHttps(): bool
