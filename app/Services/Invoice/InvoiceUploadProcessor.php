@@ -4,6 +4,7 @@ namespace App\Services\Invoice;
 
 use App\Models\Invoice;
 use App\Models\Maintenance;
+use App\Support\AppStorage;
 use Illuminate\Http\UploadedFile;
 
 class InvoiceUploadProcessor
@@ -55,7 +56,7 @@ class InvoiceUploadProcessor
     public function processSingleFile(Maintenance $maintenance, UploadedFile $file): array
     {
         $fileName = time().'_'.$file->getClientOriginalName();
-        $filePath = $file->storeAs('invoices', $fileName, 'public');
+        $filePath = $file->storeAs('invoices', $fileName, AppStorage::diskName());
 
         $invoice = Invoice::create([
             'maintenance_id' => $maintenance->id,

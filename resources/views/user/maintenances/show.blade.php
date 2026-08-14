@@ -44,7 +44,7 @@
             <h2 class="mb-4 font-semibold">Notas fiscais ({{ $maintenance->invoices->count() }})</h2>
             <div class="space-y-2">
                 @foreach($maintenance->invoices as $invoice)
-                    <a href="{{ asset('storage/'.$invoice->file_path) }}" target="_blank" rel="noopener"
+                    <a href="{{ \App\Support\AppStorage::url($invoice->file_path) }}" target="_blank" rel="noopener"
                        class="flex items-center justify-between rounded-lg bg-automotive-50 p-3 text-sm transition hover:bg-automotive-100">
                         @php $isXml = str_ends_with(strtolower($invoice->file_name), '.xml'); @endphp
                         <span class="font-medium">{{ $isXml ? '🧾' : '📄' }} {{ $invoice->file_name }}</span>

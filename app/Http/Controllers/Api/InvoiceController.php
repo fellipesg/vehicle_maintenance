@@ -7,10 +7,10 @@ use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Rules\InvoiceFile;
 use App\Services\Invoice\InvoiceUploadProcessor;
+use App\Support\AppStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -47,7 +47,7 @@ class InvoiceController extends Controller
 
             $file = $request->file('file');
             $fileName = time() . '_' . $file->getClientOriginalName();
-            $filePath = $file->storeAs('invoices', $fileName, 'public');
+            $filePath = $file->storeAs('invoices', $fileName, AppStorage::diskName());
 
             $invoice = Invoice::create([
                 'maintenance_id' => $request->maintenance_id,
@@ -100,14 +100,14 @@ class InvoiceController extends Controller
             $invoice = Invoice::with('maintenance')->findOrFail($id);
             Gate::authorize('view', $invoice);
 
-            if (! Storage::disk('public')->exists($invoice->file_path)) {
+            if (! AppStorage::disk()->exists($invoice->file_path)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invoice file not found',
                 ], 404);
             }
 
-            return Storage::disk('public')->download($invoice->file_path, $invoice->file_name);
+            return AppStorage::disk()->download($invoice->file_path, $invoice->file_name);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -124,8 +124,8 @@ class InvoiceController extends Controller
         $invoice = Invoice::with('maintenance')->findOrFail($id);
         Gate::authorize('delete', $invoice);
 
-        if (Storage::disk('public')->exists($invoice->file_path)) {
-            Storage::disk('public')->delete($invoice->file_path);
+        if (AppStorage::disk()->exists($invoice->file_path)) {
+            AppStorage::disk()->delete($invoice->file_path);
         }
 
         $invoice->delete();

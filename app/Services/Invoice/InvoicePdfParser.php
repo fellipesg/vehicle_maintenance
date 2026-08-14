@@ -2,8 +2,8 @@
 
 namespace App\Services\Invoice;
 
+use App\Support\AppStorage;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Smalot\PdfParser\Parser;
 use Throwable;
 
@@ -42,7 +42,7 @@ class InvoicePdfParser
 
     public function parseStoredPath(string $storagePath): ?ParsedInvoice
     {
-        return $this->parseFile(Storage::disk('public')->path($storagePath));
+        return $this->parseFile(AppStorage::localPath($storagePath));
     }
 
     public function parseText(string $text): ?ParsedInvoice

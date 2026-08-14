@@ -8,11 +8,11 @@ use App\Models\MaintenanceItem;
 use App\Models\Checklist;
 use App\Rules\InvoiceFile;
 use App\Services\Invoice\InvoiceUploadProcessor;
+use App\Support\AppStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 
 class MaintenanceController extends Controller
@@ -250,8 +250,8 @@ class MaintenanceController extends Controller
         Gate::authorize('delete', $maintenance);
 
         foreach ($maintenance->invoices as $invoice) {
-            if (Storage::disk('public')->exists($invoice->file_path)) {
-                Storage::disk('public')->delete($invoice->file_path);
+            if (AppStorage::disk()->exists($invoice->file_path)) {
+                AppStorage::disk()->delete($invoice->file_path);
             }
         }
 

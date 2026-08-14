@@ -3,7 +3,6 @@
 namespace App\Services\Invoice;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 
 class InvoiceParser
 {

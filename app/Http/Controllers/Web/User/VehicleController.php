@@ -12,6 +12,7 @@ use App\Services\Crlv\CrlvParseResult;
 use App\Services\Crlv\CrlvPdfParser;
 use App\Services\Vehicle\VehicleOwnershipService;
 use App\Services\VehicleCatalogService;
+use App\Support\AppStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -134,7 +135,7 @@ class VehicleController extends Controller
             'power_of_attorney' => ['required', 'file', 'mimes:pdf', 'max:10240'],
         ]);
 
-        $path = $request->file('power_of_attorney')->store('procuracoes', 'public');
+        $path = $request->file('power_of_attorney')->store('procuracoes', AppStorage::diskName());
         $crlv = $this->crlvFromVerification($pending['crlv_verification'] ?? session('crlv_verification'));
         $ownership = app(VehicleOwnershipService::class);
 

@@ -2,8 +2,8 @@
 
 namespace App\Services\Invoice;
 
+use App\Support\AppStorage;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class NfeXmlParser
@@ -28,7 +28,7 @@ class NfeXmlParser
 
     public function parseStoredPath(string $storagePath): ?ParsedInvoice
     {
-        return $this->parseFile(Storage::disk('public')->path($storagePath));
+        return $this->parseFile(AppStorage::localPath($storagePath));
     }
 
     public function parseString(string $xml): ?ParsedInvoice

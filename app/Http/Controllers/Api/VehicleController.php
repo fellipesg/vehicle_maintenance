@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
 use App\Services\VehicleCatalogService;
+use App\Support\AppStorage;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
-use Barryvdh\DomPDF\Facade\Pdf;
 use setasign\Fpdi\Fpdi;
 
 class VehicleController extends Controller
@@ -217,13 +217,17 @@ class VehicleController extends Controller
             $mainPdfContent = $pdf->output();
 
             $invoicePdfs = [];
+            $tempInvoiceFiles = [];
             foreach ($vehicle->maintenances as $maintenance) {
                 if ($maintenance->invoices && $maintenance->invoices->count() > 0) {
                     foreach ($maintenance->invoices as $invoice) {
-                        $invoicePath = Storage::disk('public')->path($invoice->file_path);
-                        if (file_exists($invoicePath)) {
-                            $invoicePdfs[] = $invoicePath;
+                        if (! AppStorage::disk()->exists($invoice->file_path)) {
+                            continue;
                         }
+
+                        $invoicePath = AppStorage::localPath($invoice->file_path);
+                        $tempInvoiceFiles[] = $invoicePath;
+                        $invoicePdfs[] = $invoicePath;
                     }
                 }
             }
@@ -258,6 +262,11 @@ class VehicleController extends Controller
                 }
 
                 $finalPdfContent = $mergedPdf->Output('', 'S');
+                foreach ($tempInvoiceFiles as $tempInvoiceFile) {
+                    if (is_file($tempInvoiceFile)) {
+                        unlink($tempInvoiceFile);
+                    }
+                }
             } else {
                 $finalPdfContent = $mainPdfContent;
             }
