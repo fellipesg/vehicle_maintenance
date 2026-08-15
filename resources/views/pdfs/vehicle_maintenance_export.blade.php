@@ -279,7 +279,7 @@
             @foreach($vehicle->maintenances as $index => $maintenance)
                 <div class="maintenance-section">
                     @php
-                        $workshopName = $maintenance->workshop?->name ?: $maintenance->workshop_name;
+                        $workshopName = $maintenance->displayWorkshopName();
                         $typeLabel = match ($maintenance->maintenance_type) {
                             'preventive' => 'PREVENTIVA',
                             'corrective' => 'CORRETIVA',
@@ -341,7 +341,7 @@
                         <div class="info-item" style="margin-top: 10px; padding: 10px; background-color: #f9fafb; border-left: 3px solid #3b82f6;">
                             <div style="margin-bottom: 8px;">
                                 <span class="info-label">Oficina:</span>
-                                <span class="info-value" style="font-weight: bold; font-size: 11pt;">{{ $maintenance->workshop ? $maintenance->workshop->name : $maintenance->workshop_name }}</span>
+                                <span class="info-value" style="font-weight: bold; font-size: 11pt;">{{ $maintenance->displayWorkshopName() }}</span>
                             </div>
                             @if($maintenance->workshop)
                                 <div style="margin-top: 8px; font-size: 9pt;">

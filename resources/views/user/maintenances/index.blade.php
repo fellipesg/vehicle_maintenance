@@ -26,7 +26,7 @@
                 </div>
                 <div class="text-right text-sm text-automotive-500">
                     <p>{{ $maintenance->maintenance_date->format('d/m/Y') }}</p>
-                    @if($maintenance->workshop)<p>🔧 {{ $maintenance->workshop->name }}</p>@endif
+                    @if($maintenance->displayWorkshopName())<p>🔧 {{ $maintenance->displayWorkshopName() }}</p>@endif
                 </div>
             </div>
         </a>

@@ -23,7 +23,7 @@
             <div class="flex justify-between sm:block"><dt class="text-automotive-600">Categoria</dt><dd><span class="badge badge-orange">{{ $categories[$maintenance->service_category] ?? '' }}</span></dd></div>
             <div class="flex justify-between sm:block"><dt class="text-automotive-600">Data</dt><dd>{{ $maintenance->maintenance_date->format('d/m/Y') }}</dd></div>
             @if($maintenance->kilometers)<div class="flex justify-between sm:block"><dt class="text-automotive-600">Quilometragem</dt><dd>{{ number_format($maintenance->kilometers, 0, ',', '.') }} km</dd></div>@endif
-            @if($maintenance->workshop_name)<div class="flex justify-between sm:block"><dt class="text-automotive-600">Oficina</dt><dd>{{ $maintenance->workshop_name }}</dd></div>@endif
+            @if($maintenance->displayWorkshopName())<div class="flex justify-between sm:block"><dt class="text-automotive-600">Oficina</dt><dd>{{ $maintenance->displayWorkshopName() }}</dd></div>@endif
             <div class="flex justify-between sm:block"><dt class="text-automotive-600">Revisão obrigatória</dt><dd>{{ $maintenance->is_manufacturer_required ? 'Sim' : 'Não' }}</dd></div>
         </dl>
         @if($maintenance->description)

@@ -228,6 +228,30 @@ class UserPortalTest extends TestCase
         });
     }
 
+    public function test_maintenance_list_shows_free_text_workshop_name(): void
+    {
+        $vehicle = Vehicle::factory()->create();
+        $this->user->vehicles()->attach($vehicle->id, [
+            'is_current_owner' => true,
+            'purchase_date' => now(),
+            'tenant_id' => $this->user->tenant_id,
+        ]);
+
+        Maintenance::factory()->create([
+            'user_id' => $this->user->id,
+            'tenant_id' => $this->user->tenant_id,
+            'vehicle_id' => $vehicle->id,
+            'workshop_id' => null,
+            'workshop_name' => 'Brothers Londrina',
+            'maintenance_type' => 'Troca Válvula',
+        ]);
+
+        $this->actingAs($this->user)
+            ->get('/usuario/manutencoes')
+            ->assertOk()
+            ->assertSee('Brothers Londrina');
+    }
+
     public function test_user_can_view_workshops_directory(): void
     {
         Workshop::factory()->create(['name' => 'Oficina Teste']);

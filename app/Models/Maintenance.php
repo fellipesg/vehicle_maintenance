@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Maintenance extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'vehicle_id',
         'user_id',
@@ -80,5 +81,13 @@ class Maintenance extends Model
     public function workshop(): BelongsTo
     {
         return $this->belongsTo(Workshop::class);
+    }
+
+    /**
+     * Official workshop name, or the free-text name when none was selected.
+     */
+    public function displayWorkshopName(): ?string
+    {
+        return $this->workshop?->name ?: $this->workshop_name;
     }
 }
