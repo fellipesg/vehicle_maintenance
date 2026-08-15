@@ -51,12 +51,22 @@ class NfeDanfeParser
             return $items;
         }
 
+        $items = $this->extractLemansStyleItems($section);
+
+        if ($items !== []) {
+            return $items;
+        }
+
         return $this->extractFreeNfeStyleItems($section);
     }
 
     private function productSection(string $text): string
     {
         $start = strpos($text, 'DADOS DOS PRODUTOS');
+
+        if ($start === false) {
+            $start = strpos($text, 'DADOS DO PRODUTO');
+        }
 
         if ($start === false) {
             return '';
@@ -114,6 +124,62 @@ class NfeDanfeParser
                 totalPrice: round($quantity * $unitPrice, 2),
                 partNumber: $partNumber,
             );
+        }
+
+        return $items;
+    }
+
+    /**
+     * Layout Lemans / SS Plus: "COD | DESCRICAO\\tNCM UNCFOP QTD VLR ..."
+     *
+     * @return ParsedInvoiceItem[]
+     */
+    private function extractLemansStyleItems(string $section): array
+    {
+        $lines = preg_split("/\n+/", $section) ?: [];
+        $items = [];
+
+        for ($i = 0, $count = count($lines); $i < $count; $i++) {
+            $line = trim($lines[$i]);
+
+            if (! preg_match(
+                '/^([A-Z0-9]+)\s*\|\s*(.+?)\t(\d{8})\s*(UN|LT|PC|KG|CX|PAR|MT|M2|M3)(\d{4})\s+([\d.,]+)\s+([\d.,]+)/u',
+                $line,
+                $match
+            )) {
+                continue;
+            }
+
+            $name = trim($match[2]);
+            $j = $i + 1;
+
+            while ($j < $count) {
+                $next = trim($lines[$j]);
+
+                if ($next === ''
+                    || str_contains($next, '|')
+                    || preg_match('/^(aprox\.|INFORMA|CÁLCULO|VALOR|DANFE|\d)/u', $next)
+                ) {
+                    break;
+                }
+
+                $name .= $next;
+                $j++;
+            }
+
+            $quantity = $this->parseBrazilianNumber($match[6]);
+            $unitPrice = $this->parseBrazilianNumber($match[7]);
+            $quantity = $quantity > 0 ? $quantity : 1.0;
+
+            $items[] = new ParsedInvoiceItem(
+                name: preg_replace('/\s+/u', ' ', $name) ?? $name,
+                quantity: $quantity,
+                unitPrice: $unitPrice,
+                totalPrice: round($quantity * $unitPrice, 2),
+                partNumber: $match[1],
+            );
+
+            $i = $j - 1;
         }
 
         return $items;
@@ -184,7 +250,13 @@ class NfeDanfeParser
             return ltrim($match[1], '0') ?: $match[1];
         }
 
-        if (preg_match('/Nº:\s*(\d+)/u', $text, $match)) {
+        if (preg_match('/N[ºo°]\.?:?\s*([\d.]+)/ui', $text, $match)) {
+            $number = str_replace('.', '', $match[1]);
+
+            return ltrim($number, '0') ?: $number;
+        }
+
+        if (preg_match('/(\d{5,})Nr\.:/u', $text, $match)) {
             return ltrim($match[1], '0') ?: $match[1];
         }
 

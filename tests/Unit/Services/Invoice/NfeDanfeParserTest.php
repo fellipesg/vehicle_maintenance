@@ -52,4 +52,26 @@ class NfeDanfeParserTest extends TestCase
         $this->assertSame(65.67, $first->unitPrice);
         $this->assertSame('2059', $first->partNumber);
     }
+
+    public function test_parses_lemans_ss_plus_danfe_items_from_fixture_pdf(): void
+    {
+        $parsed = (new InvoicePdfParser)->parseFile(
+            base_path('tests/fixtures/invoices/lemans_nfe_1940.pdf')
+        );
+
+        $this->assertNotNull($parsed);
+        $this->assertSame('nfe_danfe', $parsed->type);
+        $this->assertSame('1940', $parsed->invoiceNumber);
+        $this->assertSame('2026-07-13', $parsed->invoiceDate);
+        $this->assertSame(1499.0, $parsed->totalAmount);
+        $this->assertCount(1, $parsed->items);
+
+        $item = $parsed->items[0];
+        $this->assertSame('MER0034', $item->partNumber);
+        $this->assertSame(1.0, $item->quantity);
+        $this->assertSame(1499.0, $item->unitPrice);
+        $this->assertSame(1499.0, $item->totalPrice);
+        $this->assertStringContainsString('CARCACA VALVULA TERMOSTATICA', $item->name);
+        $this->assertStringContainsString('MERCEDES C180', $item->name);
+    }
 }
