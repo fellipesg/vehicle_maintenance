@@ -96,6 +96,18 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Neon/PgBouncer transaction pooling breaks native prepared statements.
+            // Enable when DB_HOST contains "-pooler" or DB_PGBOUNCER=true.
+            'options' => extension_loaded('pdo_pgsql') ? array_filter([
+                PDO::ATTR_EMULATE_PREPARES => filter_var(
+                    env(
+                        'DB_PGBOUNCER',
+                        str_contains((string) env('DB_HOST', ''), '-pooler')
+                            || str_contains((string) env('DB_URL', ''), '-pooler')
+                    ),
+                    FILTER_VALIDATE_BOOLEAN
+                ) ?: null,
+            ]) : [],
         ],
 
         'sqlsrv' => [

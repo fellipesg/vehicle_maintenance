@@ -7,7 +7,6 @@ use App\Services\Invoice\InvoiceUploadProcessor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 
 trait StoresMaintenanceInvoices
 {
@@ -56,8 +55,10 @@ trait StoresMaintenanceInvoices
     }
 
     /**
-     * Upload invoices to storage, then create the maintenance and invoice rows
-     * in one transaction. Parsing runs after commit.
+     * Upload invoices to storage, then create the maintenance and invoice rows.
+     * Parsing runs afterwards. Avoids a multi-statement DB::transaction on Neon
+     * pooler connections, where a swallowed query error aborts the whole block
+     * (SQLSTATE 25P02) and hides the real failure.
      *
      * @param  callable(): Maintenance  $createMaintenance
      * @return array{maintenance: Maintenance, items_created: int, warnings: string[]}
@@ -68,12 +69,8 @@ trait StoresMaintenanceInvoices
         $stored = $processor->storeUploads($request->file('invoices'));
 
         try {
-            $maintenance = DB::transaction(function () use ($createMaintenance, $processor, $stored) {
-                $maintenance = $createMaintenance();
-                $processor->createInvoiceRecords($maintenance, $stored);
-
-                return $maintenance;
-            });
+            $maintenance = $createMaintenance();
+            $processor->createInvoiceRecords($maintenance, $stored);
         } catch (\Throwable $e) {
             $processor->discardUploads($stored);
 
