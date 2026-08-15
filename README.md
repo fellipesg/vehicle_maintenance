@@ -1,73 +1,70 @@
-# Vehicle Maintenance — Backend
+# Vehicle Maintenance
 
-API e portal web Laravel para histórico de manutenções veiculares, importação de CRLV-e, notas fiscais (PDF/XML) e exportação de relatórios.
+Laravel API and web portal for vehicle service history. Records stay on the vehicle, not on whoever currently owns it.
 
-> App mobile: [`vehicle_maintenance_frontend`](https://github.com/fellipesg/vehicle_maintenance_frontend)
+Mobile client: [vehicle_maintenance_frontend](https://github.com/fellipesg/vehicle_maintenance_frontend)
+
+## What it does
+
+- Register vehicles (plate / RENAVAM) and keep a permanent maintenance log
+- Workshops, service categories, and checklists
+- Upload invoices (NF-e XML and DANFE PDF); line items can be applied to a maintenance
+- Import vehicles from CRLV PDFs
+- Export a history PDF and email it to the owner with invoice files attached (queued job)
+- Web portals for owners, workshops/garages, and catalog admin
+- REST API (`/api/v1`) for the Flutter app (Sanctum)
 
 ## Stack
 
-| Camada | Tecnologia |
-|--------|------------|
-| Runtime | PHP 8.2+ · Laravel 12 |
-| Auth | Laravel Sanctum · Socialite (OAuth) |
-| DB | SQLite (dev) · MySQL 8 (Docker) |
-| Cache / queue | Redis · database queue |
-| PDF | DomPDF · PDF Parser · FPDI |
-| Push | Firebase Admin (kreait/firebase-php) |
-| Front web | Blade · Vite · Tailwind |
+| Layer | Local | Production |
+| --- | --- | --- |
+| Runtime | PHP 8.4, Laravel 12 | Laravel Cloud |
+| Database | SQLite or MySQL 8 | Neon Postgres |
+| Files | Local disk | Amazon S3 |
+| Queue | `database` driver (`queue:listen`) | Same driver, workers on Cloud |
+| Auth | Sanctum, Socialite | Same |
+| Observability | Log / Telescope (dev) | Sentry |
+| Web UI | Blade, Vite, Tailwind | Same |
 
-## Pré-requisitos
+PDF: DomPDF, smalot/pdfparser, FPDI. Push: Firebase Admin (FCM).
 
-- PHP 8.2+ com extensões comuns do Laravel (`pdo_sqlite` ou `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`, `fileinfo`, `gd`)
-- [Composer](https://getcomposer.org/) 2.x
-- Node.js 20+ e npm (assets Vite)
-- **Ou** Docker + Docker Compose (MySQL + Redis + app)
+## Requirements
 
-## Início rápido (local sem Docker)
+- PHP 8.4+ (`pdo_sqlite` or `pdo_mysql` / `pdo_pgsql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`, `fileinfo`, `gd`)
+- Composer 2.x
+- Node.js 20+ (Vite)
+- Or Docker Compose (MySQL 8, Redis 7, PHP-FPM, Nginx)
+
+## Quick start (no Docker)
 
 ```bash
 git clone https://github.com/fellipesg/vehicle_maintenance.git
-cd vehicle_maintenance
+cd vehicle_maintenance/backend
 
 composer install
 cp .env.example .env
 php artisan key:generate
-
-# SQLite (padrão do .env.example)
 touch database/database.sqlite
-
 php artisan migrate
-# opcional: php artisan db:seed
-
-npm install
-npm run build
-
+npm install && npm run build
 composer run dev
 ```
 
-O script `composer run dev` sobe, em paralelo:
+`composer run dev` starts the HTTP server, a queue worker, Vite, and log tailing.
 
-- `php artisan serve` (API + portal)
-- queue worker
-- Vite (`npm run dev`)
-- logs (`pail`)
+- App: http://127.0.0.1:8000
+- API: `http://127.0.0.1:8000/api/v1`
 
-App: [http://127.0.0.1:8000](http://127.0.0.1:8000)  
-API: `http://127.0.0.1:8000/api/v1`
-
-> Em alguns ambientes a porta `8000` já está ocupada. Use `php artisan serve --port=8080` e ajuste `APP_URL`.
+If port 8000 is taken: `php artisan serve --port=8080` and set `APP_URL`.
 
 ## Docker
 
+From `backend/`:
+
 ```bash
 cp .env.example .env
-# Ajuste DB_* para MySQL do compose, por exemplo:
-# DB_CONNECTION=mysql
-# DB_HOST=db
-# DB_PORT=3306
-# DB_DATABASE=vehicle_maintenance
-# DB_USERNAME=vehicle_user
-# DB_PASSWORD=root
+# Set DB_CONNECTION=mysql, DB_HOST=db, DB_PORT=3306,
+# DB_DATABASE=vehicle_maintenance, DB_USERNAME=vehicle_user, DB_PASSWORD=root
 
 docker compose up -d --build
 docker compose exec app composer install
@@ -75,92 +72,104 @@ docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate
 ```
 
-Serviços típicos do `docker-compose.yml`: app, MySQL 8, Redis 7, Nginx (conforme configuração do projeto).
+Nginx listens on **8080** by default (`APP_PORT`).
 
-## Variáveis de ambiente
+## Production notes (Laravel Cloud + Neon + S3)
 
-Copie `.env.example` → `.env`. Principais chaves:
+This app runs on Laravel Cloud with:
 
-| Variável | Descrição |
-|----------|-----------|
-| `APP_KEY` | Gerada por `php artisan key:generate` |
-| `APP_URL` | URL pública (importante para OAuth e links) |
-| `DB_*` | Conexão SQLite ou MySQL |
-| `FILESYSTEM_DISK` | `local` ou `s3` |
-| `AWS_*` | Credenciais S3 (se usar storage remoto) |
-| `GOOGLE_*` / `FACEBOOK_*` / `TWITTER_*` | OAuth Socialite |
-| Firebase credentials | Conta de serviço para FCM (fora do git) |
+- **Neon Postgres** as the database
+- **S3** for invoices and generated PDFs
+- **Database queue** (no Redis required in prod)
+- A worker that runs `EmailVehicleMaintenancePdf`: builds the history PDF, loads invoice objects from S3, and mails them as attachments (300s timeout, 2 tries)
 
-**Nunca** committe `.env`, chaves privadas ou JSON de service account.
+### Postgres booleans
 
-## Testes
+Laravel binds PHP `true`/`false` as `0`/`1`. Neon/Postgres treats that as integer, aborts the transaction, and the next statement can fail with `SQLSTATE[25P02]` (the original error is gone). This project uses `App\Database\PostgresConnection` so booleans are sent as `true`/`false`. Prefer the Neon host **without** `-pooler` for Laravel; if you must use the pooler, keep `DB_PGBOUNCER=true` (see `.env.example`).
+
+### Typical production env
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=ep-....aws.neon.tech
+DB_PORT=5432
+DB_SSLMODE=require
+FILESYSTEM_DISK=s3
+QUEUE_CONNECTION=database
+SESSION_DRIVER=cookie
+CACHE_STORE=file
+```
+
+Never commit `.env`, AWS keys, or Firebase service-account JSON.
+
+## Environment
+
+| Variable | Role |
+| --- | --- |
+| `APP_KEY` | `php artisan key:generate` |
+| `APP_URL` | Public URL (OAuth and signed links) |
+| `DB_*` | SQLite, MySQL, or Postgres/Neon |
+| `FILESYSTEM_DISK` | `local` or `s3` |
+| `AWS_*` | S3 bucket and credentials |
+| `QUEUE_CONNECTION` | `database` in this project |
+| `MAIL_*` | `log` locally; SMTP (or Cloud mail) in prod |
+| `SENTRY_DSN` | Exception reporting |
+| `GOOGLE_*` / `FACEBOOK_*` / `TWITTER_*` | Socialite |
+| Firebase | Service account for FCM (not in git) |
+
+## Tests
 
 ```bash
 composer test
-# ou
+# or
 php artisan test
 ```
 
-Com Docker:
+Docker: `docker compose exec app php artisan test`
 
-```bash
-docker compose exec app php artisan test
-```
+Coverage includes invoice parsers, CRLV import, ownership, portals, and Postgres boolean binding.
 
-## Portal web
+## API (overview)
 
-Além da API REST, o backend inclui rotas Blade para:
+Prefix: `/api/v1`. Authenticated routes use Sanctum (`Authorization: Bearer …`) and tenant middleware.
 
-- **Usuário** — veículos, manutenções, importação CRLV, exportação PDF
-- **Oficina / Garage** — fluxos de oficina e consignação
-- **Admin** — catálogo de marcas/modelos
-
-Após login no browser, navegue pelas rotas em `routes/web.php`.
-
-## API (visão geral)
-
-Prefixo: `/api/v1`
-
-| Recurso | Exemplos |
-|---------|----------|
-| Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me` |
-| Vehicles | CRUD + `GET /vehicles/{id}/maintenances` + export PDF |
+| Area | Examples |
+| --- | --- |
+| Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me`, OAuth redirect/callback |
+| Vehicles | CRUD, `GET /my-vehicles`, `GET /vehicles/{id}/maintenances`, `GET /vehicles/{id}/export-pdf` |
+| Search | `GET /vehicles/search/{identifier}` (plate or RENAVAM) |
 | Maintenances | CRUD |
-| Invoices | upload / download |
-| Workshops | listagem e gestão |
+| Invoices | upload / download / delete |
+| Workshops | public list + authenticated write |
+| FCM | token register / list / delete |
 
-Autenticação: Bearer token (Sanctum).
+Web (Blade): owner portal, workshop/garage flows, admin brand/model catalog. See `routes/web.php`.
 
-## Estrutura
+## Layout
 
 ```
 app/
-  Http/Controllers/Api/   # API REST
-  Http/Controllers/Web/   # Portal Blade
-  Services/               # CRLV, NF-e, ownership, catálogo
-  Models/
+  Http/Controllers/Api/    REST
+  Http/Controllers/Web/    Blade portals
+  Jobs/                    EmailVehicleMaintenancePdf
+  Services/                Invoice, CRLV, ownership, PDF export
+  Database/                PostgresConnection (boolean binding)
 database/migrations/
-resources/views/          # Blade + PDF
+resources/views/
 routes/api.php
 routes/web.php
 tests/
 ```
 
-## Scripts úteis
+## Scripts
 
 ```bash
-composer run setup   # install + .env + migrate + npm build
-composer run dev     # serve + queue + vite + logs
+composer run setup    # install, .env, migrate, npm build
+composer run dev      # serve + queue + vite + logs
 composer run test
-vendor/bin/pint      # estilo de código
+vendor/bin/pint       # code style
 ```
 
-## Segurança
+## License
 
-- `.env`, caches e `vendor/` estão no `.gitignore`
-- Não versionar dumps SQLite locais nem `storage/logs`
-- Credenciais Firebase/OAuth apenas em ambiente local ou secrets de CI
-
-## Licença
-
-MIT
+MIT. See [LICENSE](LICENSE).
