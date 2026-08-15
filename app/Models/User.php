@@ -4,16 +4,16 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -50,6 +50,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'document',
     ];
 
     /**
@@ -62,6 +63,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'document' => 'encrypted',
             'is_admin' => 'boolean',
             'subscription_active' => 'boolean',
         ];
@@ -73,6 +75,7 @@ class User extends Authenticatable
     public function vehicles(): BelongsToMany
     {
         return $this->belongsToMany(Vehicle::class, 'user_vehicles')
+            ->using(UserVehicle::class)
             ->withPivot(
                 'purchase_date',
                 'sale_date',
@@ -91,7 +94,8 @@ class User extends Authenticatable
      */
     public function currentVehicles(): BelongsToMany
     {
-        $query = $this->vehicles()->wherePivot('is_current_owner', true);
+        // Postgres rejects "boolean = 1"; use a SQL boolean literal.
+        $query = $this->vehicles()->whereRaw('user_vehicles.is_current_owner = true');
 
         if ($this->tenant_id) {
             $query->wherePivot('tenant_id', $this->tenant_id);

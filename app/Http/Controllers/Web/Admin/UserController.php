@@ -12,7 +12,7 @@ class UserController extends Controller
     {
         $user->load([
             'vehicles' => fn ($query) => $query
-                ->where('user_vehicles.is_current_owner', true)
+                ->whereRaw('user_vehicles.is_current_owner = true')
                 ->with(['maintenances' => fn ($q) => $q->orderByDesc('maintenance_date')]),
         ]);
 

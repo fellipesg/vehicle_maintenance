@@ -16,7 +16,7 @@ class DashboardController extends Controller
     {
         $users = User::query()
             ->withCount([
-                'vehicles as vehicles_count' => fn ($query) => $query->where('user_vehicles.is_current_owner', true),
+                'vehicles as vehicles_count' => fn ($query) => $query->whereRaw('user_vehicles.is_current_owner = true'),
                 'maintenances',
             ])
             ->orderBy('name')

@@ -2,10 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\Workshop;
 
 class VehiclePolicy
 {
@@ -47,7 +45,7 @@ class VehiclePolicy
 
         return $user->vehicles()
             ->where('vehicles.id', $vehicle->id)
-            ->wherePivot('is_current_owner', true)
+            ->whereRaw('user_vehicles.is_current_owner = true')
             ->wherePivot('tenant_id', $user->tenant_id)
             ->exists();
     }
