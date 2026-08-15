@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Database\PostgresConnection;
 use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\Vehicle;
@@ -11,6 +12,7 @@ use App\Policies\MaintenancePolicy;
 use App\Policies\VehiclePolicy;
 use App\Policies\WorkshopPolicy;
 use App\Support\StorageEndpointResolver;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -20,7 +22,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
+            return new PostgresConnection($connection, $database, $prefix, $config);
+        });
     }
 
     public function boot(): void
