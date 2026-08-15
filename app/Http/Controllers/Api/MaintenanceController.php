@@ -92,6 +92,9 @@ class MaintenanceController extends Controller
         $vehicle = \App\Models\Vehicle::findOrFail($request->vehicle_id);
         Gate::authorize('view', $vehicle);
 
+        $processor = app(InvoiceUploadProcessor::class);
+        $storedInvoices = $processor->storeUploads($request->file('invoices'));
+
         try {
             DB::beginTransaction();
 
@@ -143,9 +146,6 @@ class MaintenanceController extends Controller
                 }
             }
 
-            $uploadResult = ['items_created' => 0, 'warnings' => []];
-            $invoiceFiles = $request->file('invoices');
-
             if ($request->has('checklists') && is_array($request->checklists)) {
                 foreach ($request->checklists as $checklistData) {
                     Checklist::create([
@@ -157,12 +157,11 @@ class MaintenanceController extends Controller
                 }
             }
 
+            $processor->createInvoiceRecords($maintenance, $storedInvoices);
+
             DB::commit();
 
-            // After commit: S3 upload must not share the open Postgres transaction.
-            if ($invoiceFiles) {
-                $uploadResult = app(InvoiceUploadProcessor::class)->processForMaintenance($maintenance, $invoiceFiles);
-            }
+            $uploadResult = $processor->parseStoredUploads($maintenance, $storedInvoices);
 
             $maintenance->load(['items', 'invoices', 'checklists', 'vehicle', 'user', 'workshop']);
 
@@ -183,6 +182,7 @@ class MaintenanceController extends Controller
             return response()->json($response, 201);
         } catch (\Exception $e) {
             DB::rollBack();
+            $processor->discardUploads($storedInvoices);
 
             return response()->json([
                 'success' => false,

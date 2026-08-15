@@ -7,6 +7,7 @@ use App\Services\Invoice\InvoiceUploadProcessor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 
 trait StoresMaintenanceInvoices
 {
@@ -52,6 +53,40 @@ trait StoresMaintenanceInvoices
             UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE, UPLOAD_ERR_EXTENSION => 'Erro no servidor ao receber o arquivo. Verifique permissões da pasta temporária.',
             default => 'Falha ao enviar o arquivo. Selecione o PDF ou XML novamente e tente outra vez.',
         };
+    }
+
+    /**
+     * Upload invoices to storage, then create the maintenance and invoice rows
+     * in one transaction. Parsing runs after commit.
+     *
+     * @param  callable(): Maintenance  $createMaintenance
+     * @return array{maintenance: Maintenance, items_created: int, warnings: string[]}
+     */
+    protected function storeMaintenanceWithInvoices(Request $request, callable $createMaintenance): array
+    {
+        $processor = app(InvoiceUploadProcessor::class);
+        $stored = $processor->storeUploads($request->file('invoices'));
+
+        try {
+            $maintenance = DB::transaction(function () use ($createMaintenance, $processor, $stored) {
+                $maintenance = $createMaintenance();
+                $processor->createInvoiceRecords($maintenance, $stored);
+
+                return $maintenance;
+            });
+        } catch (\Throwable $e) {
+            $processor->discardUploads($stored);
+
+            throw $e;
+        }
+
+        $parsed = $processor->parseStoredUploads($maintenance, $stored);
+
+        return [
+            'maintenance' => $maintenance,
+            'items_created' => $parsed['items_created'],
+            'warnings' => $parsed['warnings'],
+        ];
     }
 
     /**

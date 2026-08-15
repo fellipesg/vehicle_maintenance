@@ -9,7 +9,6 @@ use App\Models\Workshop;
 use App\Rules\InvoiceFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class MaintenanceController extends Controller
@@ -67,18 +66,15 @@ class MaintenanceController extends Controller
         $data['tenant_id'] = $request->user()->tenant_id;
         $data['is_manufacturer_required'] = $request->boolean('is_manufacturer_required');
 
-        $uploadResult = ['items_created' => 0, 'warnings' => []];
-
-        // Keep the DB transaction short. S3 upload + DNS pinning must not run
-        // inside it: a failed query on the same Postgres connection aborts the
-        // whole block (SQLSTATE 25P02), even when PHP catches the exception.
-        $maintenance = DB::transaction(fn () => Maintenance::create($data));
-        $uploadResult = $this->processMaintenanceInvoices($request, $maintenance);
+        $result = $this->storeMaintenanceWithInvoices(
+            $request,
+            fn () => Maintenance::create($data),
+        );
 
         return $this->redirectWithInvoiceFeedback(
-            redirect()->route('user.maintenances.show', $maintenance),
-            $uploadResult['items_created'],
-            $uploadResult['warnings'],
+            redirect()->route('user.maintenances.show', $result['maintenance']),
+            $result['items_created'],
+            $result['warnings'],
         );
     }
 
