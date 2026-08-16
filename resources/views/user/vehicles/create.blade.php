@@ -10,17 +10,32 @@
 
     <div class="my-6 flex items-center gap-3 text-sm text-automotive-500">
         <span class="h-px flex-1 bg-automotive-200"></span>
-        <span>Recomendado: importe o CRLV-e acima</span>
+        <span>ou cadastre manualmente</span>
         <span class="h-px flex-1 bg-automotive-200"></span>
     </div>
 
-    <p class="text-center text-sm text-automotive-500">
+    <form method="POST" action="{{ route('user.vehicles.store') }}" class="card space-y-4">
+        @csrf
+        <h2 class="text-lg font-semibold text-automotive-800">Preencher dados manualmente</h2>
+        <p class="text-sm text-automotive-500">
+            Informe placa, RENAVAM, CRV e demais dados do veículo. O CRLV-e continua sendo a opção recomendada quando disponível.
+        </p>
+        @error('vehicle')
+            <p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ $message }}</p>
+        @enderror
+        @error('crlv')
+            <p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ $message }}</p>
+        @enderror
+        @include('user.vehicles._form', ['catalog' => $catalog])
+        <div class="flex flex-wrap gap-3 pt-2">
+            <button type="submit" class="btn-primary">Cadastrar veículo</button>
+            <a href="{{ route('user.vehicles.index') }}" class="btn-secondary">Cancelar</a>
+        </div>
+    </form>
+
+    <p class="mt-6 text-center text-sm text-automotive-500">
         Veículo já cadastrado?
         <a href="{{ route('user.vehicles.claim') }}" class="text-wrench-600 hover:underline">Vincular com CRLV-e</a>
-    </p>
-
-    <p class="mt-4 text-center">
-        <a href="{{ route('user.vehicles.index') }}" class="btn-secondary">Voltar</a>
     </p>
 </div>
 @endsection

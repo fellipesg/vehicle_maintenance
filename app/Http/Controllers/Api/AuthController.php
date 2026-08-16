@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\FcmService;
 use App\Services\TenantService;
+use App\Support\SanctumMobileToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,7 +25,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'user_type' => 'required|in:user,workshop,garage',
+            'user_type' => 'sometimes|in:user,workshop,garage',
             'phone' => 'nullable|string|max:20',
             'postal_code' => 'nullable|string|max:10',
             'street' => 'nullable|string|max:255',
@@ -42,11 +43,20 @@ class AuthController extends Controller
             ], 422);
         }
 
+        if (in_array($request->input('user_type'), ['garage', 'workshop'], true)) {
+            return response()->json([
+                'success' => false,
+                'errors' => [
+                    'user_type' => ['Public registration is only available for vehicle owners.'],
+                ],
+            ], 422);
+        }
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'user_type' => $request->user_type,
+            'user_type' => 'user',
             'phone' => $request->phone,
             'postal_code' => $request->postal_code,
             'street' => $request->street,
@@ -57,26 +67,30 @@ class AuthController extends Controller
             'country' => $request->country ?? 'Brasil',
         ]);
 
-        (new TenantService())->createForUser($user);
+        (new TenantService)->createForUser($user);
         $user->refresh();
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        if ($twoFactorResponse = $this->maybeIssueTwoFactorChallenge($user)) {
+            return $twoFactorResponse;
+        }
+
+        $token = SanctumMobileToken::issue($user);
 
         // Send welcome notification (async, don't wait for it)
         try {
-            $fcmService = new FcmService();
+            $fcmService = new FcmService;
             $fcmService->sendToUser(
                 $user->id,
                 'Bem-vindo ao Vehicle Maintenance! 🚗',
                 "Olá {$user->name}! Sua conta foi criada com sucesso. Comece a gerenciar suas manutenções!",
                 [
                     'type' => 'welcome',
-                    'user_id' => (string)$user->id,
+                    'user_id' => (string) $user->id,
                 ]
             );
         } catch (\Exception $e) {
             // Don't fail registration if notification fails
-            \Log::warning('Failed to send welcome notification: ' . $e->getMessage());
+            \Log::warning('Failed to send welcome notification: '.$e->getMessage());
         }
 
         return response()->json([
@@ -98,6 +112,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'password' => 'required|string',
+            'portal' => 'nullable|in:admin,lojista,usuario',
         ]);
 
         if ($validator->fails()) {
@@ -107,7 +122,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        if (! Auth::validate($request->only('email', 'password'))) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid login credentials',
@@ -115,34 +130,36 @@ class AuthController extends Controller
         }
 
         $user = User::where('email', $request->email)->firstOrFail();
-        $token = $user->createToken('auth_token')->plainTextToken;
+
+        if ($request->filled('portal') && ! $this->userMatchesPortal($user, $request->string('portal')->toString())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta conta não tem acesso a este portal.',
+            ], 403);
+        }
+
+        if ($twoFactorResponse = $this->maybeIssueTwoFactorChallenge($user)) {
+            return $twoFactorResponse;
+        }
 
         // Send welcome notification (async, don't wait for it)
         try {
-            $fcmService = new FcmService();
+            $fcmService = new FcmService;
             $fcmService->sendToUser(
                 $user->id,
                 'Bem-vindo de volta! 👋',
                 "Olá {$user->name}! Você entrou no Vehicle Maintenance.",
                 [
                     'type' => 'welcome',
-                    'user_id' => (string)$user->id,
+                    'user_id' => (string) $user->id,
                 ]
             );
         } catch (\Exception $e) {
             // Don't fail login if notification fails
-            \Log::warning('Failed to send welcome notification: ' . $e->getMessage());
+            \Log::warning('Failed to send welcome notification: '.$e->getMessage());
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user' => $user,
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ],
-            'message' => 'Login successful',
-        ]);
+        return SanctumMobileToken::loginResponse($user);
     }
 
     /**
@@ -178,8 +195,8 @@ class AuthController extends Controller
     public function redirectToProvider(string $provider): JsonResponse
     {
         $validProviders = ['google', 'twitter', 'facebook'];
-        
-        if (!in_array($provider, $validProviders)) {
+
+        if (! in_array($provider, $validProviders)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid provider',
@@ -194,7 +211,7 @@ class AuthController extends Controller
         if (empty($clientId) || empty($clientSecret) || empty($redirectUri)) {
             return response()->json([
                 'success' => false,
-                'message' => ucfirst($provider) . ' OAuth credentials not configured. Please set ' . strtoupper($provider) . '_CLIENT_ID, ' . strtoupper($provider) . '_CLIENT_SECRET, and ' . strtoupper($provider) . '_REDIRECT_URI in your .env file.',
+                'message' => ucfirst($provider).' OAuth credentials not configured. Please set '.strtoupper($provider).'_CLIENT_ID, '.strtoupper($provider).'_CLIENT_SECRET, and '.strtoupper($provider).'_REDIRECT_URI in your .env file.',
                 'error_code' => 'OAUTH_NOT_CONFIGURED',
             ], 500);
         }
@@ -202,7 +219,7 @@ class AuthController extends Controller
         try {
             // Get the redirect URI from config
             $redirectUri = config("services.{$provider}.redirect");
-            
+
             // Use Socialite with explicit redirect URI to ensure consistency
             $redirectUrl = Socialite::driver($provider)
                 ->stateless()
@@ -219,7 +236,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error generating OAuth URL: ' . $e->getMessage(),
+                'message' => 'Error generating OAuth URL: '.$e->getMessage(),
                 'error_code' => 'OAUTH_ERROR',
             ], 500);
         }
@@ -231,8 +248,8 @@ class AuthController extends Controller
     public function handleProviderCallback(string $provider): JsonResponse
     {
         $validProviders = ['google', 'twitter', 'facebook'];
-        
-        if (!in_array($provider, $validProviders)) {
+
+        if (! in_array($provider, $validProviders)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid provider',
@@ -243,7 +260,7 @@ class AuthController extends Controller
             // Use the same redirect URI from config that was used in the initial authorization URL
             // This is critical - Google requires the redirect_uri to match exactly
             $redirectUri = config("services.{$provider}.redirect");
-            
+
             // Log for debugging
             \Log::info('OAuth callback', [
                 'provider' => $provider,
@@ -251,7 +268,7 @@ class AuthController extends Controller
                 'request_url' => request()->fullUrl(),
                 'has_code' => request()->has('code'),
             ]);
-            
+
             // Use Socialite with the same redirect URI from config
             $socialUser = Socialite::driver($provider)
                 ->stateless()
@@ -264,8 +281,8 @@ class AuthController extends Controller
                 ->first();
 
             $isNewUser = false;
-            
-            if (!$user) {
+
+            if (! $user) {
                 // Check if user exists with this email
                 $user = User::where('email', $socialUser->getEmail())->first();
 
@@ -286,7 +303,7 @@ class AuthController extends Controller
                         'avatar' => $socialUser->getAvatar(),
                         'password' => Hash::make(uniqid()),
                     ]);
-                    (new TenantService())->createForUser($user);
+                    (new TenantService)->createForUser($user);
                     $user->refresh();
                     $isNewUser = true;
                 }
@@ -297,11 +314,13 @@ class AuthController extends Controller
                 }
             }
 
-            $token = $user->createToken('auth_token')->plainTextToken;
+            if ($twoFactorResponse = $this->maybeIssueTwoFactorChallenge($user)) {
+                return $twoFactorResponse;
+            }
 
             // Send welcome notification (async, don't wait for it)
             try {
-                $fcmService = new FcmService();
+                $fcmService = new FcmService;
                 if ($isNewUser) {
                     $fcmService->sendToUser(
                         $user->id,
@@ -309,7 +328,7 @@ class AuthController extends Controller
                         "Olá {$user->name}! Sua conta foi criada com sucesso. Comece a gerenciar suas manutenções!",
                         [
                             'type' => 'welcome',
-                            'user_id' => (string)$user->id,
+                            'user_id' => (string) $user->id,
                         ]
                     );
                 } else {
@@ -319,29 +338,43 @@ class AuthController extends Controller
                         "Olá {$user->name}! Você entrou no Vehicle Maintenance.",
                         [
                             'type' => 'welcome',
-                            'user_id' => (string)$user->id,
+                            'user_id' => (string) $user->id,
                         ]
                     );
                 }
             } catch (\Exception $e) {
                 // Don't fail login if notification fails
-                \Log::warning('Failed to send welcome notification: ' . $e->getMessage());
+                \Log::warning('Failed to send welcome notification: '.$e->getMessage());
             }
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'user' => $user,
-                    'token' => $token,
-                    'token_type' => 'Bearer',
-                ],
-                'message' => 'Login successful',
-            ]);
+            return SanctumMobileToken::loginResponse($user);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error authenticating with ' . $provider . ': ' . $e->getMessage(),
+                'message' => 'Error authenticating with '.$provider.': '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    private function maybeIssueTwoFactorChallenge(User $user): ?JsonResponse
+    {
+        if (class_exists(\App\Services\TwoFactorChallengeService::class)) {
+            $challenge = app(\App\Services\TwoFactorChallengeService::class);
+            if ($challenge->isEnabled($user)) {
+                return $challenge->issuePendingResponse($user);
+            }
+        }
+
+        return null;
+    }
+
+    private function userMatchesPortal(User $user, string $portal): bool
+    {
+        return match ($portal) {
+            'admin' => $user->isAdmin(),
+            'lojista' => $user->isGarage(),
+            'usuario' => $user->isUser(),
+            default => false,
+        };
     }
 }

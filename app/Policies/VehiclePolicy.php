@@ -9,7 +9,7 @@ class VehiclePolicy
 {
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->tenant_id !== null;
     }
 
     public function view(User $user, Vehicle $vehicle): bool
@@ -35,6 +35,22 @@ class VehiclePolicy
     public function viewMaintenances(User $user, Vehicle $vehicle): bool
     {
         return $this->tenantOwnsVehicle($user, $vehicle);
+    }
+
+    public function link(User $user, Vehicle $vehicle): bool
+    {
+        if (! $user->tenant_id) {
+            return false;
+        }
+
+        if ($this->tenantOwnsVehicle($user, $vehicle)) {
+            return true;
+        }
+
+        return ! $vehicle->owners()
+            ->wherePivot('is_current_owner', true)
+            ->wherePivot('tenant_id', '!=', $user->tenant_id)
+            ->exists();
     }
 
     private function tenantOwnsVehicle(User $user, Vehicle $vehicle): bool

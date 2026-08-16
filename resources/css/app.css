@@ -1,36 +1,40 @@
 @import 'tailwindcss';
+@import '../../node_modules/preline/variants.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
+@source '../../node_modules/preline/dist/*.js';
+
+@plugin '@tailwindcss/forms';
 
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
-    --color-automotive-50: #f0f5fa;
-    --color-automotive-100: #dce8f3;
-    --color-automotive-200: #b8d1e6;
-    --color-automotive-300: #8ab4d4;
-    --color-automotive-400: #5a92bc;
-    --color-automotive-500: #3d74a0;
-    --color-automotive-600: #2f5d84;
-    --color-automotive-700: #284b6b;
-    --color-automotive-800: #243f59;
-    --color-automotive-900: #22364b;
-    --color-automotive-950: #162332;
-    --color-wrench-400: #fb923c;
-    --color-wrench-500: #f97316;
-    --color-wrench-600: #ea580c;
+    --color-automotive-50: #f7f6f4;
+    --color-automotive-100: #eceae6;
+    --color-automotive-200: #d8d4cd;
+    --color-automotive-300: #b8b2a8;
+    --color-automotive-400: #8f877c;
+    --color-automotive-500: #6b635a;
+    --color-automotive-600: #524b44;
+    --color-automotive-700: #3d3833;
+    --color-automotive-800: #2a2622;
+    --color-automotive-900: #1c1917;
+    --color-automotive-950: #141210;
+    --color-wrench-400: #d4a574;
+    --color-wrench-500: #c9956a;
+    --color-wrench-600: #a67c52;
 }
 
 @layer components {
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-wrench-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-wrench-600 focus:outline-none focus:ring-2 focus:ring-wrench-500 focus:ring-offset-2;
+        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-wrench-500 px-4 py-2.5 text-sm font-semibold text-automotive-950 shadow-sm transition hover:bg-wrench-400 focus:outline-none focus:ring-2 focus:ring-wrench-500 focus:ring-offset-2 focus:ring-offset-automotive-50;
     }
 
     .btn-secondary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-automotive-300 bg-white px-4 py-2.5 text-sm font-semibold text-automotive-800 shadow-sm transition hover:bg-automotive-50 focus:outline-none focus:ring-2 focus:ring-automotive-500 focus:ring-offset-2;
+        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-automotive-300 bg-white px-4 py-2.5 text-sm font-semibold text-automotive-800 shadow-sm transition hover:bg-automotive-100 focus:outline-none focus:ring-2 focus:ring-automotive-500 focus:ring-offset-2;
     }
 
     .btn-danger {
@@ -46,11 +50,11 @@
     }
 
     .form-input {
-        @apply w-full rounded-lg border border-automotive-300 px-3 py-2 text-sm text-automotive-900 shadow-sm focus:border-wrench-500 focus:outline-none focus:ring-2 focus:ring-wrench-500/20;
+        @apply w-full rounded-lg border border-automotive-300 bg-white px-3 py-2 text-sm text-automotive-900 shadow-sm focus:border-wrench-500 focus:outline-none focus:ring-2 focus:ring-wrench-500/25;
     }
 
     .form-select {
-        @apply w-full rounded-lg border border-automotive-300 px-3 py-2 text-sm text-automotive-900 shadow-sm focus:border-wrench-500 focus:outline-none focus:ring-2 focus:ring-wrench-500/20;
+        @apply w-full rounded-lg border border-automotive-300 bg-white px-3 py-2 text-sm text-automotive-900 shadow-sm focus:border-wrench-500 focus:outline-none focus:ring-2 focus:ring-wrench-500/25;
     }
 
     .badge {
@@ -58,18 +62,18 @@
     }
 
     .badge-blue {
-        @apply bg-automotive-100 text-automotive-800;
+        @apply border border-automotive-300/60 bg-automotive-100 text-automotive-700;
     }
 
     .badge-orange {
-        @apply bg-orange-100 text-orange-800;
+        @apply border border-wrench-500/30 bg-wrench-500/15 text-wrench-600;
     }
 
     .badge-green {
-        @apply bg-green-100 text-green-800;
+        @apply border border-automotive-400/40 bg-automotive-200/80 text-automotive-700;
     }
 
     .stat-card {
-        @apply rounded-xl border border-automotive-200 bg-gradient-to-br from-white to-automotive-50 p-5 shadow-sm;
+        @apply rounded-xl border border-automotive-200 bg-gradient-to-br from-white to-automotive-100/60 p-5 shadow-sm;
     }
 }

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\AppStorage;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +16,13 @@ class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'avatar_url',
+    ];
 
     /**
      * The attributes that are mass assignable.
@@ -51,6 +60,8 @@ class User extends Authenticatable
         'password',
         'remember_token',
         'document',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -66,6 +77,8 @@ class User extends Authenticatable
             'document' => 'encrypted',
             'is_admin' => 'boolean',
             'subscription_active' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
@@ -202,5 +215,47 @@ class User extends Authenticatable
     public function workshop()
     {
         return $this->hasOne(Workshop::class, 'user_id');
+    }
+
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->resolveAvatarUrl());
+    }
+
+    public function resolveAvatarUrl(): ?string
+    {
+        if ($this->avatar === null || $this->avatar === '') {
+            return null;
+        }
+
+        if (str_starts_with($this->avatar, 'http://') || str_starts_with($this->avatar, 'https://')) {
+            return $this->avatar;
+        }
+
+        return AppStorage::url($this->avatar);
+    }
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return $this->two_factor_confirmed_at !== null;
+    }
+
+    public function hasPendingTwoFactorSetup(): bool
+    {
+        return $this->two_factor_secret !== null && $this->two_factor_confirmed_at === null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function twoFactorRecoveryCodeHashes(): array
+    {
+        if ($this->two_factor_recovery_codes === null || $this->two_factor_recovery_codes === '') {
+            return [];
+        }
+
+        $decoded = json_decode($this->two_factor_recovery_codes, true);
+
+        return is_array($decoded) ? array_values($decoded) : [];
     }
 }

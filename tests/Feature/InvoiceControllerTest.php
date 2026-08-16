@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Invoice;
+use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\Maintenance;
-use App\Models\Invoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Http\UploadedFile;
@@ -319,5 +319,29 @@ class InvoiceControllerTest extends TestCase
             'maintenance_item_id' => $item->id,
             'invoice_type' => 'item',
         ]);
+    }
+
+    public function test_cannot_delete_invoice_from_other_tenant(): void
+    {
+        $this->actingAsApiUser();
+        $otherUser = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create();
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $otherUser->id,
+            'tenant_id' => $otherUser->tenant_id,
+        ]);
+
+        $file = UploadedFile::fake()->create('invoice.pdf', 100);
+        $filePath = $file->storeAs('invoices', 'other_tenant_invoice.pdf', 'public');
+
+        $invoice = Invoice::factory()->create([
+            'maintenance_id' => $maintenance->id,
+            'file_path' => $filePath,
+            'file_name' => 'invoice.pdf',
+        ]);
+
+        $this->deleteJson("/api/v1/invoices/{$invoice->id}")
+            ->assertForbidden();
     }
 }

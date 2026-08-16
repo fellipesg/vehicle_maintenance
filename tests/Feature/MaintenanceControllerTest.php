@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\Maintenance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
@@ -141,6 +141,37 @@ class MaintenanceControllerTest extends TestCase
         ]);
 
         $this->getJson("/api/v1/maintenances/{$maintenance->id}")
+            ->assertForbidden();
+    }
+
+    public function test_cannot_update_other_tenant_maintenance(): void
+    {
+        $this->actingAsApiUser();
+        $otherUser = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create();
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $otherUser->id,
+            'tenant_id' => $otherUser->tenant_id,
+        ]);
+
+        $this->putJson("/api/v1/maintenances/{$maintenance->id}", [
+            'description' => 'Hacked description',
+        ])->assertForbidden();
+    }
+
+    public function test_cannot_delete_other_tenant_maintenance(): void
+    {
+        $this->actingAsApiUser();
+        $otherUser = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create();
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $otherUser->id,
+            'tenant_id' => $otherUser->tenant_id,
+        ]);
+
+        $this->deleteJson("/api/v1/maintenances/{$maintenance->id}")
             ->assertForbidden();
     }
 

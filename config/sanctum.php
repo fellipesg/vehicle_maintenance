@@ -47,7 +47,8 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Default API token lifetime: 43200 minutes = 30 days (overridden per-token via createToken expires_at).
+    'expiration' => 43200,
 
     /*
     |--------------------------------------------------------------------------

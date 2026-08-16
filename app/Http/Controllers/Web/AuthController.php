@@ -67,33 +67,49 @@ class AuthController extends Controller
 
     public function register(Request $request): RedirectResponse
     {
+        if (in_array($request->input('user_type'), ['garage', 'workshop'], true)) {
+            return back()->withErrors([
+                'user_type' => 'Cadastro público disponível apenas para proprietários de veículos.',
+            ])->onlyInput('name', 'email', 'phone', 'document');
+        }
+
+        $request->merge([
+            'document' => $request->filled('document')
+                ? preg_replace('/\D/', '', (string) $request->input('document'))
+                : null,
+            'phone' => $request->filled('phone')
+                ? preg_replace('/\D/', '', (string) $request->input('phone'))
+                : null,
+        ]);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'user_type' => ['required', 'in:user,garage,workshop'],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone' => ['nullable', 'string', 'min:10', 'max:11'],
+            'document' => ['nullable', 'string', 'regex:/^(\d{11}|\d{14})$/'],
+        ], [
+            'password.min' => 'A senha deve ter no mínimo 8 caracteres.',
+            'password.confirmed' => 'A confirmação da senha não confere.',
+            'document.regex' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.',
         ]);
 
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'user_type' => $data['user_type'],
+            'user_type' => 'user',
             'phone' => $data['phone'] ?? null,
+            'document' => $data['document'] ?? null,
             'country' => 'Brasil',
         ]);
 
-        (new TenantService())->createForUser($user);
+        (new TenantService)->createForUser($user);
 
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect(match ($user->user_type) {
-            'garage' => route('garage.dashboard'),
-            'workshop' => route('workshop.dashboard'),
-            default => route('user.dashboard'),
-        });
+        return redirect(route('user.dashboard'));
     }
 
     public function logout(Request $request): RedirectResponse

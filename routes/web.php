@@ -1,21 +1,21 @@
 <?php
 
+use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Web\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Web\Admin\VehicleBrandController as AdminVehicleBrandController;
+use App\Http\Controllers\Web\Admin\VehicleModelController as AdminVehicleModelController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
+use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
+use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\PublicVehicleController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\Web\User\MaintenanceController as UserMaintenanceController;
 use App\Http\Controllers\Web\User\VehicleController as UserVehicleController;
 use App\Http\Controllers\Web\User\WorkshopDirectoryController;
-use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
-use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
-use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\Workshop\DashboardController as WorkshopDashboardController;
 use App\Http\Controllers\Web\Workshop\ProfileController as WorkshopProfileController;
-use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Web\Admin\UserController as AdminUserController;
-use App\Http\Controllers\Web\Admin\VehicleBrandController as AdminVehicleBrandController;
-use App\Http\Controllers\Web\Admin\VehicleModelController as AdminVehicleModelController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -28,9 +28,10 @@ Route::middleware('guest')->group(function () {
     Route::get('/login/usuario', fn () => app(AuthController::class)->showLogin('usuario'))->name('login.usuario');
     Route::post('/login/{portal}', [AuthController::class, 'login'])
         ->whereIn('portal', ['admin', 'lojista', 'usuario'])
+        ->middleware('throttle:auth-web')
         ->name('login.submit');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-web');
 });
 
 Route::middleware(['auth', 'tenant'])->group(function () {

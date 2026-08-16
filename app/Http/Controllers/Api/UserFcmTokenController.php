@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\UserFcmToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 
 class UserFcmTokenController extends Controller
@@ -27,20 +28,18 @@ class UserFcmTokenController extends Controller
             ], 422);
         }
 
+        Gate::authorize('create', UserFcmToken::class);
+
         $user = $request->user();
-        
-        // Check if token already exists for this user
         $existingToken = UserFcmToken::where('token', $request->token)->first();
-        
+
         if ($existingToken) {
-            // Update if belongs to different user
-            if ($existingToken->user_id !== $user->id) {
-                $existingToken->update([
-                    'user_id' => $user->id,
-                    'device_type' => $request->device_type ?? 'android',
-                ]);
-            }
-            
+            Gate::authorize('update', $existingToken);
+
+            $existingToken->update([
+                'device_type' => $request->device_type ?? $existingToken->device_type ?? 'android',
+            ]);
+
             return response()->json([
                 'success' => true,
                 'data' => $existingToken,
@@ -48,7 +47,6 @@ class UserFcmTokenController extends Controller
             ]);
         }
 
-        // Create new token
         $fcmToken = UserFcmToken::create([
             'user_id' => $user->id,
             'token' => $request->token,
@@ -67,18 +65,9 @@ class UserFcmTokenController extends Controller
      */
     public function destroy(string $token): JsonResponse
     {
-        $user = auth()->user();
-        
-        $fcmToken = UserFcmToken::where('token', $token)
-            ->where('user_id', $user->id)
-            ->first();
+        $fcmToken = UserFcmToken::where('token', $token)->firstOrFail();
 
-        if (!$fcmToken) {
-            return response()->json([
-                'success' => false,
-                'message' => 'FCM token not found',
-            ], 404);
-        }
+        Gate::authorize('delete', $fcmToken);
 
         $fcmToken->delete();
 
@@ -93,6 +82,8 @@ class UserFcmTokenController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        Gate::authorize('viewAny', UserFcmToken::class);
+
         $user = $request->user();
         $tokens = UserFcmToken::where('user_id', $user->id)->get();
 

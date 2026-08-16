@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\AppStorage;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -10,6 +12,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Vehicle extends Model
 {
     use HasFactory;
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'cover_photo_url',
+    ];
+
     protected $fillable = [
         'license_plate',
         'renavam',
@@ -21,7 +31,19 @@ class Vehicle extends Model
         'chassis',
         'motorization',
         'engine',
+        'cover_photo_path',
     ];
+
+    protected function coverPhotoUrl(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            if ($this->cover_photo_path === null || $this->cover_photo_path === '') {
+                return null;
+            }
+
+            return AppStorage::url($this->cover_photo_path);
+        });
+    }
 
     /**
      * Get all maintenances for this vehicle
@@ -34,6 +56,7 @@ class Vehicle extends Model
     public function owners(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_vehicles')
+            ->using(UserVehicle::class)
             ->withPivot(
                 'purchase_date',
                 'sale_date',

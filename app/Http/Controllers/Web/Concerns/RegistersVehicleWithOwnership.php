@@ -25,9 +25,9 @@ trait RegistersVehicleWithOwnership
         }
 
         return [
-            'license_plate' => ['required', 'string', 'max:10', $plateRule],
-            'renavam' => ['required', 'string', 'max:20', $renavamRule],
-            'crv_number' => ['required', 'string', 'max:20'],
+            'license_plate' => ['required', 'string', 'max:10', 'regex:/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/', $plateRule],
+            'renavam' => ['required', 'digits:11', $renavamRule],
+            'crv_number' => ['required', 'digits_between:10,12'],
             'brand' => ['required', 'string', 'max:100'],
             'model' => ['required', 'string', 'max:100'],
             'year' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
@@ -85,7 +85,18 @@ trait RegistersVehicleWithOwnership
 
     protected function registerVehicle(Request $request): RedirectResponse
     {
-        $data = $request->validate($this->vehicleValidationRules());
+        $request->merge([
+            'license_plate' => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $request->input('license_plate')) ?? ''),
+            'renavam' => preg_replace('/\D/', '', (string) $request->input('renavam')) ?? '',
+            'crv_number' => preg_replace('/\D/', '', (string) $request->input('crv_number')) ?? '',
+        ]);
+
+        $data = $request->validate($this->vehicleValidationRules(), [
+            'license_plate.regex' => 'Informe a placa no formato ABC1D23 ou ABC1234.',
+            'renavam.digits' => 'O RENAVAM deve ter exatamente 11 dígitos.',
+            'crv_number.digits_between' => 'O número do CRV deve ter entre 10 e 12 dígitos.',
+            'year.min' => 'O ano do modelo deve ser no mínimo 1900.',
+        ]);
 
         if (Vehicle::findByRenavam($data['renavam'])) {
             return redirect()->route($this->vehicleClaimRoute())
@@ -99,35 +110,37 @@ trait RegistersVehicleWithOwnership
         $ownership = app(VehicleOwnershipService::class);
 
         try {
-            if ($crlv === null) {
-                return back()->withInput()->withErrors([
-                    'crlv' => 'Para cadastrar um veículo novo, importe o CRLV-e digital ou vincule um veículo já existente.',
-                ]);
+            if ($crlv !== null) {
+                $ownershipType = $ownership->resolveOwnershipType($request->user(), $crlv);
+
+                if ($ownershipType === 'consignment') {
+                    session([
+                        'consignment_pending' => [
+                            'vehicle_data' => $data,
+                            'crlv_verification' => session('crlv_verification'),
+                        ],
+                    ]);
+
+                    return redirect()->route($this->vehicleConsignmentRoute())
+                        ->with('warning', 'O CPF/CNPJ do CRLV-e não é o seu. Envie a procuração do proprietário para acessar o histórico em consignação.');
+                }
+
+                $vehicle = $ownership->registerNew($request->user(), $data, $crlv);
+            } else {
+                $vehicle = $ownership->registerNew($request->user(), $data, null);
             }
-
-            $ownershipType = $ownership->resolveOwnershipType($request->user(), $crlv);
-
-            if ($ownershipType === 'consignment') {
-                session([
-                    'consignment_pending' => [
-                        'vehicle_data' => $data,
-                        'crlv_verification' => session('crlv_verification'),
-                    ],
-                ]);
-
-                return redirect()->route($this->vehicleConsignmentRoute())
-                    ->with('warning', 'O CPF/CNPJ do CRLV-e não é o seu. Envie a procuração do proprietário para acessar o histórico em consignação.');
-            }
-
-            $vehicle = $ownership->registerNew($request->user(), $data, $crlv);
         } catch (RuntimeException $exception) {
             return back()->withInput()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
         $request->session()->forget(['crlv_verification', 'crlv_preview', 'crlv_source']);
 
+        $successMessage = $crlv !== null
+            ? 'Veículo cadastrado com sucesso!'
+            : 'Veículo cadastrado com sucesso! Você pode importar o CRLV-e depois para validar a propriedade.';
+
         return redirect()->route($this->vehicleShowRoute(), $vehicle)
-            ->with('success', 'Veículo cadastrado com sucesso!');
+            ->with('success', $successMessage);
     }
 
     protected function claimVehicle(Request $request): RedirectResponse

@@ -30,7 +30,7 @@
 
         @if(session('info'))
             <div class="mx-auto w-full max-w-7xl px-4 pt-4">
-                <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                <div class="rounded-lg border border-automotive-300 bg-automotive-100 px-4 py-3 text-sm text-automotive-800">
                     {{ session('info') }}
                 </div>
             </div>

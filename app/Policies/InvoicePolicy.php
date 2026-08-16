@@ -17,6 +17,11 @@ class InvoicePolicy
         return $user->tenant_id !== null;
     }
 
+    public function update(User $user, Invoice $invoice): bool
+    {
+        return $this->canAccessMaintenance($user, $invoice->maintenance);
+    }
+
     public function delete(User $user, Invoice $invoice): bool
     {
         return $this->canAccessMaintenance($user, $invoice->maintenance);

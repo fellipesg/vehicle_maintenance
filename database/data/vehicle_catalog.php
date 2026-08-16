@@ -5,6 +5,7 @@ return [
     'BMW' => ['Série 1', 'Série 2', 'Série 3', 'Série 4', 'Série 5', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'Z4', 'i3', 'i4', 'iX'],
     'BYD' => ['Dolphin', 'Dolphin Mini', 'Han', 'King', 'Seal', 'Song Plus', 'Tan', 'Yuan Plus'],
     'Chevrolet' => ['Agile', 'Astra', 'Blazer', 'Camaro', 'Captiva', 'Celta', 'Classic', 'Cobalt', 'Corsa', 'Cruze', 'Equinox', 'Joy', 'Malibu', 'Meriva', 'Montana', 'Onix', 'Onix Plus', 'Prisma', 'S10', 'Spin', 'Tracker', 'Trailblazer', 'Vectra', 'Zafira'],
+    'Chery' => ['Arrizo 5', 'Arrizo 6', 'Arrizo 6 Pro', 'Celer', 'Cielo', 'Face', 'iCar', 'QQ', 'Tiggo 2', 'Tiggo 3', 'Tiggo 3X', 'Tiggo 5X', 'Tiggo 7', 'Tiggo 7 Pro', 'Tiggo 8', 'Tiggo 8 Pro'],
     'Citroën' => ['Aircross', 'Berlingo', 'C3', 'C4 Cactus', 'C4 Lounge', 'C4 Picasso', 'Jumper', 'Jumpy', 'Xsara Picasso'],
     'Fiat' => ['Argo', 'Bravo', 'Cronos', 'Doblo', 'Ducato', 'Fastback', 'Fiorino', 'Grand Siena', 'Idea', 'Linea', 'Mobi', 'Palio', 'Pulse', 'Punto', 'Siena', 'Stilo', 'Strada', 'Toro', 'Uno', 'Weekend'],
     'Ford' => ['Bronco Sport', 'Courier', 'EcoSport', 'Edge', 'Escort', 'Fiesta', 'Focus', 'Fusion', 'Ka', 'Maverick', 'Mustang', 'Ranger', 'Territory', 'Transit'],

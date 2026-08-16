@@ -35,18 +35,14 @@ class InvoiceController extends Controller
             ], 422);
         }
 
+        $maintenance = Maintenance::findOrFail($request->maintenance_id);
+
+        Gate::authorize('create', Invoice::class);
+        Gate::authorize('update', $maintenance);
+
         try {
-            $maintenance = Maintenance::findOrFail($request->maintenance_id);
-
-            if (! $request->user()->can('update', $maintenance)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized',
-                ], 403);
-            }
-
             $file = $request->file('file');
-            $fileName = time() . '_' . $file->getClientOriginalName();
+            $fileName = time().'_'.$file->getClientOriginalName();
             $filePath = $file->storeAs('invoices', $fileName, AppStorage::diskName());
 
             $invoice = Invoice::create([
@@ -86,7 +82,7 @@ class InvoiceController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error uploading invoice: ' . $e->getMessage(),
+                'message' => 'Error uploading invoice: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -111,7 +107,7 @@ class InvoiceController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error downloading invoice: ' . $e->getMessage(),
+                'message' => 'Error downloading invoice: '.$e->getMessage(),
             ], 500);
         }
     }

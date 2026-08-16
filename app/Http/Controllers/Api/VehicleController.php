@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
 use App\Services\Vehicle\VehicleMaintenancePdfExporter;
 use App\Services\VehicleCatalogService;
+use App\Support\AppStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\File;
 
 class VehicleController extends Controller
 {
@@ -60,7 +62,7 @@ class VehicleController extends Controller
             'renavam' => 'required|string|max:20|unique:vehicles,renavam',
             'brand' => 'required|string|max:100',
             'model' => 'required|string|max:100',
-            'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'year' => 'required|integer|min:1900|max:'.(date('Y') + 1),
             'color' => 'nullable|string|max:50',
             'chassis' => 'nullable|string|max:50',
             'motorization' => 'nullable|string|max:100',
@@ -109,11 +111,11 @@ class VehicleController extends Controller
         Gate::authorize('update', $vehicle);
 
         $validator = Validator::make($request->all(), [
-            'license_plate' => 'sometimes|required|string|max:10|unique:vehicles,license_plate,' . $id,
-            'renavam' => 'sometimes|required|string|max:20|unique:vehicles,renavam,' . $id,
+            'license_plate' => 'sometimes|required|string|max:10|unique:vehicles,license_plate,'.$id,
+            'renavam' => 'sometimes|required|string|max:20|unique:vehicles,renavam,'.$id,
             'brand' => 'sometimes|required|string|max:100',
             'model' => 'sometimes|required|string|max:100',
-            'year' => 'sometimes|required|integer|min:1900|max:' . (date('Y') + 1),
+            'year' => 'sometimes|required|integer|min:1900|max:'.(date('Y') + 1),
             'color' => 'nullable|string|max:50',
             'chassis' => 'nullable|string|max:50',
             'motorization' => 'nullable|string|max:100',
@@ -157,7 +159,9 @@ class VehicleController extends Controller
     {
         $vehicle = Vehicle::where('license_plate', $identifier)
             ->orWhere('renavam', $identifier)
-            ->with(['maintenances.items', 'maintenances.invoices', 'maintenances.checklists', 'maintenances.workshop'])
+            ->with(['maintenances' => function ($query) {
+                $query->orderBy('maintenance_date', 'desc');
+            }, 'maintenances.workshop'])
             ->first();
 
         if (! $vehicle) {
@@ -169,7 +173,7 @@ class VehicleController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $vehicle,
+            'data' => $this->publicVehicleSearchPayload($vehicle),
         ]);
     }
 
@@ -223,6 +227,8 @@ class VehicleController extends Controller
     public function linkToUser(Request $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
+        Gate::authorize('link', $vehicle);
+
         $user = $request->user();
 
         $existingLink = $user->vehicles()->where('vehicle_id', $vehicle->id)->first();
@@ -246,5 +252,81 @@ class VehicleController extends Controller
             'message' => 'Vehicle linked to user successfully',
             'data' => $vehicle->fresh(),
         ]);
+    }
+
+    public function uploadCover(Request $request, string $id): JsonResponse
+    {
+        $vehicle = Vehicle::findOrFail($id);
+        Gate::authorize('update', $vehicle);
+
+        $validator = Validator::make($request->all(), [
+            'cover' => [
+                'required',
+                File::image(allowSvg: false)
+                    ->types(['jpg', 'jpeg', 'png', 'webp'])
+                    ->max(5 * 1024),
+            ],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $file = $request->file('cover');
+        $extension = $file->getClientOriginalExtension() ?: 'jpg';
+        $fileName = $vehicle->id.'_'.time().'.'.$extension;
+        $filePath = $file->storeAs('vehicle-covers', $fileName, AppStorage::diskName());
+
+        $this->deleteStoredCover($vehicle->cover_photo_path);
+
+        $vehicle->update(['cover_photo_path' => $filePath]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $vehicle->fresh(),
+            'message' => 'Cover photo uploaded successfully',
+        ]);
+    }
+
+    private function deleteStoredCover(?string $coverPhotoPath): void
+    {
+        if ($coverPhotoPath === null || $coverPhotoPath === '') {
+            return;
+        }
+
+        if (AppStorage::disk()->exists($coverPhotoPath)) {
+            AppStorage::disk()->delete($coverPhotoPath);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function publicVehicleSearchPayload(Vehicle $vehicle): array
+    {
+        return [
+            'id' => $vehicle->id,
+            'license_plate' => $vehicle->license_plate,
+            'renavam' => $vehicle->renavam,
+            'brand' => $vehicle->brand,
+            'model' => $vehicle->model,
+            'year' => $vehicle->year,
+            'color' => $vehicle->color,
+            'maintenances' => $vehicle->maintenances->map(function ($maintenance) {
+                return [
+                    'id' => $maintenance->id,
+                    'maintenance_type' => $maintenance->maintenance_type,
+                    'description' => $maintenance->description,
+                    'workshop_name' => $maintenance->displayWorkshopName(),
+                    'maintenance_date' => $maintenance->maintenance_date,
+                    'kilometers' => $maintenance->kilometers,
+                    'service_category' => $maintenance->service_category,
+                    'is_manufacturer_required' => $maintenance->is_manufacturer_required,
+                ];
+            })->values()->all(),
+        ];
     }
 }

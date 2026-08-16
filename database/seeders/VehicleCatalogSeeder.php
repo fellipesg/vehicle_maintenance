@@ -10,23 +10,23 @@ class VehicleCatalogSeeder extends Seeder
 {
     public function run(): void
     {
-        if (VehicleBrand::query()->exists()) {
-            return;
-        }
-
         $catalog = require database_path('data/vehicle_catalog.php');
 
         foreach ($catalog as $brandName => $models) {
-            $brand = VehicleBrand::create([
-                'name' => $brandName,
-                'is_active' => true,
-            ]);
+            $brand = VehicleBrand::query()->firstOrCreate(
+                ['name' => $brandName],
+                ['is_active' => true],
+            );
+
+            if (! $brand->is_active) {
+                $brand->update(['is_active' => true]);
+            }
 
             foreach ($models as $modelName) {
-                $brand->models()->create([
-                    'name' => $modelName,
-                    'is_active' => true,
-                ]);
+                $brand->models()->firstOrCreate(
+                    ['name' => $modelName],
+                    ['is_active' => true],
+                );
             }
         }
 

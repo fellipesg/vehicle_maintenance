@@ -9,7 +9,7 @@
 
 @section('content')
     <div class="mb-6 text-center">
-        <span class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-automotive-500/30 text-3xl">{{ $config['icon'] }}</span>
+        @include('auth.partials.portal-icon', ['portal' => 'usuario', 'class' => 'mb-3'])
         <h1 class="text-xl font-semibold">{{ $config['title'] }}</h1>
         <p class="mt-1 text-sm text-automotive-400">{{ $config['subtitle'] }}</p>
     </div>

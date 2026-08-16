@@ -7,6 +7,8 @@
         $brandOptions[] = $selectedBrand;
         sort($brandOptions);
     }
+    $minYear = 1900;
+    $maxYear = (int) date('Y') + 1;
 @endphp
 
 <div class="grid gap-4 sm:grid-cols-2">
@@ -14,20 +16,27 @@
         <label for="license_plate" class="form-label">Placa *</label>
         <input type="text" name="license_plate" id="license_plate"
                value="{{ old('license_plate', $vehicle->license_plate ?? '') }}" required
-               class="form-input uppercase" placeholder="ABC1D23">
+               class="form-input uppercase" placeholder="ABC1D23"
+               data-mask="plate" maxlength="7" autocomplete="off">
+        <p class="mt-1 text-sm text-automotive-500" data-field-hint data-default-hint="Formato ABC1D23 ou ABC1234" data-idle-class="mt-1 text-sm text-automotive-500">Formato ABC1D23 ou ABC1234</p>
         @error('license_plate')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
     <div>
         <label for="renavam" class="form-label">RENAVAM *</label>
         <input type="text" name="renavam" id="renavam"
-               value="{{ old('renavam', $vehicle->renavam ?? '') }}" required class="form-input">
+               value="{{ old('renavam', $vehicle->renavam ?? '') }}" required class="form-input"
+               data-mask="digits" data-min-digits="11" data-max-digits="11"
+               maxlength="11" inputmode="numeric" placeholder="00000000000" autocomplete="off">
+        <p class="mt-1 text-sm text-automotive-500" data-field-hint data-default-hint="11 dígitos" data-idle-class="mt-1 text-sm text-automotive-500">11 dígitos</p>
         @error('renavam')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
     <div>
         <label for="crv_number" class="form-label">Número do CRV *</label>
         <input type="text" name="crv_number" id="crv_number"
                value="{{ old('crv_number', $vehicle->crv_number ?? '') }}" required class="form-input"
-               placeholder="Conforme o CRLV-e">
+               data-mask="digits" data-min-digits="10" data-max-digits="12"
+               maxlength="12" inputmode="numeric" placeholder="Conforme o CRLV-e" autocomplete="off">
+        <p class="mt-1 text-sm text-automotive-500" data-field-hint data-default-hint="10 a 12 dígitos" data-idle-class="mt-1 text-sm text-automotive-500">10 a 12 dígitos</p>
         @error('crv_number')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
     <div>
@@ -51,7 +60,9 @@
         <label for="year" class="form-label">Ano do modelo *</label>
         <input type="number" name="year" id="year"
                value="{{ old('year', $vehicle->year ?? date('Y')) }}" required class="form-input"
-               min="1980" max="{{ date('Y') + 1 }}">
+               min="{{ $minYear }}" max="{{ $maxYear }}"
+               data-mask="year">
+        <p class="mt-1 text-sm text-automotive-500" data-field-hint data-default-hint="Entre {{ $minYear }} e {{ $maxYear }}" data-idle-class="mt-1 text-sm text-automotive-500">Entre {{ $minYear }} e {{ $maxYear }}</p>
         @error('year')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
     <div>
@@ -62,7 +73,7 @@
     <div>
         <label for="chassis" class="form-label">Chassi</label>
         <input type="text" name="chassis" id="chassis"
-               value="{{ old('chassis', $vehicle->chassis ?? '') }}" class="form-input uppercase">
+               value="{{ old('chassis', $vehicle->chassis ?? '') }}" class="form-input uppercase" maxlength="17">
     </div>
     <div>
         <label for="motorization" class="form-label">Motorização</label>
