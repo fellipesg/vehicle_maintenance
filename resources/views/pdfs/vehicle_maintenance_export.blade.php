@@ -48,6 +48,13 @@
             margin-bottom: 10px;
             color: #1e40af;
         }
+
+        .vehicle-cover img {
+            max-width: 220px;
+            max-height: 280px;
+            width: auto;
+            height: auto;
+        }
         
         .info-grid {
             display: grid;
@@ -228,6 +235,14 @@
     
     <div class="vehicle-info">
         <h2>Informações do Veículo</h2>
+        @if(! empty($coverImageSrc))
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
+                <tr>
+                    <td class="vehicle-cover" style="width: 240px; vertical-align: top; padding-right: 12px;">
+                        <img src="{{ $coverImageSrc }}" alt="Foto de capa do {{ $vehicle->brand }} {{ $vehicle->model }}">
+                    </td>
+                    <td style="vertical-align: top;">
+        @endif
         <div class="info-grid">
             <div class="info-item">
                 <span class="info-label">Marca/Modelo:</span>
@@ -270,6 +285,11 @@
             </div>
             @endif
         </div>
+        @if(! empty($coverImageSrc))
+                    </td>
+                </tr>
+            </table>
+        @endif
     </div>
     
     @if($vehicle->maintenances->count() > 0)

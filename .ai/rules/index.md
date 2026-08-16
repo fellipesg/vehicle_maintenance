@@ -6,4 +6,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |
+| app/Services/Vehicle/VehicleMaintenancePdfExporter.php | .ai/rules/vehicle.md |
 | frontend/lib/views/vehicles/** | .ai/rules/vehicles.md |

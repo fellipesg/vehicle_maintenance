@@ -34,15 +34,16 @@ class VehicleMaintenancePdfExporter
             $vehicle->maintenances->sortByDesc('maintenance_date')->values()
         );
 
-        $pdf = Pdf::loadView('pdfs.vehicle_maintenance_export', [
-            'vehicle' => $vehicle,
-        ]);
-        $pdf->setPaper('a4', 'portrait');
-
-        $mainPdfContent = $pdf->output();
         $temps = [];
 
         try {
+            $pdf = Pdf::loadView('pdfs.vehicle_maintenance_export', [
+                'vehicle' => $vehicle,
+                'coverImageSrc' => $this->coverImageSrc($vehicle, $temps),
+            ]);
+            $pdf->setPaper('a4', 'portrait');
+
+            $mainPdfContent = $pdf->output();
             $copies = $this->collectInvoiceCopies($vehicle, $temps);
             $invoicePdfs = array_values(array_filter(
                 $copies,
@@ -94,6 +95,69 @@ class VehicleMaintenancePdfExporter
             if (is_file($temp)) {
                 unlink($temp);
             }
+        }
+    }
+
+    /**
+     * DomPDF has enable_remote=false and chroot=base_path(), so S3 URLs and
+     * /tmp copies cannot be used as <img src>. Embed JPEG/PNG as a data URI.
+     *
+     * @param  list<string>  $temps
+     */
+    private function coverImageSrc(Vehicle $vehicle, array &$temps): ?string
+    {
+        $path = $vehicle->cover_photo_path;
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        $copy = AppStorage::localCopy($path);
+        if ($copy === null) {
+            return null;
+        }
+
+        if ($copy['temporary']) {
+            $temps[] = $copy['path'];
+        }
+
+        $bytes = $copy['content'] ?? (is_file($copy['path']) ? file_get_contents($copy['path']) : false);
+        if (! is_string($bytes) || $bytes === '') {
+            return null;
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) ?: 'image/jpeg';
+        if (! in_array($mime, ['image/jpeg', 'image/png', 'image/gif'], true)) {
+            $converted = $this->coverBytesAsJpeg($bytes);
+            if ($converted === null) {
+                return null;
+            }
+
+            $bytes = $converted;
+            $mime = 'image/jpeg';
+        }
+
+        return 'data:'.$mime.';base64,'.base64_encode($bytes);
+    }
+
+    private function coverBytesAsJpeg(string $bytes): ?string
+    {
+        if (! function_exists('imagecreatefromstring')) {
+            return null;
+        }
+
+        $image = @imagecreatefromstring($bytes);
+        if ($image === false) {
+            return null;
+        }
+
+        try {
+            ob_start();
+            imagejpeg($image, null, 85);
+            $jpeg = ob_get_clean();
+
+            return is_string($jpeg) && $jpeg !== '' ? $jpeg : null;
+        } finally {
+            imagedestroy($image);
         }
     }
 
