@@ -282,13 +282,18 @@ class UserPortalTest extends TestCase
             ->get(route('user.vehicles.index'))
             ->assertOk()
             ->assertSee($alt, false)
-            ->assertSee($path, false);
+            ->assertSee($path, false)
+            ->assertSee('object-contain', false)
+            ->assertDontSee('aspect-[16/9]', false)
+            ->assertDontSee('aspect-[3/4]', false);
 
         $this->actingAs($this->user)
             ->get(route('user.vehicles.show', $vehicle))
             ->assertOk()
             ->assertSee($alt, false)
-            ->assertSee($path, false);
+            ->assertSee($path, false)
+            ->assertSee('object-contain', false)
+            ->assertDontSee('aspect-[16/9]', false);
 
         $this->actingAs($this->user)
             ->get('/usuario/dashboard')
