@@ -11,6 +11,7 @@ use App\Rules\CrlvPdfFile;
 use App\Services\Crlv\CrlvExerciseValidator;
 use App\Services\Crlv\CrlvParseResult;
 use App\Services\Crlv\CrlvPdfParser;
+use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleOwnershipService;
 use App\Services\VehicleCatalogService;
 use App\Support\AppStorage;
@@ -18,6 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
@@ -230,7 +232,7 @@ class VehicleController extends Controller
             );
     }
 
-    public function update(Request $request, Vehicle $vehicle): RedirectResponse
+    public function update(Request $request, Vehicle $vehicle, VehicleCoverService $covers): RedirectResponse
     {
         Gate::authorize('update', $vehicle);
 
@@ -245,9 +247,22 @@ class VehicleController extends Controller
             'chassis' => ['nullable', 'string', 'max:50'],
             'motorization' => ['nullable', 'string', 'max:100'],
             'engine' => ['nullable', 'string', 'max:50'],
+            'cover' => [
+                'nullable',
+                File::image(allowSvg: false)
+                    ->types(['jpg', 'jpeg', 'png', 'webp'])
+                    ->max(5 * 1024),
+            ],
         ]);
 
+        $cover = $request->file('cover');
+        unset($data['cover']);
+
         $vehicle->update($data);
+
+        if ($cover !== null) {
+            $covers->store($vehicle, $cover);
+        }
 
         return redirect()->route('user.vehicles.show', $vehicle)
             ->with('success', 'Veículo atualizado com sucesso!');

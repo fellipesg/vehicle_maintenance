@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
+use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleMaintenancePdfExporter;
 use App\Services\VehicleCatalogService;
-use App\Support\AppStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -15,6 +15,8 @@ use Illuminate\Validation\Rules\File;
 
 class VehicleController extends Controller
 {
+    public function __construct(private readonly VehicleCoverService $covers) {}
+
     public function catalogBrands(VehicleCatalogService $catalog): JsonResponse
     {
         return response()->json([
@@ -276,30 +278,13 @@ class VehicleController extends Controller
         }
 
         $file = $request->file('cover');
-        $extension = $file->getClientOriginalExtension() ?: 'jpg';
-        $fileName = $vehicle->id.'_'.time().'.'.$extension;
-        $filePath = $file->storeAs('vehicle-covers', $fileName, AppStorage::diskName());
-
-        $this->deleteStoredCover($vehicle->cover_photo_path);
-
-        $vehicle->update(['cover_photo_path' => $filePath]);
+        $vehicle = $this->covers->store($vehicle, $file);
 
         return response()->json([
             'success' => true,
-            'data' => $vehicle->fresh(),
+            'data' => $vehicle,
             'message' => 'Cover photo uploaded successfully',
         ]);
-    }
-
-    private function deleteStoredCover(?string $coverPhotoPath): void
-    {
-        if ($coverPhotoPath === null || $coverPhotoPath === '') {
-            return;
-        }
-
-        if (AppStorage::disk()->exists($coverPhotoPath)) {
-            AppStorage::disk()->delete($coverPhotoPath);
-        }
     }
 
     /**

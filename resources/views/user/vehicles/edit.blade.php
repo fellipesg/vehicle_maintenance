@@ -19,9 +19,16 @@
         <span class="h-px flex-1 bg-automotive-200"></span>
     </div>
 
-    <form method="POST" action="{{ route('user.vehicles.update', $vehicle) }}" class="card space-y-4">
+    <form method="POST" action="{{ route('user.vehicles.update', $vehicle) }}" enctype="multipart/form-data" class="card space-y-4">
         @csrf
         @method('PUT')
+        <div>
+            <p class="form-label">Foto de capa</p>
+            <x-vehicle-cover :vehicle="$vehicle" variant="card" class="mb-3 max-h-64 overflow-hidden rounded-lg" />
+            <input type="file" name="cover" id="cover" accept="image/jpeg,image/png,image/webp" class="form-input">
+            <p class="mt-1 text-sm text-automotive-500">JPG, PNG ou WebP até 5 MB. Prefira paisagem; no app o enquadramento 16:9 é pedido na hora.</p>
+            @error('cover')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
         @include('user.vehicles._form', ['vehicle' => $vehicle, 'catalog' => $catalog])
         <div class="flex gap-3 pt-2">
             <button type="submit" class="btn-primary">Atualizar</button>

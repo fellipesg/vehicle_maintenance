@@ -303,4 +303,52 @@ class UserPortalTest extends TestCase
             ->assertSee($alt, false)
             ->assertSee($path, false);
     }
+
+    public function test_vehicle_edit_shows_and_updates_cover_photo(): void
+    {
+        Storage::fake('public');
+        $this->seed(\Database\Seeders\VehicleCatalogSeeder::class);
+
+        $vehicle = Vehicle::factory()->create([
+            'brand' => 'Honda',
+            'model' => 'Civic',
+            'year' => 2020,
+            'crv_number' => '123456789012',
+            'cover_photo_path' => 'vehicle-covers/old.jpg',
+        ]);
+        $this->user->vehicles()->attach($vehicle->id, [
+            'is_current_owner' => true,
+            'purchase_date' => now(),
+            'tenant_id' => $this->user->tenant_id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->get(route('user.vehicles.edit', $vehicle))
+            ->assertOk()
+            ->assertSee('Foto de capa')
+            ->assertSee('Capa do Honda Civic', false);
+
+        $file = UploadedFile::fake()->image('nova-capa.jpg', 800, 450);
+
+        $this->actingAs($this->user)
+            ->put(route('user.vehicles.update', $vehicle), [
+                'license_plate' => $vehicle->license_plate,
+                'renavam' => $vehicle->renavam,
+                'crv_number' => $vehicle->crv_number,
+                'brand' => $vehicle->brand,
+                'model' => $vehicle->model,
+                'year' => $vehicle->year,
+                'color' => $vehicle->color,
+                'chassis' => $vehicle->chassis,
+                'motorization' => $vehicle->motorization,
+                'engine' => $vehicle->engine,
+                'cover' => $file,
+            ])
+            ->assertRedirect(route('user.vehicles.show', $vehicle));
+
+        $vehicle->refresh();
+        $this->assertNotSame('vehicle-covers/old.jpg', $vehicle->cover_photo_path);
+        $this->assertNotNull($vehicle->cover_photo_path);
+        Storage::disk('public')->assertExists($vehicle->cover_photo_path);
+    }
 }
