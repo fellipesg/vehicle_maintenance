@@ -28,13 +28,31 @@
         </div>
     </div>
 
-    <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <div class="stat-card"><p class="text-sm text-automotive-600">RENAVAM</p><p class="font-semibold">{{ $vehicle->renavam }}</p></div>
-        <div class="stat-card"><p class="text-sm text-automotive-600">CRV</p><p class="font-semibold text-sm">{{ $vehicle->crv_number ?? '—' }}</p></div>
-        <div class="stat-card"><p class="text-sm text-automotive-600">Chassi</p><p class="font-semibold text-sm">{{ $vehicle->chassis ?? '—' }}</p></div>
-        <div class="stat-card"><p class="text-sm text-automotive-600">Motorização</p><p class="font-semibold text-sm">{{ $vehicle->motorization ?? '—' }}</p></div>
-        <div class="stat-card"><p class="text-sm text-automotive-600">Código do motor</p><p class="font-semibold text-sm">{{ $vehicle->engine ?? '—' }}</p></div>
-        <div class="stat-card"><p class="text-sm text-automotive-600">Manutenções</p><p class="text-2xl font-bold">{{ $vehicle->maintenances->count() }}</p></div>
+    <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="stat-card">
+            <p class="text-sm text-automotive-600">RENAVAM</p>
+            <p class="font-semibold wrap-anywhere">{{ $vehicle->renavam }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-automotive-600">CRV</p>
+            <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->crv_number ?? '—' }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-automotive-600">Chassi</p>
+            <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->chassis ?? '—' }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-automotive-600">Motorização</p>
+            <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->motorization ?? '—' }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-automotive-600">Código do motor</p>
+            <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->engine ?? '—' }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-automotive-600">Manutenções</p>
+            <p class="text-2xl font-bold">{{ $vehicle->maintenances->count() }}</p>
+        </div>
     </div>
 
     <h2 class="mb-4 text-xl font-semibold">🔧 Histórico de Manutenções</h2>

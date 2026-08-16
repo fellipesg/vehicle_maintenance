@@ -293,7 +293,9 @@ class UserPortalTest extends TestCase
             ->assertSee($alt, false)
             ->assertSee($path, false)
             ->assertSee('object-contain', false)
-            ->assertDontSee('aspect-[16/9]', false);
+            ->assertDontSee('aspect-[16/9]', false)
+            ->assertSee('lg:grid-cols-3', false)
+            ->assertSee('wrap-anywhere', false);
 
         $this->actingAs($this->user)
             ->get('/usuario/dashboard')

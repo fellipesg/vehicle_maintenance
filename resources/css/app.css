@@ -74,6 +74,6 @@
     }
 
     .stat-card {
-        @apply rounded-xl border border-automotive-200 bg-gradient-to-br from-white to-automotive-100/60 p-5 shadow-sm;
+        @apply min-w-0 overflow-hidden rounded-xl border border-automotive-200 bg-gradient-to-br from-white to-automotive-100/60 p-5 shadow-sm;
     }
 }
