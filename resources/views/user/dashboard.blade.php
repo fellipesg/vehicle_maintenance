@@ -35,10 +35,13 @@
             </div>
             @forelse($vehicles as $vehicle)
                 <a href="{{ route('user.vehicles.show', $vehicle) }}" class="card mb-2 block !p-4 transition hover:border-wrench-300 hover:shadow-sm">
-                    <div class="flex justify-between gap-3">
-                        <div>
-                            <p class="font-semibold text-automotive-900">{{ $vehicle->brand }} {{ $vehicle->model }}</p>
-                            <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }}</p>
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <x-vehicle-cover :vehicle="$vehicle" />
+                            <div class="min-w-0">
+                                <p class="font-semibold text-automotive-900">{{ $vehicle->brand }} {{ $vehicle->model }}</p>
+                                <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }}</p>
+                            </div>
                         </div>
                         <span class="badge badge-blue shrink-0">{{ $vehicle->maintenances_count }} manutenções</span>
                     </div>

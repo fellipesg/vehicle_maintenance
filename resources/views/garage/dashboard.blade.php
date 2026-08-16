@@ -33,8 +33,13 @@
             <h2 class="mb-3 text-lg font-semibold text-automotive-900">Estoque</h2>
             @forelse($vehicles as $vehicle)
                 <a href="{{ route('garage.vehicles.show', $vehicle) }}" class="card mb-2 block !p-4 transition hover:border-wrench-300 hover:shadow-sm">
-                    <p class="font-semibold text-automotive-900">{{ $vehicle->brand }} {{ $vehicle->model }}</p>
-                    <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }} · {{ $vehicle->maintenances_count }} manutenções</p>
+                    <div class="flex items-center gap-3">
+                        <x-vehicle-cover :vehicle="$vehicle" />
+                        <div class="min-w-0">
+                            <p class="font-semibold text-automotive-900">{{ $vehicle->brand }} {{ $vehicle->model }}</p>
+                            <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }} · {{ $vehicle->maintenances_count }} manutenções</p>
+                        </div>
+                    </div>
                 </a>
             @empty
                 <div class="card !p-8 text-center">

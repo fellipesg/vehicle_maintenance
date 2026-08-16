@@ -11,18 +11,21 @@
 
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @forelse($vehicles as $vehicle)
-            <div class="card">
-                <div class="mb-3 flex items-start justify-between">
-                    <div>
-                        <h2 class="text-lg font-semibold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
-                        <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->color ?? '—' }}</p>
+            <div class="card !p-0 overflow-hidden">
+                <x-vehicle-cover :vehicle="$vehicle" variant="card" />
+                <div class="p-6">
+                    <div class="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
+                            <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->color ?? '—' }}</p>
+                        </div>
+                        <span class="badge badge-blue">{{ $vehicle->license_plate }}</span>
                     </div>
-                    <span class="badge badge-blue">{{ $vehicle->license_plate }}</span>
-                </div>
-                <p class="mb-4 text-sm text-automotive-500">{{ $vehicle->maintenances_count }} manutenções registradas</p>
-                <div class="flex gap-2">
-                    <a href="{{ route('user.vehicles.show', $vehicle) }}" class="btn-primary !py-1.5 !text-xs flex-1 text-center">Ver</a>
-                    <a href="{{ route('user.vehicles.edit', $vehicle) }}" class="btn-secondary !py-1.5 !text-xs">Editar</a>
+                    <p class="mb-4 text-sm text-automotive-500">{{ $vehicle->maintenances_count }} manutenções registradas</p>
+                    <div class="flex gap-2">
+                        <a href="{{ route('user.vehicles.show', $vehicle) }}" class="btn-primary !py-1.5 !text-xs flex-1 text-center">Ver</a>
+                        <a href="{{ route('user.vehicles.edit', $vehicle) }}" class="btn-secondary !py-1.5 !text-xs">Editar</a>
+                    </div>
                 </div>
             </div>
         @empty

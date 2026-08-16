@@ -28,8 +28,9 @@
     @if(isset($identifier) && $identifier)
         @if($vehicle)
             <div class="mt-8">
-                <div class="card mb-6">
-                    <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="card mb-6 !p-0 overflow-hidden">
+                    <x-vehicle-cover :vehicle="$vehicle" variant="card" />
+                    <div class="flex flex-wrap items-start justify-between gap-4 p-6">
                         <div>
                             <h2 class="text-2xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
                             <p class="text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->color ?? 'Cor não informada' }}</p>

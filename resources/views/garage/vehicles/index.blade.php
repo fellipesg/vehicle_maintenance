@@ -14,11 +14,14 @@
 
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @forelse($vehicles as $vehicle)
-            <div class="card">
-                <h2 class="text-lg font-semibold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
-                <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }}</p>
-                <p class="mt-2 text-sm text-automotive-500">{{ $vehicle->maintenances_count }} revisões documentadas</p>
-                <a href="{{ route('garage.vehicles.show', $vehicle) }}" class="btn-primary mt-4 !py-1.5 !text-xs w-full text-center">Ver detalhes</a>
+            <div class="card !p-0 overflow-hidden">
+                <x-vehicle-cover :vehicle="$vehicle" variant="card" />
+                <div class="p-6">
+                    <h2 class="text-lg font-semibold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
+                    <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }}</p>
+                    <p class="mt-2 text-sm text-automotive-500">{{ $vehicle->maintenances_count }} revisões documentadas</p>
+                    <a href="{{ route('garage.vehicles.show', $vehicle) }}" class="btn-primary mt-4 !py-1.5 !text-xs w-full text-center">Ver detalhes</a>
+                </div>
             </div>
         @empty
             <div class="card col-span-full text-center">

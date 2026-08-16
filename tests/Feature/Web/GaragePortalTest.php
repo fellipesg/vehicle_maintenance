@@ -4,7 +4,6 @@ namespace Tests\Feature\Web;
 
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\Workshop;
 use Database\Seeders\VehicleCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -73,5 +72,40 @@ class GaragePortalTest extends TestCase
             ->get('/garagem/estoque')
             ->assertOk()
             ->assertSee($vehicle->brand);
+    }
+
+    public function test_stock_listing_and_detail_show_cover_photo(): void
+    {
+        $path = 'vehicle-covers/civic.jpg';
+        $vehicle = Vehicle::factory()->create([
+            'brand' => 'Honda',
+            'model' => 'Civic',
+            'cover_photo_path' => $path,
+        ]);
+        $this->garage->vehicles()->attach($vehicle->id, [
+            'is_current_owner' => true,
+            'purchase_date' => now(),
+            'tenant_id' => $this->garage->tenant_id,
+        ]);
+
+        $alt = 'Capa do Honda Civic';
+
+        $this->actingAs($this->garage)
+            ->get(route('garage.vehicles.index'))
+            ->assertOk()
+            ->assertSee($alt, false)
+            ->assertSee($path, false);
+
+        $this->actingAs($this->garage)
+            ->get(route('garage.vehicles.show', $vehicle))
+            ->assertOk()
+            ->assertSee($alt, false)
+            ->assertSee($path, false);
+
+        $this->actingAs($this->garage)
+            ->get('/garagem/dashboard')
+            ->assertOk()
+            ->assertSee($alt, false)
+            ->assertSee($path, false);
     }
 }

@@ -12,6 +12,7 @@
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-8">
     <span class="badge badge-green mb-2">🏪 Garagem</span>
+    <x-vehicle-cover :vehicle="$vehicle" variant="hero" class="mb-6" />
     <h1 class="text-3xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h1>
     <p class="text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }}</p>
 

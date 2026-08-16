@@ -261,4 +261,39 @@ class UserPortalTest extends TestCase
             ->assertOk()
             ->assertSee('Oficina Teste');
     }
+
+    public function test_vehicle_listing_and_detail_show_cover_photo(): void
+    {
+        $path = 'vehicle-covers/c180.jpg';
+        $vehicle = Vehicle::factory()->create([
+            'brand' => 'Mercedes-Benz',
+            'model' => 'C 180',
+            'cover_photo_path' => $path,
+        ]);
+        $this->user->vehicles()->attach($vehicle->id, [
+            'is_current_owner' => true,
+            'purchase_date' => now(),
+            'tenant_id' => $this->user->tenant_id,
+        ]);
+
+        $alt = 'Capa do Mercedes-Benz C 180';
+
+        $this->actingAs($this->user)
+            ->get(route('user.vehicles.index'))
+            ->assertOk()
+            ->assertSee($alt, false)
+            ->assertSee($path, false);
+
+        $this->actingAs($this->user)
+            ->get(route('user.vehicles.show', $vehicle))
+            ->assertOk()
+            ->assertSee($alt, false)
+            ->assertSee($path, false);
+
+        $this->actingAs($this->user)
+            ->get('/usuario/dashboard')
+            ->assertOk()
+            ->assertSee($alt, false)
+            ->assertSee($path, false);
+    }
 }

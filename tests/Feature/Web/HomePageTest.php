@@ -25,11 +25,15 @@ class HomePageTest extends TestCase
 
     public function test_vehicle_search_finds_vehicle_by_plate(): void
     {
-        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        $vehicle = Vehicle::factory()->create([
+            'license_plate' => 'ABC1D23',
+            'cover_photo_path' => 'vehicle-covers/search.jpg',
+        ]);
 
         $this->get('/buscar-veiculo?identifier=ABC1D23')
             ->assertOk()
             ->assertSee($vehicle->brand)
-            ->assertSee('ABC1D23');
+            ->assertSee('ABC1D23')
+            ->assertSee('Capa do '.$vehicle->brand.' '.$vehicle->model, false);
     }
 }

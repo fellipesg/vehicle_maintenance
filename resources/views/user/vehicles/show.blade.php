@@ -11,6 +11,8 @@
 
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-8">
+    <x-vehicle-cover :vehicle="$vehicle" variant="hero" class="mb-6" />
+
     <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
             <h1 class="text-3xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h1>
