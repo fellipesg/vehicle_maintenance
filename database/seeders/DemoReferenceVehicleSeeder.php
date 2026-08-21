@@ -12,8 +12,7 @@ use App\Services\Vehicle\VehicleMileageService;
 use Illuminate\Database\Seeder;
 
 /**
- * Veículo fictício para demos/postagens — estrutura parecida com timeline real,
- * sem expor placa, chassi ou dados pessoais reais.
+ * Veículo fictício para demos/postagens — dados inventados, sem relação com veículos reais.
  */
 class DemoReferenceVehicleSeeder extends Seeder
 {
@@ -22,7 +21,7 @@ class DemoReferenceVehicleSeeder extends Seeder
         $user = User::where('email', 'fgoncalves2008@gmail.com')->first();
 
         if ($user === null) {
-            $this->command?->warn('Usuário fgoncalves2008@gmail.com não encontrado. Rode FelipeVehicleSeeder ou crie o usuário antes.');
+            $this->command?->warn('Usuário fgoncalves2008@gmail.com não encontrado.');
 
             return;
         }
@@ -32,54 +31,59 @@ class DemoReferenceVehicleSeeder extends Seeder
             $user->refresh();
         }
 
-        $premiumWorkshop = Workshop::firstOrCreate(
-            ['name' => 'Premium Motors Centro'],
+        $vilaVerde = Workshop::firstOrCreate(
+            ['name' => 'Mecânica Vila Verde'],
             [
-                'phone' => '4333001100',
-                'whatsapp' => '4333001100',
-                'cep' => '86010000',
-                'street' => 'Rua das Oficinas',
-                'number' => '1200',
-                'neighborhood' => 'Centro',
-                'city' => 'Londrina',
+                'phone' => '4133229900',
+                'whatsapp' => '41999887766',
+                'cep' => '80240000',
+                'street' => 'Rua das Palmeiras',
+                'number' => '88',
+                'neighborhood' => 'Vila Verde',
+                'city' => 'Curitiba',
                 'state' => 'PR',
             ]
         );
 
-        $brothersWorkshop = Workshop::firstOrCreate(
-            ['name' => 'Brothers Auto Service'],
+        $autoNorte = Workshop::firstOrCreate(
+            ['name' => 'AutoCenter Norte'],
             [
-                'phone' => '4333002200',
-                'whatsapp' => '4333002200',
-                'cep' => '86020000',
-                'street' => 'Av. Automotiva',
-                'number' => '450',
-                'neighborhood' => 'Industrial',
-                'city' => 'Londrina',
+                'phone' => '4133551122',
+                'whatsapp' => '41988776655',
+                'cep' => '81000000',
+                'street' => 'Av. das Indústrias',
+                'number' => '2200',
+                'neighborhood' => 'São Lourenço',
+                'city' => 'Curitiba',
                 'state' => 'PR',
             ]
         );
 
         $vehicle = Vehicle::updateOrCreate(
-            ['license_plate' => 'REF8D24'],
+            ['license_plate' => 'XC4D3M0'],
             [
-                'renavam' => '98765432109',
-                'crv_number' => '999888777666555',
-                'brand' => 'Mercedes-Benz',
-                'model' => 'C 200',
-                'year' => 2019,
-                'color' => 'Prata',
-                'chassis' => 'WDD2050421F123456',
-                'engine' => '27492012345678',
-                'motorization' => '184CV',
-                'odometer_at_registration' => 80_000,
-                'current_kilometers' => 110_000,
+                'renavam' => '55443322109',
+                'crv_number' => '112233445566778',
+                'brand' => 'Volvo',
+                'model' => 'XC40 T4',
+                'year' => 2021,
+                'color' => 'Azul Denim',
+                'chassis' => 'YV1XZEDVOM1234567',
+                'engine' => 'B4204T231234567',
+                'motorization' => '190CV',
+                'odometer_at_registration' => 58_200,
+                'current_kilometers' => 94_300,
             ]
         );
 
+        Maintenance::where('vehicle_id', $vehicle->id)->each(function (Maintenance $maintenance): void {
+            $maintenance->items()->delete();
+            $maintenance->delete();
+        });
+
         $user->vehicles()->syncWithoutDetaching([
             $vehicle->id => [
-                'purchase_date' => '2021-04-12',
+                'purchase_date' => '2023-09-18',
                 'is_current_owner' => true,
                 'tenant_id' => $user->tenant_id,
                 'ownership_verified_at' => now(),
@@ -93,62 +97,61 @@ class DemoReferenceVehicleSeeder extends Seeder
 
         $maintenances = [
             [
-                'maintenance_type' => 'Revisão 80.000 km',
-                'maintenance_date' => '2025-06-14',
-                'kilometers' => 80_000,
-                'workshop_id' => $premiumWorkshop->id,
-                'workshop_name' => 'Premium Motors Centro',
+                'maintenance_type' => 'Inspeção pós-aquisição',
+                'maintenance_date' => '2024-09-22',
+                'kilometers' => 58_200,
+                'workshop_id' => $vilaVerde->id,
+                'workshop_name' => 'Mecânica Vila Verde',
                 'service_category' => 'mechanical',
-                'description' => 'Revisão programada de 80.000 km com itens de filtro, fluidos e pastilhas.',
+                'description' => 'Checklist completo após compra do seminovo, com leitura de códigos e teste de rodagem.',
                 'items' => [
-                    ['name' => 'Filtro de poeira', 'quantity' => 1, 'unit_price' => 240.97, 'total_price' => 240.97],
-                    ['name' => 'Jogo de peças, elemento filtro', 'quantity' => 1, 'unit_price' => 153.83, 'total_price' => 153.83],
-                    ['name' => 'Lubrificante Sint. 5W40 MBB 229.5', 'quantity' => 7, 'unit_price' => 85.90, 'total_price' => 601.30],
-                    ['name' => 'Fluido freio DOT4 Plus', 'quantity' => 2, 'unit_price' => 45.00, 'total_price' => 90.00],
-                    ['name' => 'Pastilha do freio a disco', 'quantity' => 1, 'unit_price' => 1619.68, 'total_price' => 1619.68],
-                    ['name' => 'Elemento filtro de ar', 'quantity' => 1, 'unit_price' => 436.00, 'total_price' => 436.00],
-                    ['name' => 'Filtro habitáculo', 'quantity' => 1, 'unit_price' => 365.00, 'total_price' => 365.00],
-                    ['name' => 'Mão de obra revisão', 'quantity' => 1, 'unit_price' => 2107.72, 'total_price' => 2107.72],
+                    ['name' => 'Scanner diagnóstico completo', 'quantity' => 1, 'unit_price' => 180.00, 'total_price' => 180.00],
+                    ['name' => 'Kit filtro de cabine', 'quantity' => 1, 'unit_price' => 142.50, 'total_price' => 142.50],
+                    ['name' => 'Troca de óleo sintético 0W20', 'quantity' => 5, 'unit_price' => 68.00, 'total_price' => 340.00],
+                    ['name' => 'Balanceamento e calibragem', 'quantity' => 4, 'unit_price' => 35.00, 'total_price' => 140.00],
                 ],
             ],
             [
-                'maintenance_type' => 'Revisão B (Assyst B)',
-                'maintenance_date' => '2026-03-10',
-                'kilometers' => 95_000,
-                'workshop_id' => $premiumWorkshop->id,
-                'workshop_name' => 'Premium Motors Centro',
-                'service_category' => 'mechanical',
-                'description' => 'Revisão B com troca de filtros, fluido de freio e bateria AGM.',
+                'maintenance_type' => 'Suspensão dianteira',
+                'maintenance_date' => '2025-03-14',
+                'kilometers' => 72_600,
+                'workshop_id' => $autoNorte->id,
+                'workshop_name' => 'AutoCenter Norte',
+                'service_category' => 'suspension',
+                'description' => 'Ruído em badéis identificado na dianteira esquerda; substituídos amortecedor e batente.',
                 'items' => [
-                    ['name' => 'Filtro de poeira (complemento)', 'quantity' => 1, 'unit_price' => 258.32, 'total_price' => 258.32],
-                    ['name' => 'Lubrificante 229.51 5W30', 'quantity' => 7, 'unit_price' => 85.00, 'total_price' => 595.00],
-                    ['name' => 'Bateria 12V AGM 80AH', 'quantity' => 1, 'unit_price' => 3316.68, 'total_price' => 3316.68],
+                    ['name' => 'Amortecedor dianteiro esquerdo', 'quantity' => 1, 'unit_price' => 890.00, 'total_price' => 890.00],
+                    ['name' => 'Kit batente e coifa', 'quantity' => 1, 'unit_price' => 210.00, 'total_price' => 210.00],
+                    ['name' => 'Alinhamento 3D', 'quantity' => 1, 'unit_price' => 160.00, 'total_price' => 160.00],
                 ],
             ],
             [
-                'maintenance_type' => 'Revisão preventiva',
-                'maintenance_date' => '2026-03-12',
-                'kilometers' => 105_103,
-                'workshop_id' => $premiumWorkshop->id,
-                'workshop_name' => 'Premium Motors Centro',
+                'maintenance_type' => 'Pacote fluidos e filtros',
+                'maintenance_date' => '2025-11-08',
+                'kilometers' => 86_900,
+                'workshop_id' => $vilaVerde->id,
+                'workshop_name' => 'Mecânica Vila Verde',
                 'service_category' => 'mechanical',
-                'description' => 'Inspeção complementar com substituição de pastilhas dianteiras.',
+                'description' => 'Manutenção de fim de ano com fluido de arrefecimento, limpador e filtros.',
                 'items' => [
-                    ['name' => 'Pastilha dianteira', 'quantity' => 1, 'unit_price' => 980.00, 'total_price' => 980.00],
-                    ['name' => 'Fluido limpador parabrisa', 'quantity' => 2, 'unit_price' => 28.50, 'total_price' => 57.00],
-                    ['name' => 'Diagnóstico eletrônico', 'quantity' => 1, 'unit_price' => 2768.00, 'total_price' => 2768.00],
+                    ['name' => 'Aditivo arrefecimento longa vida', 'quantity' => 2, 'unit_price' => 89.00, 'total_price' => 178.00],
+                    ['name' => 'Filtro de ar motor', 'quantity' => 1, 'unit_price' => 195.00, 'total_price' => 195.00],
+                    ['name' => 'Palhetas limpador traseiro', 'quantity' => 1, 'unit_price' => 78.00, 'total_price' => 78.00],
+                    ['name' => 'Mão de obra pacote', 'quantity' => 1, 'unit_price' => 420.00, 'total_price' => 420.00],
                 ],
             ],
             [
-                'maintenance_type' => 'Troca Válvula Termostática',
-                'maintenance_date' => '2026-08-15',
-                'kilometers' => 110_000,
-                'workshop_id' => $brothersWorkshop->id,
-                'workshop_name' => 'Brothers Auto Service',
-                'service_category' => 'other',
-                'description' => 'Substituição da válvula termostática por indicação de temperatura instável.',
+                'maintenance_type' => 'Injeção / partida fria',
+                'maintenance_date' => '2026-06-02',
+                'kilometers' => 94_300,
+                'workshop_id' => $autoNorte->id,
+                'workshop_name' => 'AutoCenter Norte',
+                'service_category' => 'electrical',
+                'description' => 'Dificuldade de partida em manhãs frias; limpeza de bicos e atualização de software do módulo.',
                 'items' => [
-                    ['name' => 'Carcaça válvula termostática sedã premium', 'quantity' => 1, 'unit_price' => 1499.00, 'total_price' => 1499.00],
+                    ['name' => 'Limpeza ultrassônica bicos', 'quantity' => 4, 'unit_price' => 95.00, 'total_price' => 380.00],
+                    ['name' => 'Atualização software ECU', 'quantity' => 1, 'unit_price' => 320.00, 'total_price' => 320.00],
+                    ['name' => 'Vela de ignição iridium', 'quantity' => 4, 'unit_price' => 112.00, 'total_price' => 448.00],
                 ],
             ],
         ];
@@ -157,20 +160,12 @@ class DemoReferenceVehicleSeeder extends Seeder
             $items = $payload['items'];
             unset($payload['items']);
 
-            $maintenance = Maintenance::updateOrCreate(
-                [
-                    'vehicle_id' => $vehicle->id,
-                    'maintenance_type' => $payload['maintenance_type'],
-                    'maintenance_date' => $payload['maintenance_date'],
-                ],
-                array_merge($payload, [
-                    'user_id' => $user->id,
-                    'tenant_id' => $user->tenant_id,
-                    'is_manufacturer_required' => true,
-                ]),
-            );
-
-            $maintenance->items()->delete();
+            $maintenance = Maintenance::create(array_merge($payload, [
+                'vehicle_id' => $vehicle->id,
+                'user_id' => $user->id,
+                'tenant_id' => $user->tenant_id,
+                'is_manufacturer_required' => false,
+            ]));
 
             foreach ($items as $item) {
                 MaintenanceItem::create(array_merge($item, [
@@ -183,7 +178,7 @@ class DemoReferenceVehicleSeeder extends Seeder
 
         app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
 
-        $this->command?->info('Veículo demo REF8D24 (Mercedes-Benz C 200) vinculado a '.$user->email);
-        $this->command?->info('4 manutenções fictícias — timeline ~110k km, próxima revisão ~120k km');
+        $this->command?->info('Veículo demo XC4D3M0 (Volvo XC40 T4) vinculado a '.$user->email);
+        $this->command?->info('4 manutenções fictícias — odômetro 94.300 km');
     }
 }
