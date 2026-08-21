@@ -8,6 +8,7 @@ use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
 use App\Rules\InvoiceFile;
 use App\Services\Invoice\InvoiceUploadProcessor;
+use App\Services\Vehicle\VehicleMileageService;
 use App\Support\AppStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -64,7 +65,7 @@ class MaintenanceController extends Controller
             'description' => 'nullable|string',
             'workshop_name' => 'nullable|string|max:255',
             'maintenance_date' => 'required|date',
-            'kilometers' => 'nullable|integer|min:0',
+            'kilometers' => 'required|integer|min:0|max:9999999',
             'service_category' => 'required|in:mechanical,electrical,suspension,painting,finishing,interior,other',
             'is_manufacturer_required' => 'nullable|boolean',
             'items' => 'nullable|array',
@@ -91,6 +92,18 @@ class MaintenanceController extends Controller
 
         $vehicle = \App\Models\Vehicle::findOrFail($request->vehicle_id);
         Gate::authorize('view', $vehicle);
+
+        try {
+            app(VehicleMileageService::class)->assertMaintenanceKilometers(
+                $vehicle,
+                (int) $request->integer('kilometers'),
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+            ], 422);
+        }
 
         $processor = app(InvoiceUploadProcessor::class);
         $storedInvoices = $processor->storeUploads($request->file('invoices'));
@@ -127,7 +140,7 @@ class MaintenanceController extends Controller
                 'description' => $request->description,
                 'workshop_name' => $workshopName,
                 'maintenance_date' => $request->maintenance_date,
-                'kilometers' => $request->kilometers ?? null,
+                'kilometers' => (int) $request->integer('kilometers'),
                 'service_category' => $request->service_category,
                 'is_manufacturer_required' => $isManufacturerRequired,
             ]);
@@ -158,6 +171,11 @@ class MaintenanceController extends Controller
             }
 
             $processor->createInvoiceRecords($maintenance, $storedInvoices);
+
+            app(VehicleMileageService::class)->applyMaintenanceKilometers(
+                $vehicle->fresh(),
+                (int) $maintenance->kilometers,
+            );
 
             DB::commit();
 
@@ -236,7 +254,26 @@ class MaintenanceController extends Controller
             }
         }
 
+        if (isset($data['kilometers'])) {
+            try {
+                app(VehicleMileageService::class)->assertMaintenanceKilometers(
+                    $maintenance->vehicle,
+                    (int) $data['kilometers'],
+                    $maintenance,
+                );
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $e->errors(),
+                ], 422);
+            }
+        }
+
         $maintenance->update($data);
+
+        if (isset($data['kilometers'])) {
+            app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
+        }
 
         return response()->json([
             'success' => true,
@@ -256,7 +293,12 @@ class MaintenanceController extends Controller
             }
         }
 
+        $vehicle = $maintenance->vehicle;
         $maintenance->delete();
+
+        if ($vehicle !== null) {
+            app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
+        }
 
         return response()->json([
             'success' => true,

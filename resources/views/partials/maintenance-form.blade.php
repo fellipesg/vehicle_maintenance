@@ -48,10 +48,43 @@
         @error('maintenance_date')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
     <div>
-        <label for="kilometers" class="form-label">Quilometragem</label>
-        <input type="number" name="kilometers" id="kilometers" value="{{ old('kilometers') }}" class="form-input" min="0">
+        <label for="kilometers" class="form-label">Quilometragem *</label>
+        <input type="number" name="kilometers" id="kilometers" value="{{ old('kilometers') }}" class="form-input" min="0" max="9999999" required>
+        <p class="mt-1 text-xs text-automotive-500" id="kilometers-hint">Informe a quilometragem do hodômetro nesta manutenção.</p>
+        @error('kilometers')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
 </div>
+
+@push('scripts')
+<script>
+(() => {
+    const vehicles = @json($vehicles->map(fn ($vehicle) => [
+        'id' => $vehicle->id,
+        'current_kilometers' => $vehicle->current_kilometers,
+    ])->values());
+    const select = document.getElementById('vehicle_id');
+    const kmInput = document.getElementById('kilometers');
+    const hint = document.getElementById('kilometers-hint');
+
+    const syncHint = () => {
+        const vehicle = vehicles.find((item) => String(item.id) === String(select.value));
+        if (!vehicle || vehicle.current_kilometers == null) {
+            hint.textContent = 'Informe a quilometragem do hodômetro nesta manutenção.';
+            return;
+        }
+
+        hint.textContent = `Hodômetro atual do veículo: ${new Intl.NumberFormat('pt-BR').format(vehicle.current_kilometers)} km. Informe um valor igual ou maior.`;
+        if (!kmInput.value) {
+            kmInput.value = vehicle.current_kilometers;
+        }
+        kmInput.min = vehicle.current_kilometers;
+    };
+
+    select?.addEventListener('change', syncHint);
+    syncHint();
+})();
+</script>
+@endpush
 
 <div>
     <label for="workshop_name" class="form-label">Nome da oficina (se não selecionada acima)</label>

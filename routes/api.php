@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\LegalController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\UserFcmTokenController;
@@ -21,6 +22,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/vehicles/search/{identifier}', [VehicleController::class, 'search']);
     Route::get('/vehicle-catalog/brands', [VehicleController::class, 'catalogBrands']);
     Route::get('/vehicle-catalog/models', [VehicleController::class, 'catalogModels']);
+    Route::get('/legal/terms-of-use', [LegalController::class, 'termsOfUse']);
 
     // Workshop routes (public - visible to all users)
     Route::get('/workshops', [WorkshopController::class, 'index']);
@@ -45,6 +47,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy']);
         Route::post('/vehicles/{id}/cover', [VehicleController::class, 'uploadCover']);
         Route::get('/vehicles/{id}/maintenances', [VehicleController::class, 'maintenances']);
+        Route::get('/vehicles/{id}/timeline', [VehicleController::class, 'timeline']);
 
         // Link vehicle to user
         Route::post('/vehicles/{id}/link', [VehicleController::class, 'linkToUser']);

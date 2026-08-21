@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Web\User;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Web\Concerns\StoresMaintenanceInvoices;
 use App\Models\Maintenance;
+use App\Models\Vehicle;
 use App\Models\Workshop;
 use App\Rules\InvoiceFile;
+use App\Services\Vehicle\VehicleMileageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -46,7 +48,7 @@ class MaintenanceController extends Controller
             'description' => ['nullable', 'string'],
             'workshop_name' => ['nullable', 'string', 'max:255'],
             'maintenance_date' => ['required', 'date'],
-            'kilometers' => ['nullable', 'integer', 'min:0'],
+            'kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
             'service_category' => ['required', 'in:mechanical,electrical,suspension,painting,finishing,interior,other'],
             'is_manufacturer_required' => ['nullable', 'boolean'],
             'invoices' => ['nullable', 'array'],
@@ -66,9 +68,23 @@ class MaintenanceController extends Controller
         $data['tenant_id'] = $request->user()->tenant_id;
         $data['is_manufacturer_required'] = $request->boolean('is_manufacturer_required');
 
+        $vehicle = Vehicle::findOrFail($data['vehicle_id']);
+        app(VehicleMileageService::class)->assertMaintenanceKilometers(
+            $vehicle,
+            (int) $data['kilometers'],
+        );
+
         $result = $this->storeMaintenanceWithInvoices(
             $request,
-            fn () => Maintenance::create($data),
+            function () use ($data) {
+                $maintenance = Maintenance::create($data);
+                app(VehicleMileageService::class)->applyMaintenanceKilometers(
+                    Vehicle::findOrFail($data['vehicle_id']),
+                    (int) $data['kilometers'],
+                );
+
+                return $maintenance;
+            },
         );
 
         return $this->redirectWithInvoiceFeedback(

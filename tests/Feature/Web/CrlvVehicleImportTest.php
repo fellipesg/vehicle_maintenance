@@ -123,6 +123,8 @@ class CrlvVehicleImportTest extends TestCase
                 'chassis' => $expected['chassis'],
                 'engine' => $expected['engine'],
                 'motorization' => $expected['motorization'],
+                'current_kilometers' => 50_000,
+                'terms_accepted' => '1',
                 'crlv_verification_token' => $token,
             ])
             ->assertRedirect();

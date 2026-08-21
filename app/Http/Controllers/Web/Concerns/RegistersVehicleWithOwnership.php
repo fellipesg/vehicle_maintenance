@@ -35,6 +35,8 @@ trait RegistersVehicleWithOwnership
             'chassis' => ['nullable', 'string', 'max:50'],
             'motorization' => ['nullable', 'string', 'max:100'],
             'engine' => ['nullable', 'string', 'max:50'],
+            'current_kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
+            'terms_accepted' => ['required', 'accepted'],
             'crlv_verification_token' => ['nullable', 'string'],
         ];
     }

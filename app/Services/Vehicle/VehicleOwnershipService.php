@@ -56,9 +56,11 @@ class VehicleOwnershipService
                 'chassis' => isset($vehicleData['chassis']) ? strtoupper($vehicleData['chassis']) : null,
                 'motorization' => $vehicleData['motorization'] ?? null,
                 'engine' => $vehicleData['engine'] ?? null,
+                'current_kilometers' => (int) $vehicleData['current_kilometers'],
+                'odometer_at_registration' => (int) $vehicleData['current_kilometers'],
             ]);
 
-            $this->attachUserToVehicle($user, $vehicle, $crlv, $ownershipType);
+            $this->attachUserToVehicle($user, $vehicle, $crlv, $ownershipType, acceptedTerms: true);
 
             return $vehicle;
         });
@@ -88,7 +90,7 @@ class VehicleOwnershipService
             throw new RuntimeException('consignment_required');
         }
 
-        return DB::transaction(function () use ($user, $vehicle, $crlv, $ownershipType) {
+        return DB::transaction(function () use ($user, $vehicle, $crlv) {
             DB::table('user_vehicles')
                 ->where('vehicle_id', $vehicle->id)
                 ->update(['is_current_owner' => false]);
@@ -187,6 +189,7 @@ class VehicleOwnershipService
         Vehicle $vehicle,
         ?CrlvParseResult $crlv,
         string $ownershipType,
+        bool $acceptedTerms = false,
     ): void {
         $user->vehicles()->attach($vehicle->id, [
             'purchase_date' => now(),
@@ -196,6 +199,8 @@ class VehicleOwnershipService
             'crlv_exercise_year' => $crlv?->exerciseYear,
             'owner_document' => $crlv?->normalizedOwnerDocument(),
             'ownership_type' => $ownershipType,
+            'terms_accepted_at' => $acceptedTerms ? now() : null,
+            'terms_version' => $acceptedTerms ? config('legal.terms_version') : null,
         ]);
     }
 

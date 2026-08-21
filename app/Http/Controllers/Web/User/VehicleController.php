@@ -13,6 +13,7 @@ use App\Services\Crlv\CrlvParseResult;
 use App\Services\Crlv\CrlvPdfParser;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleOwnershipService;
+use App\Services\Vehicle\VehicleTimelineBuilder;
 use App\Services\VehicleCatalogService;
 use App\Support\AppStorage;
 use Illuminate\Http\RedirectResponse;
@@ -174,8 +175,9 @@ class VehicleController extends Controller
         $vehicle->load(['maintenances.items', 'maintenances.invoices', 'maintenances.workshop']);
 
         $canViewMaintenances = auth()->user()->canViewVehicleMaintenances($vehicle);
+        $timeline = app(VehicleTimelineBuilder::class)->build($vehicle);
 
-        return view('user.vehicles.show', compact('vehicle', 'canViewMaintenances'));
+        return view('user.vehicles.show', compact('vehicle', 'canViewMaintenances', 'timeline'));
     }
 
     public function edit(Vehicle $vehicle, VehicleCatalogService $catalog): View

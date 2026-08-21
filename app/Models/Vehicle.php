@@ -32,7 +32,17 @@ class Vehicle extends Model
         'motorization',
         'engine',
         'cover_photo_path',
+        'current_kilometers',
+        'odometer_at_registration',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'current_kilometers' => 'integer',
+            'odometer_at_registration' => 'integer',
+        ];
+    }
 
     protected function coverPhotoUrl(): Attribute
     {
@@ -66,6 +76,8 @@ class Vehicle extends Model
                 'crlv_exercise_year',
                 'owner_document',
                 'ownership_type',
+                'terms_accepted_at',
+                'terms_version',
             )
             ->withTimestamps();
     }

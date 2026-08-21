@@ -26,9 +26,10 @@
         @error('crlv')
             <p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ $message }}</p>
         @enderror
-        @include('user.vehicles._form', ['catalog' => $catalog])
+        @include('user.vehicles._form', ['catalog' => $catalog, 'vehicle' => new \App\Models\Vehicle()])
+        <x-terms-scroll-accept class="mt-2" />
         <div class="flex flex-wrap gap-3 pt-2">
-            <button type="submit" class="btn-primary">Cadastrar veículo</button>
+            <button type="submit" class="btn-primary" data-terms-submit disabled>Cadastrar veículo</button>
             <a href="{{ route('user.vehicles.index') }}" class="btn-secondary">Cancelar</a>
         </div>
     </form>

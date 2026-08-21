@@ -52,6 +52,8 @@ class GaragePortalTest extends TestCase
                 'brand' => 'Honda',
                 'model' => 'Civic',
                 'year' => 2016,
+                'current_kilometers' => 85_000,
+                'terms_accepted' => '1',
                 'crlv_verification_token' => session('crlv_verification.token'),
             ])
             ->assertRedirect();

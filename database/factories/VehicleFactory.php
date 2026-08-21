@@ -19,10 +19,11 @@ class VehicleFactory extends Factory
         $brands = ['Toyota', 'Honda', 'Volkswagen', 'Ford', 'Chevrolet', 'Fiat', 'Renault', 'Hyundai'];
         $models = ['Corolla', 'Civic', 'Gol', 'Ka', 'Onix', 'Uno', 'Sandero', 'HB20'];
         $colors = ['Branco', 'Preto', 'Prata', 'Vermelho', 'Azul', 'Cinza'];
-        
+
         $brand = $this->faker->randomElement($brands);
         $model = $this->faker->randomElement($models);
-        
+        $kilometers = $this->faker->numberBetween(10000, 180000);
+
         return [
             'license_plate' => strtoupper($this->faker->bothify('???####')),
             'renavam' => $this->faker->numerify('###########'),
@@ -33,6 +34,8 @@ class VehicleFactory extends Factory
             'chassis' => $this->faker->optional()->bothify('?????????????????'),
             'motorization' => $this->faker->optional()->randomElement(['1.0', '1.4', '1.6', '1.6 Turbo', '2.0 Turbo']),
             'engine' => $this->faker->optional()->bothify('?##?##?########'),
+            'current_kilometers' => $kilometers,
+            'odometer_at_registration' => $kilometers,
         ];
     }
 }

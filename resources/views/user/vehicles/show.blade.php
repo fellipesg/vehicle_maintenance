@@ -50,10 +50,25 @@
             <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->engine ?? '—' }}</p>
         </div>
         <div class="stat-card">
+            <p class="text-sm text-automotive-600">Quilometragem atual</p>
+            <p class="text-2xl font-bold">{{ $vehicle->current_kilometers !== null ? number_format($vehicle->current_kilometers, 0, ',', '.') . ' km' : '—' }}</p>
+        </div>
+        @if(! empty($timeline['summary']['approximate_annual_kilometers']))
+            <div class="stat-card">
+                <p class="text-sm text-automotive-600">Média aproximada por ano</p>
+                <p class="text-2xl font-bold">{{ number_format((int) $timeline['summary']['approximate_annual_kilometers'], 0, ',', '.') }} km/ano</p>
+                <p class="mt-1 text-xs text-automotive-500">Estimativa com base no cadastro e nas manutenções registradas.</p>
+            </div>
+        @endif
+        <div class="stat-card">
             <p class="text-sm text-automotive-600">Manutenções</p>
             <p class="text-2xl font-bold">{{ $vehicle->maintenances->count() }}</p>
         </div>
     </div>
+
+    @if($canViewMaintenances)
+        <x-vehicle-timeline :timeline="$timeline" class="mb-8" />
+    @endif
 
     <h2 class="mb-4 text-xl font-semibold">🔧 Histórico de Manutenções</h2>
     @include('partials.vehicle-maintenance-history', [

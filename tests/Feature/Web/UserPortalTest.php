@@ -63,6 +63,8 @@ class UserPortalTest extends TestCase
                 'brand' => 'Mercedes-Benz',
                 'model' => 'C 180',
                 'year' => 2018,
+                'current_kilometers' => 95000,
+                'terms_accepted' => '1',
                 'crlv_verification_token' => session('crlv_verification.token'),
             ])
             ->assertRedirect();
@@ -96,6 +98,8 @@ class UserPortalTest extends TestCase
                 'model' => 'Civic',
                 'year' => 2020,
                 'color' => 'Prata',
+                'current_kilometers' => 42000,
+                'terms_accepted' => '1',
             ])
             ->assertRedirect();
 
@@ -134,6 +138,7 @@ class UserPortalTest extends TestCase
                 'vehicle_id' => $vehicle->id,
                 'maintenance_type' => 'Revisão',
                 'maintenance_date' => '2025-06-01',
+                'kilometers' => ($vehicle->current_kilometers ?? 0) + 500,
                 'service_category' => 'mechanical',
             ])
             ->assertRedirect();
@@ -163,6 +168,7 @@ class UserPortalTest extends TestCase
                 'vehicle_id' => $vehicle->id,
                 'maintenance_type' => 'Revisão',
                 'maintenance_date' => '2025-06-01',
+                'kilometers' => ($vehicle->current_kilometers ?? 0) + 500,
                 'service_category' => 'mechanical',
                 'invoices' => [$pdf],
             ])
@@ -197,11 +203,13 @@ class UserPortalTest extends TestCase
                 'vehicle_id' => $vehicle->id,
                 'maintenance_type' => 'Revisão',
                 'maintenance_date' => '2025-06-01',
+                'kilometers' => ($vehicle->current_kilometers ?? 0) + 500,
                 'service_category' => 'mechanical',
                 'invoices' => [$pdf],
             ])
             ->assertRedirect()
-            ->assertSessionHas('warning', fn (string $message) => str_contains($message, 'nota-ilegivel.pdf')
+            ->assertSessionHas('warning', fn (?string $message) => is_string($message)
+                && str_contains($message, 'nota-ilegivel.pdf')
                 && str_contains($message, 'XML'));
     }
 

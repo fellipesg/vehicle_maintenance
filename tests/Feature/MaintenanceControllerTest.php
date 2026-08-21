@@ -71,7 +71,7 @@ class MaintenanceControllerTest extends TestCase
             'description' => 'Troca de óleo e filtros',
             'workshop_name' => 'Oficina Teste',
             'maintenance_date' => '2024-01-15',
-            'kilometers' => 10000,
+            'kilometers' => ($vehicle->current_kilometers ?? 0) + 1000,
             'service_category' => 'mechanical',
             'is_manufacturer_required' => true,
             'items' => [
@@ -110,6 +110,7 @@ class MaintenanceControllerTest extends TestCase
             'vehicle_id' => $vehicle->id,
             'maintenance_type' => 'Test',
             'maintenance_date' => '2024-01-15',
+            'kilometers' => ($vehicle->current_kilometers ?? 0) + 500,
             'service_category' => 'mechanical',
         ])->assertForbidden();
     }

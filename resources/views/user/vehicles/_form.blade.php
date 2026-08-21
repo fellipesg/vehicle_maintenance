@@ -89,6 +89,24 @@
                placeholder="Número do motor conforme o CRLV">
         @error('engine')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
+    @if(empty($vehicle?->id))
+        <div class="sm:col-span-2">
+            <label for="current_kilometers" class="form-label">Quilometragem atual *</label>
+            <input type="number" name="current_kilometers" id="current_kilometers"
+                   value="{{ old('current_kilometers') }}" required class="form-input"
+                   min="0" max="9999999" inputmode="numeric" placeholder="Ex: 85000">
+            <p class="mt-1 text-sm text-automotive-500">Informe o hodômetro atual do veículo.</p>
+            @error('current_kilometers')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
+    @else
+        <div class="sm:col-span-2">
+            <label for="current_kilometers" class="form-label">Quilometragem atual</label>
+            <input type="number" name="current_kilometers" id="current_kilometers"
+                   value="{{ old('current_kilometers', $vehicle->current_kilometers) }}" class="form-input"
+                   min="0" max="9999999" inputmode="numeric">
+            @error('current_kilometers')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
+    @endif
 </div>
 
 @push('scripts')

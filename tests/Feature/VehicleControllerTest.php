@@ -51,6 +51,8 @@ class VehicleControllerTest extends TestCase
             'model' => 'Corolla',
             'year' => 2020,
             'color' => 'Branco',
+            'current_kilometers' => 45000,
+            'terms_accepted' => true,
         ];
 
         $response = $this->postJson('/api/v1/vehicles', $vehicleData);
@@ -81,6 +83,8 @@ class VehicleControllerTest extends TestCase
             'brand' => 'Honda',
             'model' => 'Civic',
             'year' => 2021,
+            'current_kilometers' => 12000,
+            'terms_accepted' => true,
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['license_plate']);
     }

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleMaintenancePdfExporter;
+use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Vehicle\VehicleTimelineBuilder;
 use App\Services\VehicleCatalogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -69,6 +71,8 @@ class VehicleController extends Controller
             'chassis' => 'nullable|string|max:50',
             'motorization' => 'nullable|string|max:100',
             'engine' => 'nullable|string|max:50',
+            'current_kilometers' => 'required|integer|min:0|max:9999999',
+            'terms_accepted' => 'required|accepted',
         ]);
 
         if ($validator->fails()) {
@@ -78,14 +82,26 @@ class VehicleController extends Controller
             ], 422);
         }
 
-        $vehicle = Vehicle::create($validator->validated());
+        $data = collect($validator->validated())
+            ->except(['terms_accepted'])
+            ->all();
+
+        $vehicle = Vehicle::create($data);
         $user = $request->user();
 
         $user->vehicles()->attach($vehicle->id, [
             'purchase_date' => $request->purchase_date ?? now(),
             'is_current_owner' => true,
             'tenant_id' => $user->tenant_id,
+            'terms_accepted_at' => now(),
+            'terms_version' => config('legal.terms_version'),
         ]);
+
+        app(VehicleMileageService::class)->registerOdometer(
+            $vehicle,
+            (int) $data['current_kilometers'],
+        );
+        $vehicle->refresh();
 
         return response()->json([
             'success' => true,
@@ -122,6 +138,7 @@ class VehicleController extends Controller
             'chassis' => 'nullable|string|max:50',
             'motorization' => 'nullable|string|max:100',
             'engine' => 'nullable|string|max:50',
+            'current_kilometers' => 'sometimes|required|integer|min:0|max:9999999',
         ]);
 
         if ($validator->fails()) {
@@ -132,6 +149,10 @@ class VehicleController extends Controller
         }
 
         $vehicle->update($validator->validated());
+
+        if ($request->has('current_kilometers')) {
+            app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
+        }
 
         return response()->json([
             'success' => true,
@@ -192,6 +213,17 @@ class VehicleController extends Controller
         return response()->json([
             'success' => true,
             'data' => $maintenances,
+        ]);
+    }
+
+    public function timeline(Request $request, string $id): JsonResponse
+    {
+        $vehicle = Vehicle::findOrFail($id);
+        Gate::authorize('view', $vehicle);
+
+        return response()->json([
+            'success' => true,
+            'data' => app(VehicleTimelineBuilder::class)->build($vehicle),
         ]);
     }
 

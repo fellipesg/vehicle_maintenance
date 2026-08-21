@@ -21,6 +21,8 @@ class UserVehicle extends Pivot
         'crlv_exercise_year',
         'owner_document',
         'ownership_type',
+        'terms_accepted_at',
+        'terms_version',
     ];
 
     protected function casts(): array
@@ -30,6 +32,7 @@ class UserVehicle extends Pivot
             'sale_date' => 'date',
             'is_current_owner' => 'boolean',
             'ownership_verified_at' => 'datetime',
+            'terms_accepted_at' => 'datetime',
             'owner_document' => 'encrypted',
             'crlv_exercise_year' => 'integer',
         ];
