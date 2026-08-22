@@ -51,7 +51,7 @@ class Vehicle extends Model
                 return null;
             }
 
-            return AppStorage::url($this->cover_photo_path);
+            return AppStorage::coversUrl($this->cover_photo_path);
         });
     }
 

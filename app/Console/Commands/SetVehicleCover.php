@@ -38,17 +38,17 @@ class SetVehicleCover extends Command
         $fileName = $vehicle->id.'_'.time().'.'.$extension;
         $storagePath = 'vehicle-covers/'.$fileName;
 
-        if ($vehicle->cover_photo_path && AppStorage::disk()->exists($vehicle->cover_photo_path)) {
-            AppStorage::disk()->delete($vehicle->cover_photo_path);
+        if ($vehicle->cover_photo_path && AppStorage::coversDisk()->exists($vehicle->cover_photo_path)) {
+            AppStorage::coversDisk()->delete($vehicle->cover_photo_path);
         }
 
-        AppStorage::disk()->put($storagePath, File::get($path));
+        AppStorage::coversDisk()->put($storagePath, File::get($path));
 
         $vehicle->update(['cover_photo_path' => $storagePath]);
 
         $this->info("Cover photo set for {$vehicle->brand} {$vehicle->model} ({$vehicle->license_plate})");
         $this->line('Storage path: '.$storagePath);
-        $this->line('URL: '.AppStorage::url($storagePath));
+        $this->line('URL: '.AppStorage::coversUrl($storagePath));
 
         return self::SUCCESS;
     }

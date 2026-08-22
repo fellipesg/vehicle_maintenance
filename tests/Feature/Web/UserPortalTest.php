@@ -314,8 +314,10 @@ class UserPortalTest extends TestCase
 
     public function test_vehicle_edit_shows_and_updates_cover_photo(): void
     {
-        Storage::fake('public');
+        $this->fakeCoversDisk('r2');
         $this->seed(\Database\Seeders\VehicleCatalogSeeder::class);
+
+        Storage::disk('r2')->put('vehicle-covers/old.jpg', 'old-cover');
 
         $vehicle = Vehicle::factory()->create([
             'brand' => 'Honda',
@@ -357,6 +359,7 @@ class UserPortalTest extends TestCase
         $vehicle->refresh();
         $this->assertNotSame('vehicle-covers/old.jpg', $vehicle->cover_photo_path);
         $this->assertNotNull($vehicle->cover_photo_path);
-        Storage::disk('public')->assertExists($vehicle->cover_photo_path);
+        Storage::disk('r2')->assertExists($vehicle->cover_photo_path);
+        Storage::disk('r2')->assertMissing('vehicle-covers/old.jpg');
     }
 }

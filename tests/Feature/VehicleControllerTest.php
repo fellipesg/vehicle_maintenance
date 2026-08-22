@@ -277,7 +277,7 @@ class VehicleControllerTest extends TestCase
 
     public function test_can_upload_vehicle_cover_photo(): void
     {
-        Storage::fake('public');
+        $this->fakeCoversDisk('r2');
 
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
@@ -295,12 +295,12 @@ class VehicleControllerTest extends TestCase
 
         $vehicle->refresh();
         $this->assertNotNull($vehicle->cover_photo_path);
-        Storage::disk('public')->assertExists($vehicle->cover_photo_path);
+        Storage::disk('r2')->assertExists($vehicle->cover_photo_path);
     }
 
     public function test_other_user_cannot_upload_vehicle_cover_photo(): void
     {
-        Storage::fake('public');
+        $this->fakeCoversDisk('r2');
 
         $owner = $this->actingAsApiUser();
         $otherUser = User::factory()->asUser()->create();
@@ -318,17 +318,17 @@ class VehicleControllerTest extends TestCase
 
     public function test_vehicle_show_includes_cover_photo_url(): void
     {
-        Storage::fake('public');
+        $this->fakeCoversDisk('r2');
 
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
         $this->attachVehicleToUser($user, $vehicle);
 
-        Storage::disk('public')->put('vehicle-covers/test.jpg', 'fake-image');
+        Storage::disk('r2')->put('vehicle-covers/test.jpg', 'fake-image');
         $vehicle->update(['cover_photo_path' => 'vehicle-covers/test.jpg']);
 
         $this->getJson("/api/v1/vehicles/{$vehicle->id}")
             ->assertOk()
-            ->assertJsonPath('data.cover_photo_url', AppStorage::url('vehicle-covers/test.jpg'));
+            ->assertJsonPath('data.cover_photo_url', AppStorage::coversUrl('vehicle-covers/test.jpg'));
     }
 }

@@ -15,6 +15,8 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'covers_disk' => env('VEHICLE_COVERS_DISK'),
+
     /*
     |--------------------------------------------------------------------------
     | Pin The Storage Endpoint To Its Public Addresses
@@ -82,6 +84,31 @@ return [
                 'connect_timeout' => 20,
                 'timeout' => 120,
                 // Prefer IPv4 when dual-stack DNS is present (avoids long hangs).
+                'force_ip_resolve' => 'v4',
+            ],
+            'retries' => [
+                'mode' => 'standard',
+                'max_attempts' => 3,
+            ],
+        ],
+
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('R2_ACCESS_KEY_ID'),
+            'secret' => env('R2_SECRET_ACCESS_KEY'),
+            'region' => 'auto',
+            'bucket' => env('R2_BUCKET', 'vehicle-maintenance'),
+            'url' => env('R2_PUBLIC_URL'),
+            'endpoint' => env('R2_ENDPOINT'),
+            'use_path_style_endpoint' => env('R2_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => env('R2_VISIBILITY', 'public'),
+            'throw' => false,
+            'report' => false,
+            'requestChecksumCalculation' => 'when_required',
+            'responseChecksumValidation' => 'when_required',
+            'http' => [
+                'connect_timeout' => 20,
+                'timeout' => 120,
                 'force_ip_resolve' => 'v4',
             ],
             'retries' => [

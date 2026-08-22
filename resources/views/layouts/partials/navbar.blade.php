@@ -42,6 +42,7 @@
             </a>
 
             @auth
+                <x-notification-bell />
                 @if($showAdminBadge)
                     <span class="badge badge-orange hidden sm:inline-flex">Admin</span>
                 @else

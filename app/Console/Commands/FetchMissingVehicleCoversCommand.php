@@ -11,7 +11,9 @@ use Illuminate\Support\Str;
 
 class FetchMissingVehicleCoversCommand extends Command
 {
-    protected $signature = 'vehicles:fetch-missing-covers {--force : Replace covers even when already set}';
+    protected $signature = 'vehicles:fetch-missing-covers
+                            {--force : Replace covers even when already set}
+                            {--plate=* : Atualizar apenas estas placas}';
 
     protected $description = 'Baixa fotos de capa (Wikimedia Commons) para veículos sem imagem';
 
@@ -19,7 +21,14 @@ class FetchMissingVehicleCoversCommand extends Command
     {
         $query = Vehicle::query()->orderBy('id');
 
-        if (! $this->option('force')) {
+        $plates = collect($this->option('plate'))
+            ->map(fn (string $plate) => strtoupper(trim($plate)))
+            ->filter()
+            ->values();
+
+        if ($plates->isNotEmpty()) {
+            $query->whereIn('license_plate', $plates->all());
+        } elseif (! $this->option('force')) {
             $query->where(function ($builder): void {
                 $builder->whereNull('cover_photo_path')
                     ->orWhere('cover_photo_path', '');
@@ -60,15 +69,15 @@ class FetchMissingVehicleCoversCommand extends Command
             $extension = $this->guessExtension($downloadUrl, $response->header('Content-Type'));
             $storagePath = 'vehicle-covers/'.$vehicle->id.'_'.time().'.'.$extension;
 
-            if ($vehicle->cover_photo_path && AppStorage::disk()->exists($vehicle->cover_photo_path)) {
-                AppStorage::disk()->delete($vehicle->cover_photo_path);
+            if ($vehicle->cover_photo_path && AppStorage::coversDisk()->exists($vehicle->cover_photo_path)) {
+                AppStorage::coversDisk()->delete($vehicle->cover_photo_path);
             }
 
-            AppStorage::disk()->put($storagePath, $response->body());
+            AppStorage::coversDisk()->put($storagePath, $response->body());
             $vehicle->update(['cover_photo_path' => $storagePath]);
 
             $updated++;
-            $this->info('  Capa salva: '.AppStorage::url($storagePath));
+            $this->info('  Capa salva: '.AppStorage::coversUrl($storagePath));
         }
 
         $this->info("Concluído. {$updated} veículo(s) atualizado(s).");

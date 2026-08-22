@@ -9,6 +9,7 @@ use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardContro
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
 use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
+use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\PublicVehicleController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\Web\User\MaintenanceController as UserMaintenanceController;
@@ -36,6 +37,10 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth', 'tenant'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    Route::get('/notificacoes', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notificacoes/{notification}/lida', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notificacoes/lidas', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
     Route::prefix('usuario')->middleware('user.type:user')->name('user.')->group(function () {
         Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');

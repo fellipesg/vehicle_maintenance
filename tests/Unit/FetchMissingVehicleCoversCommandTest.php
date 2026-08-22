@@ -14,7 +14,7 @@ class FetchMissingVehicleCoversCommandTest extends TestCase
 
     public function test_command_downloads_cover_for_vehicle_without_photo(): void
     {
-        Storage::fake('public');
+        $this->fakeCoversDisk('r2');
 
         Http::fake([
             'commons.wikimedia.org/*' => Http::response([
@@ -47,13 +47,13 @@ class FetchMissingVehicleCoversCommandTest extends TestCase
         $vehicle->refresh();
 
         $this->assertNotNull($vehicle->cover_photo_path);
-        Storage::disk('public')->assertExists($vehicle->cover_photo_path);
+        Storage::disk('r2')->assertExists($vehicle->cover_photo_path);
         $this->assertStringStartsWith('vehicle-covers/', $vehicle->cover_photo_path);
     }
 
     public function test_command_skips_vehicles_with_existing_cover(): void
     {
-        Storage::fake('public');
+        $this->fakeCoversDisk('r2');
         Http::fake();
 
         Vehicle::factory()->create([

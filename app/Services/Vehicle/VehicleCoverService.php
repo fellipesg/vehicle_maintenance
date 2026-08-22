@@ -12,7 +12,7 @@ class VehicleCoverService
     {
         $extension = $file->getClientOriginalExtension() ?: 'jpg';
         $fileName = $vehicle->id.'_'.time().'.'.$extension;
-        $filePath = $file->storeAs('vehicle-covers', $fileName, AppStorage::diskName());
+        $filePath = $file->storeAs('vehicle-covers', $fileName, AppStorage::coversDiskName());
 
         $this->deleteStored($vehicle->cover_photo_path);
 
@@ -27,8 +27,8 @@ class VehicleCoverService
             return;
         }
 
-        if (AppStorage::disk()->exists($coverPhotoPath)) {
-            AppStorage::disk()->delete($coverPhotoPath);
+        if (AppStorage::coversDisk()->exists($coverPhotoPath)) {
+            AppStorage::coversDisk()->delete($coverPhotoPath);
         }
     }
 }
