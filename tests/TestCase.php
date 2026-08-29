@@ -4,6 +4,7 @@ namespace Tests;
 
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Support\SanctumMobileToken;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +22,7 @@ abstract class TestCase extends BaseTestCase
     {
         $user = $user ?? User::factory()->asUser()->create();
         $user->refresh();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, SanctumMobileToken::ABILITIES);
 
         return $user;
     }

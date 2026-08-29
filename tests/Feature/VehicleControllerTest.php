@@ -36,8 +36,8 @@ class VehicleControllerTest extends TestCase
         $response = $this->getJson('/api/v1/vehicles');
 
         $response->assertOk()
-            ->assertJsonPath('data.data.0.id', $owned->id)
-            ->assertJsonCount(1, 'data.data');
+            ->assertJsonPath('data.0.id', $owned->id)
+            ->assertJsonCount(1, 'data');
     }
 
     public function test_can_create_vehicle(): void
@@ -270,9 +270,17 @@ class VehicleControllerTest extends TestCase
             'tenant_id' => $user->tenant_id,
         ]);
 
-        $this->get("/api/v1/vehicles/{$vehicle->id}/export-pdf")
+        $queued = $this->postJson("/api/v1/vehicles/{$vehicle->id}/export-pdf")
+            ->assertAccepted()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'pending');
+
+        $exportId = $queued->json('data.export_id');
+
+        $this->getJson("/api/v1/vehicle-pdf-exports/{$exportId}")
             ->assertOk()
-            ->assertHeader('content-type', 'application/pdf');
+            ->assertJsonPath('data.status', 'completed')
+            ->assertJsonStructure(['data' => ['download_url', 'filename']]);
     }
 
     public function test_can_upload_vehicle_cover_photo(): void
@@ -291,7 +299,7 @@ class VehicleControllerTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonStructure(['data' => ['cover_photo_url', 'cover_photo_path']]);
+            ->assertJsonStructure(['data' => ['cover_photo_url']]);
 
         $vehicle->refresh();
         $this->assertNotNull($vehicle->cover_photo_path);

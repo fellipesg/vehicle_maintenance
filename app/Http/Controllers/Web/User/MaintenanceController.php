@@ -19,12 +19,7 @@ class MaintenanceController extends Controller
 
     public function index(Request $request): View
     {
-        $maintenances = Maintenance::where('tenant_id', $request->user()->tenant_id)
-            ->with(['vehicle', 'workshop'])
-            ->orderByDesc('maintenance_date')
-            ->paginate(15);
-
-        return view('user.maintenances.index', compact('maintenances'));
+        return view('user.maintenances.index');
     }
 
     public function create(Request $request): View

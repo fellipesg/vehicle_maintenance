@@ -2,49 +2,61 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\StoreVehicleRequest;
+use App\Http\Requests\Api\V1\UpdateVehicleRequest;
+use App\Http\Requests\Api\V1\UploadVehicleCoverRequest;
+use App\Http\Resources\Api\V1\MaintenanceResource;
+use App\Http\Resources\Api\V1\PublicVehicleSearchResource;
+use App\Http\Resources\Api\V1\TimelineResource;
+use App\Http\Resources\Api\V1\VehiclePdfExportResource;
+use App\Http\Resources\Api\V1\VehicleResource;
 use App\Models\Vehicle;
 use App\Services\Vehicle\VehicleCoverService;
-use App\Services\Vehicle\VehicleMaintenancePdfExporter;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Vehicle\VehiclePdfExportService;
 use App\Services\Vehicle\VehicleTimelineBuilder;
 use App\Services\VehicleCatalogService;
+use App\Support\ApiResponse;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rules\File;
 
 #[Group('Vehicles', weight: 10)]
 class VehicleController extends Controller
 {
+    use ResolvesPagination;
+
     public function __construct(private readonly VehicleCoverService $covers) {}
 
+    #[QueryParameter('limit', 'Maximum number of brands to return (default 500, max 500).', type: 'integer')]
     #[Endpoint(title: 'Vehicle catalog brands')]
-    public function catalogBrands(VehicleCatalogService $catalog): JsonResponse
+    public function catalogBrands(Request $request, VehicleCatalogService $catalog): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'data' => $catalog->brands(),
-        ]);
+        $brands = $catalog->brands();
+        $limit = $this->catalogLimit($request);
+
+        return ApiResponse::success(array_slice($brands, 0, $limit));
     }
 
     #[QueryParameter('brand', 'Filter models by brand name.', required: true)]
+    #[QueryParameter('limit', 'Maximum number of models to return (default 500, max 500).', type: 'integer')]
     #[Endpoint(title: 'Vehicle catalog models')]
     public function catalogModels(Request $request, VehicleCatalogService $catalog): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'data' => $catalog->models($request->query('brand', '')),
-        ]);
+        $models = $catalog->models($request->query('brand', ''));
+        $limit = $this->catalogLimit($request);
+
+        return ApiResponse::success(array_slice($models, 0, $limit));
     }
 
     #[QueryParameter('search', 'Filter by license plate, RENAVAM, brand, or model.')]
-    #[QueryParameter('per_page', 'Results per page (default 15).', type: 'integer')]
+    #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
+    #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
     public function index(Request $request): JsonResponse
     {
         Gate::authorize('viewAny', Vehicle::class);
@@ -59,41 +71,15 @@ class VehicleController extends Controller
                         ->orWhere('model', 'like', "%{$search}%");
                 });
             })
-            ->paginate($request->per_page ?? 15);
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'success' => true,
-            'data' => $vehicles,
-        ]);
+        return ApiResponse::paginated($vehicles, VehicleResource::class);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreVehicleRequest $request): JsonResponse
     {
-        Gate::authorize('create', Vehicle::class);
-
-        $validator = Validator::make($request->all(), [
-            'license_plate' => 'required|string|max:10|unique:vehicles,license_plate',
-            'renavam' => 'required|string|max:20|unique:vehicles,renavam',
-            'brand' => 'required|string|max:100',
-            'model' => 'required|string|max:100',
-            'year' => 'required|integer|min:1900|max:'.(date('Y') + 1),
-            'color' => 'nullable|string|max:50',
-            'chassis' => 'nullable|string|max:50',
-            'motorization' => 'nullable|string|max:100',
-            'engine' => 'nullable|string|max:50',
-            'current_kilometers' => 'required|integer|min:0|max:9999999',
-            'terms_accepted' => 'required|accepted',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $data = collect($validator->validated())
-            ->except(['terms_accepted'])
+        $data = collect($request->validated())
+            ->except(['terms_accepted', 'purchase_date'])
             ->all();
 
         $vehicle = Vehicle::create($data);
@@ -113,11 +99,7 @@ class VehicleController extends Controller
         );
         $vehicle->refresh();
 
-        return response()->json([
-            'success' => true,
-            'data' => $vehicle,
-            'message' => 'Vehicle created successfully',
-        ], 201);
+        return ApiResponse::created(new VehicleResource($vehicle), 'Vehicle created successfully');
     }
 
     public function show(Request $request, string $id): JsonResponse
@@ -127,48 +109,20 @@ class VehicleController extends Controller
 
         Gate::authorize('view', $vehicle);
 
-        return response()->json([
-            'success' => true,
-            'data' => $vehicle,
-        ]);
+        return ApiResponse::success(new VehicleResource($vehicle));
     }
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(UpdateVehicleRequest $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
-        Gate::authorize('update', $vehicle);
 
-        $validator = Validator::make($request->all(), [
-            'license_plate' => 'sometimes|required|string|max:10|unique:vehicles,license_plate,'.$id,
-            'renavam' => 'sometimes|required|string|max:20|unique:vehicles,renavam,'.$id,
-            'brand' => 'sometimes|required|string|max:100',
-            'model' => 'sometimes|required|string|max:100',
-            'year' => 'sometimes|required|integer|min:1900|max:'.(date('Y') + 1),
-            'color' => 'nullable|string|max:50',
-            'chassis' => 'nullable|string|max:50',
-            'motorization' => 'nullable|string|max:100',
-            'engine' => 'nullable|string|max:50',
-            'current_kilometers' => 'sometimes|required|integer|min:0|max:9999999',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $vehicle->update($validator->validated());
+        $vehicle->update($request->validated());
 
         if ($request->has('current_kilometers')) {
             app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $vehicle->fresh(),
-            'message' => 'Vehicle updated successfully',
-        ]);
+        return ApiResponse::success(new VehicleResource($vehicle->fresh()), 'Vehicle updated successfully');
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -182,10 +136,7 @@ class VehicleController extends Controller
             $vehicle->delete();
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Vehicle removed from your account',
-        ]);
+        return ApiResponse::success(message: 'Vehicle removed from your account');
     }
 
     /**
@@ -208,18 +159,14 @@ class VehicleController extends Controller
             ->first();
 
         if (! $vehicle) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vehicle not found',
-            ], 404);
+            return ApiResponse::error('Vehicle not found', 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $this->publicVehicleSearchPayload($vehicle),
-        ]);
+        return ApiResponse::success(new PublicVehicleSearchResource($vehicle));
     }
 
+    #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
+    #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
     public function maintenances(Request $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
@@ -228,12 +175,9 @@ class VehicleController extends Controller
         $maintenances = $vehicle->maintenances()
             ->with(['items', 'invoices', 'checklists', 'user', 'workshop'])
             ->orderBy('maintenance_date', 'desc')
-            ->get();
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'success' => true,
-            'data' => $maintenances,
-        ]);
+        return ApiResponse::paginated($maintenances, MaintenanceResource::class);
     }
 
     public function timeline(Request $request, string $id): JsonResponse
@@ -241,49 +185,40 @@ class VehicleController extends Controller
         $vehicle = Vehicle::findOrFail($id);
         Gate::authorize('view', $vehicle);
 
-        return response()->json([
-            'success' => true,
-            'data' => app(VehicleTimelineBuilder::class)->build($vehicle),
-        ]);
+        return ApiResponse::success(
+            new TimelineResource(app(VehicleTimelineBuilder::class)->build($vehicle)),
+        );
     }
 
-    #[Endpoint(title: 'Export maintenance history PDF', description: 'Returns a PDF file download on success.')]
-    public function exportPdf(Request $request, string $id)
+    #[Endpoint(
+        title: 'Request maintenance history PDF export',
+        description: 'Queues async PDF generation. Poll status_url until completed, then download via the signed download_url.',
+    )]
+    public function requestExportPdf(Request $request, string $id, VehiclePdfExportService $exports): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
-        Gate::authorize('view', $vehicle);
 
-        try {
-            return app(VehicleMaintenancePdfExporter::class)->download($vehicle);
-        } catch (\Exception $e) {
-            Log::error('Vehicle PDF export failed', [
-                'vehicle_id' => $vehicle->id,
-                'exception' => $e->getMessage(),
-            ]);
+        $export = $exports->createExport($request->user(), $vehicle);
 
-            return response()->json([
-                'success' => false,
-                'message' => app()->hasDebugModeEnabled()
-                    ? 'Erro ao gerar PDF: '.$e->getMessage()
-                    : 'Unable to generate PDF. Please try again later.',
-            ], 500);
-        }
+        return ApiResponse::success(
+            new VehiclePdfExportResource($exports->queuedPayload($export)),
+            'PDF export queued.',
+            202,
+        );
     }
 
+    #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
+    #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
     public function myVehicles(Request $request): JsonResponse
     {
         $user = $request->user();
 
         $vehicles = $user->currentVehicles()
-            ->with(['maintenances' => function ($query) {
-                $query->orderBy('maintenance_date', 'desc');
-            }])
-            ->get();
+            ->withCount('maintenances')
+            ->orderByDesc('vehicles.created_at')
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'success' => true,
-            'data' => $vehicles,
-        ]);
+        return ApiResponse::paginated($vehicles, VehicleResource::class);
     }
 
     public function linkToUser(Request $request, string $id): JsonResponse
@@ -309,73 +244,18 @@ class VehicleController extends Controller
             ]);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Vehicle linked to user successfully',
-            'data' => $vehicle->fresh(),
-        ]);
+        return ApiResponse::success(new VehicleResource($vehicle->fresh()), 'Vehicle linked to user successfully');
     }
 
     #[Endpoint(
         title: 'Upload vehicle cover',
         description: 'Multipart form upload. Field name: `cover` (image: jpg, jpeg, png, webp; max 5 MB).',
     )]
-    public function uploadCover(Request $request, string $id): JsonResponse
+    public function uploadCover(UploadVehicleCoverRequest $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
-        Gate::authorize('update', $vehicle);
+        $vehicle = $this->covers->store($vehicle, $request->file('cover'));
 
-        $validator = Validator::make($request->all(), [
-            'cover' => [
-                'required',
-                File::image(allowSvg: false)
-                    ->types(['jpg', 'jpeg', 'png', 'webp'])
-                    ->max(5 * 1024),
-            ],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $file = $request->file('cover');
-        $vehicle = $this->covers->store($vehicle, $file);
-
-        return response()->json([
-            'success' => true,
-            'data' => $vehicle,
-            'message' => 'Cover photo uploaded successfully',
-        ]);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function publicVehicleSearchPayload(Vehicle $vehicle): array
-    {
-        return [
-            'id' => $vehicle->id,
-            'license_plate' => $vehicle->license_plate,
-            'renavam' => $vehicle->renavam,
-            'brand' => $vehicle->brand,
-            'model' => $vehicle->model,
-            'year' => $vehicle->year,
-            'color' => $vehicle->color,
-            'maintenances' => $vehicle->maintenances->map(function ($maintenance) {
-                return [
-                    'id' => $maintenance->id,
-                    'maintenance_type' => $maintenance->maintenance_type,
-                    'description' => $maintenance->description,
-                    'workshop_name' => $maintenance->displayWorkshopName(),
-                    'maintenance_date' => $maintenance->maintenance_date,
-                    'kilometers' => $maintenance->kilometers,
-                    'service_category' => $maintenance->service_category,
-                    'is_manufacturer_required' => $maintenance->is_manufacturer_required,
-                ];
-            })->values()->all(),
-        ];
+        return ApiResponse::success(new VehicleResource($vehicle), 'Cover photo uploaded successfully');
     }
 }

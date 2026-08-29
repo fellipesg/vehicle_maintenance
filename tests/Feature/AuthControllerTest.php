@@ -131,7 +131,7 @@ class AuthControllerTest extends TestCase
             'password' => 'password123',
             'portal' => 'lojista',
         ])->assertForbidden()
-            ->assertJsonPath('message', 'Esta conta não tem acesso a este portal.');
+            ->assertJsonPath('message', 'This account does not have access to this portal.');
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }

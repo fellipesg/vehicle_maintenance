@@ -3,7 +3,7 @@
 @section('title', 'Dashboard')
 
 @section('content')
-<div class="mx-auto max-w-7xl px-4 py-6">
+<div class="mx-auto max-w-7xl px-4 py-6" data-api-page="dashboard">
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-automotive-900">Olá, {{ auth()->user()->name }}</h1>
         <p class="mt-1 text-sm text-automotive-600">Gerencie seus veículos e manutenções</p>
@@ -12,11 +12,11 @@
     <div class="mb-6 grid gap-3 sm:grid-cols-3">
         <div class="stat-card !p-4">
             <p class="text-sm text-automotive-600">Meus Veículos</p>
-            <p class="text-2xl font-bold text-automotive-900">{{ $vehicles->count() }}</p>
+            <p class="text-2xl font-bold text-automotive-900" data-vehicle-count>—</p>
         </div>
         <div class="stat-card !p-4">
             <p class="text-sm text-automotive-600">Manutenções Recentes</p>
-            <p class="text-2xl font-bold text-automotive-900">{{ $recentMaintenances->count() }}</p>
+            <p class="text-2xl font-bold text-automotive-900" data-maintenance-count>—</p>
         </div>
         <div class="stat-card !p-4">
             <p class="text-sm text-automotive-600">Ações Rápidas</p>
@@ -33,26 +33,9 @@
                 <h2 class="text-lg font-semibold text-automotive-900">Meus Veículos</h2>
                 <a href="{{ route('user.vehicles.index') }}" class="text-sm text-wrench-600 hover:underline">Ver todos</a>
             </div>
-            @forelse($vehicles as $vehicle)
-                <a href="{{ route('user.vehicles.show', $vehicle) }}" class="card mb-2 block !p-4 transition hover:border-wrench-300 hover:shadow-sm">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="flex min-w-0 items-center gap-3">
-                            <x-vehicle-cover :vehicle="$vehicle" />
-                            <div class="min-w-0">
-                                <p class="font-semibold text-automotive-900">{{ $vehicle->brand }} {{ $vehicle->model }}</p>
-                                <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }}</p>
-                            </div>
-                        </div>
-                        <span class="badge badge-blue shrink-0">{{ $vehicle->maintenances_count }} manutenções</span>
-                    </div>
-                </a>
-            @empty
-                <div class="card !p-8 text-center">
-                    <p class="text-automotive-600">Nenhum veículo cadastrado ainda.</p>
-                    <p class="mt-1 text-sm text-automotive-500">Adicione seu primeiro veículo para começar o histórico.</p>
-                    <a href="{{ route('user.vehicles.create') }}" class="btn-primary mt-4">Cadastrar veículo</a>
-                </div>
-            @endforelse
+            <div data-dashboard-vehicles>
+                <div class="card !p-8 text-center text-automotive-500">Carregando veículos...</div>
+            </div>
         </div>
 
         <div>
@@ -60,17 +43,9 @@
                 <h2 class="text-lg font-semibold text-automotive-900">Manutenções Recentes</h2>
                 <a href="{{ route('user.maintenances.index') }}" class="text-sm text-wrench-600 hover:underline">Ver todas</a>
             </div>
-            @forelse($recentMaintenances as $maintenance)
-                <a href="{{ route('user.maintenances.show', $maintenance) }}" class="card mb-2 block !p-4 transition hover:border-wrench-300">
-                    <p class="font-semibold text-automotive-900">{{ $maintenance->maintenance_type }}</p>
-                    <p class="text-sm text-automotive-600">{{ $maintenance->vehicle->brand }} {{ $maintenance->vehicle->model }} · {{ $maintenance->maintenance_date->format('d/m/Y') }}</p>
-                </a>
-            @empty
-                <div class="card !p-8 text-center">
-                    <p class="text-automotive-600">Nenhuma manutenção registrada.</p>
-                    <p class="mt-1 text-sm text-automotive-500">Registre serviços para acompanhar o histórico do veículo.</p>
-                </div>
-            @endforelse
+            <div data-dashboard-maintenances>
+                <div class="card !p-8 text-center text-automotive-500">Carregando manutenções...</div>
+            </div>
         </div>
     </div>
 </div>

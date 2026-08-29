@@ -2,36 +2,24 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\StoreFcmTokenRequest;
+use App\Http\Resources\Api\V1\UserFcmTokenResource;
 use App\Models\UserFcmToken;
+use App\Support\ApiResponse;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Validator;
 
 #[Group('FCM Tokens', weight: 25)]
 class UserFcmTokenController extends Controller
 {
-    /**
-     * Register or update FCM token
-     */
-    public function store(Request $request): JsonResponse
+    use ResolvesPagination;
+
+    public function store(StoreFcmTokenRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'token' => 'required|string|max:500',
-            'device_type' => 'nullable|string|max:50',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        Gate::authorize('create', UserFcmToken::class);
-
         $user = $request->user();
         $existingToken = UserFcmToken::where('token', $request->token)->first();
 
@@ -42,11 +30,7 @@ class UserFcmTokenController extends Controller
                 'device_type' => $request->device_type ?? $existingToken->device_type ?? 'android',
             ]);
 
-            return response()->json([
-                'success' => true,
-                'data' => $existingToken,
-                'message' => 'FCM token updated successfully',
-            ]);
+            return ApiResponse::success(new UserFcmTokenResource($existingToken), 'FCM token updated successfully');
         }
 
         $fcmToken = UserFcmToken::create([
@@ -55,16 +39,9 @@ class UserFcmTokenController extends Controller
             'device_type' => $request->device_type ?? 'android',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => $fcmToken,
-            'message' => 'FCM token registered successfully',
-        ], 201);
+        return ApiResponse::created(new UserFcmTokenResource($fcmToken), 'FCM token registered successfully');
     }
 
-    /**
-     * Remove FCM token (by token value)
-     */
     public function destroy(string $token): JsonResponse
     {
         $fcmToken = UserFcmToken::where('token', $token)->firstOrFail();
@@ -73,25 +50,18 @@ class UserFcmTokenController extends Controller
 
         $fcmToken->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'FCM token removed successfully',
-        ]);
+        return ApiResponse::success(message: 'FCM token removed successfully');
     }
 
-    /**
-     * Get all FCM tokens for authenticated user
-     */
     public function index(Request $request): JsonResponse
     {
         Gate::authorize('viewAny', UserFcmToken::class);
 
         $user = $request->user();
-        $tokens = UserFcmToken::where('user_id', $user->id)->get();
+        $tokens = UserFcmToken::where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'success' => true,
-            'data' => $tokens,
-        ]);
+        return ApiResponse::paginated($tokens, UserFcmTokenResource::class);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Http\Resources\Api\V1\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 
@@ -38,14 +39,12 @@ class SanctumMobileToken
 
     public static function loginResponse(User $user, string $message = 'Login successful'): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'user' => $user,
-                'token' => self::issue($user),
-                'token_type' => 'Bearer',
-            ],
-            'message' => $message,
-        ]);
+        $user->loadMissing('currentVehicles');
+
+        return ApiResponse::success([
+            'user' => new UserResource($user),
+            'token' => self::issue($user),
+            'token_type' => 'Bearer',
+        ], $message);
     }
 }

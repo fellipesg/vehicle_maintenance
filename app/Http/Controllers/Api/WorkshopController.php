@@ -2,26 +2,33 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\StoreWorkshopRequest;
+use App\Http\Requests\Api\V1\UpdateWorkshopRequest;
+use App\Http\Resources\Api\V1\WorkshopResource;
 use App\Models\Workshop;
+use App\Support\ApiResponse;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Validator;
 
 #[Group('Workshops', weight: 20)]
 class WorkshopController extends Controller
 {
+    use ResolvesPagination;
+
     #[QueryParameter('search', 'Filter by workshop name, city, or neighborhood.')]
+    #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
+    #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
     #[Endpoint(title: 'List workshops')]
     public function index(Request $request): JsonResponse
     {
         $query = Workshop::query();
 
-        // Search by name
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -31,45 +38,13 @@ class WorkshopController extends Controller
             });
         }
 
-        $workshops = $query->orderBy('name')->get();
+        $workshops = $query->orderBy('name')->paginate($this->perPage($request));
 
-        return response()->json([
-            'success' => true,
-            'data' => $workshops,
-        ]);
+        return ApiResponse::paginated($workshops, WorkshopResource::class);
     }
 
-    /**
-     * Store a newly created workshop
-     */
-    public function store(Request $request): JsonResponse
+    public function store(StoreWorkshopRequest $request): JsonResponse
     {
-        Gate::authorize('create', Workshop::class);
-
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
-            'whatsapp' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
-            'facebook' => 'nullable|url|max:255',
-            'instagram' => 'nullable|url|max:255',
-            'cep' => 'required|string|size:8',
-            'street' => 'required|string|max:255',
-            'number' => 'required|string|max:20',
-            'complement' => 'nullable|string|max:255',
-            'neighborhood' => 'required|string|max:255',
-            'city' => 'required|string|max:255',
-            'state' => 'required|string|size:2',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        // If whatsapp is not provided, use phone
         $whatsapp = $request->whatsapp ?? $request->phone;
 
         $workshop = Workshop::create([
@@ -81,7 +56,7 @@ class WorkshopController extends Controller
             'email' => $request->email,
             'facebook' => $request->facebook,
             'instagram' => $request->instagram,
-            'cep' => preg_replace('/\D/', '', $request->cep), // Remove non-digits
+            'cep' => preg_replace('/\D/', '', $request->cep),
             'street' => $request->street,
             'number' => $request->number,
             'complement' => $request->complement,
@@ -90,78 +65,25 @@ class WorkshopController extends Controller
             'state' => strtoupper($request->state),
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Oficina cadastrada com sucesso!',
-            'data' => $workshop,
-        ], 201);
+        return ApiResponse::created(new WorkshopResource($workshop), 'Workshop created successfully');
     }
 
-    /**
-     * Display the specified workshop
-     */
     public function show(string $id): JsonResponse
     {
-        $workshop = Workshop::find($id);
+        $workshop = Workshop::findOrFail($id);
 
-        if (! $workshop) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Oficina não encontrada',
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => $workshop,
-        ]);
+        return ApiResponse::success(new WorkshopResource($workshop));
     }
 
-    /**
-     * Update the specified workshop
-     */
-    public function update(Request $request, string $id): JsonResponse
+    public function update(UpdateWorkshopRequest $request, string $id): JsonResponse
     {
-        $workshop = Workshop::find($id);
-
-        if (! $workshop) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Oficina não encontrada',
-            ], 404);
-        }
-
-        Gate::authorize('update', $workshop);
-
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|required|string|max:255',
-            'phone' => 'sometimes|required|string|max:20',
-            'whatsapp' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
-            'facebook' => 'nullable|url|max:255',
-            'instagram' => 'nullable|url|max:255',
-            'cep' => 'sometimes|required|string|size:8',
-            'street' => 'sometimes|required|string|max:255',
-            'number' => 'sometimes|required|string|max:20',
-            'complement' => 'nullable|string|max:255',
-            'neighborhood' => 'sometimes|required|string|max:255',
-            'city' => 'sometimes|required|string|max:255',
-            'state' => 'sometimes|required|string|size:2',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
+        $workshop = Workshop::findOrFail($id);
 
         $data = $request->only([
             'name', 'phone', 'whatsapp', 'email', 'facebook', 'instagram',
             'cep', 'street', 'number', 'complement', 'neighborhood', 'city', 'state',
         ]);
 
-        // Format CEP and state
         if (isset($data['cep'])) {
             $data['cep'] = preg_replace('/\D/', '', $data['cep']);
         }
@@ -169,7 +91,6 @@ class WorkshopController extends Controller
             $data['state'] = strtoupper($data['state']);
         }
 
-        // If whatsapp is not provided, use phone
         if (! isset($data['whatsapp']) && isset($data['phone'])) {
             $data['whatsapp'] = $data['phone'];
         } elseif (! isset($data['whatsapp']) && ! isset($data['phone'])) {
@@ -178,41 +99,24 @@ class WorkshopController extends Controller
 
         $workshop->update($data);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Oficina atualizada com sucesso!',
-            'data' => $workshop->fresh(),
-        ]);
+        return ApiResponse::success(new WorkshopResource($workshop->fresh()), 'Workshop updated successfully');
     }
 
-    /**
-     * Remove the specified workshop
-     */
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $workshop = Workshop::find($id);
-
-        if (! $workshop) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Oficina não encontrada',
-            ], 404);
-        }
+        $workshop = Workshop::findOrFail($id);
 
         Gate::authorize('delete', $workshop);
 
         if ($workshop->maintenances()->count() > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Não é possível excluir a oficina pois ela possui manutenções associadas',
-            ], 422);
+            return ApiResponse::error(
+                'Cannot delete workshop because it has associated maintenances.',
+                422,
+            );
         }
 
         $workshop->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Oficina excluída com sucesso!',
-        ]);
+        return ApiResponse::success(message: 'Workshop deleted successfully');
     }
 }

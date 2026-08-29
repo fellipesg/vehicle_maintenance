@@ -257,7 +257,8 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get('/usuario/manutencoes')
             ->assertOk()
-            ->assertSee('Brothers Londrina');
+            ->assertSee('data-api-page="maintenances-index"', false)
+            ->assertSee('Carregando manutenções');
     }
 
     public function test_user_can_view_workshops_directory(): void
@@ -267,7 +268,8 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get('/usuario/oficinas')
             ->assertOk()
-            ->assertSee('Oficina Teste');
+            ->assertSee('data-api-page="workshops-index"', false)
+            ->assertSee('Carregando oficinas');
     }
 
     public function test_vehicle_listing_and_detail_show_cover_photo(): void
@@ -284,32 +286,24 @@ class UserPortalTest extends TestCase
             'tenant_id' => $this->user->tenant_id,
         ]);
 
-        $alt = 'Capa do Mercedes-Benz C 180';
-
         $this->actingAs($this->user)
             ->get(route('user.vehicles.index'))
             ->assertOk()
-            ->assertSee($alt, false)
-            ->assertSee($path, false)
-            ->assertSee('object-contain', false)
-            ->assertDontSee('aspect-[16/9]', false)
-            ->assertDontSee('aspect-[3/4]', false);
+            ->assertSee('data-api-page="vehicles-index"', false)
+            ->assertSee('Carregando veículos');
 
         $this->actingAs($this->user)
             ->get(route('user.vehicles.show', $vehicle))
             ->assertOk()
-            ->assertSee($alt, false)
-            ->assertSee($path, false)
-            ->assertSee('object-contain', false)
-            ->assertDontSee('aspect-[16/9]', false)
-            ->assertSee('lg:grid-cols-3', false)
-            ->assertSee('wrap-anywhere', false);
+            ->assertSee('data-api-page="vehicle-show"', false)
+            ->assertSee('data-vehicle-id="'.$vehicle->id.'"', false)
+            ->assertSee('Carregando veículo');
 
         $this->actingAs($this->user)
             ->get('/usuario/dashboard')
             ->assertOk()
-            ->assertSee($alt, false)
-            ->assertSee($path, false);
+            ->assertSee('data-api-page="dashboard"', false)
+            ->assertSee('Carregando veículos');
     }
 
     public function test_vehicle_edit_shows_and_updates_cover_photo(): void

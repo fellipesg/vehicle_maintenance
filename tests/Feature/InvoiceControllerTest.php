@@ -118,7 +118,7 @@ class InvoiceControllerTest extends TestCase
         ])
             ->assertCreated()
             ->assertJsonPath('parsed_items_count', 5)
-            ->assertJsonPath('message', 'Nota fiscal salva e 5 itens importados da NF-e.');
+            ->assertJsonPath('message', 'Invoice saved and 5 items imported from NF-e.');
 
         $this->assertDatabaseCount('maintenance_items', 5);
         $this->assertDatabaseHas('invoices', [

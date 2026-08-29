@@ -33,7 +33,7 @@ class MaintenanceControllerTest extends TestCase
 
         $this->getJson('/api/v1/maintenances')
             ->assertOk()
-            ->assertJsonCount(2, 'data.data');
+            ->assertJsonCount(2, 'data');
     }
 
     public function test_can_filter_maintenances_by_vehicle(): void
@@ -56,7 +56,7 @@ class MaintenanceControllerTest extends TestCase
 
         $this->getJson("/api/v1/maintenances?vehicle_id={$vehicle1->id}")
             ->assertOk()
-            ->assertJsonCount(2, 'data.data');
+            ->assertJsonCount(2, 'data');
     }
 
     public function test_can_create_maintenance(): void
@@ -229,7 +229,7 @@ class MaintenanceControllerTest extends TestCase
 
         $this->getJson('/api/v1/maintenances?service_category=mechanical')
             ->assertOk()
-            ->assertJsonCount(1, 'data.data')
-            ->assertJsonPath('data.data.0.service_category', 'mechanical');
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.service_category', 'mechanical');
     }
 }

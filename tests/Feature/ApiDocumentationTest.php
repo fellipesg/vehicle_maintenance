@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\GenerateVehicleMaintenancePdfExport;
 use App\Models\Vehicle;
+use App\Models\VehiclePdfExport;
 use App\Services\Vehicle\VehicleMaintenancePdfExporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
 use Mockery;
 use Tests\TestCase;
@@ -101,20 +104,39 @@ class ApiDocumentationTest extends TestCase
     public function test_export_pdf_does_not_leak_exception_message_in_production(): void
     {
         Config::set('app.debug', false);
+        Bus::fake();
 
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
         $this->attachVehicleToUser($user, $vehicle);
 
         $mock = Mockery::mock(VehicleMaintenancePdfExporter::class);
-        $mock->shouldReceive('download')
+        $mock->shouldReceive('generate')
             ->once()
             ->andThrow(new \RuntimeException('Sensitive internal failure details'));
+        $mock->shouldReceive('cleanupTemps')->zeroOrMoreTimes();
         $this->app->instance(VehicleMaintenancePdfExporter::class, $mock);
 
-        $this->getJson("/api/v1/vehicles/{$vehicle->id}/export-pdf")
-            ->assertStatus(500)
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Unable to generate PDF. Please try again later.');
+        $queued = $this->postJson("/api/v1/vehicles/{$vehicle->id}/export-pdf")
+            ->assertAccepted();
+
+        $exportId = $queued->json('data.export_id');
+
+        Bus::assertDispatched(GenerateVehicleMaintenancePdfExport::class);
+
+        try {
+            (new GenerateVehicleMaintenancePdfExport($exportId))->handle($mock);
+        } catch (\RuntimeException) {
+            // Expected on first attempt.
+        }
+
+        (new GenerateVehicleMaintenancePdfExport($exportId))->failed(
+            new \RuntimeException('Sensitive internal failure details')
+        );
+
+        $this->getJson("/api/v1/vehicle-pdf-exports/{$exportId}")
+            ->assertOk()
+            ->assertJsonPath('data.status', VehiclePdfExport::STATUS_FAILED)
+            ->assertJsonPath('data.error_message', 'Unable to generate PDF. Please try again later.');
     }
 }

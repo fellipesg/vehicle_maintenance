@@ -13,11 +13,19 @@ $apiDescription = <<<'MD'
 
 All protected routes require the header: `Authorization: Bearer {token}`.
 
-Mobile tokens are issued via Sanctum (30-day expiry, named `mobile`). Token abilities exist in the API (`profile:read`, `vehicles:write`, etc.) but are **not enforced** on routes — all mobile tokens receive the full ability set.
+Mobile tokens are issued via Sanctum (30-day expiry, named `mobile`) with scoped abilities enforced on protected routes.
 
 ## Two-factor authentication (2FA)
 
-When 2FA is enabled on an account, `POST /login` and `POST /register` return a pending challenge instead of a token (`two_factor_required: true` and a `challenge_token`). Complete sign-in with `POST /two-factor/challenge` using the `challenge_token` and a TOTP `code` or `recovery_code`.
+When 2FA is enabled on an account, `POST /login` and `POST /register` return a pending challenge instead of a token (`requires_two_factor: true` and `challenge_token`). Complete sign-in with `POST /two-factor/challenge` using the `challenge_token` and a TOTP `code` or `recovery_code`.
+
+## Token abilities
+
+Protected routes enforce Sanctum token abilities (e.g. `vehicles:read`, `maintenances:write`). First-party web sessions authenticated via cookies bypass ability checks. Mobile Bearer tokens must include the required ability.
+
+## Pagination
+
+List endpoints accept `page` (default 1) and `per_page` (default 15, max 100). Paginated responses include top-level `meta` and `links` alongside `data`.
 
 ## Demo account (QA)
 
@@ -44,6 +52,7 @@ All JSON responses follow this shape:
 - `data` — payload on success (optional)
 - `message` — summary message (optional)
 - `errors` — validation or field errors (optional, usually on 422)
+- `meta` / `links` — pagination metadata on list endpoints (optional)
 MD;
 
 return [

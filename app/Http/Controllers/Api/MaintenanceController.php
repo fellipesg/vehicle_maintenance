@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\StoreMaintenanceRequest;
+use App\Http\Requests\Api\V1\UpdateMaintenanceRequest;
+use App\Http\Resources\Api\V1\MaintenanceResource;
 use App\Models\Checklist;
 use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
-use App\Rules\InvoiceFile;
 use App\Services\Invoice\InvoiceUploadProcessor;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Support\ApiResponse;
 use App\Support\AppStorage;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
@@ -16,14 +20,17 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 #[Group('Maintenances', weight: 12)]
 class MaintenanceController extends Controller
 {
+    use ResolvesPagination;
+
     #[QueryParameter('vehicle_id', 'Filter by vehicle ID.', type: 'integer')]
     #[QueryParameter('service_category', 'Filter by category: mechanical, electrical, suspension, painting, finishing, interior, other.')]
-    #[QueryParameter('per_page', 'Results per page (default 15).', type: 'integer')]
+    #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
+    #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
     public function index(Request $request): JsonResponse
     {
         Gate::authorize('viewAny', Maintenance::class);
@@ -49,52 +56,15 @@ class MaintenanceController extends Controller
         }
 
         $maintenances = $query->orderBy('maintenance_date', 'desc')
-            ->paginate($request->per_page ?? 15);
+            ->paginate($this->perPage($request));
 
-        return response()->json([
-            'success' => true,
-            'data' => $maintenances,
-        ]);
+        return ApiResponse::paginated($maintenances, MaintenanceResource::class);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreMaintenanceRequest $request): JsonResponse
     {
-        Gate::authorize('create', Maintenance::class);
-
         $user = $request->user();
         $userId = $user->id;
-
-        $validator = Validator::make($request->all(), [
-            'vehicle_id' => 'required|exists:vehicles,id',
-            'workshop_id' => 'nullable|exists:workshops,id',
-            'maintenance_type' => 'required|string|max:100',
-            'description' => 'nullable|string',
-            'workshop_name' => 'nullable|string|max:255',
-            'maintenance_date' => 'required|date',
-            'kilometers' => 'required|integer|min:0|max:9999999',
-            'service_category' => 'required|in:mechanical,electrical,suspension,painting,finishing,interior,other',
-            'is_manufacturer_required' => 'nullable|boolean',
-            'items' => 'nullable|array',
-            'items.*.name' => 'required_with:items|string|max:255',
-            'items.*.description' => 'nullable|string',
-            'items.*.quantity' => 'required_with:items|integer|min:1',
-            'items.*.unit_price' => 'nullable|numeric|min:0',
-            'items.*.total_price' => 'nullable|numeric|min:0',
-            'items.*.part_number' => 'nullable|string|max:100',
-            'invoices' => 'nullable|array',
-            'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
-            'checklists' => 'nullable|array',
-            'checklists.*.checklist_type' => 'required_with:checklists|in:initial,final',
-            'checklists.*.items' => 'required_with:checklists|array',
-            'checklists.*.notes' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
 
         $vehicle = \App\Models\Vehicle::findOrFail($request->vehicle_id);
         Gate::authorize('view', $vehicle);
@@ -105,10 +75,7 @@ class MaintenanceController extends Controller
                 (int) $request->integer('kilometers'),
             );
         } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'errors' => $e->errors(),
-            ], 422);
+            return ApiResponse::validation($e->errors());
         }
 
         $processor = app(InvoiceUploadProcessor::class);
@@ -189,29 +156,33 @@ class MaintenanceController extends Controller
 
             $maintenance->load(['items', 'invoices', 'checklists', 'vehicle', 'user', 'workshop']);
 
-            $response = [
-                'success' => true,
-                'data' => $maintenance,
-                'message' => 'Maintenance created successfully',
-            ];
+            $extra = [];
 
             if ($uploadResult['items_created'] > 0) {
-                $response['parsed_items_count'] = $uploadResult['items_created'];
+                $extra['parsed_items_count'] = $uploadResult['items_created'];
             }
 
             if ($uploadResult['warnings'] !== []) {
-                $response['parse_warnings'] = $uploadResult['warnings'];
+                $extra['parse_warnings'] = $uploadResult['warnings'];
             }
 
-            return response()->json($response, 201);
+            $payload = array_merge(
+                ['success' => true, 'data' => new MaintenanceResource($maintenance), 'message' => 'Maintenance created successfully'],
+                $extra,
+            );
+
+            return response()->json($payload, 201);
         } catch (\Exception $e) {
             DB::rollBack();
             $processor->discardUploads($storedInvoices);
+            Log::error('Error creating maintenance', ['exception' => $e->getMessage()]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Error creating maintenance: '.$e->getMessage(),
-            ], 500);
+            return ApiResponse::error(
+                app()->hasDebugModeEnabled()
+                    ? 'Error creating maintenance: '.$e->getMessage()
+                    : 'Unable to create maintenance.',
+                500,
+            );
         }
     }
 
@@ -222,36 +193,14 @@ class MaintenanceController extends Controller
 
         Gate::authorize('view', $maintenance);
 
-        return response()->json([
-            'success' => true,
-            'data' => $maintenance,
-        ]);
+        return ApiResponse::success(new MaintenanceResource($maintenance));
     }
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(UpdateMaintenanceRequest $request, string $id): JsonResponse
     {
         $maintenance = Maintenance::findOrFail($id);
-        Gate::authorize('update', $maintenance);
 
-        $validator = Validator::make($request->all(), [
-            'workshop_id' => 'nullable|exists:workshops,id',
-            'maintenance_type' => 'sometimes|required|string|max:100',
-            'description' => 'nullable|string',
-            'workshop_name' => 'nullable|string|max:255',
-            'maintenance_date' => 'sometimes|required|date',
-            'kilometers' => 'sometimes|required|integer|min:0',
-            'service_category' => 'sometimes|required|in:mechanical,electrical,suspension,painting,finishing,interior,other',
-            'is_manufacturer_required' => 'boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $data = $validator->validated();
+        $data = $request->validated();
 
         if (isset($data['workshop_id'])) {
             $workshop = \App\Models\Workshop::find($data['workshop_id']);
@@ -268,10 +217,7 @@ class MaintenanceController extends Controller
                     $maintenance,
                 );
             } catch (\Illuminate\Validation\ValidationException $e) {
-                return response()->json([
-                    'success' => false,
-                    'errors' => $e->errors(),
-                ], 422);
+                return ApiResponse::validation($e->errors());
             }
         }
 
@@ -281,11 +227,10 @@ class MaintenanceController extends Controller
             app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $maintenance->fresh(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop']),
-            'message' => 'Maintenance updated successfully',
-        ]);
+        return ApiResponse::success(
+            new MaintenanceResource($maintenance->fresh(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop'])),
+            'Maintenance updated successfully',
+        );
     }
 
     public function destroy(string $id): JsonResponse
@@ -306,9 +251,6 @@ class MaintenanceController extends Controller
             app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Maintenance deleted successfully',
-        ]);
+        return ApiResponse::success(message: 'Maintenance deleted successfully');
     }
 }

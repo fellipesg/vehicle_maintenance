@@ -3,16 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\ChallengeTwoFactorRequest;
+use App\Http\Requests\Api\V1\ConfirmTwoFactorRequest;
+use App\Http\Requests\Api\V1\DisableTwoFactorRequest;
 use App\Models\User;
 use App\Services\TwoFactorChallengeService;
 use App\Services\TwoFactorService;
+use App\Support\ApiResponse;
 use App\Support\SanctumMobileToken;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
 
 #[Group('Two-Factor Authentication', weight: 8)]
 class TwoFactorController extends Controller
@@ -28,10 +31,7 @@ class TwoFactorController extends Controller
         $user = $request->user();
 
         if ($this->challengeService->isEnabled($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Two-factor authentication is already enabled.',
-            ], 422);
+            return ApiResponse::error('Two-factor authentication is already enabled.', 422);
         }
 
         $secret = $this->twoFactorService->generateSecretKey();
@@ -42,51 +42,27 @@ class TwoFactorController extends Controller
             'two_factor_recovery_codes' => null,
         ])->save();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'secret' => $secret,
-                'otpauth_uri' => $this->twoFactorService->otpauthUri($user, $secret),
-            ],
-            'message' => 'Scan the secret with your authenticator app, then confirm with a code.',
-        ]);
+        return ApiResponse::success([
+            'secret' => $secret,
+            'otpauth_uri' => $this->twoFactorService->otpauthUri($user, $secret),
+        ], 'Scan the secret with your authenticator app, then confirm with a code.');
     }
 
-    public function confirm(Request $request): JsonResponse
+    public function confirm(ConfirmTwoFactorRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'code' => 'required|string|size:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         /** @var User $user */
         $user = $request->user();
 
         if ($this->challengeService->isEnabled($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Two-factor authentication is already enabled.',
-            ], 422);
+            return ApiResponse::error('Two-factor authentication is already enabled.', 422);
         }
 
         if ($user->two_factor_secret === null) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Enable two-factor authentication before confirming.',
-            ], 422);
+            return ApiResponse::error('Enable two-factor authentication before confirming.', 422);
         }
 
         if (! $this->twoFactorService->verifyTotp($user, $request->string('code')->toString())) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid authentication code.',
-            ], 422);
+            return ApiResponse::error('Invalid authentication code.', 422);
         }
 
         $recoveryCodes = $this->twoFactorService->generateRecoveryCodes();
@@ -98,97 +74,48 @@ class TwoFactorController extends Controller
             ),
         ])->save();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'recovery_codes' => $recoveryCodes,
-            ],
-            'message' => 'Two-factor authentication enabled.',
-        ]);
+        return ApiResponse::success([
+            'recovery_codes' => $recoveryCodes,
+        ], 'Two-factor authentication enabled.');
     }
 
-    public function disable(Request $request): JsonResponse
+    public function disable(DisableTwoFactorRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'password' => 'required|string',
-            'code' => 'required|string|size:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         /** @var User $user */
         $user = $request->user();
 
         if (! $this->challengeService->isEnabled($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Two-factor authentication is not enabled.',
-            ], 422);
+            return ApiResponse::error('Two-factor authentication is not enabled.', 422);
         }
 
         if (! Hash::check($request->string('password')->toString(), $user->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid password.',
-            ], 422);
+            return ApiResponse::error('Invalid password.', 422);
         }
 
         if (! $this->twoFactorService->verifyTotp($user, $request->string('code')->toString())) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid authentication code.',
-            ], 422);
+            return ApiResponse::error('Invalid authentication code.', 422);
         }
 
         $this->twoFactorService->clearTwoFactor($user);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Two-factor authentication disabled.',
-        ]);
+        return ApiResponse::success(message: 'Two-factor authentication disabled.');
     }
 
-    public function regenerateRecoveryCodes(Request $request): JsonResponse
+    public function regenerateRecoveryCodes(DisableTwoFactorRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'password' => 'required|string',
-            'code' => 'required|string|size:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         /** @var User $user */
         $user = $request->user();
 
         if (! $this->challengeService->isEnabled($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Two-factor authentication is not enabled.',
-            ], 422);
+            return ApiResponse::error('Two-factor authentication is not enabled.', 422);
         }
 
         if (! Hash::check($request->string('password')->toString(), $user->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid password.',
-            ], 422);
+            return ApiResponse::error('Invalid password.', 422);
         }
 
         if (! $this->twoFactorService->verifyTotp($user, $request->string('code')->toString())) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid authentication code.',
-            ], 422);
+            return ApiResponse::error('Invalid authentication code.', 422);
         }
 
         $recoveryCodes = $this->twoFactorService->generateRecoveryCodes();
@@ -197,59 +124,33 @@ class TwoFactorController extends Controller
             $this->twoFactorService->hashRecoveryCodes($recoveryCodes),
         );
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'recovery_codes' => $recoveryCodes,
-            ],
-            'message' => 'Recovery codes regenerated.',
-        ]);
+        return ApiResponse::success([
+            'recovery_codes' => $recoveryCodes,
+        ], 'Recovery codes regenerated.');
     }
 
     #[Endpoint(
         title: 'Complete 2FA challenge',
         description: 'Public endpoint used after login/register when 2FA is enabled. Provide `challenge_token` from the pending response plus either a TOTP `code` or a `recovery_code`.',
     )]
-    public function challenge(Request $request): JsonResponse
+    public function challenge(ChallengeTwoFactorRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'challenge_token' => 'required|string',
-            'code' => 'required_without:recovery_code|nullable|string|size:6',
-            'recovery_code' => 'required_without:code|nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         $challengeToken = $request->string('challenge_token')->toString();
         $user = $this->challengeService->resolveUser($challengeToken);
 
         if ($user === null) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired challenge token.',
-            ], 422);
+            return ApiResponse::error('Invalid or expired challenge token.', 422);
         }
 
         if (! $this->challengeService->isEnabled($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Two-factor authentication is not enabled for this account.',
-            ], 422);
+            return ApiResponse::error('Two-factor authentication is not enabled for this account.', 422);
         }
 
         $code = $request->input('code');
         $recoveryCode = $request->input('recovery_code');
 
         if (! $this->challengeService->verifyChallenge($user, is_string($code) ? $code : null, is_string($recoveryCode) ? $recoveryCode : null)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid authentication code.',
-            ], 422);
+            return ApiResponse::error('Invalid authentication code.', 422);
         }
 
         $this->challengeService->forgetChallenge($challengeToken);

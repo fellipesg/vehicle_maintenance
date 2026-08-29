@@ -13,7 +13,6 @@ use App\Services\Crlv\CrlvParseResult;
 use App\Services\Crlv\CrlvPdfParser;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleOwnershipService;
-use App\Services\Vehicle\VehicleTimelineBuilder;
 use App\Services\VehicleCatalogService;
 use App\Support\AppStorage;
 use Illuminate\Http\RedirectResponse;
@@ -92,11 +91,7 @@ class VehicleController extends Controller
 
     public function index(Request $request): View
     {
-        $vehicles = $request->user()->currentVehicles()
-            ->withCount('maintenances')
-            ->get();
-
-        return view('user.vehicles.index', compact('vehicles'));
+        return view('user.vehicles.index');
     }
 
     public function create(VehicleCatalogService $catalog): View
@@ -172,12 +167,11 @@ class VehicleController extends Controller
 
     public function show(Vehicle $vehicle): View
     {
-        $vehicle->load(['maintenances.items', 'maintenances.invoices', 'maintenances.workshop']);
+        Gate::authorize('view', $vehicle);
 
-        $canViewMaintenances = auth()->user()->canViewVehicleMaintenances($vehicle);
-        $timeline = app(VehicleTimelineBuilder::class)->build($vehicle);
-
-        return view('user.vehicles.show', compact('vehicle', 'canViewMaintenances', 'timeline'));
+        return view('user.vehicles.show', [
+            'vehicleId' => $vehicle->id,
+        ]);
     }
 
     public function edit(Vehicle $vehicle, VehicleCatalogService $catalog): View

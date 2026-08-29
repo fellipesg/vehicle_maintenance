@@ -3,17 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\UploadInvoiceRequest;
+use App\Http\Resources\Api\V1\InvoiceResource;
 use App\Models\Invoice;
 use App\Models\Maintenance;
-use App\Rules\InvoiceFile;
 use App\Services\Invoice\InvoiceUploadProcessor;
+use App\Support\ApiResponse;
 use App\Support\AppStorage;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 #[Group('Invoices', weight: 18)]
@@ -26,25 +27,10 @@ class InvoiceController extends Controller
         title: 'Upload invoice',
         description: 'Multipart form upload. Required fields: `file` (PDF or XML, max 10 MB), `maintenance_id`, `invoice_type` (`item` or `general`). Optional: `maintenance_item_id`, `invoice_number`, `invoice_date`, `total_amount`.',
     )]
-    public function upload(Request $request): JsonResponse
+    public function upload(UploadInvoiceRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'file' => ['required', 'file', new InvoiceFile, 'max:10240'],
-            'maintenance_id' => 'required|exists:maintenances,id',
-            'maintenance_item_id' => 'nullable|exists:maintenance_items,id',
-            'invoice_type' => 'required|in:item,general',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         $maintenance = Maintenance::findOrFail($request->maintenance_id);
 
-        Gate::authorize('create', Invoice::class);
         Gate::authorize('update', $maintenance);
 
         try {
@@ -72,31 +58,32 @@ class InvoiceController extends Controller
 
             $invoice->refresh();
 
-            $response = [
+            $payload = [
                 'success' => true,
-                'data' => $invoice->load('maintenance.items'),
+                'data' => new InvoiceResource($invoice->load('maintenance.items')),
                 'parsed_items_count' => $result['items_created'],
                 'message' => $result['items_created'] > 0
-                    ? "Nota fiscal salva e {$result['items_created']} itens importados da NF-e."
-                    : 'Nota fiscal salva com sucesso.',
+                    ? "Invoice saved and {$result['items_created']} items imported from NF-e."
+                    : 'Invoice saved successfully.',
             ];
 
             if ($result['parse_warning'] ?? null) {
-                $response['parse_warning'] = $result['parse_warning'];
+                $payload['parse_warning'] = $result['parse_warning'];
             }
 
-            return response()->json($response, 201);
+            return response()->json($payload, 201);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error uploading invoice: '.$e->getMessage(),
-            ], 500);
+            Log::error('Error uploading invoice', ['exception' => $e->getMessage()]);
+
+            return ApiResponse::error(
+                app()->hasDebugModeEnabled()
+                    ? 'Error uploading invoice: '.$e->getMessage()
+                    : 'Unable to upload invoice.',
+                500,
+            );
         }
     }
 
-    /**
-     * Download invoice file
-     */
     public function download(string $id): StreamedResponse|JsonResponse
     {
         try {
@@ -104,24 +91,22 @@ class InvoiceController extends Controller
             Gate::authorize('view', $invoice);
 
             if (! AppStorage::disk()->exists($invoice->file_path)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invoice file not found',
-                ], 404);
+                return ApiResponse::error('Invoice file not found', 404);
             }
 
             return AppStorage::disk()->download($invoice->file_path, $invoice->file_name);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error downloading invoice: '.$e->getMessage(),
-            ], 500);
+            Log::error('Error downloading invoice', ['exception' => $e->getMessage()]);
+
+            return ApiResponse::error(
+                app()->hasDebugModeEnabled()
+                    ? 'Error downloading invoice: '.$e->getMessage()
+                    : 'Unable to download invoice.',
+                500,
+            );
         }
     }
 
-    /**
-     * Delete invoice
-     */
     public function destroy(string $id): JsonResponse
     {
         $invoice = Invoice::with('maintenance')->findOrFail($id);
@@ -133,9 +118,6 @@ class InvoiceController extends Controller
 
         $invoice->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Invoice deleted successfully',
-        ]);
+        return ApiResponse::success(message: 'Invoice deleted successfully');
     }
 }

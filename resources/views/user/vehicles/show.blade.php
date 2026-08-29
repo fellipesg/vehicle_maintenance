@@ -1,80 +1,11 @@
 @extends('layouts.app')
 
-@section('title', $vehicle->brand . ' ' . $vehicle->model)
-
-@php
-    $categories = [
-        'mechanical' => 'Mecânica', 'electrical' => 'Elétrica', 'suspension' => 'Suspensão',
-        'painting' => 'Pintura', 'finishing' => 'Acabamento', 'interior' => 'Interior', 'other' => 'Outros',
-    ];
-@endphp
+@section('title', 'Veículo')
 
 @section('content')
-<div class="mx-auto max-w-7xl px-4 py-8">
-    <x-vehicle-cover :vehicle="$vehicle" variant="hero" class="mb-6" />
-
-    <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-            <h1 class="text-3xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h1>
-            <p class="text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->color ?? '—' }} · {{ $vehicle->license_plate }}</p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-            <form method="POST" action="{{ route('user.vehicles.export-pdf', $vehicle) }}">
-                @csrf
-                <button type="submit" class="btn-secondary">📄 Exportar PDF</button>
-            </form>
-            <a href="{{ route('user.vehicles.edit', $vehicle) }}" class="btn-secondary">Editar</a>
-            <a href="{{ route('user.maintenances.create') }}?vehicle_id={{ $vehicle->id }}" class="btn-primary">+ Manutenção</a>
-        </div>
+<div class="mx-auto max-w-7xl px-4 py-8" data-api-page="vehicle-show" data-vehicle-id="{{ $vehicleId }}">
+    <div data-vehicle-content>
+        <div class="card !p-8 text-center text-automotive-500">Carregando veículo...</div>
     </div>
-
-    <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div class="stat-card">
-            <p class="text-sm text-automotive-600">RENAVAM</p>
-            <p class="font-semibold wrap-anywhere">{{ $vehicle->renavam }}</p>
-        </div>
-        <div class="stat-card">
-            <p class="text-sm text-automotive-600">CRV</p>
-            <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->crv_number ?? '—' }}</p>
-        </div>
-        <div class="stat-card">
-            <p class="text-sm text-automotive-600">Chassi</p>
-            <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->chassis ?? '—' }}</p>
-        </div>
-        <div class="stat-card">
-            <p class="text-sm text-automotive-600">Motorização</p>
-            <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->motorization ?? '—' }}</p>
-        </div>
-        <div class="stat-card">
-            <p class="text-sm text-automotive-600">Código do motor</p>
-            <p class="font-semibold text-sm wrap-anywhere">{{ $vehicle->engine ?? '—' }}</p>
-        </div>
-        <div class="stat-card">
-            <p class="text-sm text-automotive-600">Quilometragem atual</p>
-            <p class="text-2xl font-bold">{{ $vehicle->current_kilometers !== null ? number_format($vehicle->current_kilometers, 0, ',', '.') . ' km' : '—' }}</p>
-        </div>
-        @if(! empty($timeline['summary']['approximate_annual_kilometers']))
-            <div class="stat-card">
-                <p class="text-sm text-automotive-600">Média aproximada por ano</p>
-                <p class="text-2xl font-bold">{{ number_format((int) $timeline['summary']['approximate_annual_kilometers'], 0, ',', '.') }} km/ano</p>
-                <p class="mt-1 text-xs text-automotive-500">Estimativa com base no cadastro e nas manutenções registradas.</p>
-            </div>
-        @endif
-        <div class="stat-card">
-            <p class="text-sm text-automotive-600">Manutenções</p>
-            <p class="text-2xl font-bold">{{ $vehicle->maintenances->count() }}</p>
-        </div>
-    </div>
-
-    @if($canViewMaintenances)
-        <x-vehicle-timeline :timeline="$timeline" class="mb-8" />
-    @endif
-
-    <h2 class="mb-4 text-xl font-semibold">🔧 Histórico de Manutenções</h2>
-    @include('partials.vehicle-maintenance-history', [
-        'vehicle' => $vehicle,
-        'categories' => $categories,
-        'canViewMaintenances' => $canViewMaintenances,
-    ])
 </div>
 @endsection
