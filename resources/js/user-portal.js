@@ -146,6 +146,18 @@ async function loadVehiclesIndex() {
     }
 }
 
+function triggerBrowserDownload(blob, filename) {
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename || 'historico_manutencoes.pdf';
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+}
+
 async function pollPdfExport(exportId, button) {
     const maxAttempts = 60;
     let attempts = 0;
@@ -155,8 +167,14 @@ async function pollPdfExport(exportId, button) {
         const response = await apiClient.getVehiclePdfExportStatus(exportId);
         const data = response.data.data ?? {};
 
-        if (data.status === 'completed' && data.download_url) {
-            window.location.href = data.download_url;
+        if (data.status === 'completed') {
+            const downloadResponse = await apiClient.downloadVehiclePdfExport(exportId);
+            const filename = data.filename || 'historico_manutencoes.pdf';
+            triggerBrowserDownload(
+                new Blob([downloadResponse.data], { type: 'application/pdf' }),
+                filename,
+            );
+
             if (button) {
                 button.disabled = false;
                 button.textContent = '📄 Exportar PDF';

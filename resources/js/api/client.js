@@ -21,6 +21,9 @@ export default {
     getVehicleTimeline: (id) => api.get(`/vehicles/${id}/timeline`),
     requestVehiclePdfExport: (id) => api.post(`/vehicles/${id}/export-pdf`),
     getVehiclePdfExportStatus: (exportId) => api.get(`/vehicle-pdf-exports/${exportId}`),
+    downloadVehiclePdfExport: (exportId) => api.get(`/vehicle-pdf-exports/${exportId}/download`, {
+        responseType: 'blob',
+    }),
     getMaintenances: (params = {}) => api.get('/maintenances', { params }),
     getMaintenance: (id) => api.get(`/maintenances/${id}`),
     getWorkshops: (params = {}) => api.get('/workshops', { params }),

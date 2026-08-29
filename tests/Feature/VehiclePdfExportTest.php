@@ -138,6 +138,38 @@ class VehiclePdfExportTest extends TestCase
         $this->assertIsString($downloadUrl);
         $this->assertNotSame('', $downloadUrl);
         $this->assertNotNull($response->json('data.download_url_expires_at'));
+        $this->assertSame(
+            "/api/v1/vehicle-pdf-exports/{$export->id}/download",
+            $response->json('data.download_api_url'),
+        );
+    }
+
+    public function test_completed_export_can_be_downloaded_as_attachment(): void
+    {
+        Storage::fake('public');
+
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $path = 'exports/vehicle-pdfs/test-export.pdf';
+        $pdfContents = '%PDF-1.4 test';
+        Storage::disk('public')->put($path, $pdfContents);
+
+        $export = VehiclePdfExport::factory()->completed()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'file_path' => $path,
+            'filename' => 'historico_teste.pdf',
+        ]);
+
+        $this->get("/api/v1/vehicle-pdf-exports/{$export->id}/download")
+            ->assertOk()
+            ->assertDownload('historico_teste.pdf')
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->assertSame($pdfContents, Storage::disk('public')->get($path));
     }
 
     public function test_old_sync_get_export_endpoint_is_gone(): void

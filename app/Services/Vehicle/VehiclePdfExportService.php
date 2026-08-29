@@ -49,6 +49,7 @@ class VehiclePdfExportService
             );
 
             $payload['filename'] = $export->filename;
+            $payload['download_api_url'] = $this->downloadUrl($export);
             $payload['download_url'] = $export->file_path !== null
                 ? AppStorage::url($export->file_path, $downloadUrlExpiresAt)
                 : null;
@@ -66,6 +67,11 @@ class VehiclePdfExportService
     public function statusUrl(VehiclePdfExport $export): string
     {
         return '/api/v1/vehicle-pdf-exports/'.$export->id;
+    }
+
+    public function downloadUrl(VehiclePdfExport $export): string
+    {
+        return '/api/v1/vehicle-pdf-exports/'.$export->id.'/download';
     }
 
     /**

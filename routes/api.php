@@ -63,6 +63,7 @@ Route::prefix('v1')->group(function () {
         // Export maintenance history to PDF (async)
         Route::post('/vehicles/{id}/export-pdf', [VehicleController::class, 'requestExportPdf'])->middleware('ability:vehicles:read');
         Route::get('/vehicle-pdf-exports/{exportId}', [VehiclePdfExportController::class, 'show'])->middleware('ability:vehicles:read');
+        Route::get('/vehicle-pdf-exports/{exportId}/download', [VehiclePdfExportController::class, 'download'])->middleware('ability:vehicles:read');
 
         // Invoice routes
         Route::post('/invoices/upload', [InvoiceController::class, 'upload'])->middleware('ability:invoices:write');
