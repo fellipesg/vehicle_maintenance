@@ -7,11 +7,14 @@ use App\Models\User;
 use App\Services\TwoFactorChallengeService;
 use App\Services\TwoFactorService;
 use App\Support\SanctumMobileToken;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
+#[Group('Two-Factor Authentication', weight: 8)]
 class TwoFactorController extends Controller
 {
     public function __construct(
@@ -203,6 +206,10 @@ class TwoFactorController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Complete 2FA challenge',
+        description: 'Public endpoint used after login/register when 2FA is enabled. Provide `challenge_token` from the pending response plus either a TOTP `code` or a `recovery_code`.',
+    )]
     public function challenge(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [

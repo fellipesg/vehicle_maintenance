@@ -4,17 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workshop;
-use Illuminate\Http\Request;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 
+#[Group('Workshops', weight: 20)]
 class WorkshopController extends Controller
 {
-    /**
-     * Display a listing of workshops with optional search
-     */
+    #[QueryParameter('search', 'Filter by workshop name, city, or neighborhood.')]
+    #[Endpoint(title: 'List workshops')]
     public function index(Request $request): JsonResponse
     {
         $query = Workshop::query();
@@ -24,8 +26,8 @@ class WorkshopController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('city', 'like', "%{$search}%")
-                  ->orWhere('neighborhood', 'like', "%{$search}%");
+                    ->orWhere('city', 'like', "%{$search}%")
+                    ->orWhere('neighborhood', 'like', "%{$search}%");
             });
         }
 
@@ -63,7 +65,6 @@ class WorkshopController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation error',
                 'errors' => $validator->errors(),
             ], 422);
         }
@@ -103,7 +104,7 @@ class WorkshopController extends Controller
     {
         $workshop = Workshop::find($id);
 
-        if (!$workshop) {
+        if (! $workshop) {
             return response()->json([
                 'success' => false,
                 'message' => 'Oficina não encontrada',
@@ -151,14 +152,13 @@ class WorkshopController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation error',
                 'errors' => $validator->errors(),
             ], 422);
         }
 
         $data = $request->only([
             'name', 'phone', 'whatsapp', 'email', 'facebook', 'instagram',
-            'cep', 'street', 'number', 'complement', 'neighborhood', 'city', 'state'
+            'cep', 'street', 'number', 'complement', 'neighborhood', 'city', 'state',
         ]);
 
         // Format CEP and state
@@ -170,9 +170,9 @@ class WorkshopController extends Controller
         }
 
         // If whatsapp is not provided, use phone
-        if (!isset($data['whatsapp']) && isset($data['phone'])) {
+        if (! isset($data['whatsapp']) && isset($data['phone'])) {
             $data['whatsapp'] = $data['phone'];
-        } elseif (!isset($data['whatsapp']) && !isset($data['phone'])) {
+        } elseif (! isset($data['whatsapp']) && ! isset($data['phone'])) {
             $data['whatsapp'] = $workshop->phone;
         }
 

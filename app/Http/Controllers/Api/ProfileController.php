@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\AppStorage;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\File;
 
+#[Group('Profile', weight: 15)]
 class ProfileController extends Controller
 {
     /**
@@ -66,6 +69,10 @@ class ProfileController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Upload avatar',
+        description: 'Multipart form upload. Field name: `avatar` (image: jpg, jpeg, png, webp; max 5 MB).',
+    )]
     public function uploadAvatar(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [

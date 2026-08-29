@@ -10,14 +10,20 @@ use App\Rules\InvoiceFile;
 use App\Services\Invoice\InvoiceUploadProcessor;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Support\AppStorage;
+use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 
+#[Group('Maintenances', weight: 12)]
 class MaintenanceController extends Controller
 {
+    #[QueryParameter('vehicle_id', 'Filter by vehicle ID.', type: 'integer')]
+    #[QueryParameter('service_category', 'Filter by category: mechanical, electrical, suspension, painting, finishing, interior, other.')]
+    #[QueryParameter('per_page', 'Results per page (default 15).', type: 'integer')]
     public function index(Request $request): JsonResponse
     {
         Gate::authorize('viewAny', Maintenance::class);

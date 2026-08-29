@@ -7,18 +7,25 @@ use App\Models\User;
 use App\Services\FcmService;
 use App\Services\TenantService;
 use App\Support\SanctumMobileToken;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Socialite\Facades\Socialite;
 
+#[Group('Authentication', weight: 0)]
 class AuthController extends Controller
 {
     /**
-     * Register a new user
+     * Register a new user.
+     *
+     * Returns a Bearer token on success, or a 2FA challenge when two-factor is enabled.
      */
+    #[Endpoint(title: 'Register')]
     public function register(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -105,8 +112,11 @@ class AuthController extends Controller
     }
 
     /**
-     * Login user
+     * Login with email and password.
+     *
+     * Returns a Bearer token on success, or a 2FA challenge when two-factor is enabled.
      */
+    #[Endpoint(title: 'Login')]
     public function login(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -162,9 +172,7 @@ class AuthController extends Controller
         return SanctumMobileToken::loginResponse($user);
     }
 
-    /**
-     * Logout user
-     */
+    #[Endpoint(title: 'Logout')]
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
@@ -175,9 +183,7 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Get authenticated user
-     */
+    #[Endpoint(title: 'Current user')]
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -190,8 +196,13 @@ class AuthController extends Controller
     }
 
     /**
-     * Redirect to SSO provider
+     * Get the OAuth provider authorization URL (browser flow).
      */
+    #[Group('OAuth (Advanced)', 'Optional browser-based OAuth for mobile/web clients. Email/password login is the primary method.', weight: 90)]
+    #[Endpoint(
+        title: 'OAuth redirect URL',
+        description: 'Returns a URL to open in a browser. After authorization, the provider redirects to the callback endpoint.',
+    )]
     public function redirectToProvider(string $provider): JsonResponse
     {
         $validProviders = ['google', 'twitter', 'facebook'];
@@ -243,8 +254,13 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle SSO callback
+     * Handle OAuth provider callback and issue a Bearer token.
      */
+    #[Group('OAuth (Advanced)', 'Optional browser-based OAuth for mobile/web clients. Email/password login is the primary method.', weight: 90)]
+    #[Endpoint(
+        title: 'OAuth callback',
+        description: 'Called by the OAuth provider after user authorization. Returns a Bearer token or 2FA challenge.',
+    )]
     public function handleProviderCallback(string $provider): JsonResponse
     {
         $validProviders = ['google', 'twitter', 'facebook'];
@@ -349,9 +365,16 @@ class AuthController extends Controller
 
             return SanctumMobileToken::loginResponse($user);
         } catch (\Exception $e) {
+            Log::error('OAuth callback failed', [
+                'provider' => $provider,
+                'exception' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error authenticating with '.$provider.': '.$e->getMessage(),
+                'message' => app()->hasDebugModeEnabled()
+                    ? 'Error authenticating with '.$provider.': '.$e->getMessage()
+                    : 'Unable to authenticate with the selected provider.',
             ], 500);
         }
     }

@@ -9,16 +9,22 @@ use App\Services\Vehicle\VehicleMaintenancePdfExporter;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\VehicleTimelineBuilder;
 use App\Services\VehicleCatalogService;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\File;
 
+#[Group('Vehicles', weight: 10)]
 class VehicleController extends Controller
 {
     public function __construct(private readonly VehicleCoverService $covers) {}
 
+    #[Endpoint(title: 'Vehicle catalog brands')]
     public function catalogBrands(VehicleCatalogService $catalog): JsonResponse
     {
         return response()->json([
@@ -27,6 +33,8 @@ class VehicleController extends Controller
         ]);
     }
 
+    #[QueryParameter('brand', 'Filter models by brand name.', required: true)]
+    #[Endpoint(title: 'Vehicle catalog models')]
     public function catalogModels(Request $request, VehicleCatalogService $catalog): JsonResponse
     {
         return response()->json([
@@ -35,6 +43,8 @@ class VehicleController extends Controller
         ]);
     }
 
+    #[QueryParameter('search', 'Filter by license plate, RENAVAM, brand, or model.')]
+    #[QueryParameter('per_page', 'Results per page (default 15).', type: 'integer')]
     public function index(Request $request): JsonResponse
     {
         Gate::authorize('viewAny', Vehicle::class);
@@ -178,6 +188,16 @@ class VehicleController extends Controller
         ]);
     }
 
+    /**
+     * Public vehicle search by license plate or RENAVAM.
+     *
+     * No authentication required. Response excludes owner PII (no user data, addresses, or contact info).
+     */
+    #[Group('Vehicles (Public)', weight: 5)]
+    #[Endpoint(
+        title: 'Search vehicle (public)',
+        description: 'Public endpoint. Returns maintenance history without owner PII.',
+    )]
     public function search(string $identifier): JsonResponse
     {
         $vehicle = Vehicle::where('license_plate', $identifier)
@@ -227,6 +247,7 @@ class VehicleController extends Controller
         ]);
     }
 
+    #[Endpoint(title: 'Export maintenance history PDF', description: 'Returns a PDF file download on success.')]
     public function exportPdf(Request $request, string $id)
     {
         $vehicle = Vehicle::findOrFail($id);
@@ -235,9 +256,16 @@ class VehicleController extends Controller
         try {
             return app(VehicleMaintenancePdfExporter::class)->download($vehicle);
         } catch (\Exception $e) {
+            Log::error('Vehicle PDF export failed', [
+                'vehicle_id' => $vehicle->id,
+                'exception' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Erro ao gerar PDF: '.$e->getMessage(),
+                'message' => app()->hasDebugModeEnabled()
+                    ? 'Erro ao gerar PDF: '.$e->getMessage()
+                    : 'Unable to generate PDF. Please try again later.',
             ], 500);
         }
     }
@@ -288,6 +316,10 @@ class VehicleController extends Controller
         ]);
     }
 
+    #[Endpoint(
+        title: 'Upload vehicle cover',
+        description: 'Multipart form upload. Field name: `cover` (image: jpg, jpeg, png, webp; max 5 MB).',
+    )]
     public function uploadCover(Request $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);

@@ -8,17 +8,24 @@ use App\Models\Maintenance;
 use App\Rules\InvoiceFile;
 use App\Services\Invoice\InvoiceUploadProcessor;
 use App\Support\AppStorage;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+#[Group('Invoices', weight: 18)]
 class InvoiceController extends Controller
 {
     /**
      * Upload and process invoice PDF or XML, extracting NF-e items when possible.
      */
+    #[Endpoint(
+        title: 'Upload invoice',
+        description: 'Multipart form upload. Required fields: `file` (PDF or XML, max 10 MB), `maintenance_id`, `invoice_type` (`item` or `general`). Optional: `maintenance_item_id`, `invoice_number`, `invoice_date`, `total_amount`.',
+    )]
     public function upload(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
