@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\UserFcmToken;
+use App\Support\FirebaseCredentials;
+use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
-use App\Models\UserFcmToken;
-use Illuminate\Support\Facades\Log;
 
 class FcmService
 {
@@ -14,14 +15,8 @@ class FcmService
 
     public function __construct()
     {
-        $credentialsPath = config('firebase.credentials_path');
-        
-        if (!$credentialsPath || !file_exists(storage_path('app/' . $credentialsPath))) {
-            throw new \Exception('Firebase credentials file not found. Please configure FIREBASE_CREDENTIALS_PATH in .env');
-        }
-
         $factory = (new Factory)
-            ->withServiceAccount(storage_path('app/' . $credentialsPath));
+            ->withServiceAccount(FirebaseCredentials::resolve());
 
         $this->messaging = $factory->createMessaging();
     }
@@ -35,6 +30,7 @@ class FcmService
 
         if (empty($tokens)) {
             Log::warning("No FCM tokens found for user {$userId}");
+
             return false;
         }
 
@@ -52,7 +48,7 @@ class FcmService
 
         try {
             $notification = Notification::create($title, $body);
-            
+
             $message = CloudMessage::new()
                 ->withNotification($notification)
                 ->withData($data);
@@ -68,14 +64,15 @@ class FcmService
                 }
             }
 
-            Log::info("FCM notification sent", [
+            Log::info('FCM notification sent', [
                 'successful' => $report->successes()->count(),
                 'failed' => $report->failures()->count(),
             ]);
 
             return $report->successes()->count() > 0;
         } catch (\Exception $e) {
-            Log::error("FCM notification error: " . $e->getMessage());
+            Log::error('FCM notification error: '.$e->getMessage());
+
             return false;
         }
     }
@@ -86,8 +83,8 @@ class FcmService
     public function sendToWorkshop(int $workshopId, string $title, string $body, array $data = []): bool
     {
         $workshop = \App\Models\Workshop::with('user')->find($workshopId);
-        
-        if (!$workshop || !$workshop->user) {
+
+        if (! $workshop || ! $workshop->user) {
             return false;
         }
 
@@ -99,14 +96,14 @@ class FcmService
      */
     public function sendMaintenanceReminder(int $userId, array $maintenanceData, array $serviceData, array $workshopData): bool
     {
-        $title = "Lembrete de Manutenção";
-        $body = "Sua manutenção está próxima do vencimento";
-        
+        $title = 'Lembrete de Manutenção';
+        $body = 'Sua manutenção está próxima do vencimento';
+
         $data = [
             'type' => 'maintenance_reminder',
-            'maintenance_id' => (string)$maintenanceData['id'],
-            'service_id' => (string)($serviceData['id'] ?? ''),
-            'workshop_id' => (string)($workshopData['id'] ?? ''),
+            'maintenance_id' => (string) $maintenanceData['id'],
+            'service_id' => (string) ($serviceData['id'] ?? ''),
+            'workshop_id' => (string) ($workshopData['id'] ?? ''),
         ];
 
         return $this->sendToUser($userId, $title, $body, $data);
@@ -117,14 +114,14 @@ class FcmService
      */
     public function sendNewMaintenanceToWorkshop(int $workshopId, array $maintenanceData, array $userData): bool
     {
-        $title = "Nova Manutenção Cadastrada";
+        $title = 'Nova Manutenção Cadastrada';
         $body = "Uma nova manutenção foi cadastrada para sua oficina por {$userData['name']}";
-        
+
         $data = [
             'type' => 'new_maintenance',
-            'maintenance_id' => (string)$maintenanceData['id'],
-            'workshop_id' => (string)$workshopId,
-            'user_id' => (string)$userData['id'],
+            'maintenance_id' => (string) $maintenanceData['id'],
+            'workshop_id' => (string) $workshopId,
+            'user_id' => (string) $userData['id'],
         ];
 
         return $this->sendToWorkshop($workshopId, $title, $body, $data);
