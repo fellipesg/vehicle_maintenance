@@ -8,15 +8,15 @@ use Tests\TestCase;
 
 class FirebaseCredentialsTest extends TestCase
 {
-    protected function tearDown(): void
+    protected function setUp(): void
     {
+        parent::setUp();
+
         config([
             'firebase.credentials_base64' => null,
             'firebase.credentials_json' => null,
-            'firebase.credentials_path' => 'firebase-service-account.json',
+            'firebase.credentials_path' => 'missing-firebase-credentials.json',
         ]);
-
-        parent::tearDown();
     }
 
     #[Test]

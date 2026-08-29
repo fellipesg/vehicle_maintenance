@@ -3,10 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Maintenance;
-use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class VehicleMileageTest extends TestCase
@@ -15,7 +13,7 @@ class VehicleMileageTest extends TestCase
 
     public function test_vehicle_registration_requires_kilometers_and_terms(): void
     {
-        Sanctum::actingAs(User::factory()->asUser()->create());
+        $this->actingAsApiUser();
 
         $this->postJson('/api/v1/vehicles', [
             'license_plate' => 'KM12345',
@@ -29,8 +27,7 @@ class VehicleMileageTest extends TestCase
 
     public function test_maintenance_updates_vehicle_current_kilometers(): void
     {
-        $user = User::factory()->asUser()->create();
-        Sanctum::actingAs($user);
+        $user = $this->actingAsApiUser();
 
         $vehicle = Vehicle::factory()->create([
             'current_kilometers' => 50000,
@@ -51,8 +48,7 @@ class VehicleMileageTest extends TestCase
 
     public function test_maintenance_cannot_use_lower_kilometers_than_current(): void
     {
-        $user = User::factory()->asUser()->create();
-        Sanctum::actingAs($user);
+        $user = $this->actingAsApiUser();
 
         $vehicle = Vehicle::factory()->create([
             'current_kilometers' => 80000,
@@ -72,8 +68,7 @@ class VehicleMileageTest extends TestCase
 
     public function test_vehicle_timeline_endpoint_returns_events(): void
     {
-        $user = User::factory()->asUser()->create();
-        Sanctum::actingAs($user);
+        $user = $this->actingAsApiUser();
 
         $vehicle = Vehicle::factory()->create([
             'current_kilometers' => 60000,
@@ -99,8 +94,7 @@ class VehicleMileageTest extends TestCase
 
     public function test_timeline_registration_uses_first_maintenance_when_odometer_missing(): void
     {
-        $user = User::factory()->asUser()->create();
-        Sanctum::actingAs($user);
+        $user = $this->actingAsApiUser();
 
         $vehicle = Vehicle::factory()->create([
             'current_kilometers' => 110_000,

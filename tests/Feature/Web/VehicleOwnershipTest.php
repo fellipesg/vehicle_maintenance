@@ -78,7 +78,7 @@ class VehicleOwnershipTest extends TestCase
         );
     }
 
-    public function test_vehicle_show_paywall_when_no_subscription(): void
+    public function test_vehicle_show_renders_api_driven_shell(): void
     {
         $vehicle = Vehicle::factory()->create();
         $this->user->vehicles()->attach($vehicle->id, [
@@ -86,16 +86,15 @@ class VehicleOwnershipTest extends TestCase
             'tenant_id' => $this->user->tenant_id,
         ]);
 
-        \App\Models\Maintenance::factory()->create(['vehicle_id' => $vehicle->id]);
-
         $this->actingAs($this->user)
             ->get(route('user.vehicles.show', $vehicle))
             ->assertOk()
-            ->assertSee('Assinar e liberar histórico')
-            ->assertDontSee('hover:border-wrench-300');
+            ->assertSee('data-api-page="vehicle-show"', false)
+            ->assertSee('data-vehicle-id="'.$vehicle->id.'"', false)
+            ->assertSee('Carregando veículo...');
     }
 
-    public function test_subscribed_user_sees_maintenance_list(): void
+    public function test_subscribed_user_api_returns_maintenances_for_vehicle(): void
     {
         $this->user->update(['subscription_active' => true]);
 
@@ -107,13 +106,16 @@ class VehicleOwnershipTest extends TestCase
 
         $maintenance = \App\Models\Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
+            'user_id' => $this->user->id,
+            'tenant_id' => $this->user->tenant_id,
             'maintenance_type' => 'Revisão Premium Visível',
         ]);
 
-        $this->actingAs($this->user)
-            ->get(route('user.vehicles.show', $vehicle))
+        $this->actingAsApiUser($this->user);
+
+        $this->getJson("/api/v1/vehicles/{$vehicle->id}/maintenances")
             ->assertOk()
-            ->assertSee('Revisão Premium Visível')
-            ->assertDontSee('Assinar e liberar histórico');
+            ->assertJsonPath('success', true)
+            ->assertJsonFragment(['maintenance_type' => 'Revisão Premium Visível']);
     }
 }
