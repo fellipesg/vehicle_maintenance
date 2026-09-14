@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Garage;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\Workshop;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -52,6 +53,12 @@ class UserFactory extends Factory
                 Garage::create([
                     'tenant_id' => $tenant->id,
                     'user_id' => $user->id,
+                    'name' => $user->name,
+                ]);
+            }
+
+            if ($type === 'workshop') {
+                Workshop::factory()->forUser($user->fresh())->create([
                     'name' => $user->name,
                 ]);
             }

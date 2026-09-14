@@ -54,5 +54,7 @@
             </div>
         </div>
     @endif
+
+    @include('partials.maintenance-photos-display', ['maintenance' => $maintenance])
 </div>
 @endsection

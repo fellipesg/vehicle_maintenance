@@ -30,6 +30,7 @@ class WorkshopResource extends JsonResource
             'city' => $this->city,
             'state' => $this->state,
             'full_address' => $this->full_address,
+            'logo_url' => $this->logoUrl(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

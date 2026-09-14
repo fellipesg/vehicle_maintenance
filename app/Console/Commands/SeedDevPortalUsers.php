@@ -9,7 +9,7 @@ class SeedDevPortalUsers extends Command
 {
     protected $signature = 'dev:seed-portal-users';
 
-    protected $description = 'Seed idempotent dev login accounts for usuario, lojista, and admin portals';
+    protected $description = 'Seed idempotent dev login accounts for usuario, lojista, oficina, and admin portals';
 
     public function handle(): int
     {

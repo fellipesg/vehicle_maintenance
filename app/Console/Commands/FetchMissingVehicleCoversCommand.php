@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Vehicle;
+use App\Services\Vehicle\VehicleCoverCropper;
 use App\Services\Vehicle\VehicleCoverImageResolver;
+use App\Services\Vehicle\VehicleCoverService;
 use App\Support\AppStorage;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -12,13 +14,17 @@ use Illuminate\Support\Str;
 class FetchMissingVehicleCoversCommand extends Command
 {
     protected $signature = 'vehicles:fetch-missing-covers
+                            {--missing-orientation : Preenche apenas a orientação que falta}
                             {--force : Replace covers even when already set}
                             {--plate=* : Atualizar apenas estas placas}';
 
     protected $description = 'Baixa fotos de capa (Wikimedia Commons) para veículos sem imagem';
 
-    public function handle(VehicleCoverImageResolver $resolver): int
-    {
+    public function handle(
+        VehicleCoverImageResolver $resolver,
+        VehicleCoverCropper $cropper,
+        VehicleCoverService $covers,
+    ): int {
         $query = Vehicle::query()->orderBy('id');
 
         $plates = collect($this->option('plate'))
@@ -28,11 +34,25 @@ class FetchMissingVehicleCoversCommand extends Command
 
         if ($plates->isNotEmpty()) {
             $query->whereIn('license_plate', $plates->all());
-        } elseif (! $this->option('force')) {
-            $query->where(function ($builder): void {
-                $builder->whereNull('cover_photo_path')
-                    ->orWhere('cover_photo_path', '');
-            });
+        }
+
+        if (! $this->option('force')) {
+            if ($this->option('missing-orientation')) {
+                $query->where(function ($builder): void {
+                    $builder->where(function ($missing): void {
+                        $missing->whereNull('cover_photo_path')
+                            ->orWhere('cover_photo_path', '');
+                    })->orWhere(function ($missing): void {
+                        $missing->whereNull('cover_photo_portrait_path')
+                            ->orWhere('cover_photo_portrait_path', '');
+                    });
+                });
+            } else {
+                $query->where(function ($builder): void {
+                    $builder->whereNull('cover_photo_path')
+                        ->orWhere('cover_photo_path', '');
+                });
+            }
         }
 
         $vehicles = $query->get();
@@ -46,6 +66,21 @@ class FetchMissingVehicleCoversCommand extends Command
         $updated = 0;
 
         foreach ($vehicles as $vehicle) {
+            $needsLandscape = $this->option('force') || ! $vehicle->hasLandscapeCover();
+            $needsPortrait = $this->option('force') || ! $vehicle->hasPortraitCover();
+
+            if ($this->option('missing-orientation') && ! $this->option('force')) {
+                if ($vehicle->hasLandscapeCover() && ! $vehicle->hasPortraitCover()) {
+                    $needsLandscape = false;
+                } elseif ($vehicle->hasPortraitCover() && ! $vehicle->hasLandscapeCover()) {
+                    $needsPortrait = false;
+                }
+            }
+
+            if (! $needsLandscape && ! $needsPortrait) {
+                continue;
+            }
+
             $this->line("Buscando capa para #{$vehicle->id} {$vehicle->brand} {$vehicle->model} ({$vehicle->license_plate})...");
 
             $downloadUrl = $resolver->resolveDownloadUrl($vehicle);
@@ -67,17 +102,29 @@ class FetchMissingVehicleCoversCommand extends Command
             }
 
             $extension = $this->guessExtension($downloadUrl, $response->header('Content-Type'));
-            $storagePath = 'vehicle-covers/'.$vehicle->id.'_'.time().'.'.$extension;
+            $sourceBytes = $response->body();
 
-            if ($vehicle->cover_photo_path && AppStorage::coversDisk()->exists($vehicle->cover_photo_path)) {
-                AppStorage::coversDisk()->delete($vehicle->cover_photo_path);
+            try {
+                if ($needsLandscape) {
+                    $landscapeBytes = $cropper->cropToLandscape($sourceBytes);
+                    $covers->storeLandscapeBytes($vehicle, $landscapeBytes, $extension);
+                    $vehicle->refresh();
+                    $this->info('  Paisagem salva: '.AppStorage::coversUrl((string) $vehicle->cover_photo_path));
+                }
+
+                if ($needsPortrait) {
+                    $portraitBytes = $cropper->cropToPortrait($sourceBytes);
+                    $covers->storePortraitBytes($vehicle, $portraitBytes, $extension);
+                    $vehicle->refresh();
+                    $this->info('  Retrato salva: '.AppStorage::coversUrl((string) $vehicle->cover_photo_portrait_path));
+                }
+            } catch (\Throwable $exception) {
+                $this->warn('  Falha ao processar imagem: '.$exception->getMessage());
+
+                continue;
             }
 
-            AppStorage::coversDisk()->put($storagePath, $response->body());
-            $vehicle->update(['cover_photo_path' => $storagePath]);
-
             $updated++;
-            $this->info('  Capa salva: '.AppStorage::coversUrl($storagePath));
         }
 
         $this->info("Concluído. {$updated} veículo(s) atualizado(s).");

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Rules\InvoiceFile;
+use App\Rules\RequiresInvoiceWhenWorkshopAssigned;
 use Illuminate\Support\Facades\Gate;
 
 class StoreMaintenanceRequest extends ApiFormRequest
@@ -34,7 +35,17 @@ class StoreMaintenanceRequest extends ApiFormRequest
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.total_price' => 'nullable|numeric|min:0',
             'items.*.part_number' => 'nullable|string|max:100',
-            'invoices' => 'nullable|array',
+            'items.*.warranty_template_id' => 'nullable|integer|exists:warranty_templates,id',
+            'general_warranty_template_id' => 'nullable|integer|exists:warranty_templates,id',
+            'invoices' => [
+                'required_with:workshop_id',
+                'nullable',
+                'array',
+                new RequiresInvoiceWhenWorkshopAssigned(
+                    workshopId: $this->filled('workshop_id') ? (int) $this->input('workshop_id') : null,
+                    isWorkshopPortal: (bool) $this->user()?->isWorkshop(),
+                ),
+            ],
             'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
             'checklists' => 'nullable|array',
             'checklists.*.checklist_type' => 'required_with:checklists|in:initial,final',

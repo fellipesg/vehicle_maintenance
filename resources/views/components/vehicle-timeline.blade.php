@@ -8,6 +8,7 @@
     $nextDue = $summary['next_due_kilometers'] ?? null;
     $remaining = $summary['kilometers_remaining'] ?? null;
     $progress = $summary['progress_percent'] ?? null;
+    $odometerProgress = $summary['odometer_progress_percent'] ?? $progress;
     $isOverdue = (bool) ($summary['is_overdue'] ?? false);
     $approxAnnualKm = $summary['approximate_annual_kilometers'] ?? null;
 
@@ -20,17 +21,16 @@
     $eventCount = max(count($displayEvents), 1);
 
     $defaultIndex = 0;
+
     foreach ($displayEvents as $index => $event) {
         if (($event['is_current'] ?? false) && ($event['type'] ?? '') !== 'upcoming') {
             $defaultIndex = $index;
-            break;
         }
     }
 
     $defaultEvent = $displayEvents[$defaultIndex] ?? null;
-    $timelineProgressPercent = $eventCount > 1
-        ? min(100, max(0, ($defaultIndex / ($eventCount - 1)) * 100))
-        : 0;
+    $trackCurrentIndex = (int) ($summary['track_current_index'] ?? $defaultIndex);
+    $timelineProgressPercent = (float) ($summary['track_progress_percent'] ?? 0);
 @endphp
 
 @if(count($displayEvents) > 0)
@@ -59,9 +59,9 @@
                     <div class="mt-3 h-2.5 overflow-hidden rounded-full border border-automotive-200 bg-automotive-100">
                         <div
                             class="h-full rounded-full transition-all duration-300 {{ $isOverdue ? 'bg-red-500' : 'bg-wrench-500' }}"
-                            style="width: {{ min(100, max(0, (float) ($progress ?? 0))) }}%"
+                            style="width: {{ min(100, max(0, (float) ($odometerProgress ?? 0))) }}%"
                             role="progressbar"
-                            aria-valuenow="{{ (int) ($progress ?? 0) }}"
+                            aria-valuenow="{{ (int) ($odometerProgress ?? 0) }}"
                             aria-valuemin="0"
                             aria-valuemax="100"
                         ></div>
@@ -91,9 +91,11 @@
                     aria-hidden="true"
                 ></div>
                 <div
-                    class="pointer-events-none absolute left-[calc(100%/(2*{{ $eventCount }}))] top-8 z-[1] h-0.5 bg-wrench-500 transition-all duration-300"
-                    style="width: calc((100% - (100% / {{ $eventCount }})) * {{ $timelineProgressPercent / 100 }});"
+                    class="pointer-events-none absolute top-8 z-[1] h-0.5 bg-wrench-500 transition-all duration-300"
+                    style="left: calc(100% / (2 * {{ $eventCount }})); width: calc((100% - (100% / {{ $eventCount }})) * {{ $timelineProgressPercent / 100 }});"
                     data-timeline-progress
+                    data-track-index="{{ $trackCurrentIndex }}"
+                    data-track-percent="{{ $timelineProgressPercent }}"
                     aria-hidden="true"
                 ></div>
 
@@ -123,6 +125,8 @@
                             <span class="box-border h-4 w-4 rounded-full border-2 border-dashed border-automotive-400 bg-white"></span>
                         @elseif($isSelected)
                             <span class="box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500"></span>
+                        @elseif($index <= $trackCurrentIndex)
+                            <span class="box-border h-4 w-4 rounded-full border-2 border-wrench-500 bg-wrench-500"></span>
                         @else
                             <span class="box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white"></span>
                         @endif
@@ -215,6 +219,22 @@
                             <div class="min-w-0">
                                 <p class="text-sm font-medium text-automotive-900">{{ $item['name'] }}</p>
                                 <p class="text-xs text-automotive-500">{{ $item['quantity'] }}x</p>
+                                @if(($item['has_warranty'] ?? false) && ! empty($item['warranty_starts_at']) && ! empty($item['warranty_ends_at']))
+                                    <div class="mt-1 flex flex-wrap items-center gap-2">
+                                        <span @class([
+                                            'badge',
+                                            'badge-green' => $item['is_under_warranty'] ?? false,
+                                            'badge-orange' => ! ($item['is_under_warranty'] ?? false),
+                                        ])>
+                                            {{ ($item['is_under_warranty'] ?? false) ? 'Em garantia' : 'Garantia encerrada' }}
+                                        </span>
+                                        <span class="text-xs text-automotive-600">
+                                            {{ \Carbon\Carbon::parse($item['warranty_starts_at'])->format('d/m/Y') }}
+                                            —
+                                            {{ \Carbon\Carbon::parse($item['warranty_ends_at'])->format('d/m/Y') }}
+                                        </span>
+                                    </div>
+                                @endif
                             </div>
                             <p class="shrink-0 text-sm text-automotive-900">
                                 R$ {{ number_format((float) ($item['total_price'] ?? 0), 2, ',', '.') }}
@@ -246,8 +266,6 @@
                 const total = root.querySelector('[data-detail-total]');
                 const workshop = root.querySelector('[data-detail-workshop]');
                 const items = root.querySelector('[data-detail-items]');
-                const timelineProgress = root.querySelector('[data-timeline-progress]');
-
                 const formatMoney = (value) => new Intl.NumberFormat('pt-BR', {
                     style: 'currency',
                     currency: 'BRL',
@@ -263,11 +281,29 @@
                     return `${day}/${month}/${year}`;
                 };
 
-                const updateTimelineProgress = (selectedIndex) => {
-                    if (!timelineProgress || eventCount <= 1) return;
-                    const percent = (selectedIndex / (eventCount - 1)) * 100;
-                    timelineProgress.style.width = `calc((100% - (100% / ${eventCount})) * ${percent / 100})`;
+                const positionTimelineProgress = () => {
+                    const grid = root.querySelector('[data-timeline-grid]');
+                    const progress = root.querySelector('[data-timeline-progress]');
+                    const columns = root.querySelectorAll('[data-timeline-column]');
+
+                    if (!grid || !progress || columns.length < 2) {
+                        return;
+                    }
+
+                    const percent = Number(progress.dataset.trackPercent ?? 0);
+                    const first = columns[0];
+                    const last = columns[columns.length - 1];
+                    const firstCenter = first.offsetLeft + (first.offsetWidth / 2);
+                    const lastCenter = last.offsetLeft + (last.offsetWidth / 2);
+                    const ratio = Math.min(1, Math.max(0, percent / 100));
+
+                    progress.style.left = `${firstCenter}px`;
+                    progress.style.width = `${Math.max(0, lastCenter - firstCenter) * ratio}px`;
+                    progress.style.right = 'auto';
                 };
+
+                requestAnimationFrame(positionTimelineProgress);
+                window.addEventListener('resize', positionTimelineProgress);
 
                 const setSelectedStyles = (selectedIndex) => {
                     root.querySelectorAll('[data-timeline-column]').forEach((column) => {
@@ -281,9 +317,13 @@
 
                         const dot = column.querySelector('span.rounded-full');
                         if (dot && ! isUpcoming) {
-                            dot.className = isSelected
-                                ? 'box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500'
-                                : 'box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white';
+                            if (isSelected) {
+                                dot.className = 'box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500';
+                            } else if (index <= {{ $trackCurrentIndex }}) {
+                                dot.className = 'box-border h-4 w-4 rounded-full border-2 border-wrench-500 bg-wrench-500';
+                            } else {
+                                dot.className = 'box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white';
+                            }
                         }
 
                         if (columnDate && ! isUpcoming) {
@@ -297,8 +337,22 @@
                             columnTitle.classList.toggle('font-medium', ! isSelected);
                         }
                     });
+                };
 
-                    updateTimelineProgress(selectedIndex);
+                const warrantyItemHtml = (item) => {
+                    if (! item?.has_warranty || ! item.warranty_starts_at || ! item.warranty_ends_at) {
+                        return '';
+                    }
+
+                    const badgeClass = item.is_under_warranty ? 'badge-green' : 'badge-orange';
+                    const label = item.is_under_warranty ? 'Em garantia' : 'Garantia encerrada';
+
+                    return `<div class="mt-1 flex flex-wrap items-center gap-2">
+                        <span class="badge ${badgeClass}">${label}</span>
+                        <span class="text-xs text-automotive-600">
+                            ${formatDate(item.warranty_starts_at)} — ${formatDate(item.warranty_ends_at)}
+                        </span>
+                    </div>`;
                 };
 
                 const renderItems = (event) => {
@@ -313,6 +367,7 @@
                                     <div class="min-w-0">
                                         <p class="text-sm font-medium text-automotive-900">${item.name}</p>
                                         <p class="text-xs text-automotive-500">${item.quantity}x</p>
+                                        ${warrantyItemHtml(item)}
                                     </div>
                                     <p class="shrink-0 text-sm text-automotive-900">${formatMoney(item.total_price)}</p>
                                 </div>`;

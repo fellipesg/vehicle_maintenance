@@ -5,15 +5,18 @@ namespace App\Providers;
 use App\Database\PostgresConnection;
 use App\Models\Invoice;
 use App\Models\Maintenance;
+use App\Models\MaintenancePhoto;
 use App\Models\Vehicle;
 use App\Models\Workshop;
 use App\Policies\InvoicePolicy;
+use App\Policies\MaintenancePhotoPolicy;
 use App\Policies\MaintenancePolicy;
 use App\Policies\VehiclePolicy;
 use App\Policies\WorkshopPolicy;
 use App\Support\StorageEndpointResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -32,6 +35,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Model::preventLazyLoading(! $this->app->isProduction());
+
         if (! $this->app->runningInConsole() && $this->requestIsHttps()) {
             URL::forceScheme('https');
         }
@@ -54,8 +59,25 @@ class AppServiceProvider extends ServiceProvider
                 ]),
         ));
 
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by(
+            (string) ($request->user()?->id ?: $request->ip()),
+        ));
+
+        RateLimiter::for('search', fn (Request $request) => Limit::perMinute(20)->by(
+            'search|'.$request->ip(),
+        ));
+
+        RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(10)->by(
+            'uploads|'.($request->user()?->id ?: $request->ip()),
+        ));
+
+        RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by(
+            '2fa|'.strtolower((string) $request->input('email', '')).'|'.$request->ip(),
+        ));
+
         Gate::policy(Vehicle::class, VehiclePolicy::class);
         Gate::policy(Maintenance::class, MaintenancePolicy::class);
+        Gate::policy(MaintenancePhoto::class, MaintenancePhotoPolicy::class);
         Gate::policy(Workshop::class, WorkshopPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
 

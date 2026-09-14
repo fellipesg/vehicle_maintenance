@@ -31,6 +31,15 @@ class PublicVehicleSearchResource extends JsonResource
                     'kilometers' => $maintenance->kilometers,
                     'service_category' => $maintenance->service_category,
                     'is_manufacturer_required' => (bool) $maintenance->is_manufacturer_required,
+                    'photos' => $maintenance->relationLoaded('photos')
+                        ? $maintenance->photos
+                            ->filter(fn ($photo) => $photo->isPublicVisible())
+                            ->map(fn ($photo) => [
+                                'id' => $photo->id,
+                                'url' => $photo->url,
+                                'sort' => $photo->sort,
+                            ])->values()->all()
+                        : [],
                 ])->values()->all();
             }),
         ];

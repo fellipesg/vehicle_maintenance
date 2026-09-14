@@ -150,6 +150,21 @@ class AuthControllerTest extends TestCase
         ])->assertOk();
     }
 
+    public function test_workshop_can_login_via_oficina_portal(): void
+    {
+        User::factory()->asWorkshop()->create([
+            'email' => 'oficina@example.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $this->postJson('/api/v1/login', [
+            'email' => 'oficina@example.com',
+            'password' => 'password123',
+            'portal' => 'oficina',
+        ])->assertOk()
+            ->assertJsonPath('data.user.email', 'oficina@example.com');
+    }
+
     public function test_can_get_authenticated_user(): void
     {
         $user = $this->actingAsApiUser();

@@ -14,9 +14,12 @@ use App\Http\Controllers\Web\PublicVehicleController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\Web\User\MaintenanceController as UserMaintenanceController;
 use App\Http\Controllers\Web\User\VehicleController as UserVehicleController;
+use App\Http\Controllers\Web\User\VehiclePdfExportDownloadController;
 use App\Http\Controllers\Web\User\WorkshopDirectoryController;
 use App\Http\Controllers\Web\Workshop\DashboardController as WorkshopDashboardController;
+use App\Http\Controllers\Web\Workshop\MaintenanceController as WorkshopMaintenanceController;
 use App\Http\Controllers\Web\Workshop\ProfileController as WorkshopProfileController;
+use App\Http\Controllers\Web\Workshop\WarrantyTemplateController as WorkshopWarrantyTemplateController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -27,8 +30,9 @@ Route::middleware('guest')->group(function () {
     Route::get('/login/admin', fn () => app(AuthController::class)->showLogin('admin'))->name('login.admin');
     Route::get('/login/lojista', fn () => app(AuthController::class)->showLogin('lojista'))->name('login.lojista');
     Route::get('/login/usuario', fn () => app(AuthController::class)->showLogin('usuario'))->name('login.usuario');
+    Route::get('/login/oficina', fn () => app(AuthController::class)->showLogin('oficina'))->name('login.oficina');
     Route::post('/login/{portal}', [AuthController::class, 'login'])
-        ->whereIn('portal', ['admin', 'lojista', 'usuario'])
+        ->whereIn('portal', ['admin', 'lojista', 'usuario', 'oficina'])
         ->middleware('throttle:auth-web')
         ->name('login.submit');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
@@ -60,6 +64,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/veiculos/{vehicle}/importar-crlv', [UserVehicleController::class, 'importCrlvForEdit'])->name('vehicles.import-crlv.edit');
         Route::put('/veiculos/{vehicle}', [UserVehicleController::class, 'update'])->name('vehicles.update');
         Route::post('/veiculos/{vehicle}/pdf', [UserVehicleController::class, 'exportPdf'])->name('vehicles.export-pdf');
+        Route::get('/exportacoes-pdf/{export}/baixar', [VehiclePdfExportDownloadController::class, 'redirectToNamedFile'])
+            ->name('vehicle-pdf-exports.redirect');
+        Route::get('/exportacoes-pdf/{export}/{filename}', [VehiclePdfExportDownloadController::class, 'download'])
+            ->where('filename', '[A-Za-z0-9._-]+\.pdf')
+            ->name('vehicle-pdf-exports.download');
         Route::get('/manutencoes', [UserMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [UserMaintenanceController::class, 'create'])->name('maintenances.create');
         Route::post('/manutencoes', [UserMaintenanceController::class, 'store'])->name('maintenances.store');
@@ -93,7 +102,20 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/perfil', [WorkshopProfileController::class, 'store'])->name('profile.store');
         Route::get('/perfil/editar', [WorkshopProfileController::class, 'edit'])->name('profile.edit');
         Route::put('/perfil', [WorkshopProfileController::class, 'update'])->name('profile.update');
-        Route::get('/manutencoes', [WorkshopProfileController::class, 'maintenances'])->name('maintenances.index');
+        Route::get('/manutencoes', [WorkshopMaintenanceController::class, 'index'])->name('maintenances.index');
+        Route::get('/manutencoes/nova', [WorkshopMaintenanceController::class, 'create'])->name('maintenances.create');
+        Route::post('/manutencoes', [WorkshopMaintenanceController::class, 'store'])
+            ->middleware('throttle:uploads')
+            ->name('maintenances.store');
+        Route::get('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'show'])->name('maintenances.show');
+        Route::get('/manutencoes/{maintenance}/editar', [WorkshopMaintenanceController::class, 'edit'])->name('maintenances.edit');
+        Route::put('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'update'])
+            ->middleware('throttle:uploads')
+            ->name('maintenances.update');
+        Route::delete('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'destroy'])->name('maintenances.destroy');
+        Route::resource('garantias/templates', WorkshopWarrantyTemplateController::class)
+            ->names('warranty-templates')
+            ->parameters(['templates' => 'warranty_template']);
     });
 
     Route::prefix('admin')->middleware('admin')->name('admin.')->group(function () {

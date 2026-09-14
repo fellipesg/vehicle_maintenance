@@ -14,7 +14,11 @@ class MaintenancePolicy
 
     public function view(User $user, Maintenance $maintenance): bool
     {
-        return $this->belongsToTenant($user, $maintenance);
+        if ($user->isWorkshop() && $user->workshop) {
+            return $maintenance->workshop_id === $user->workshop->id;
+        }
+
+        return $maintenance->tenant_id === $user->tenant_id;
     }
 
     public function create(User $user): bool
@@ -24,19 +28,17 @@ class MaintenancePolicy
 
     public function update(User $user, Maintenance $maintenance): bool
     {
-        return $this->belongsToTenant($user, $maintenance);
+        if ($user->isWorkshop() && $user->workshop) {
+            return $maintenance->workshop_id === $user->workshop->id;
+        }
+
+        return $maintenance->tenant_id === $user->tenant_id;
     }
 
     public function delete(User $user, Maintenance $maintenance): bool
     {
-        return $this->belongsToTenant($user, $maintenance);
-    }
-
-    private function belongsToTenant(User $user, Maintenance $maintenance): bool
-    {
         if ($user->isWorkshop() && $user->workshop) {
-            return $maintenance->workshop_id === $user->workshop->id
-                || $maintenance->tenant_id === $user->tenant_id;
+            return $maintenance->workshop_id === $user->workshop->id;
         }
 
         return $maintenance->tenant_id === $user->tenant_id;

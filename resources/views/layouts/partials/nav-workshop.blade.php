@@ -1,3 +1,4 @@
 <a href="{{ route('workshop.dashboard') }}" class="text-sm text-automotive-300 hover:text-wrench-400 {{ request()->routeIs('workshop.dashboard') ? '!text-wrench-400' : '' }}">Dashboard</a>
 <a href="{{ route('workshop.profile.show') }}" class="text-sm text-automotive-300 hover:text-wrench-400 {{ request()->routeIs('workshop.profile.*') ? '!text-wrench-400' : '' }}">Minha Oficina</a>
-<a href="{{ route('workshop.maintenances.index') }}" class="text-sm text-automotive-300 hover:text-wrench-400 {{ request()->routeIs('workshop.maintenances.*') ? '!text-wrench-400' : '' }}">Serviços</a>
+<a href="{{ route('workshop.maintenances.index') }}" class="text-sm text-automotive-300 hover:text-wrench-400 {{ request()->routeIs('workshop.maintenances.*') ? '!text-wrench-400' : '' }}">Ordens de serviço</a>
+<a href="{{ route('workshop.warranty-templates.index') }}" class="text-sm text-automotive-300 hover:text-wrench-400 {{ request()->routeIs('workshop.warranty-templates.*') ? '!text-wrench-400' : '' }}">Templates de garantia</a>

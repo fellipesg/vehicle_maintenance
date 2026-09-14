@@ -92,6 +92,53 @@ class VehicleMaintenanceReminderService
             <= ($summary['notify_before_kilometers'] ?? 2_000);
     }
 
+    /**
+     * Same as summarize(), but uses the provided kilometer reading instead of current_kilometers.
+     *
+     * @return array{
+     *     interval_kilometers: int,
+     *     anchor_kilometers: int|null,
+     *     next_due_kilometers: int|null,
+     *     kilometers_remaining: int|null,
+     *     is_overdue: bool,
+     *     progress_percent: float|null,
+     *     notify_before_kilometers: int
+     * }
+     */
+    public function summarizeAtKilometers(Vehicle $vehicle, int $kilometers): array
+    {
+        $interval = max(1, (int) config('maintenance_intervals.default_preventive_kilometers', 10_000));
+        $anchor = $this->anchorKilometers($vehicle);
+
+        if ($anchor === null && $kilometers <= 0) {
+            return [
+                'interval_kilometers' => $interval,
+                'anchor_kilometers' => null,
+                'next_due_kilometers' => null,
+                'kilometers_remaining' => null,
+                'is_overdue' => false,
+                'progress_percent' => null,
+                'notify_before_kilometers' => (int) config('maintenance_intervals.notify_before_kilometers', 2_000),
+            ];
+        }
+
+        $anchor ??= $kilometers;
+        $nextDue = $this->nextDueKilometers($kilometers, $anchor, $interval);
+        $remaining = max(0, $nextDue - $kilometers);
+        $isOverdue = $kilometers >= $nextDue;
+        $progress = $this->progressPercent($anchor, $nextDue, $kilometers, $interval);
+
+        return [
+            'interval_kilometers' => $interval,
+            'anchor_kilometers' => $anchor,
+            'next_due_kilometers' => $nextDue,
+            'kilometers_remaining' => $isOverdue ? 0 : $remaining,
+            'is_overdue' => $isOverdue,
+            'progress_percent' => $progress,
+            'notify_before_kilometers' => (int) config('maintenance_intervals.notify_before_kilometers', 2_000),
+        ];
+    }
+
     private function anchorKilometers(Vehicle $vehicle): ?int
     {
         $maintenanceKm = $vehicle->maintenances
@@ -122,23 +169,13 @@ class VehicleMaintenanceReminderService
 
     private function progressPercent(int $anchorKm, int $nextDueKm, int $currentKm, int $intervalKm): ?float
     {
-        $progressStart = $anchorKm;
-
-        if ($progressStart >= $currentKm) {
-            $progressStart = $nextDueKm - $intervalKm;
-
-            while ($progressStart >= $currentKm && $progressStart > 0) {
-                $progressStart -= $intervalKm;
-            }
-        }
-
-        $span = $nextDueKm - $progressStart;
+        $span = $nextDueKm - $anchorKm;
 
         if ($span <= 0) {
             return null;
         }
 
-        $progress = (($currentKm - $progressStart) / $span) * 100;
+        $progress = (($currentKm - $anchorKm) / $span) * 100;
 
         return round(min(100, max(0, $progress)), 1);
     }

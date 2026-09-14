@@ -22,16 +22,18 @@ class DevPortalUsersSeederTest extends TestCase
         $seeder->run();
         $countAfterSecondRun = User::count();
 
-        $this->assertSame(3, $countAfterFirstRun);
-        $this->assertSame(3, $countAfterSecondRun);
+        $this->assertSame(4, $countAfterFirstRun);
+        $this->assertSame(4, $countAfterSecondRun);
 
         $owner = User::where('email', DevPortalUsersSeeder::OWNER_EMAIL)->first();
         $garage = User::where('email', DevPortalUsersSeeder::GARAGE_EMAIL)->first();
         $admin = User::where('email', DevPortalUsersSeeder::ADMIN_EMAIL)->first();
+        $workshop = User::where('email', DevPortalUsersSeeder::WORKSHOP_EMAIL)->first();
 
         $this->assertNotNull($owner);
         $this->assertNotNull($garage);
         $this->assertNotNull($admin);
+        $this->assertNotNull($workshop);
 
         $this->assertTrue($owner->isUser());
         $this->assertFalse($owner->isAdmin());
@@ -46,9 +48,15 @@ class DevPortalUsersSeederTest extends TestCase
         $this->assertTrue($admin->isAdmin());
         $this->assertNotNull($admin->tenant_id);
 
+        $this->assertTrue($workshop->isWorkshop());
+        $this->assertFalse($workshop->isAdmin());
+        $this->assertNotNull($workshop->tenant_id);
+        $this->assertNotNull($workshop->workshop);
+
         $this->assertTrue(Hash::check(DevPortalUsersSeeder::PASSWORD, $owner->password));
         $this->assertTrue(Hash::check(DevPortalUsersSeeder::PASSWORD, $garage->password));
         $this->assertTrue(Hash::check(DevPortalUsersSeeder::PASSWORD, $admin->password));
+        $this->assertTrue(Hash::check(DevPortalUsersSeeder::PASSWORD, $workshop->password));
     }
 
     public function test_seeder_does_not_run_in_production_environment(): void

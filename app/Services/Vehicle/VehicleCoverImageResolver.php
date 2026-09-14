@@ -15,6 +15,7 @@ class VehicleCoverImageResolver
      */
     private const DIRECT_URLS = [
         'mercedes-benz|c 200|2019' => 'https://upload.wikimedia.org/wikipedia/commons/3/3c/Mercedes-Benz_C_200_%28W205%2C_2019%29_%2853989141488%29.jpg',
+        'mercedes-benz|c 180|2018' => 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Mercedes-Benz_C180_AVANTGARDE_(W205)_front.JPG',
         'toyota|corolla xei|2019' => 'https://upload.wikimedia.org/wikipedia/commons/f/fb/Toyota_Corolla%2C_GIMS_2019%2C_Le_Grand-Saconnex_%28GIMS1340%29.jpg',
         'honda|civic exl|2017' => 'https://upload.wikimedia.org/wikipedia/commons/3/36/2017_Honda_Civic_VTi-S_sedan_%282018-10-29%29_01.jpg',
     ];
@@ -24,6 +25,7 @@ class VehicleCoverImageResolver
      */
     private const SEARCH_OVERRIDES = [
         'mercedes-benz|c 200|2019' => '2019 Mercedes-Benz C 200 W205',
+        'mercedes-benz|c 180|2018' => '2018 Mercedes-Benz C 180 W205',
         'mercedes-benz|gla 200|2014' => '2014 Mercedes-Benz GLA X156',
         'chery|tiggo 8 pro|2022' => '2022 Chery Tiggo 8',
         'volvo|xc40 t4|2021' => '2021 Volvo XC40',
@@ -103,7 +105,11 @@ class VehicleCoverImageResolver
 
     private function vehicleKey(Vehicle $vehicle): string
     {
-        return Str::lower(trim($vehicle->brand))
+        $brand = Str::lower(trim($vehicle->brand));
+        $brand = str_replace([' ', '_'], '-', $brand);
+        $brand = (string) preg_replace('/-+/', '-', $brand);
+
+        return $brand
             .'|'.Str::lower(trim($vehicle->model))
             .'|'.(int) $vehicle->year;
     }

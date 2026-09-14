@@ -10,6 +10,7 @@
             <thead class="bg-automotive-50">
                 <tr>
                     <th scope="col" class="px-4 py-3 text-left font-semibold text-automotive-700">Item</th>
+                    <th scope="col" class="px-4 py-3 text-left font-semibold text-automotive-700 whitespace-nowrap">Garantia</th>
                     <th scope="col" class="px-4 py-3 text-right font-semibold text-automotive-700 whitespace-nowrap">Qtd.</th>
                     <th scope="col" class="px-4 py-3 text-right font-semibold text-automotive-700 whitespace-nowrap">Preço unit.</th>
                     <th scope="col" class="px-4 py-3 text-right font-semibold text-automotive-700 whitespace-nowrap">Total</th>
@@ -25,6 +26,16 @@
                             @endif
                             @if($item->description)
                                 <p class="mt-0.5 text-xs text-automotive-500">{{ $item->description }}</p>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 align-top whitespace-nowrap">
+                            @if($item->warrantyPeriodLabel())
+                                <span class="badge {{ $item->isUnderWarranty() ? 'badge-green' : 'badge-orange' }}">
+                                    {{ $item->isUnderWarranty() ? 'Em garantia' : 'Garantia encerrada' }}
+                                </span>
+                                <p class="mt-1 text-xs text-automotive-600">{{ $item->warrantyPeriodLabel() }}</p>
+                            @else
+                                <span class="text-automotive-400">—</span>
                             @endif
                         </td>
                         <td class="px-4 py-3 text-right align-top whitespace-nowrap text-automotive-800">
@@ -60,7 +71,7 @@
             @if($grandTotal > 0)
                 <tfoot class="bg-automotive-50">
                     <tr>
-                        <td colspan="3" class="px-4 py-3 text-right font-semibold text-automotive-700">Total dos itens</td>
+                        <td colspan="4" class="px-4 py-3 text-right font-semibold text-automotive-700">Total dos itens</td>
                         <td class="px-4 py-3 text-right font-semibold text-automotive-900 whitespace-nowrap">
                             R$ {{ number_format($grandTotal, 2, ',', '.') }}
                         </td>

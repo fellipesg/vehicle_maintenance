@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\AppStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Workshop extends Model
 {
@@ -27,6 +29,7 @@ class Workshop extends Model
         'neighborhood',
         'city',
         'state',
+        'logo_path',
     ];
 
     /**
@@ -66,6 +69,44 @@ class Workshop extends Model
         return $this->hasMany(Service::class);
     }
 
+    public function messageTemplates(): HasMany
+    {
+        return $this->hasMany(WorkshopMessageTemplate::class);
+    }
+
+    public function warrantyTemplates(): HasMany
+    {
+        return $this->hasMany(WarrantyTemplate::class);
+    }
+
+    public function issuedWarranties(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            MaintenanceWarranty::class,
+            Maintenance::class,
+            'workshop_id',
+            'maintenance_id',
+        );
+    }
+
+    public function hasActiveWarranties(): bool
+    {
+        $today = now()->startOfDay();
+
+        return $this->issuedWarranties()
+            ->whereDate('maintenance_warranties.ends_at', '>=', $today)
+            ->exists();
+    }
+
+    public function logoUrl(): ?string
+    {
+        if ($this->logo_path === null || $this->logo_path === '') {
+            return null;
+        }
+
+        return AppStorage::urlForPath($this->logo_path);
+    }
+
     /**
      * Get full address as a single string
      */
@@ -77,6 +118,7 @@ class Workshop extends Model
         }
         $address .= " - {$this->neighborhood}, {$this->city}/{$this->state}";
         $address .= " - CEP: {$this->cep}";
+
         return $address;
     }
 

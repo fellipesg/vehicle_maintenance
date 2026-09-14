@@ -17,7 +17,17 @@ class PublicVehicleController extends Controller
         if ($identifier) {
             $vehicle = Vehicle::where('license_plate', $identifier)
                 ->orWhere('renavam', $identifier)
-                ->with(['maintenances.items', 'maintenances.invoices', 'maintenances.workshop'])
+                ->with([
+                    'maintenances' => fn ($query) => $query->with([
+                        'items',
+                        'invoices',
+                        'workshop',
+                        'photos' => fn ($photos) => $photos
+                            ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
+                            ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
+                            ->orderBy('sort'),
+                    ]),
+                ])
                 ->first();
         }
 

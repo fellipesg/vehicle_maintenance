@@ -25,6 +25,15 @@
             </div>
         </a>
 
+        <a href="{{ route('login.oficina') }}"
+           class="group flex items-center gap-4 rounded-xl border border-automotive-600 bg-automotive-800/50 p-4 transition hover:border-wrench-500 hover:bg-automotive-800">
+            @include('auth.partials.portal-icon', ['portal' => 'oficina', 'size' => 'sm', 'class' => 'group-hover:border-wrench-500 group-hover:text-wrench-400'])
+            <div>
+                <p class="font-semibold">Oficina</p>
+                <p class="text-sm text-automotive-400">Serviços realizados e perfil no diretório</p>
+            </div>
+        </a>
+
         <a href="{{ route('login.admin') }}"
            class="group flex items-center gap-4 rounded-xl border border-automotive-600 bg-automotive-800/50 p-4 transition hover:border-wrench-500 hover:bg-automotive-800">
             @include('auth.partials.portal-icon', ['portal' => 'admin', 'size' => 'sm', 'class' => 'group-hover:border-wrench-500 group-hover:text-wrench-400'])

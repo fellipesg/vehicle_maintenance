@@ -22,6 +22,20 @@ class VehicleControllerTest extends TestCase
         $this->getJson('/api/v1/vehicles')->assertUnauthorized();
     }
 
+    public function test_web_session_can_list_my_vehicles_from_user_portal(): void
+    {
+        $user = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'XC4D3M0']);
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $this->actingAs($user)
+            ->withHeader('Referer', url('/usuario/veiculos'))
+            ->getJson('/api/v1/my-vehicles')
+            ->assertOk()
+            ->assertJsonPath('data.0.license_plate', 'XC4D3M0')
+            ->assertJsonCount(1, 'data');
+    }
+
     public function test_can_list_only_tenant_vehicles(): void
     {
         $user = $this->actingAsApiUser();
@@ -98,6 +112,24 @@ class VehicleControllerTest extends TestCase
         $this->getJson("/api/v1/vehicles/{$vehicle->id}")
             ->assertOk()
             ->assertJsonPath('data.id', $vehicle->id);
+    }
+
+    public function test_show_returns_slim_payload_without_maintenances_list(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        Maintenance::factory()->count(3)->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+        ]);
+
+        $this->getJson("/api/v1/vehicles/{$vehicle->id}")
+            ->assertOk()
+            ->assertJsonPath('data.maintenances_count', 3)
+            ->assertJsonMissingPath('data.maintenances');
     }
 
     public function test_cannot_show_vehicle_from_other_tenant(): void
@@ -299,7 +331,7 @@ class VehicleControllerTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonStructure(['data' => ['cover_photo_url']]);
+            ->assertJsonStructure(['data' => ['cover_photo_url', 'cover_photo_portrait_url']]);
 
         $vehicle->refresh();
         $this->assertNotNull($vehicle->cover_photo_path);
@@ -338,5 +370,68 @@ class VehicleControllerTest extends TestCase
         $this->getJson("/api/v1/vehicles/{$vehicle->id}")
             ->assertOk()
             ->assertJsonPath('data.cover_photo_url', AppStorage::coversUrl('vehicle-covers/test.jpg'));
+    }
+
+    public function test_can_upload_portrait_cover_without_removing_landscape(): void
+    {
+        $this->fakeCoversDisk('r2');
+
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create([
+            'cover_photo_path' => 'vehicle-covers/landscape.jpg',
+        ]);
+        Storage::disk('r2')->put('vehicle-covers/landscape.jpg', 'landscape');
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $file = UploadedFile::fake()->image('portrait.jpg', 450, 800);
+
+        $this->post("/api/v1/vehicles/{$vehicle->id}/cover", [
+            'cover_portrait' => $file,
+        ])->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['data' => ['cover_photo_portrait_url']]);
+
+        $vehicle->refresh();
+        $this->assertSame('vehicle-covers/landscape.jpg', $vehicle->cover_photo_path);
+        $this->assertNotNull($vehicle->cover_photo_portrait_path);
+        Storage::disk('r2')->assertExists('vehicle-covers/landscape.jpg');
+        Storage::disk('r2')->assertExists($vehicle->cover_photo_portrait_path);
+    }
+
+    public function test_can_upload_both_covers_in_one_request(): void
+    {
+        $this->fakeCoversDisk('r2');
+
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $landscape = UploadedFile::fake()->image('landscape.jpg', 800, 450);
+        $portrait = UploadedFile::fake()->image('portrait.jpg', 450, 800);
+
+        $this->post("/api/v1/vehicles/{$vehicle->id}/cover", [
+            'cover' => $landscape,
+            'cover_portrait' => $portrait,
+        ])->assertOk();
+
+        $vehicle->refresh();
+        $this->assertNotNull($vehicle->cover_photo_path);
+        $this->assertNotNull($vehicle->cover_photo_portrait_path);
+    }
+
+    public function test_vehicle_show_includes_portrait_cover_url(): void
+    {
+        $this->fakeCoversDisk('r2');
+
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        Storage::disk('r2')->put('vehicle-covers/portrait.jpg', 'fake-image');
+        $vehicle->update(['cover_photo_portrait_path' => 'vehicle-covers/portrait.jpg']);
+
+        $this->getJson("/api/v1/vehicles/{$vehicle->id}")
+            ->assertOk()
+            ->assertJsonPath('data.cover_photo_portrait_url', AppStorage::coversUrl('vehicle-covers/portrait.jpg'));
     }
 }

@@ -11,9 +11,11 @@ use App\Models\Checklist;
 use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
 use App\Services\Invoice\InvoiceUploadProcessor;
+use App\Services\Maintenance\MaintenanceWarrantyApplicator;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Support\ApiResponse;
 use App\Support\AppStorage;
+use App\Support\VehicleTenantResolver;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
@@ -36,13 +38,10 @@ class MaintenanceController extends Controller
         Gate::authorize('viewAny', Maintenance::class);
 
         $user = $request->user();
-        $query = Maintenance::with(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop']);
+        $query = Maintenance::with(['vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'photos']);
 
         if ($user->isWorkshop() && $user->workshop) {
-            $query->where(function ($q) use ($user) {
-                $q->where('tenant_id', $user->tenant_id)
-                    ->orWhere('workshop_id', $user->workshop->id);
-            });
+            $query->where('workshop_id', $user->workshop->id);
         } else {
             $query->where('tenant_id', $user->tenant_id);
         }
@@ -67,7 +66,14 @@ class MaintenanceController extends Controller
         $userId = $user->id;
 
         $vehicle = \App\Models\Vehicle::findOrFail($request->vehicle_id);
-        Gate::authorize('view', $vehicle);
+
+        if ($user->isWorkshop() && $user->workshop) {
+            if (! $user->workshop) {
+                return ApiResponse::error('Workshop profile is required.', 403);
+            }
+        } else {
+            Gate::authorize('view', $vehicle);
+        }
 
         try {
             app(VehicleMileageService::class)->assertMaintenanceKilometers(
@@ -97,7 +103,14 @@ class MaintenanceController extends Controller
             }
 
             $workshopName = $request->workshop_name;
-            if ($request->workshop_id) {
+            $workshopId = $request->workshop_id;
+            $tenantId = $user->tenant_id;
+
+            if ($user->isWorkshop() && $user->workshop) {
+                $workshopId = $user->workshop->id;
+                $workshopName = $user->workshop->name;
+                $tenantId = VehicleTenantResolver::resolveTenantId($vehicle) ?? $user->tenant_id;
+            } elseif ($request->workshop_id) {
                 $workshop = \App\Models\Workshop::find($request->workshop_id);
                 if ($workshop) {
                     $workshopName = $workshop->name;
@@ -107,8 +120,8 @@ class MaintenanceController extends Controller
             $maintenance = Maintenance::create([
                 'vehicle_id' => $request->vehicle_id,
                 'user_id' => $userId,
-                'tenant_id' => $user->tenant_id,
-                'workshop_id' => $request->workshop_id,
+                'tenant_id' => $tenantId,
+                'workshop_id' => $workshopId,
                 'maintenance_type' => $request->maintenance_type,
                 'description' => $request->description,
                 'workshop_name' => $workshopName,
@@ -130,6 +143,17 @@ class MaintenanceController extends Controller
                         'part_number' => $itemData['part_number'] ?? null,
                     ]);
                 }
+            }
+
+            $workshop = null;
+            if ($user->isWorkshop() && $user->workshop) {
+                $workshop = $user->workshop;
+            } elseif ($workshopId !== null) {
+                $workshop = \App\Models\Workshop::find($workshopId);
+            }
+
+            if ($workshop !== null) {
+                app(MaintenanceWarrantyApplicator::class)->sync($maintenance, $request, $workshop);
             }
 
             if ($request->has('checklists') && is_array($request->checklists)) {
@@ -154,7 +178,16 @@ class MaintenanceController extends Controller
 
             $uploadResult = $processor->parseStoredUploads($maintenance, $storedInvoices);
 
-            $maintenance->load(['items', 'invoices', 'checklists', 'vehicle', 'user', 'workshop']);
+            $maintenance->load([
+                'items.warranty',
+                'generalWarranty',
+                'invoices',
+                'checklists',
+                'vehicle',
+                'user',
+                'workshop',
+                'photos',
+            ]);
 
             $extra = [];
 
@@ -188,8 +221,17 @@ class MaintenanceController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $maintenance = Maintenance::with(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop'])
-            ->findOrFail($id);
+        $maintenance = Maintenance::with([
+            'vehicle',
+            'user',
+            'items.warranty',
+            'generalWarranty',
+            'warranties',
+            'invoices',
+            'checklists',
+            'workshop',
+            'photos',
+        ])->findOrFail($id);
 
         Gate::authorize('view', $maintenance);
 
@@ -202,7 +244,10 @@ class MaintenanceController extends Controller
 
         $data = $request->validated();
 
-        if (isset($data['workshop_id'])) {
+        if ($request->user()->isWorkshop() && $request->user()->workshop) {
+            $data['workshop_id'] = $request->user()->workshop->id;
+            $data['workshop_name'] = $request->user()->workshop->name;
+        } elseif (isset($data['workshop_id'])) {
             $workshop = \App\Models\Workshop::find($data['workshop_id']);
             if ($workshop) {
                 $data['workshop_name'] = $workshop->name;
@@ -237,6 +282,12 @@ class MaintenanceController extends Controller
     {
         $maintenance = Maintenance::findOrFail($id);
         Gate::authorize('delete', $maintenance);
+
+        foreach ($maintenance->photos as $photo) {
+            if (AppStorage::disk()->exists($photo->path)) {
+                AppStorage::disk()->delete($photo->path);
+            }
+        }
 
         foreach ($maintenance->invoices as $invoice) {
             if (AppStorage::disk()->exists($invoice->file_path)) {

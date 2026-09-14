@@ -47,7 +47,7 @@ class VehicleMaintenanceReminderServiceTest extends TestCase
         $this->assertSame(87.0, $summary['progress_percent']);
     }
 
-    public function test_progress_uses_interval_start_when_at_last_maintenance(): void
+    public function test_progress_starts_at_zero_when_odometer_matches_last_maintenance(): void
     {
         $user = User::factory()->asUser()->create();
         $vehicle = Vehicle::factory()->create([
@@ -67,7 +67,7 @@ class VehicleMaintenanceReminderServiceTest extends TestCase
         $summary = $this->service->summarize($vehicle->fresh(['maintenances']));
 
         $this->assertSame(120_000, $summary['next_due_kilometers']);
-        $this->assertSame(50.0, $summary['progress_percent']);
+        $this->assertSame(0.0, $summary['progress_percent']);
     }
 
     public function test_should_notify_when_within_threshold(): void

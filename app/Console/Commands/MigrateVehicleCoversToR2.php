@@ -70,14 +70,13 @@ class MigrateVehicleCoversToR2 extends Command
             }
 
             try {
-                $stream = $source->readStream($path);
+                $contents = $source->get($path);
 
-                if (! is_resource($stream)) {
-                    throw new \RuntimeException('origem não retornou stream');
+                if (! is_string($contents) || $contents === '') {
+                    throw new \RuntimeException('origem não retornou conteúdo');
                 }
 
-                $target->writeStream($path, $stream);
-                fclose($stream);
+                $target->put($path, $contents, AppStorage::publicObjectOptions());
 
                 $this->info("  copied {$path}");
                 $copied++;

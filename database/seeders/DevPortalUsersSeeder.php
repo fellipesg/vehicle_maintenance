@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Workshop;
 use App\Services\TenantService;
 use Illuminate\Database\Seeder;
 
@@ -15,6 +16,8 @@ class DevPortalUsersSeeder extends Seeder
     public const GARAGE_EMAIL = 'loja@vehicle-maintenance.test';
 
     public const ADMIN_EMAIL = 'admin@vehicle-maintenance.test';
+
+    public const WORKSHOP_EMAIL = 'oficina@vehicle-maintenance.test';
 
     /**
      * @return list<array{email: string, name: string, user_type: string, is_admin: bool, login_path: string}>
@@ -42,6 +45,13 @@ class DevPortalUsersSeeder extends Seeder
                 'user_type' => 'user',
                 'is_admin' => true,
                 'login_path' => '/login/admin',
+            ],
+            [
+                'email' => self::WORKSHOP_EMAIL,
+                'name' => 'Dev Oficina',
+                'user_type' => 'workshop',
+                'is_admin' => false,
+                'login_path' => '/login/oficina',
             ],
         ];
     }
@@ -74,6 +84,8 @@ class DevPortalUsersSeeder extends Seeder
             }
         }
 
+        $this->seedDevWorkshop();
+
         $this->command?->info('Dev portal users ready (password: '.self::PASSWORD.'):');
 
         foreach (self::accounts() as $account) {
@@ -81,5 +93,44 @@ class DevPortalUsersSeeder extends Seeder
         }
 
         // One-liner: php artisan db:seed --class=DevPortalUsersSeeder
+    }
+
+    private function seedDevWorkshop(): void
+    {
+        $workshopUser = User::query()->where('email', self::WORKSHOP_EMAIL)->first();
+
+        if ($workshopUser === null) {
+            return;
+        }
+
+        $workshop = Workshop::query()
+            ->where('name', 'Dev Oficina')
+            ->orWhere('id', 6)
+            ->first();
+
+        if ($workshop === null) {
+            Workshop::create([
+                'user_id' => $workshopUser->id,
+                'tenant_id' => $workshopUser->tenant_id,
+                'name' => 'Dev Oficina',
+                'email' => self::WORKSHOP_EMAIL,
+                'phone' => '43999999999',
+                'whatsapp' => '43999999999',
+                'cep' => '86010000',
+                'street' => 'Rua Dev',
+                'number' => '100',
+                'neighborhood' => 'Centro',
+                'city' => 'Londrina',
+                'state' => 'PR',
+            ]);
+
+            return;
+        }
+
+        $workshop->update([
+            'user_id' => $workshopUser->id,
+            'tenant_id' => $workshopUser->tenant_id,
+            'email' => self::WORKSHOP_EMAIL,
+        ]);
     }
 }

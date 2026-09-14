@@ -19,13 +19,13 @@ class UploadVehicleCoverRequest extends ApiFormRequest
      */
     public function rules(): array
     {
+        $imageRule = File::image(allowSvg: false)
+            ->types(['jpg', 'jpeg', 'png', 'webp'])
+            ->max(5 * 1024);
+
         return [
-            'cover' => [
-                'required',
-                File::image(allowSvg: false)
-                    ->types(['jpg', 'jpeg', 'png', 'webp'])
-                    ->max(5 * 1024),
-            ],
+            'cover' => ['nullable', 'required_without:cover_portrait', $imageRule],
+            'cover_portrait' => ['nullable', 'required_without:cover', $imageRule],
         ];
     }
 }

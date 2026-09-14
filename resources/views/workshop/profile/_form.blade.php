@@ -1,4 +1,16 @@
 <div>
+    <label for="logo" class="form-label">Logo da oficina</label>
+    @if(!empty($workshop?->logoUrl()))
+        <div class="mb-3">
+            <img src="{{ $workshop->logoUrl() }}" alt="Logo da oficina" class="h-20 w-auto rounded border border-automotive-200 object-contain">
+        </div>
+    @endif
+    <input type="file" name="logo" id="logo" accept="image/jpeg,image/png,image/webp" class="form-input">
+    <p class="mt-1 text-sm text-automotive-500">JPEG, PNG ou WebP. Máximo 2 MB.</p>
+    @error('logo')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+</div>
+
+<div>
     <label for="name" class="form-label">Nome da oficina *</label>
     <input type="text" name="name" id="name" value="{{ old('name', $workshop->name ?? '') }}" required class="form-input">
     @error('name')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror

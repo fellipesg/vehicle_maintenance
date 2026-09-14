@@ -42,7 +42,7 @@ class SetVehicleCover extends Command
             AppStorage::coversDisk()->delete($vehicle->cover_photo_path);
         }
 
-        AppStorage::coversDisk()->put($storagePath, File::get($path));
+        AppStorage::putPublic($storagePath, File::get($path));
 
         $vehicle->update(['cover_photo_path' => $storagePath]);
 

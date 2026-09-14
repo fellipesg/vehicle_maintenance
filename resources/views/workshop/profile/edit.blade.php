@@ -7,7 +7,7 @@
     <span class="badge badge-orange mb-2">🔧 Oficina</span>
     <h1 class="mb-6 text-3xl font-bold">Editar Oficina</h1>
 
-    <form method="POST" action="{{ route('workshop.profile.update') }}" class="card space-y-4">
+    <form method="POST" action="{{ route('workshop.profile.update') }}" enctype="multipart/form-data" class="card space-y-4">
         @csrf
         @method('PUT')
         @include('workshop.profile._form', ['workshop' => $workshop])

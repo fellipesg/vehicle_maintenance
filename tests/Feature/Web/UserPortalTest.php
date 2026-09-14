@@ -329,7 +329,8 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('user.vehicles.edit', $vehicle))
             ->assertOk()
-            ->assertSee('Foto de capa')
+            ->assertSee('Capa paisagem (celular deitado)')
+            ->assertSee('Capa retrato (celular em pé)')
             ->assertSee('Capa do Honda Civic', false);
 
         $file = UploadedFile::fake()->image('nova-capa.jpg', 800, 450);

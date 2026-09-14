@@ -3,7 +3,6 @@
 namespace Tests\Feature\Web;
 
 use App\Models\User;
-use App\Models\Workshop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -29,8 +28,11 @@ class WorkshopPortalTest extends TestCase
 
     public function test_workshop_can_register_profile(): void
     {
+        $this->workshopUser->workshop->delete();
+        $this->workshopUser->unsetRelation('workshop');
+
         $this->actingAs($this->workshopUser)
-            ->post('/oficina/perfil', [
+            ->post(route('workshop.profile.store'), [
                 'name' => 'Mecânica do Bairro',
                 'phone' => '11999999999',
                 'cep' => '01310100',
@@ -50,10 +52,10 @@ class WorkshopPortalTest extends TestCase
 
     public function test_workshop_can_view_profile(): void
     {
-        Workshop::factory()->forUser($this->workshopUser)->create(['name' => 'Oficina XYZ']);
+        $this->workshopUser->workshop->update(['name' => 'Oficina XYZ']);
 
         $this->actingAs($this->workshopUser)
-            ->get('/oficina/perfil')
+            ->get(route('workshop.profile.show'))
             ->assertOk()
             ->assertSee('Oficina XYZ');
     }

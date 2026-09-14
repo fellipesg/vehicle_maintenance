@@ -21,7 +21,12 @@ class AuthTest extends TestCase
 
     public function test_login_hub_is_accessible(): void
     {
-        $this->get('/login')->assertOk()->assertSee('Como você deseja entrar?');
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('Como você deseja entrar?')
+            ->assertSee('Oficina')
+            ->assertSee('images/brand/lockup-horizontal-tagline.png', false)
+            ->assertSee('alt="RevisaLog"', false);
     }
 
     public function test_typed_login_pages_are_accessible(): void
@@ -29,6 +34,7 @@ class AuthTest extends TestCase
         $this->get('/login/usuario')->assertOk()->assertSee('Área do Proprietário');
         $this->get('/login/lojista')->assertOk()->assertSee('Área do Lojista');
         $this->get('/login/admin')->assertOk()->assertSee('Painel Administrador');
+        $this->get('/login/oficina')->assertOk()->assertSee('Área da Oficina');
     }
 
     public function test_register_page_is_accessible(): void
@@ -121,6 +127,21 @@ class AuthTest extends TestCase
         $this->assertAuthenticatedAs($admin);
     }
 
+    public function test_workshop_can_login_via_oficina_portal(): void
+    {
+        $workshop = User::factory()->asWorkshop()->create([
+            'email' => 'oficina@example.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $this->post('/login/oficina', [
+            'email' => 'oficina@example.com',
+            'password' => 'password123',
+        ])->assertRedirect(route('workshop.dashboard'));
+
+        $this->assertAuthenticatedAs($workshop);
+    }
+
     public function test_wrong_portal_rejects_valid_credentials(): void
     {
         User::factory()->asUser()->create([
@@ -130,6 +151,18 @@ class AuthTest extends TestCase
 
         $this->post('/login/lojista', [
             'email' => 'user@example.com',
+            'password' => 'password123',
+        ])->assertSessionHasErrors('email');
+
+        $this->assertGuest();
+
+        User::factory()->asWorkshop()->create([
+            'email' => 'oficina@example.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $this->post('/login/usuario', [
+            'email' => 'oficina@example.com',
             'password' => 'password123',
         ])->assertSessionHasErrors('email');
 
