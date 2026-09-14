@@ -5,11 +5,45 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribut
 const api = axios.create({
     baseURL: '/api/v1',
     withCredentials: true,
+    withXSRFToken: true,
     headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
     },
+});
+
+let csrfCookieInitialized = false;
+let csrfCookiePromise = null;
+
+function hasCsrfCookie() {
+    return document.cookie.split(';').some((cookie) => cookie.trim().startsWith('XSRF-TOKEN='));
+}
+
+async function ensureCsrfCookie() {
+    if (csrfCookieInitialized || hasCsrfCookie()) {
+        csrfCookieInitialized = true;
+
+        return;
+    }
+
+    if (!csrfCookiePromise) {
+        csrfCookiePromise = axios.get('/sanctum/csrf-cookie', { withCredentials: true })
+            .then(() => {
+                csrfCookieInitialized = true;
+            })
+            .finally(() => {
+                csrfCookiePromise = null;
+            });
+    }
+
+    await csrfCookiePromise;
+}
+
+api.interceptors.request.use(async (config) => {
+    await ensureCsrfCookie();
+
+    return config;
 });
 
 export default {
@@ -21,9 +55,6 @@ export default {
     getVehicleTimeline: (id) => api.get(`/vehicles/${id}/timeline`),
     requestVehiclePdfExport: (id) => api.post(`/vehicles/${id}/export-pdf`),
     getVehiclePdfExportStatus: (exportId) => api.get(`/vehicle-pdf-exports/${exportId}`),
-    downloadVehiclePdfExport: (exportId) => api.get(`/vehicle-pdf-exports/${exportId}/download`, {
-        responseType: 'blob',
-    }),
     getMaintenances: (params = {}) => api.get('/maintenances', { params }),
     getMaintenance: (id) => api.get(`/maintenances/${id}`),
     getWorkshops: (params = {}) => api.get('/workshops', { params }),

@@ -18,6 +18,7 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'user_type' => $this->user_type,
+            'workshop_id' => $this->when($this->isWorkshop(), fn () => $this->workshop?->id),
             'tenant_id' => $this->tenant_id,
             'is_admin' => (bool) $this->is_admin,
             'phone' => $this->phone,

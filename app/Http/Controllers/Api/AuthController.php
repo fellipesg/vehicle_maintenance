@@ -254,6 +254,7 @@ class AuthController extends Controller
             'admin' => $user->isAdmin(),
             'lojista' => $user->isGarage(),
             'usuario' => $user->isUser(),
+            'oficina' => $user->isWorkshop(),
             default => false,
         };
     }

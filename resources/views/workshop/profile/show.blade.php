@@ -14,6 +14,12 @@
 
     @if($workshop)
         <div class="card space-y-3">
+            @if($workshop->logoUrl())
+                <div>
+                    <p class="mb-2 font-semibold">Logo</p>
+                    <img src="{{ $workshop->logoUrl() }}" alt="Logo da {{ $workshop->name }}" class="h-24 w-auto rounded border border-automotive-200 object-contain">
+                </div>
+            @endif
             <p><strong>Telefone:</strong> {{ $workshop->phone }}</p>
             <p><strong>WhatsApp:</strong> {{ $workshop->whatsapp }}</p>
             @if($workshop->email)<p><strong>E-mail:</strong> {{ $workshop->email }}</p>@endif

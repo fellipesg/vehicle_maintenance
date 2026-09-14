@@ -12,25 +12,32 @@
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
-    --color-automotive-50: #f7f6f4;
-    --color-automotive-100: #eceae6;
-    --color-automotive-200: #d8d4cd;
-    --color-automotive-300: #b8b2a8;
-    --color-automotive-400: #8f877c;
-    --color-automotive-500: #6b635a;
-    --color-automotive-600: #524b44;
-    --color-automotive-700: #3d3833;
-    --color-automotive-800: #2a2622;
-    --color-automotive-900: #1c1917;
-    --color-automotive-950: #141210;
-    --color-wrench-400: #d4a574;
-    --color-wrench-500: #c9956a;
-    --color-wrench-600: #a67c52;
+    --color-automotive-50: #f4f7fa;
+    --color-automotive-100: #e8edf2;
+    --color-automotive-200: #d1dae4;
+    --color-automotive-300: #a8b8c8;
+    --color-automotive-400: #7a91a8;
+    --color-automotive-500: #5a7289;
+    --color-automotive-600: #455a6e;
+    --color-automotive-700: #344453;
+    --color-automotive-800: #243041;
+    --color-automotive-900: #162636;
+    --color-automotive-950: #0b1c2c;
+    --color-wrench-50: #e6faf8;
+    --color-wrench-100: #ccf5f0;
+    --color-wrench-200: #99ebe1;
+    --color-wrench-400: #4dd4c8;
+    --color-wrench-500: #2ec4b6;
+    --color-wrench-600: #26a99d;
+    --color-wrench-700: #1f8a80;
+    --color-wrench-800: #186b64;
+    --color-wrench-900: #124c47;
+    --color-wrench-950: #0b2e2b;
 }
 
 @layer components {
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-wrench-500 px-4 py-2.5 text-sm font-semibold text-automotive-950 shadow-sm transition hover:bg-wrench-400 focus:outline-none focus:ring-2 focus:ring-wrench-500 focus:ring-offset-2 focus:ring-offset-automotive-50;
+        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-wrench-500 px-4 py-2.5 text-sm font-semibold text-automotive-950 shadow-sm transition hover:bg-wrench-400 focus:outline-none focus:ring-2 focus:ring-wrench-500 focus:ring-offset-2 focus:ring-offset-automotive-50 disabled:opacity-60;
     }
 
     .btn-secondary {

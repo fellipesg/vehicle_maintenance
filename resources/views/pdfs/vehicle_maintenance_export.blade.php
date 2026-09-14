@@ -2,7 +2,6 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Histórico de Manutenções - {{ $vehicle->brand }} {{ $vehicle->model }}</title>
     <style>
         * {
@@ -10,217 +9,278 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'DejaVu Sans', sans-serif;
             font-size: 10pt;
             line-height: 1.4;
             color: #333;
-            padding: 0 18px 18px;
-        }
-        
-        .header {
-            background-color: #1e40af;
-            color: white;
-            padding: 20px 18px;
-            margin: 0 -18px 18px;
-        }
-        
-        .header h1 {
-            font-size: 18pt;
-            margin-bottom: 5px;
-        }
-        
-        .header p {
-            font-size: 9pt;
-            opacity: 0.9;
-        }
-        
-        .vehicle-info {
-            background-color: #f3f4f6;
-            padding: 15px;
-            margin-bottom: 18px;
-            border-radius: 5px;
-        }
-        
-        .vehicle-info h2 {
-            font-size: 14pt;
-            margin-bottom: 10px;
-            color: #1e40af;
         }
 
-        .vehicle-cover img {
-            max-width: 220px;
-            max-height: 280px;
+        .document-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .document-table thead {
+            display: table-header-group;
+        }
+
+        .document-table > tbody > tr > td {
+            vertical-align: top;
+            padding: 14px 18px 18px;
+        }
+
+        .document-table > thead > tr > td {
+            padding: 18px 18px 0;
+        }
+
+        .cover-document {
+            page-break-after: always;
+        }
+
+        .cover-document > tbody > tr > td {
+            padding: 0;
+        }
+
+        .cover-body {
+            padding: 14px 18px 18px;
+        }
+
+        .os-document {
+            page-break-before: always;
+        }
+
+        .os-document thead {
+            display: table-header-group;
+        }
+
+        .os-document > tbody > tr > td {
+            padding: 0 18px 14px;
+        }
+
+        .os-document > thead > tr > td {
+            padding: 18px 18px 0;
+        }
+
+        .letterhead-name {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #0B1C2C;
+            margin-bottom: 6px;
+        }
+
+        .letterhead-line {
+            font-size: 9pt;
+            color: #374151;
+            margin-bottom: 3px;
+            line-height: 1.35;
+        }
+
+        .brand-header-bar {
+            background-color: #0B1C2C;
+            padding: 14px 18px;
+            text-align: center;
+        }
+
+        .brand-header-bar img {
+            max-height: 64px;
+            max-width: 320px;
             width: auto;
             height: auto;
         }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+
+        .letterhead {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #d1d5db;
         }
-        
-        .info-item {
-            margin-bottom: 8px;
+
+        .letterhead-logo-cell {
+            text-align: right;
+            vertical-align: middle;
         }
-        
+
+        .letterhead-logo {
+            display: block;
+            width: {{ $workshopLogoWidth ?? 120 }}px;
+            height: {{ $workshopLogoHeight ?? 130 }}px;
+        }
+
+        .title-band {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+        }
+
+        .title-band--cover {
+            margin-top: 0;
+        }
+
+        .title-band td {
+            background: #0B1C2C;
+            color: #fff;
+            font-size: 10pt;
+            line-height: 14px;
+            padding: 8px 12px;
+            vertical-align: middle;
+            border: 0;
+        }
+
+        .title-band .band-left {
+            font-weight: bold;
+        }
+
+        .title-band .band-right {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .vehicle-section-title {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #0B1C2C;
+            margin-bottom: 12px;
+        }
+
+        .vehicle-cover-photo {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #d1d5db;
+            margin-bottom: 12px;
+        }
+
+        .info-table-wrapper {
+            border: 1px solid #d1d5db;
+            padding: 12px;
+        }
+
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .info-table td {
+            width: 50%;
+            vertical-align: top;
+            padding: 0 8px 8px 0;
+        }
+
         .info-label {
             font-weight: bold;
             color: #666;
             font-size: 9pt;
         }
-        
+
         .info-value {
             color: #333;
             font-size: 10pt;
         }
 
-        .maintenances-wrapper {
-            margin-top: 4px;
+        .os-body-card {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #d1d5db;
         }
 
-        .maintenances-wrapper > h2 {
-            font-size: 14pt;
-            margin: 0 0 12px;
-            color: #1e40af;
-            page-break-after: avoid;
+        .os-body-card td {
+            padding: 10px 12px 12px;
+            vertical-align: top;
         }
-        
-        .maintenance-section {
-            margin-bottom: 14px;
-            page-break-inside: avoid;
-        }
-        
-        .maintenance-header {
-            background-color: #3b82f6;
-            color: white;
-            padding: 10px 12px;
-            border-radius: 5px 5px 0 0;
+
+        .meta-block {
             margin-bottom: 0;
         }
 
-        .maintenance-title {
-            width: 100%;
-            border-collapse: collapse;
+        .meta-line {
+            margin-bottom: 5px;
+            line-height: 1.4;
+            padding: 2px 0;
         }
 
-        .maintenance-title td {
-            vertical-align: middle;
-            padding: 0;
-            color: white;
-            font-size: 11pt;
-            font-weight: bold;
-            line-height: 1.2;
-        }
-
-        .maintenance-title .title-sep {
-            padding: 0 6px;
-            white-space: nowrap;
-        }
-
-        .maintenance-title .title-text {
-            white-space: nowrap;
-        }
-        
-        .maintenance-content {
-            border: 1px solid #e5e7eb;
-            border-top: none;
-            padding: 15px;
-            border-radius: 0 0 5px 5px;
-        }
-        
-        .maintenance-details {
-            margin-bottom: 15px;
-        }
-        
-        .maintenance-details .info-item {
-            margin-bottom: 6px;
-        }
-        
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
+            margin: 0;
             font-size: 9pt;
+            border: 1px solid #d1d5db;
+            page-break-inside: auto;
         }
-        
+
+        .items-table thead {
+            display: table-header-group;
+        }
+
         .items-table th {
-            background-color: #f3f4f6;
+            background-color: #e5e7eb;
             padding: 8px;
             text-align: left;
-            border: 1px solid #e5e7eb;
+            border: 1px solid #d1d5db;
             font-weight: bold;
         }
-        
+
         .items-table td {
             padding: 8px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid #d1d5db;
         }
-        
-        .items-table tr:nth-child(even) {
+
+        .items-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+
+        .items-table tr:nth-child(even) td {
             background-color: #f9fafb;
         }
-        
-        .invoices-section {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #e5e7eb;
+
+        .warranty-small {
+            color: #166534;
+            font-size: 8pt;
         }
-        
+
+        .invoices-section {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: 0;
+        }
+
         .invoices-section h4 {
             font-size: 11pt;
-            margin-bottom: 10px;
-            color: #1e40af;
+            margin-bottom: 8px;
+            color: #0B1C2C;
         }
-        
+
         .invoice-item {
-            padding: 8px;
+            padding: 8px 12px;
             background-color: #f9fafb;
             margin-bottom: 8px;
-            border-left: 3px solid #3b82f6;
-            padding-left: 12px;
+            border: 1px solid #d1d5db;
+            font-size: 9pt;
         }
-        
+
         .invoice-item strong {
-            color: #1e40af;
+            color: #0B1C2C;
         }
-        
-        .badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 8pt;
+
+        .section-heading {
+            font-size: 11pt;
+            margin: 0 0 8px;
+            color: #0B1C2C;
             font-weight: bold;
-            line-height: 1.2;
-            vertical-align: middle;
         }
-        
-        .badge-preventive {
-            background-color: #10b981;
-            color: white;
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 18px;
+            color: #666;
         }
-        
-        .badge-corrective {
-            background-color: #ef4444;
-            color: white;
-        }
-        
-        .badge-inspection {
-            background-color: #f59e0b;
-            color: white;
-        }
-        
-        .badge-other {
-            background-color: #6b7280;
-            color: white;
-        }
-        
-        .footer {
-            margin-top: 24px;
-            padding-top: 12px;
-            border-top: 1px solid #e5e7eb;
+
+        .doc-footer {
+            margin-top: 18px;
+            padding-top: 10px;
+            border-top: 1px solid #d1d5db;
             text-align: center;
             font-size: 8pt;
             color: #666;
@@ -228,265 +288,313 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Histórico de Manutenções</h1>
-        <p>Relatório gerado em {{ now()->format('d/m/Y H:i') }}</p>
-    </div>
-    
-    <div class="vehicle-info">
-        <h2>Informações do Veículo</h2>
-        @if(! empty($coverImageSrc))
-            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
-                <tr>
-                    <td class="vehicle-cover" style="width: 240px; vertical-align: top; padding-right: 12px;">
-                        <img src="{{ $coverImageSrc }}" alt="Foto de capa do {{ $vehicle->brand }} {{ $vehicle->model }}">
-                    </td>
-                    <td style="vertical-align: top;">
-        @endif
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Marca/Modelo:</span>
-                <span class="info-value">{{ $vehicle->brand }} {{ $vehicle->model }}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Ano:</span>
-                <span class="info-value">{{ $vehicle->year }}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Placa:</span>
-                <span class="info-value">{{ $vehicle->license_plate }}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">RENAVAM:</span>
-                <span class="info-value">{{ $vehicle->renavam }}</span>
-            </div>
-            @if($vehicle->color)
-            <div class="info-item">
-                <span class="info-label">Cor:</span>
-                <span class="info-value">{{ $vehicle->color }}</span>
-            </div>
-            @endif
-            @if($vehicle->chassis)
-            <div class="info-item">
-                <span class="info-label">Chassi:</span>
-                <span class="info-value">{{ $vehicle->chassis }}</span>
-            </div>
-            @endif
-            @if($vehicle->motorization)
-            <div class="info-item">
-                <span class="info-label">Motorização:</span>
-                <span class="info-value">{{ $vehicle->motorization }}</span>
-            </div>
-            @endif
-            @if($vehicle->engine)
-            <div class="info-item">
-                <span class="info-label">Código do motor:</span>
-                <span class="info-value">{{ $vehicle->engine }}</span>
-            </div>
-            @endif
-        </div>
-        @if(! empty($coverImageSrc))
-                    </td>
-                </tr>
-            </table>
-        @endif
-    </div>
-    
-    @if($vehicle->maintenances->count() > 0)
-        <div class="maintenances-wrapper">
-            <h2>Manutenções Realizadas ({{ $vehicle->maintenances->count() }})</h2>
-        
-            @foreach($vehicle->maintenances as $index => $maintenance)
-                <div class="maintenance-section">
-                    @php
-                        $workshopName = $maintenance->displayWorkshopName();
-                        $typeLabel = match ($maintenance->maintenance_type) {
-                            'preventive' => 'PREVENTIVA',
-                            'corrective' => 'CORRETIVA',
-                            'inspection' => 'INSPEÇÃO',
-                            default => strtoupper((string) $maintenance->maintenance_type),
-                        };
-                        $badgeClass = match ($maintenance->maintenance_type) {
-                            'preventive' => 'badge-preventive',
-                            'corrective' => 'badge-corrective',
-                            'inspection' => 'badge-inspection',
-                            default => 'badge-other',
-                        };
-                    @endphp
-                    <div class="maintenance-header">
-                        <table class="maintenance-title">
-                            <tr>
-                                <td style="width: 1%; white-space: nowrap;">
-                                    <span class="badge {{ $badgeClass }}">{{ $typeLabel }}</span>
-                                </td>
-                                @if($workshopName)
-                                    <td class="title-sep">-</td>
-                                    <td class="title-text">{{ $workshopName }}</td>
-                                @endif
-                                <td class="title-sep">-</td>
-                                <td class="title-text">{{ \Carbon\Carbon::parse($maintenance->maintenance_date)->format('d/m/Y') }}</td>
-                                <td style="width: 99%;"></td>
-                            </tr>
-                        </table>
-                    </div>
-                
-                <div class="maintenance-content">
-                    <div class="maintenance-details">
-                        <div class="info-item">
-                            <span class="info-label">Data:</span>
-                            <span class="info-value">{{ \Carbon\Carbon::parse($maintenance->maintenance_date)->format('d/m/Y') }}</span>
+    {{-- Página 1: capa RevisaLog + dados do veículo --}}
+    <table class="document-table cover-document" cellpadding="0" cellspacing="0">
+        <tbody>
+            <tr>
+                <td>
+                    @if(! empty($revisalogCoverLogoSrc))
+                        <div class="brand-header-bar">
+                            <img src="{{ $revisalogCoverLogoSrc }}" alt="RevisaLog">
                         </div>
-                        @if($maintenance->kilometers)
-                        <div class="info-item">
-                            <span class="info-label">Quilometragem:</span>
-                            <span class="info-value">{{ number_format($maintenance->kilometers, 0, ',', '.') }} km</span>
-                        </div>
+                    @endif
+                    <table class="title-band title-band--cover" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td class="band-left" width="70%" valign="middle">Histórico de manutenções</td>
+                            <td class="band-right" width="30%" valign="middle">{{ now()->format('d/m/Y H:i') }}</td>
+                        </tr>
+                    </table>
+
+                    <div class="cover-body">
+                        <div class="vehicle-section-title">Informações do veículo</div>
+
+                        @if(! empty($coverImageSrc))
+                            <img
+                                class="vehicle-cover-photo"
+                                src="{{ $coverImageSrc }}"
+                                alt="Foto de capa do {{ $vehicle->brand }} {{ $vehicle->model }}"
+                            >
                         @endif
-                        @if($maintenance->service_category)
-                        <div class="info-item">
-                            <span class="info-label">Categoria:</span>
-                            <span class="info-value">
-                                @if($maintenance->service_category === 'mechanical') Mecânica
-                                @elseif($maintenance->service_category === 'electrical') Elétrica
-                                @elseif($maintenance->service_category === 'suspension') Suspensão
-                                @elseif($maintenance->service_category === 'painting') Pintura
-                                @elseif($maintenance->service_category === 'finishing') Acabamento
-                                @elseif($maintenance->service_category === 'interior') Interior
-                                @else Outra
-                                @endif
-                            </span>
-                        </div>
-                        @endif
-                        @if($maintenance->workshop || $maintenance->workshop_name)
-                        <div class="info-item" style="margin-top: 10px; padding: 10px; background-color: #f9fafb; border-left: 3px solid #3b82f6;">
-                            <div style="margin-bottom: 8px;">
-                                <span class="info-label">Oficina:</span>
-                                <span class="info-value" style="font-weight: bold; font-size: 11pt;">{{ $maintenance->displayWorkshopName() }}</span>
-                            </div>
-                            @if($maintenance->workshop)
-                                <div style="margin-top: 8px; font-size: 9pt;">
-                                    @if($maintenance->workshop->phone)
-                                    <div style="margin-bottom: 4px;">
-                                        <strong>Telefone:</strong> {{ $maintenance->workshop->phone }}
-                                    </div>
-                                    @endif
-                                    @if($maintenance->workshop->whatsapp)
-                                    <div style="margin-bottom: 4px;">
-                                        <strong>WhatsApp:</strong> {{ $maintenance->workshop->whatsapp }}
-                                    </div>
-                                    @endif
-                                    @if($maintenance->workshop->email)
-                                    <div style="margin-bottom: 4px;">
-                                        <strong>Email:</strong> <a href="mailto:{{ $maintenance->workshop->email }}" style="color: #3b82f6;">{{ $maintenance->workshop->email }}</a>
-                                    </div>
-                                    @endif
-                                    <div style="margin-bottom: 4px;">
-                                        <strong>Endereço:</strong> {{ $maintenance->workshop->street }}, {{ $maintenance->workshop->number }}
-                                        @if($maintenance->workshop->complement)
-                                            - {{ $maintenance->workshop->complement }}
-                                        @endif
-                                        - {{ $maintenance->workshop->neighborhood }}, {{ $maintenance->workshop->city }}/{{ $maintenance->workshop->state }}
-                                        - CEP: {{ preg_replace('/(\d{5})(\d{3})/', '$1-$2', $maintenance->workshop->cep) }}
-                                    </div>
-                                    @if($maintenance->workshop->facebook || $maintenance->workshop->instagram)
-                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-                                        <strong>Redes Sociais:</strong>
-                                        @if($maintenance->workshop->facebook)
-                                        <div style="margin-top: 4px;">
-                                            <span style="color: #1877f2;">📘 Facebook:</span> <a href="{{ $maintenance->workshop->facebook }}" style="color: #3b82f6; text-decoration: underline;">{{ $maintenance->workshop->facebook }}</a>
-                                        </div>
-                                        @endif
-                                        @if($maintenance->workshop->instagram)
-                                        <div style="margin-top: 4px;">
-                                            <span style="color: #e4405f;">📷 Instagram:</span> <a href="{{ $maintenance->workshop->instagram }}" style="color: #3b82f6; text-decoration: underline;">{{ $maintenance->workshop->instagram }}</a>
-                                        </div>
-                                        @endif
-                                    </div>
-                                    @endif
-                                </div>
-                            @endif
-                        </div>
-                        @endif
-                        @if($maintenance->is_manufacturer_required)
-                        <div class="info-item">
-                            <span class="info-label">Tipo:</span>
-                            <span class="info-value">Exigida pelo fabricante</span>
-                        </div>
-                        @endif
-                        @if($maintenance->description)
-                        <div class="info-item" style="margin-top: 10px;">
-                            <span class="info-label">Descrição:</span>
-                            <div class="info-value" style="margin-top: 5px;">{{ $maintenance->description }}</div>
-                        </div>
-                        @endif
-                    </div>
-                    
-                    @if($maintenance->items && $maintenance->items->count() > 0)
-                        <h4 style="font-size: 11pt; margin: 15px 0 10px 0; color: #1e40af;">Itens da Manutenção</h4>
-                        <table class="items-table">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th>Quantidade</th>
-                                    <th>Preço Unit.</th>
-                                    <th>Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($maintenance->items as $item)
+
+                        <div class="info-table-wrapper">
+                            <table class="info-table" cellpadding="0" cellspacing="0">
                                 <tr>
                                     <td>
-                                        <strong>{{ $item->name }}</strong>
-                                        @if($item->description)
-                                        <br><small style="color: #666;">{{ $item->description }}</small>
-                                        @endif
-                                        @if($item->part_number)
-                                        <br><small style="color: #999;">Código: {{ $item->part_number }}</small>
+                                        <span class="info-label">Marca/Modelo:</span>
+                                        <span class="info-value">{{ $vehicle->brand }} {{ $vehicle->model }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="info-label">Ano:</span>
+                                        <span class="info-value">{{ $vehicle->year }}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <span class="info-label">Placa:</span>
+                                        <span class="info-value">{{ $vehicle->license_plate }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="info-label">RENAVAM:</span>
+                                        <span class="info-value">{{ $vehicle->renavam }}</span>
+                                    </td>
+                                </tr>
+                                @if($vehicle->current_kilometers)
+                                <tr>
+                                    <td colspan="2">
+                                        <span class="info-label">Quilometragem:</span>
+                                        <span class="info-value">{{ number_format($vehicle->current_kilometers, 0, ',', '.') }} km</span>
+                                    </td>
+                                </tr>
+                                @endif
+                                @if($vehicle->color || $vehicle->chassis)
+                                <tr>
+                                    @if($vehicle->color)
+                                    <td>
+                                        <span class="info-label">Cor:</span>
+                                        <span class="info-value">{{ $vehicle->color }}</span>
+                                    </td>
+                                    @else
+                                    <td></td>
+                                    @endif
+                                    @if($vehicle->chassis)
+                                    <td>
+                                        <span class="info-label">Chassi:</span>
+                                        <span class="info-value">{{ $vehicle->chassis }}</span>
+                                    </td>
+                                    @else
+                                    <td></td>
+                                    @endif
+                                </tr>
+                                @endif
+                                @if($vehicle->motorization || $vehicle->engine)
+                                <tr>
+                                    @if($vehicle->motorization)
+                                    <td>
+                                        <span class="info-label">Motorização:</span>
+                                        <span class="info-value">{{ $vehicle->motorization }}</span>
+                                    </td>
+                                    @else
+                                    <td></td>
+                                    @endif
+                                    @if($vehicle->engine)
+                                    <td>
+                                        <span class="info-label">Código do motor:</span>
+                                        <span class="info-value">{{ $vehicle->engine }}</span>
+                                    </td>
+                                    @else
+                                    <td></td>
+                                    @endif
+                                </tr>
+                                @endif
+                            </table>
+                        </div>
+
+                        @if($vehicle->maintenances->count() > 0)
+                            <p style="margin-top: 16px; font-size: 9pt; color: #666;">
+                                {{ $vehicle->maintenances->count() }} manutenção(ões) registrada(s) — detalhes nas páginas seguintes.
+                            </p>
+                        @endif
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    @if($vehicle->maintenances->count() > 0)
+        @foreach($vehicle->maintenances as $maintenance)
+            @php
+                $workshopName = $maintenance->displayWorkshopName();
+                $maintenanceTitle = $maintenance->maintenance_type ?: 'Manutenção';
+                $maintenanceDate = \Carbon\Carbon::parse($maintenance->maintenance_date)->format('d/m/Y');
+                $workshopLogo = $workshopLogos[$maintenance->id] ?? null;
+            @endphp
+
+            <table class="document-table os-document" cellpadding="0" cellspacing="0">
+                <thead>
+                    <tr>
+                        <td>
+                            <table class="letterhead" width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td width="75%" valign="top" style="padding:8px 10px;">
+                                        @if($maintenance->workshop)
+                                            <div class="letterhead-name">{{ $maintenance->workshop->name }}</div>
+                                            <div class="letterhead-line">{{ $maintenance->workshop->full_address }}</div>
+                                            @if($maintenance->workshop->phone)
+                                                <div class="letterhead-line">Telefone: {{ $maintenance->workshop->phone }}</div>
+                                            @endif
+                                            @if($maintenance->workshop->whatsapp)
+                                                <div class="letterhead-line">WhatsApp: {{ $maintenance->workshop->whatsapp }}</div>
+                                            @endif
+                                            @if($maintenance->workshop->email)
+                                                <div class="letterhead-line">E-mail: {{ $maintenance->workshop->email }}</div>
+                                            @endif
+                                            @if($maintenance->workshop->instagram)
+                                                <div class="letterhead-line">Instagram: {{ $maintenance->workshop->instagram }}</div>
+                                            @endif
+                                            @if($maintenance->workshop->facebook)
+                                                <div class="letterhead-line">Facebook: {{ $maintenance->workshop->facebook }}</div>
+                                            @endif
+                                        @elseif($workshopName)
+                                            <div class="letterhead-name">{{ $workshopName }}</div>
+                                        @else
+                                            <div class="letterhead-name">Manutenção registrada pelo proprietário</div>
                                         @endif
                                     </td>
-                                    <td>{{ $item->quantity }}x</td>
-                                    <td>R$ {{ number_format($item->unit_price ?? 0, 2, ',', '.') }}</td>
-                                    <td><strong>R$ {{ number_format($item->total_price ?? 0, 2, ',', '.') }}</strong></td>
+                                    <td width="25%" class="letterhead-logo-cell" style="padding:8px 10px;">
+                                        @if(! empty($workshopLogo))
+                                            <img
+                                                src="{{ $workshopLogo }}"
+                                                alt=""
+                                                class="letterhead-logo"
+                                                width="{{ $workshopLogoWidth ?? 120 }}"
+                                                height="{{ $workshopLogoHeight ?? 130 }}"
+                                            >
+                                        @elseif(! $maintenance->workshop && empty($workshopName) && ! empty($revisalogLogoSrc))
+                                            <img
+                                                src="{{ $revisalogLogoSrc }}"
+                                                alt="RevisaLog"
+                                                class="letterhead-logo"
+                                                width="{{ $workshopLogoWidth ?? 120 }}"
+                                                height="{{ $workshopLogoHeight ?? 130 }}"
+                                            >
+                                        @endif
+                                    </td>
                                 </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                            </table>
+                            <table class="title-band" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td class="band-left" width="70%" valign="middle">{{ $maintenanceTitle }}</td>
+                                    <td class="band-right" width="30%" valign="middle">{{ $maintenanceDate }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <table class="os-body-card" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td>
+                                        <div class="meta-block">
+                                            @if($maintenance->kilometers)
+                                                <div class="meta-line">
+                                                    <span class="info-label">Quilometragem:</span>
+                                                    <span class="info-value">{{ number_format($maintenance->kilometers, 0, ',', '.') }} km</span>
+                                                </div>
+                                            @endif
+                                            @if($maintenance->service_category)
+                                                <div class="meta-line">
+                                                    <span class="info-label">Categoria:</span>
+                                                    <span class="info-value">
+                                                        @if($maintenance->service_category === 'mechanical') Mecânica
+                                                        @elseif($maintenance->service_category === 'electrical') Elétrica
+                                                        @elseif($maintenance->service_category === 'suspension') Suspensão
+                                                        @elseif($maintenance->service_category === 'painting') Pintura
+                                                        @elseif($maintenance->service_category === 'finishing') Acabamento
+                                                        @elseif($maintenance->service_category === 'interior') Interior
+                                                        @else Outra
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                            @endif
+                                            @if($maintenance->generalWarranty)
+                                                <div class="meta-line">
+                                                    <span class="info-label">Garantia geral:</span>
+                                                    <span class="info-value">{{ $maintenance->generalWarranty->name }} — até {{ $maintenance->generalWarranty->ends_at->format('d/m/Y') }}</span>
+                                                </div>
+                                            @endif
+                                            @if($maintenance->is_manufacturer_required)
+                                                <div class="meta-line">
+                                                    <span class="info-label">Tipo:</span>
+                                                    <span class="info-value">Exigida pelo fabricante</span>
+                                                </div>
+                                            @endif
+                                            @if($maintenance->description)
+                                                <div class="meta-line" style="margin-top: 8px;">
+                                                    <span class="info-label">Descrição:</span>
+                                                    <div class="info-value" style="margin-top: 4px;">{{ $maintenance->description }}</div>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    @if($maintenance->items && $maintenance->items->count() > 0)
+                        <tr>
+                            <td>
+                                <div class="section-heading">Itens da manutenção</div>
+                                <table class="items-table" cellpadding="0" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th>Quantidade</th>
+                                            <th>Preço unit.</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($maintenance->items as $item)
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ $item->name }}</strong>
+                                                    @if($item->description)
+                                                        <br><span style="color: #666; font-size: 8pt;">{{ $item->description }}</span>
+                                                    @endif
+                                                    @if($item->part_number)
+                                                        <br><span style="color: #999; font-size: 8pt;">Código: {{ $item->part_number }}</span>
+                                                    @endif
+                                                    @if($item->warranty)
+                                                        <br><span class="warranty-small">{{ $item->warranty->name }} — até {{ $item->warranty->ends_at->format('d/m/Y') }}</span>
+                                                    @endif
+                                                </td>
+                                                <td>{{ $item->quantity }}x</td>
+                                                <td>R$ {{ number_format($item->unit_price ?? 0, 2, ',', '.') }}</td>
+                                                <td><strong>R$ {{ number_format($item->total_price ?? 0, 2, ',', '.') }}</strong></td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
                     @endif
-                    
                     @if($maintenance->invoices && $maintenance->invoices->count() > 0)
-                        <div class="invoices-section">
-                            <h4>Notas Fiscais</h4>
-                            @foreach($maintenance->invoices as $invoice)
-                                <div class="invoice-item">
-                                    <strong>{{ $invoice->file_name }}</strong><br>
-                                    <small>DANFE nas páginas seguintes deste PDF e em anexo no e-mail.</small><br>
-                                    @if($invoice->invoice_number)
-                                        <small>Número: {{ $invoice->invoice_number }}</small><br>
-                                    @endif
-                                    @if($invoice->invoice_date)
-                                        <small>Data: {{ \Carbon\Carbon::parse($invoice->invoice_date)->format('d/m/Y') }}</small><br>
-                                    @endif
-                                    @if($invoice->total_amount)
-                                        <small>Valor: R$ {{ number_format($invoice->total_amount, 2, ',', '.') }}</small>
-                                    @endif
+                        <tr>
+                            <td>
+                                <div class="invoices-section">
+                                    <h4>Notas fiscais</h4>
+                                    @foreach($maintenance->invoices as $invoice)
+                                        <div class="invoice-item">
+                                            <strong>{{ $invoice->file_name }}</strong><br>
+                                            <span>DANFE nas páginas seguintes deste PDF e em anexo no e-mail.</span><br>
+                                            @if($invoice->invoice_number)
+                                                <span>Número: {{ $invoice->invoice_number }}</span><br>
+                                            @endif
+                                            @if($invoice->invoice_date)
+                                                <span>Data: {{ \Carbon\Carbon::parse($invoice->invoice_date)->format('d/m/Y') }}</span><br>
+                                            @endif
+                                            @if($invoice->total_amount)
+                                                <span>Valor: R$ {{ number_format($invoice->total_amount, 2, ',', '.') }}</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
                                 </div>
-                            @endforeach
-                        </div>
+                            </td>
+                        </tr>
                     @endif
-                </div>
-            </div>
-            @endforeach
-        </div>
+                </tbody>
+            </table>
+        @endforeach
     @else
-        <div style="text-align: center; padding: 40px; color: #666;">
+        <div class="empty-state">
             <p>Nenhuma manutenção registrada para este veículo.</p>
         </div>
     @endif
-    
-    <div class="footer">
-        <p>Este relatório foi gerado automaticamente pelo sistema Vehicle Maintenance</p>
-        <p>Para mais informações, acesse o sistema ou entre em contato com o suporte.</p>
+
+    <div class="doc-footer">
+        <p>Relatório gerado automaticamente pela Revisalog (revisalog.com.br)</p>
     </div>
 </body>
 </html>
-

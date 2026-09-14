@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\WarrantyScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Maintenance extends Model
 {
@@ -81,6 +83,29 @@ class Maintenance extends Model
     public function workshop(): BelongsTo
     {
         return $this->belongsTo(Workshop::class);
+    }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(MaintenancePhoto::class)->orderBy('sort');
+    }
+
+    public function warranties(): HasMany
+    {
+        return $this->hasMany(MaintenanceWarranty::class);
+    }
+
+    public function generalWarranty(): HasOne
+    {
+        return $this->hasOne(MaintenanceWarranty::class)
+            ->where('scope', WarrantyScope::Order);
+    }
+
+    public function publicPhotos(): HasMany
+    {
+        return $this->photos()
+            ->where('subject', MaintenancePhoto::SUBJECT_VEHICLE)
+            ->where('stage', MaintenancePhoto::STAGE_AFTER);
     }
 
     /**

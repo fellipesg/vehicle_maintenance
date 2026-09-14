@@ -29,11 +29,17 @@
             </div>
         </div>
 
-        <h2 class="mb-3 text-lg font-semibold text-automotive-900">Serviços Recentes</h2>
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-lg font-semibold text-automotive-900">Serviços Recentes</h2>
+            <a href="{{ route('workshop.maintenances.create') }}" class="btn-primary text-sm">Nova OS</a>
+        </div>
         @forelse($recentMaintenances as $maintenance)
             <div class="card mb-2 !p-4">
-                <p class="font-semibold text-automotive-900">{{ $maintenance->maintenance_type }}</p>
-                <p class="text-sm text-automotive-600">{{ $maintenance->vehicle->brand }} {{ $maintenance->vehicle->model }} · {{ $maintenance->maintenance_date->format('d/m/Y') }}</p>
+                <a href="{{ route('workshop.maintenances.show', $maintenance) }}" class="block hover:text-wrench-700">
+                    <p class="font-semibold text-automotive-900">{{ $maintenance->maintenance_type }}</p>
+                    <p class="text-sm text-automotive-600">{{ $maintenance->vehicle->brand }} {{ $maintenance->vehicle->model }} · {{ $maintenance->maintenance_date->format('d/m/Y') }}</p>
+                </a>
+                <a href="{{ route('workshop.maintenances.show', $maintenance) }}" class="mt-2 inline-block text-sm text-wrench-600 hover:underline">Ver detalhes →</a>
             </div>
         @empty
             <div class="card !p-8 text-center">

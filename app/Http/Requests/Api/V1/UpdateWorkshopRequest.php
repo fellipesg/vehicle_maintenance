@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rules\File;
 
 class UpdateWorkshopRequest extends ApiFormRequest
 {
@@ -32,6 +33,12 @@ class UpdateWorkshopRequest extends ApiFormRequest
             'neighborhood' => 'sometimes|required|string|max:255',
             'city' => 'sometimes|required|string|max:255',
             'state' => 'sometimes|required|string|size:2',
+            'logo' => [
+                'nullable',
+                File::image(allowSvg: false)
+                    ->types(['jpg', 'jpeg', 'png', 'webp'])
+                    ->max(2 * 1024),
+            ],
         ];
     }
 }

@@ -34,6 +34,7 @@ Use the shared demo credentials provided by the team (email: `fgoncalves2008@gma
 ## Rate limiting
 
 Auth endpoints (`/login`, `/register`, OAuth callback) are limited to **5 requests per minute** per IP/email (`throttle:auth`).
+Authenticated API traffic is limited to **60/min** (`throttle:api`). Public vehicle search is **20/min** (`throttle:search`). File uploads are **10/min** (`throttle:uploads`). 2FA challenge is **5/min** (`throttle:two-factor`).
 
 ## Response envelope
 

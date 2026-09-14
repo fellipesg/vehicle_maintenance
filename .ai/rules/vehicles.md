@@ -5,5 +5,5 @@ paths:
 
 # Vehicles
 
-## Crop vehicle cover to 16:9 after pick
-After picking a vehicle cover, always open the 16:9 cropper (Enquadrar capa). Do not upload the gallery file uncropped. Cancel keeps the previous photo.
+## Dual vehicle covers (landscape + portrait)
+Cadastro pede capa paisagem (celular deitado, 16:9) e retrato (celular em pé, 9:16). Hero largo / desktop usa paisagem; telas <768px, avatares e PDF usam retrato. Sempre cropper antes do upload. Cancelar mantém a foto anterior daquela orientação.

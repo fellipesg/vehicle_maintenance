@@ -249,15 +249,26 @@ class VehicleController extends Controller
                     ->types(['jpg', 'jpeg', 'png', 'webp'])
                     ->max(5 * 1024),
             ],
+            'cover_portrait' => [
+                'nullable',
+                File::image(allowSvg: false)
+                    ->types(['jpg', 'jpeg', 'png', 'webp'])
+                    ->max(5 * 1024),
+            ],
         ]);
 
         $cover = $request->file('cover');
-        unset($data['cover']);
+        $coverPortrait = $request->file('cover_portrait');
+        unset($data['cover'], $data['cover_portrait']);
 
         $vehicle->update($data);
 
         if ($cover !== null) {
-            $covers->store($vehicle, $cover);
+            $covers->storeLandscape($vehicle, $cover);
+        }
+
+        if ($coverPortrait !== null) {
+            $covers->storePortrait($vehicle, $coverPortrait);
         }
 
         return redirect()->route('user.vehicles.show', $vehicle)

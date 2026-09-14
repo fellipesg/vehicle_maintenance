@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rules\File;
 
 class StoreWorkshopRequest extends ApiFormRequest
 {
@@ -30,6 +31,12 @@ class StoreWorkshopRequest extends ApiFormRequest
             'neighborhood' => 'required|string|max:255',
             'city' => 'required|string|max:255',
             'state' => 'required|string|size:2',
+            'logo' => [
+                'nullable',
+                File::image(allowSvg: false)
+                    ->types(['jpg', 'jpeg', 'png', 'webp'])
+                    ->max(2 * 1024),
+            ],
         ];
     }
 }

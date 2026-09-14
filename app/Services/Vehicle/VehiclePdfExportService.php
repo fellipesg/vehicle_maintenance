@@ -8,6 +8,7 @@ use App\Models\Vehicle;
 use App\Models\VehiclePdfExport;
 use App\Support\AppStorage;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 class VehiclePdfExportService
@@ -49,6 +50,7 @@ class VehiclePdfExportService
             );
 
             $payload['filename'] = $export->filename;
+            $payload['download_portal_url'] = $this->portalDownloadUrl($export);
             $payload['download_api_url'] = $this->downloadUrl($export);
             $payload['download_url'] = $export->file_path !== null
                 ? AppStorage::url($export->file_path, $downloadUrlExpiresAt)
@@ -72,6 +74,53 @@ class VehiclePdfExportService
     public function downloadUrl(VehiclePdfExport $export): string
     {
         return '/api/v1/vehicle-pdf-exports/'.$export->id.'/download';
+    }
+
+    public function portalDownloadUrl(VehiclePdfExport $export): string
+    {
+        // Relative path only — absolute route() URLs use APP_URL (often localhost) while
+        // users browse 127.0.0.1:8000; cross-origin GETs lose session + Content-Disposition.
+        return '/usuario/exportacoes-pdf/'.$export->id.'/'.$this->resolveDownloadFilename($export);
+    }
+
+    public function resolveDownloadFilename(VehiclePdfExport $export): string
+    {
+        $filename = $export->filename ?? 'historico_manutencoes.pdf';
+
+        if (! str_ends_with(strtolower($filename), '.pdf')) {
+            $filename .= '.pdf';
+        }
+
+        return $filename;
+    }
+
+    public function downloadFileResponse(VehiclePdfExport $export): BinaryFileResponse
+    {
+        $filename = $this->resolveDownloadFilename($export);
+        $path = $export->file_path;
+        $disk = AppStorage::disk();
+
+        if (! AppStorage::isRemotePath($path)) {
+            return response()->download($disk->path($path), $filename, [
+                'Content-Type' => 'application/pdf',
+            ]);
+        }
+
+        $copy = AppStorage::localCopy($path);
+
+        if ($copy === null) {
+            abort(404);
+        }
+
+        $response = response()->download($copy['path'], $filename, [
+            'Content-Type' => 'application/pdf',
+        ]);
+
+        if ($copy['temporary']) {
+            $response->deleteFileAfterSend();
+        }
+
+        return $response;
     }
 
     /**

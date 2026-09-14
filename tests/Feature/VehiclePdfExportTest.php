@@ -142,6 +142,11 @@ class VehiclePdfExportTest extends TestCase
             "/api/v1/vehicle-pdf-exports/{$export->id}/download",
             $response->json('data.download_api_url'),
         );
+        $this->assertSame(
+            '/usuario/exportacoes-pdf/'.$export->id.'/historico_manutencoes_TEST_2026-08-29.pdf',
+            $response->json('data.download_portal_url'),
+        );
+        $this->assertStringEndsWith('.pdf', $response->json('data.download_portal_url'));
     }
 
     public function test_completed_export_can_be_downloaded_as_attachment(): void
@@ -170,6 +175,31 @@ class VehiclePdfExportTest extends TestCase
             ->assertHeader('content-type', 'application/pdf');
 
         $this->assertSame($pdfContents, Storage::disk('public')->get($path));
+    }
+
+    public function test_download_appends_pdf_extension_when_filename_has_none(): void
+    {
+        Storage::fake('public');
+
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $path = 'exports/vehicle-pdfs/test-export.pdf';
+        Storage::disk('public')->put($path, '%PDF-1.4 test');
+
+        $export = VehiclePdfExport::factory()->completed()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'file_path' => $path,
+            'filename' => 'historico_QOS6H54_garantias',
+        ]);
+
+        $this->get("/api/v1/vehicle-pdf-exports/{$export->id}/download")
+            ->assertOk()
+            ->assertDownload('historico_QOS6H54_garantias.pdf')
+            ->assertHeader('content-type', 'application/pdf');
     }
 
     public function test_old_sync_get_export_endpoint_is_gone(): void

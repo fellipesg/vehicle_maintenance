@@ -11,13 +11,16 @@
     <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div class="flex items-center gap-6">
             <a href="{{ route($portal['route']) }}" class="flex items-center gap-2 font-bold">
-                <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-automotive-800 text-wrench-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" aria-hidden="true">
-                        <path d="M5 11h1.6l1.1-3.2A1.4 1.4 0 0 1 9.02 7h5.96a1.4 1.4 0 0 1 1.32.8L17.4 11H19a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-1.1a2.4 2.4 0 1 1-4.8 0H9.9a2.4 2.4 0 1 1-4.8 0H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1h1V11Z"/>
-                        <path d="M15.5 3.5 14 5l1.5 1.5L14 8l1.5 1.5L17 8l1.5 1.5L20 8l-1.5-1.5L20 5l-1.5-1.5L17 5l-1.5-1.5Z"/>
-                    </svg>
-                </span>
-                <span class="hidden sm:inline">Vehicle Maintenance</span>
+                <img
+                    src="{{ asset('images/brand/app-icon.png') }}"
+                    alt="RevisaLog"
+                    class="h-9 w-9 shrink-0 sm:hidden"
+                >
+                <img
+                    src="{{ asset('images/brand/lockup-horizontal.png') }}"
+                    alt="RevisaLog"
+                    class="hidden h-9 w-auto sm:block"
+                >
             </a>
 
             @auth

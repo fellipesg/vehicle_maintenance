@@ -22,7 +22,12 @@ class VehicleTimelineBuilder
      */
     public function build(Vehicle $vehicle): array
     {
-        $vehicle->load(['maintenances.items', 'maintenances.workshop', 'maintenances.invoices']);
+        $vehicle->load([
+            'maintenances.items.warranty',
+            'maintenances.generalWarranty',
+            'maintenances.workshop',
+            'maintenances.invoices',
+        ]);
 
         $events = [];
         $currentKm = (int) ($vehicle->current_kilometers ?? 0);
@@ -59,7 +64,15 @@ class VehicleTimelineBuilder
                 'quantity' => $item->quantity,
                 'unit_price' => $item->unit_price !== null ? (float) $item->unit_price : null,
                 'total_price' => $item->total_price !== null ? (float) $item->total_price : null,
+                'has_warranty' => $item->warranty !== null,
+                'warranty_name' => $item->warranty?->name,
+                'warranty_starts_at' => $item->warranty?->starts_at?->toDateString(),
+                'warranty_ends_at' => $item->warranty?->ends_at?->toDateString(),
+                'warranty_period_label' => $item->warrantyPeriodLabel(),
+                'is_under_warranty' => $item->isUnderWarranty(),
             ])->values()->all();
+
+            $generalWarranty = $maintenance->generalWarranty;
 
             $events[] = [
                 'type' => 'maintenance',
@@ -67,6 +80,13 @@ class VehicleTimelineBuilder
                 'label' => $maintenance->maintenance_type,
                 'description' => $maintenance->description,
                 'workshop_name' => $maintenance->displayWorkshopName(),
+                'workshop_logo_url' => $maintenance->workshop?->logoUrl(),
+                'general_warranty' => $generalWarranty !== null ? [
+                    'name' => $generalWarranty->name,
+                    'ends_at' => $generalWarranty->ends_at?->toDateString(),
+                    'is_vigente' => $generalWarranty->isVigente(),
+                    'label' => $generalWarranty->label(),
+                ] : null,
                 'service_category' => $maintenance->service_category,
                 'date' => $maintenance->maintenance_date->toDateString(),
                 'kilometers' => (int) $maintenance->kilometers,
@@ -78,7 +98,15 @@ class VehicleTimelineBuilder
             ];
         }
 
-        usort($events, fn (array $a, array $b) => ((int) ($a['kilometers'] ?? 0)) <=> ((int) ($b['kilometers'] ?? 0)));
+        usort($events, function (array $a, array $b): int {
+            $kmComparison = ((int) ($a['kilometers'] ?? 0)) <=> ((int) ($b['kilometers'] ?? 0));
+
+            if ($kmComparison !== 0) {
+                return $kmComparison;
+            }
+
+            return strcmp((string) ($a['date'] ?? ''), (string) ($b['date'] ?? ''));
+        });
 
         $this->markCurrentEvent($events, $currentKm);
 
@@ -94,6 +122,7 @@ class VehicleTimelineBuilder
 
         $reminder = $this->reminders->summarize($vehicle);
         $usage = $this->mileageStats->approximateAnnualKilometers($vehicle);
+        $trackProgress = $this->resolveTrackProgress($events, $currentKm);
 
         return [
             'vehicle' => [
@@ -119,6 +148,9 @@ class VehicleTimelineBuilder
                 'next_due_kilometers' => $reminder['next_due_kilometers'],
                 'kilometers_remaining' => $reminder['kilometers_remaining'],
                 'progress_percent' => $reminder['progress_percent'],
+                'odometer_progress_percent' => $this->resolveOdometerProgressPercent($currentKm, $reminder),
+                'track_progress_percent' => $trackProgress['percent'],
+                'track_current_index' => $trackProgress['current_index'],
                 'is_overdue' => $reminder['is_overdue'],
                 'approximate_annual_kilometers' => $usage['approximate_annual_kilometers'] ?? null,
                 'usage_is_approximate' => $usage !== null,
@@ -169,6 +201,7 @@ class VehicleTimelineBuilder
     {
         $bestIndex = null;
         $bestKm = -1;
+        $bestDate = '';
 
         foreach ($events as $index => $event) {
             if (($event['type'] ?? '') === 'upcoming') {
@@ -176,8 +209,15 @@ class VehicleTimelineBuilder
             }
 
             $km = (int) ($event['kilometers'] ?? -1);
-            if ($km <= $currentKm && $km >= $bestKm) {
+            $date = (string) ($event['date'] ?? '');
+
+            if ($km > $currentKm) {
+                continue;
+            }
+
+            if ($km > $bestKm || ($km === $bestKm && $date >= $bestDate)) {
                 $bestKm = $km;
+                $bestDate = $date;
                 $bestIndex = $index;
             }
         }
@@ -185,5 +225,78 @@ class VehicleTimelineBuilder
         if ($bestIndex !== null) {
             $events[$bestIndex]['is_current'] = true;
         }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $events
+     * @return array{percent: float, current_index: int}
+     */
+    private function resolveTrackProgress(array $events, int $currentKm): array
+    {
+        $eventCount = count($events);
+
+        if ($eventCount <= 1) {
+            return ['percent' => 0.0, 'current_index' => 0];
+        }
+
+        $currentIndex = null;
+        $lastMaintenanceIndex = 0;
+        $lastMaintenanceKm = 0;
+        $upcomingIndex = null;
+        $upcomingKm = null;
+
+        foreach ($events as $index => $event) {
+            if (($event['type'] ?? '') === 'upcoming') {
+                $upcomingIndex = $index;
+                $upcomingKm = (int) ($event['kilometers'] ?? 0);
+
+                continue;
+            }
+
+            $lastMaintenanceIndex = $index;
+            $lastMaintenanceKm = (int) ($event['kilometers'] ?? 0);
+
+            if (($event['is_current'] ?? false) && ($event['type'] ?? '') !== 'upcoming') {
+                $currentIndex = $index;
+            }
+        }
+
+        $currentIndex ??= $lastMaintenanceIndex;
+        $progressIndex = (float) $currentIndex;
+
+        if (
+            $upcomingIndex !== null
+            && $upcomingKm !== null
+            && $currentKm > $lastMaintenanceKm
+            && $upcomingKm > $lastMaintenanceKm
+            && $upcomingIndex > $lastMaintenanceIndex
+        ) {
+            $kmFraction = ($currentKm - $lastMaintenanceKm) / ($upcomingKm - $lastMaintenanceKm);
+            $kmFraction = min(1.0, max(0.0, $kmFraction));
+            $progressIndex += $kmFraction * ($upcomingIndex - $lastMaintenanceIndex);
+        }
+
+        return [
+            'percent' => round(min(100, max(0, ($progressIndex / ($eventCount - 1)) * 100)), 1),
+            'current_index' => $currentIndex,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $reminder
+     */
+    private function resolveOdometerProgressPercent(int $currentKm, array $reminder): ?float
+    {
+        $nextDue = $reminder['next_due_kilometers'] ?? null;
+
+        if ($nextDue === null || (int) $nextDue <= 0) {
+            return null;
+        }
+
+        if (($reminder['is_overdue'] ?? false) === true) {
+            return 100.0;
+        }
+
+        return round(min(100, max(0, ($currentKm / (int) $nextDue) * 100)), 1);
     }
 }

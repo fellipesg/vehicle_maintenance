@@ -3,7 +3,8 @@
 use App\Http\Controllers\Api\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/two-factor/challenge', [TwoFactorController::class, 'challenge']);
+Route::post('/two-factor/challenge', [TwoFactorController::class, 'challenge'])
+    ->middleware('throttle:two-factor');
 
 Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('/two-factor/enable', [TwoFactorController::class, 'enable']);

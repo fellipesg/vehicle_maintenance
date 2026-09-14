@@ -12,7 +12,7 @@ class LoginRequest extends ApiFormRequest
         return [
             'email' => 'required|email',
             'password' => 'required|string',
-            'portal' => 'nullable|in:admin,lojista,usuario',
+            'portal' => 'nullable|in:admin,lojista,usuario,oficina',
         ];
     }
 }

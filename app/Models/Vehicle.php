@@ -18,6 +18,7 @@ class Vehicle extends Model
      */
     protected $appends = [
         'cover_photo_url',
+        'cover_photo_portrait_url',
     ];
 
     protected $fillable = [
@@ -32,6 +33,7 @@ class Vehicle extends Model
         'motorization',
         'engine',
         'cover_photo_path',
+        'cover_photo_portrait_path',
         'current_kilometers',
         'odometer_at_registration',
     ];
@@ -53,6 +55,42 @@ class Vehicle extends Model
 
             return AppStorage::coversUrl($this->cover_photo_path);
         });
+    }
+
+    protected function coverPhotoPortraitUrl(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            if ($this->cover_photo_portrait_path === null || $this->cover_photo_portrait_path === '') {
+                return null;
+            }
+
+            return AppStorage::coversUrl($this->cover_photo_portrait_path);
+        });
+    }
+
+    public function coverPathForPdf(): ?string
+    {
+        $landscape = $this->cover_photo_path;
+        if (is_string($landscape) && $landscape !== '') {
+            return $landscape;
+        }
+
+        $portrait = $this->cover_photo_portrait_path;
+        if (is_string($portrait) && $portrait !== '') {
+            return $portrait;
+        }
+
+        return null;
+    }
+
+    public function hasLandscapeCover(): bool
+    {
+        return is_string($this->cover_photo_path) && $this->cover_photo_path !== '';
+    }
+
+    public function hasPortraitCover(): bool
+    {
+        return is_string($this->cover_photo_portrait_path) && $this->cover_photo_portrait_path !== '';
     }
 
     /**

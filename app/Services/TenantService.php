@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Garage;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\Workshop;
 
 class TenantService
 {
@@ -34,6 +35,22 @@ class TenantService
                 'name' => $user->name,
                 'phone' => $user->phone,
                 'email' => $user->email,
+            ]);
+        }
+
+        if ($type === 'workshop') {
+            Workshop::create([
+                'tenant_id' => $tenant->id,
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'phone' => $user->phone ?: '11999999999',
+                'email' => $user->email,
+                'cep' => '86010000',
+                'street' => 'Rua Demonstração',
+                'number' => '100',
+                'neighborhood' => 'Centro',
+                'city' => 'Londrina',
+                'state' => 'PR',
             ]);
         }
 

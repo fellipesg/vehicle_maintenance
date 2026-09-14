@@ -29,7 +29,7 @@
         @if($vehicle)
             <div class="mt-8">
                 <div class="card mb-6 !p-0 overflow-hidden">
-                    <x-vehicle-cover :vehicle="$vehicle" variant="card" />
+                    <x-vehicle-cover :vehicle="$vehicle" variant="card" class="aspect-[21/9] w-full max-h-72" />
                     <div class="flex flex-wrap items-start justify-between gap-4 p-6">
                         <div>
                             <h2 class="text-2xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
@@ -58,6 +58,13 @@
                                 @if($maintenance->workshop_name)<p>🔧 {{ $maintenance->workshop_name }}</p>@endif
                             </div>
                         </div>
+                        @if($maintenance->relationLoaded('photos') && $maintenance->photos->isNotEmpty())
+                            <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                @foreach($maintenance->photos as $photo)
+                                    <img src="{{ $photo->url }}" alt="Depois do serviço" class="h-20 w-full rounded-lg object-cover">
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                 @empty
                     <div class="card text-center text-automotive-500">Nenhuma manutenção registrada para este veículo.</div>

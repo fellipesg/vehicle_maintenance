@@ -4,24 +4,31 @@
 ])
 
 @php
-    $url = $vehicle->cover_photo_url;
+    $landscapeUrl = $vehicle->cover_photo_url;
+    $portraitUrl = $vehicle->cover_photo_portrait_url ?? $landscapeUrl;
+    $landscapeUrl = $landscapeUrl ?? $portraitUrl;
+    $displayUrl = $portraitUrl ?? $landscapeUrl;
     $alt = 'Capa do '.$vehicle->brand.' '.$vehicle->model;
     $isThumb = $variant === 'thumb';
     $frame = match ($variant) {
-        'hero' => 'flex w-full justify-center overflow-hidden rounded-xl bg-automotive-100',
-        'card' => 'flex w-full justify-center overflow-hidden bg-automotive-100',
-        default => 'h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-automotive-100',
+        'hero' => 'relative w-full overflow-hidden rounded-xl bg-automotive-100',
+        'card' => 'relative w-full overflow-hidden bg-automotive-100',
+        default => 'relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-automotive-100',
     };
-    $image = match ($variant) {
-        'hero' => 'h-auto max-h-[36rem] w-auto max-w-full object-contain',
-        'card' => 'h-auto max-h-96 w-auto max-w-full object-contain',
-        default => 'h-full w-full object-cover',
-    };
+    $imageClass = 'absolute inset-0 h-full w-full object-cover object-center';
+    $pictureClass = 'absolute inset-0 block h-full w-full';
 @endphp
 
 <div {{ $attributes->merge(['class' => $frame]) }}>
-    @if ($url)
-        <img src="{{ $url }}" alt="{{ $alt }}" class="{{ $image }}">
+    @if ($displayUrl)
+        @if ($isThumb || ! $landscapeUrl || $landscapeUrl === $portraitUrl)
+            <img src="{{ $displayUrl }}" alt="{{ $alt }}" class="{{ $imageClass }}">
+        @else
+            <picture class="{{ $pictureClass }}">
+                <source media="(min-width: 768px)" srcset="{{ $landscapeUrl }}">
+                <img src="{{ $portraitUrl ?? $landscapeUrl }}" alt="{{ $alt }}" class="{{ $imageClass }}">
+            </picture>
+        @endif
     @else
         <div class="flex h-full min-h-24 w-full items-center justify-center text-automotive-400 {{ $isThumb ? '' : 'py-12' }}" aria-hidden="true">
             <svg class="h-1/2 w-1/2 max-h-10 max-w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">

@@ -92,4 +92,20 @@ class VehicleCoverImageResolverTest extends TestCase
 
         $this->assertStringContainsString('Mercedes-Benz_C_200_%28W205%2C_2019%29', (string) $url);
     }
+
+    public function test_uses_curated_url_for_2018_c180_demo(): void
+    {
+        Http::fake();
+
+        $vehicle = Vehicle::factory()->create([
+            'brand' => 'Mercedes-Benz',
+            'model' => 'C 180',
+            'year' => 2018,
+        ]);
+
+        $url = app(VehicleCoverImageResolver::class)->resolveDownloadUrl($vehicle);
+
+        $this->assertStringContainsString('Mercedes-Benz_C180_AVANTGARDE_(W205)_front', (string) $url);
+        Http::assertNothingSent();
+    }
 }

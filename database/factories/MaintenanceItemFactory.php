@@ -28,10 +28,10 @@ class MaintenanceItemFactory extends Factory
             'Bateria',
             'Correia Dentada',
         ];
-        
+
         $quantity = $this->faker->numberBetween(1, 4);
         $unitPrice = $this->faker->randomFloat(2, 10, 500);
-        
+
         return [
             'maintenance_id' => \App\Models\Maintenance::factory(),
             'name' => $this->faker->randomElement($items),
@@ -40,6 +40,22 @@ class MaintenanceItemFactory extends Factory
             'unit_price' => $unitPrice,
             'total_price' => $quantity * $unitPrice,
             'part_number' => $this->faker->optional()->bothify('???-####'),
+            'has_warranty' => false,
+            'warranty_starts_at' => null,
+            'warranty_ends_at' => null,
         ];
+    }
+
+    public function withWarranty(): static
+    {
+        return $this->state(function (array $attributes) {
+            $startsAt = now()->subDays(10);
+
+            return [
+                'has_warranty' => true,
+                'warranty_starts_at' => $startsAt,
+                'warranty_ends_at' => $startsAt->copy()->addYear(),
+            ];
+        });
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Maintenance;
 use App\Models\Vehicle;
 use App\Models\Workshop;
 use App\Rules\InvoiceFile;
+use App\Rules\RequiresInvoiceWhenWorkshopAssigned;
 use App\Services\Vehicle\VehicleMileageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,7 +47,14 @@ class MaintenanceController extends Controller
             'kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
             'service_category' => ['required', 'in:mechanical,electrical,suspension,painting,finishing,interior,other'],
             'is_manufacturer_required' => ['nullable', 'boolean'],
-            'invoices' => ['nullable', 'array'],
+            'invoices' => [
+                'required_with:workshop_id',
+                'nullable',
+                'array',
+                new RequiresInvoiceWhenWorkshopAssigned(
+                    workshopId: $request->filled('workshop_id') ? (int) $request->input('workshop_id') : null,
+                ),
+            ],
             'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
         ], [
             'invoices.*.uploaded' => 'Falha ao enviar o arquivo. Verifique se o PDF ou XML não está corrompido e se o tamanho está dentro do limite do servidor.',
@@ -91,7 +99,7 @@ class MaintenanceController extends Controller
 
     public function show(Maintenance $maintenance): View
     {
-        $maintenance->load(['vehicle', 'items', 'invoices', 'checklists', 'workshop']);
+        $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'photos']);
 
         return view('user.maintenances.show', compact('maintenance'));
     }

@@ -1,5 +1,45 @@
 <?php
 
+/**
+ * @return list<string>
+ */
+if (! function_exists('cors_allowed_origins')) {
+    function cors_allowed_origins(): array
+    {
+        $raw = env('CORS_ALLOWED_ORIGINS');
+
+        if (is_string($raw) && trim($raw) !== '') {
+            return array_values(array_filter(array_map('trim', explode(',', $raw))));
+        }
+
+        if (env('APP_ENV') === 'production') {
+            $appUrl = rtrim((string) env('APP_URL', ''), '/');
+
+            return $appUrl !== '' ? [$appUrl] : [];
+        }
+
+        return ['*'];
+    }
+}
+
+/**
+ * @return list<string>
+ */
+if (! function_exists('cors_allowed_origin_patterns')) {
+    function cors_allowed_origin_patterns(): array
+    {
+        $raw = env('CORS_ALLOWED_ORIGIN_PATTERNS');
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return env('APP_ENV') === 'production'
+                ? ['#^https://[a-z0-9-]+\.laravel\.cloud$#']
+                : [];
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', $raw))));
+    }
+}
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -18,10 +58,9 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'], // Permite todas as origens (desenvolvimento)
-    // Para produção, especifique: ['https://seu-dominio.com']
+    'allowed_origins' => cors_allowed_origins(),
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => cors_allowed_origin_patterns(),
 
     'allowed_headers' => ['*'],
 
@@ -29,5 +68,5 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true,
+    'supports_credentials' => ! in_array('*', cors_allowed_origins(), true),
 ];

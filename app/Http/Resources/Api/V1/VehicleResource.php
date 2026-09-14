@@ -27,6 +27,7 @@ class VehicleResource extends JsonResource
             'current_kilometers' => $this->current_kilometers,
             'odometer_at_registration' => $this->odometer_at_registration,
             'cover_photo_url' => $this->cover_photo_url,
+            'cover_photo_portrait_url' => $this->cover_photo_portrait_url,
             'maintenances_count' => $this->when(isset($this->maintenances_count), $this->maintenances_count),
             'maintenances' => MaintenanceResource::collection($this->whenLoaded('maintenances')),
             'created_at' => $this->created_at?->toIso8601String(),

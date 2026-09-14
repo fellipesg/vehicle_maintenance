@@ -1,4 +1,5 @@
 import apiClient from './api/client';
+import { mountVehicleTimeline, renderVehicleTimeline } from './vehicle-timeline-portal';
 
 const categories = {
     mechanical: 'Mecânica',
@@ -36,13 +37,33 @@ function formatKm(value) {
     return `${Number(value).toLocaleString('pt-BR')} km`;
 }
 
-function vehicleCoverHtml(vehicle) {
-    const url = vehicle.cover_photo_url;
-    if (url) {
-        return `<img src="${escapeHtml(url)}" alt="" class="h-full w-full object-cover">`;
+function vehicleCoverHtml(vehicle, options = {}) {
+    const variant = typeof options === 'string' ? options : (options.variant ?? 'default');
+    const fill = typeof options === 'string' ? false : (options.fill ?? variant !== 'thumb');
+    const landscape = vehicle.cover_photo_url;
+    const portrait = vehicle.cover_photo_portrait_url || landscape;
+    const fallbackLandscape = landscape || portrait;
+    const imgClass = fill
+        ? 'absolute inset-0 h-full w-full object-cover object-center'
+        : 'h-full w-full object-cover object-center';
+    const pictureClass = fill ? 'absolute inset-0 block h-full w-full' : 'block h-full w-full';
+
+    if (!fallbackLandscape) {
+        const placeholderClass = fill
+            ? 'absolute inset-0 flex items-center justify-center bg-automotive-100 text-3xl'
+            : 'flex h-full w-full items-center justify-center bg-automotive-100 text-3xl';
+
+        return `<div class="${placeholderClass}">🚗</div>`;
     }
 
-    return '<div class="flex h-full w-full items-center justify-center bg-automotive-100 text-3xl">🚗</div>';
+    if (variant === 'thumb' || !landscape || landscape === portrait) {
+        return `<img src="${escapeHtml(portrait || fallbackLandscape)}" alt="" class="${imgClass}">`;
+    }
+
+    return `<picture class="${pictureClass}">
+        <source media="(min-width: 768px)" srcset="${escapeHtml(fallbackLandscape)}">
+        <img src="${escapeHtml(portrait || fallbackLandscape)}" alt="" class="${imgClass}">
+    </picture>`;
 }
 
 async function loadDashboard() {
@@ -124,7 +145,7 @@ async function loadVehiclesIndex() {
             ? '<div class="card col-span-full text-center"><p class="text-automotive-500">Nenhum veículo cadastrado ainda.</p></div>'
             : vehicles.map((vehicle) => `
                 <div class="card !p-0 overflow-hidden">
-                    <div class="aspect-video overflow-hidden">${vehicleCoverHtml(vehicle)}</div>
+                    <div class="relative aspect-video overflow-hidden max-md:aspect-[9/16] max-md:max-h-64">${vehicleCoverHtml(vehicle, { fill: true })}</div>
                     <div class="p-6">
                         <div class="mb-3 flex items-start justify-between gap-3">
                             <div>
@@ -143,19 +164,17 @@ async function loadVehiclesIndex() {
             `).join('');
     } catch (error) {
         console.error('Failed to load vehicles', error);
+        if (grid) {
+            grid.innerHTML = '<div class="card col-span-full text-center text-red-600">Não foi possível carregar os veículos. Recarregue a página ou faça login novamente.</div>';
+        }
     }
 }
 
-function triggerBrowserDownload(blob, filename) {
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = filename || 'historico_manutencoes.pdf';
-    anchor.style.display = 'none';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(objectUrl);
+function pdfDownloadFilename(name) {
+    const fallback = 'historico_manutencoes.pdf';
+    const raw = String(name || fallback).trim() || fallback;
+
+    return raw.toLowerCase().endsWith('.pdf') ? raw : `${raw}.pdf`;
 }
 
 async function pollPdfExport(exportId, button) {
@@ -168,16 +187,18 @@ async function pollPdfExport(exportId, button) {
         const data = response.data.data ?? {};
 
         if (data.status === 'completed') {
-            const downloadResponse = await apiClient.downloadVehiclePdfExport(exportId);
-            const filename = data.filename || 'historico_manutencoes.pdf';
-            triggerBrowserDownload(
-                new Blob([downloadResponse.data], { type: 'application/pdf' }),
-                filename,
-            );
+            const filename = pdfDownloadFilename(data.filename);
+            const portalUrl = data.download_portal_url
+                || `/usuario/exportacoes-pdf/${exportId}/${encodeURIComponent(filename)}`;
 
             if (button) {
-                button.disabled = false;
-                button.textContent = '📄 Exportar PDF';
+                const link = document.createElement('a');
+                // Last path segment MUST be *.pdf. Do not set the download attribute:
+                // Chromium then fetches as blob: and the download shelf shows a UUID.
+                link.href = portalUrl;
+                link.className = button.className || 'btn-secondary';
+                link.textContent = 'Baixar PDF';
+                button.replaceWith(link);
             }
 
             return;
@@ -204,20 +225,29 @@ async function loadVehicleShow() {
     const exportButton = root.querySelector('[data-export-pdf]');
 
     try {
-        const [vehicleRes, maintenancesRes, timelineRes] = await Promise.all([
+        const [vehicleRes, timelineRes] = await Promise.all([
             apiClient.getVehicle(vehicleId),
-            apiClient.getVehicleMaintenances(vehicleId, { per_page: 50 }),
             apiClient.getVehicleTimeline(vehicleId),
         ]);
 
         const vehicle = vehicleRes.data.data;
-        const maintenances = maintenancesRes.data.data ?? [];
         const timeline = timelineRes.data.data ?? {};
+        const maintenances = (timeline.events ?? [])
+            .filter((event) => event.type === 'maintenance')
+            .sort((left, right) => (right.date ?? '').localeCompare(left.date ?? ''))
+            .map((event) => ({
+                id: event.id,
+                maintenance_type: event.label,
+                kilometers: event.kilometers,
+                maintenance_date: event.date,
+                workshop_name: event.workshop_name,
+                service_category: event.service_category,
+            }));
 
         if (content) {
             content.innerHTML = `
-                <div class="mb-6 overflow-hidden rounded-xl border border-automotive-200">
-                    <div class="aspect-[21/9] max-h-72">${vehicleCoverHtml(vehicle)}</div>
+                <div class="relative mb-6 w-full overflow-hidden rounded-xl border border-automotive-200 aspect-[9/16] max-h-80 md:aspect-[21/9] md:max-h-72">
+                    ${vehicleCoverHtml(vehicle, { fill: true })}
                 </div>
                 <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -236,6 +266,7 @@ async function loadVehicleShow() {
                     <div class="stat-card"><p class="text-sm text-automotive-600">Quilometragem atual</p><p class="text-2xl font-bold">${formatKm(vehicle.current_kilometers)}</p></div>
                     <div class="stat-card"><p class="text-sm text-automotive-600">Manutenções</p><p class="text-2xl font-bold">${maintenances.length}</p></div>
                 </div>
+                ${renderVehicleTimeline(timeline)}
                 <h2 class="mb-4 text-xl font-semibold">🔧 Histórico de Manutenções</h2>
                 <div class="space-y-3">
                     ${maintenances.length === 0
@@ -257,6 +288,8 @@ async function loadVehicleShow() {
                         `).join('')}
                 </div>
             `;
+
+            mountVehicleTimeline(content, timeline);
         }
 
         const newExportButton = root.querySelector('[data-export-pdf]');

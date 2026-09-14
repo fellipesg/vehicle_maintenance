@@ -123,7 +123,7 @@ class AuthController extends Controller
 
     private function portalIsValid(string $portal): bool
     {
-        return in_array($portal, ['admin', 'lojista', 'usuario'], true);
+        return in_array($portal, ['admin', 'lojista', 'usuario', 'oficina'], true);
     }
 
     /**
@@ -146,6 +146,13 @@ class AuthController extends Controller
                 'accent' => 'emerald',
                 'register' => true,
             ],
+            'oficina' => [
+                'title' => 'Área da Oficina',
+                'subtitle' => 'Gerencie serviços e o perfil da sua oficina',
+                'icon' => '🔧',
+                'accent' => 'wrench',
+                'register' => false,
+            ],
             default => [
                 'title' => 'Área do Proprietário',
                 'subtitle' => 'Histórico de veículos e manutenções',
@@ -162,6 +169,7 @@ class AuthController extends Controller
             'admin' => $user->isAdmin(),
             'lojista' => $user->isGarage(),
             'usuario' => $user->isUser(),
+            'oficina' => $user->isWorkshop(),
             default => false,
         };
     }
@@ -171,6 +179,7 @@ class AuthController extends Controller
         return match ($portal) {
             'admin' => route('admin.dashboard'),
             'lojista' => route('garage.dashboard'),
+            'oficina' => route('workshop.dashboard'),
             default => route('user.dashboard'),
         };
     }

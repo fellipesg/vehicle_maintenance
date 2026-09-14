@@ -8,6 +8,7 @@ use App\Http\Requests\Api\V1\StoreWorkshopRequest;
 use App\Http\Requests\Api\V1\UpdateWorkshopRequest;
 use App\Http\Resources\Api\V1\WorkshopResource;
 use App\Models\Workshop;
+use App\Services\Workshop\WorkshopLogoService;
 use App\Support\ApiResponse;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
@@ -20,6 +21,10 @@ use Illuminate\Support\Facades\Gate;
 class WorkshopController extends Controller
 {
     use ResolvesPagination;
+
+    public function __construct(
+        private WorkshopLogoService $logos,
+    ) {}
 
     #[QueryParameter('search', 'Filter by workshop name, city, or neighborhood.')]
     #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
@@ -65,6 +70,11 @@ class WorkshopController extends Controller
             'state' => strtoupper($request->state),
         ]);
 
+        if ($request->hasFile('logo')) {
+            $this->logos->store($workshop, $request->file('logo'));
+            $workshop->refresh();
+        }
+
         return ApiResponse::created(new WorkshopResource($workshop), 'Workshop created successfully');
     }
 
@@ -98,6 +108,10 @@ class WorkshopController extends Controller
         }
 
         $workshop->update($data);
+
+        if ($request->hasFile('logo')) {
+            $this->logos->store($workshop, $request->file('logo'));
+        }
 
         return ApiResponse::success(new WorkshopResource($workshop->fresh()), 'Workshop updated successfully');
     }

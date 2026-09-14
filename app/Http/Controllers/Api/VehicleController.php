@@ -104,8 +104,7 @@ class VehicleController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $vehicle = Vehicle::with(['maintenances.items', 'maintenances.invoices', 'maintenances.checklists'])
-            ->findOrFail($id);
+        $vehicle = Vehicle::withCount('maintenances')->findOrFail($id);
 
         Gate::authorize('view', $vehicle);
 
@@ -154,7 +153,12 @@ class VehicleController extends Controller
         $vehicle = Vehicle::where('license_plate', $identifier)
             ->orWhere('renavam', $identifier)
             ->with(['maintenances' => function ($query) {
-                $query->orderBy('maintenance_date', 'desc');
+                $query->orderBy('maintenance_date', 'desc')
+                    ->with(['photos' => fn ($photos) => $photos
+                        ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
+                        ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
+                        ->orderBy('sort'),
+                    ]);
             }, 'maintenances.workshop'])
             ->first();
 
@@ -173,7 +177,7 @@ class VehicleController extends Controller
         Gate::authorize('viewMaintenances', $vehicle);
 
         $maintenances = $vehicle->maintenances()
-            ->with(['items', 'invoices', 'checklists', 'user', 'workshop'])
+            ->with(['items.warranty', 'generalWarranty', 'invoices', 'checklists', 'user', 'workshop'])
             ->orderBy('maintenance_date', 'desc')
             ->paginate($this->perPage($request));
 
@@ -249,13 +253,20 @@ class VehicleController extends Controller
 
     #[Endpoint(
         title: 'Upload vehicle cover',
-        description: 'Multipart form upload. Field name: `cover` (image: jpg, jpeg, png, webp; max 5 MB).',
+        description: 'Multipart form upload. Fields: `cover` (landscape 16:9) and/or `cover_portrait` (portrait 9:16). At least one required. Image: jpg, jpeg, png, webp; max 5 MB each.',
     )]
     public function uploadCover(UploadVehicleCoverRequest $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
-        $vehicle = $this->covers->store($vehicle, $request->file('cover'));
 
-        return ApiResponse::success(new VehicleResource($vehicle), 'Cover photo uploaded successfully');
+        if ($request->hasFile('cover')) {
+            $vehicle = $this->covers->storeLandscape($vehicle, $request->file('cover'));
+        }
+
+        if ($request->hasFile('cover_portrait')) {
+            $vehicle = $this->covers->storePortrait($vehicle, $request->file('cover_portrait'));
+        }
+
+        return ApiResponse::success(new VehicleResource($vehicle->fresh()), 'Cover photo uploaded successfully');
     }
 }

@@ -12,7 +12,7 @@ use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 #[Group('Vehicle PDF Exports', weight: 11)]
 class VehiclePdfExportController extends Controller
@@ -40,7 +40,7 @@ class VehiclePdfExportController extends Controller
         title: 'Download vehicle PDF export',
         description: 'Streams the generated PDF with Content-Disposition attachment. Use this URL instead of download_url when you need a forced file download in browsers.',
     )]
-    public function download(Request $request, string $exportId): StreamedResponse|JsonResponse
+    public function download(Request $request, string $exportId): BinaryFileResponse|JsonResponse
     {
         $export = VehiclePdfExport::query()->findOrFail($exportId);
 
@@ -56,10 +56,6 @@ class VehiclePdfExportController extends Controller
             return ApiResponse::error('PDF file not found', 404);
         }
 
-        return AppStorage::disk()->download(
-            $export->file_path,
-            $export->filename ?? 'historico_manutencoes.pdf',
-            ['Content-Type' => 'application/pdf'],
-        );
+        return $this->exports->downloadFileResponse($export);
     }
 }

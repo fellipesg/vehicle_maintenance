@@ -83,7 +83,7 @@
             <p class="text-xs font-semibold uppercase tracking-wide text-automotive-500">Oficina</p>
             <h3 class="mt-1 text-lg font-semibold text-automotive-900">Oficinas</h3>
             <p class="mt-2 text-sm text-automotive-600">Cadastre sua oficina, apareça no diretório e acompanhe os serviços realizados.</p>
-            @guest<a href="{{ route('register') }}" class="btn-secondary mt-4">Cadastrar oficina</a>@endguest
+            @guest<a href="{{ route('login.oficina') }}" class="btn-secondary mt-4">Entrar como oficina</a>@endguest
         </div>
     </div>
 </div>
