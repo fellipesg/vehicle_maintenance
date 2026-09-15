@@ -2,13 +2,6 @@
 
 @section('title', 'Buscar Veículo')
 
-@php
-    $categories = [
-        'mechanical' => 'Mecânica', 'electrical' => 'Elétrica', 'suspension' => 'Suspensão',
-        'painting' => 'Pintura', 'finishing' => 'Acabamento', 'interior' => 'Interior', 'other' => 'Outros',
-    ];
-@endphp
-
 @section('content')
 <div class="mx-auto max-w-7xl px-4 py-8">
     <div class="mb-8 text-center">
@@ -48,37 +41,64 @@
                     </div>
                 </div>
 
-                <h3 class="mb-4 text-xl font-semibold">Histórico de Manutenções ({{ $vehicle->maintenances->count() }})</h3>
+                <x-provenance-strip
+                    :vehicle="$vehicle"
+                    maintenance-path-prefix="#"
+                    :filter-base-url="route('vehicle.search', ['identifier' => $identifier])"
+                    class="mb-6"
+                />
 
-                @forelse($vehicle->maintenances->sortByDesc('maintenance_date') as $maintenance)
-                    <div class="card mb-4">
-                        <div class="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                                <span class="badge badge-orange">{{ $categories[$maintenance->service_category] ?? $maintenance->service_category }}</span>
-                                <h4 class="mt-2 font-semibold">{{ $maintenance->maintenance_type }}</h4>
-                                <p class="text-sm text-automotive-600">{{ $maintenance->description }}</p>
-                            </div>
-                            <div class="text-right text-sm text-automotive-500">
-                                <p>{{ $maintenance->maintenance_date->format('d/m/Y') }}</p>
-                                @if($maintenance->kilometers)<p>{{ number_format($maintenance->kilometers, 0, ',', '.') }} km</p>@endif
-                                @if($maintenance->workshop_name)<p>🔧 {{ $maintenance->workshop_name }}</p>@endif
-                            </div>
-                        </div>
-                        @if($maintenance->relationLoaded('photos') && $maintenance->photos->isNotEmpty())
-                            <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                @foreach($maintenance->photos as $photo)
-                                    <img src="{{ $photo->url }}" alt="Depois do serviço" class="h-20 w-full rounded-lg object-cover">
+                @if ($vehicle->relationLoaded('plates') && $vehicle->plates->count() > 1)
+                    <details class="card mb-6">
+                        <summary class="cursor-pointer font-semibold text-automotive-900">Histórico de placas</summary>
+                        <table class="mt-4 w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-automotive-500">
+                                    <th class="pb-2">Placa</th>
+                                    <th class="pb-2">De</th>
+                                    <th class="pb-2">Até</th>
+                                    <th class="pb-2">Origem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($vehicle->plates as $plateRow)
+                                    <tr class="border-t border-automotive-100">
+                                        <td class="py-2 font-mono">{{ $plateRow->plate }}</td>
+                                        <td class="py-2">{{ $plateRow->started_at?->format('d/m/Y') ?? '—' }}</td>
+                                        <td class="py-2">{{ $plateRow->ended_at?->format('d/m/Y') ?? 'Vigente' }}</td>
+                                        <td class="py-2">{{ \App\Models\VehiclePlate::sourceLabel($plateRow->source) }}</td>
+                                    </tr>
                                 @endforeach
-                            </div>
-                        @endif
-                    </div>
+                            </tbody>
+                        </table>
+                    </details>
+                @endif
+
+                <x-provenance-legend class="mb-4" />
+
+                <h3 class="mb-4 text-xl font-semibold">Histórico de manutenções ({{ $vehicle->maintenances->count() }})</h3>
+
+                @php
+                    $verifiedFilter = request()->query('verified');
+                    $filtered = $vehicle->maintenances;
+                    if ($verifiedFilter === '1') {
+                        $filtered = $filtered->filter(fn ($m) => $m->isVerified());
+                    } elseif ($verifiedFilter === '0') {
+                        $filtered = $filtered->filter(fn ($m) => ! $m->isVerified());
+                    }
+                @endphp
+
+                @forelse($filtered as $maintenance)
+                    <x-provenance-card :maintenance="$maintenance" class="mb-4" />
                 @empty
                     <div class="card text-center text-automotive-500">Nenhuma manutenção registrada para este veículo.</div>
                 @endforelse
+
+                <x-provenance-legend class="mt-8" />
             </div>
         @else
             <div class="mx-auto mt-8 max-w-xl rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-center text-yellow-800">
-                Veículo não encontrado para "{{ $identifier }}".
+                Nenhum veículo encontrado para &quot;{{ $identifier }}&quot;.
             </div>
         @endif
     @endif

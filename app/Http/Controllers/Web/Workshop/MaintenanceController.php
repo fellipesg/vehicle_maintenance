@@ -159,7 +159,7 @@ class MaintenanceController extends Controller
     {
         Gate::authorize('view', $maintenance);
 
-        $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'photos', 'workshop']);
+        $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'photos', 'workshop', 'verifiedWorkshop', 'user']);
 
         return view('workshop.maintenances.show', compact('maintenance'));
     }

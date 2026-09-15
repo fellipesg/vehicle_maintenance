@@ -12,11 +12,10 @@
         <a href="{{ route('garage.maintenances.create') }}" class="btn-primary">+ Nova Revisão</a>
     </div>
 
+    <x-provenance-legend class="mb-4" />
+
     @forelse($maintenances as $maintenance)
-        <div class="card mb-3">
-            <p class="font-semibold">{{ $maintenance->maintenance_type }}</p>
-            <p class="text-sm text-automotive-600">{{ $maintenance->vehicle->brand }} {{ $maintenance->vehicle->model }} · {{ $maintenance->vehicle->license_plate }} · {{ $maintenance->maintenance_date->format('d/m/Y') }}</p>
-        </div>
+        <x-provenance-card :maintenance="$maintenance" class="mb-3" />
     @empty
         <div class="card text-center text-automotive-500">Nenhuma revisão registrada.</div>
     @endforelse

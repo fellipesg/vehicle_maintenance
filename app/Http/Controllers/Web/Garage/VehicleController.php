@@ -157,7 +157,15 @@ class VehicleController extends Controller
 
     public function show(Vehicle $vehicle): View
     {
-        $vehicle->load(['maintenances.items', 'maintenances.workshop']);
+        $vehicle->loadCount([
+            'maintenances',
+            'maintenances as verified_maintenances_count' => fn ($query) => $query->whereNotNull('verified_at'),
+        ]);
+        $vehicle->load([
+            'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
+            'provenanceStripMaintenances',
+            'maintenances' => fn ($query) => $query->with(['items', 'workshop', 'verifiedWorkshop', 'user', 'invoices']),
+        ]);
 
         return view('garage.vehicles.show', compact('vehicle'));
     }

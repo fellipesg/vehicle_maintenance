@@ -20,7 +20,7 @@ class MaintenanceController extends Controller
     public function index(Request $request): View
     {
         $maintenances = Maintenance::where('tenant_id', $request->user()->tenant_id)
-            ->with(['vehicle', 'workshop'])
+            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user', 'invoices'])
             ->orderByDesc('maintenance_date')
             ->paginate(15);
 

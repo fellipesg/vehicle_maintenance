@@ -1,4 +1,7 @@
 import apiClient from './api/client';
+import { initProvenanceActions } from './provenance-actions';
+import { renderProvenanceCard, renderProvenanceLegend, renderProvenanceStrip, renderVehicleIdentity } from './provenance-ui';
+import { initVehicleIdentity } from './vehicle-identity';
 import { mountVehicleTimeline, renderVehicleTimeline } from './vehicle-timeline-portal';
 
 const categories = {
@@ -147,12 +150,10 @@ async function loadVehiclesIndex() {
                 <div class="card !p-0 overflow-hidden">
                     <div class="relative aspect-video overflow-hidden max-md:aspect-[9/16] max-md:max-h-64">${vehicleCoverHtml(vehicle, { fill: true })}</div>
                     <div class="p-6">
-                        <div class="mb-3 flex items-start justify-between gap-3">
-                            <div>
-                                <h2 class="text-lg font-semibold">${escapeHtml(vehicle.brand)} ${escapeHtml(vehicle.model)}</h2>
-                                <p class="text-sm text-automotive-600">${escapeHtml(vehicle.year)} · ${escapeHtml(vehicle.color ?? '—')}</p>
-                            </div>
-                            <span class="badge badge-blue">${escapeHtml(vehicle.license_plate)}</span>
+                        <div class="mb-3">
+                            <h2 class="text-lg font-semibold">${escapeHtml(vehicle.brand)} ${escapeHtml(vehicle.model)}</h2>
+                            <p class="text-sm text-automotive-600">${escapeHtml(vehicle.year)} · ${escapeHtml(vehicle.color ?? '—')}</p>
+                            <div class="mt-2">${renderVehicleIdentity(vehicle, { editUrl: `/usuario/veiculos/${vehicle.id}/editar` })}</div>
                         </div>
                         <p class="mb-4 text-sm text-automotive-500">${escapeHtml(vehicle.maintenances_count ?? 0)} manutenções registradas</p>
                         <div class="flex gap-2">
@@ -242,7 +243,16 @@ async function loadVehicleShow() {
                 maintenance_date: event.date,
                 workshop_name: event.workshop_name,
                 service_category: event.service_category,
+                is_verified: event.is_verified,
+                registered_by_type: event.registered_by_type,
+                provenance_label: event.provenance_label,
+                provenance_card_label: event.provenance_label,
+                provenance_meta: event.is_verified ? 'verificada' : 'não verificada',
             }));
+
+        const plateRows = (vehicle.plate_history ?? [])
+            .map((row) => `<tr class="border-t border-automotive-100"><td class="py-2 font-mono">${escapeHtml(row.plate)}</td><td class="py-2">${formatDate(row.started_at)}</td><td class="py-2">${row.ended_at ? formatDate(row.ended_at) : 'Vigente'}</td><td class="py-2">${escapeHtml(row.source)}</td></tr>`)
+            .join('');
 
         if (content) {
             content.innerHTML = `
@@ -250,9 +260,10 @@ async function loadVehicleShow() {
                     ${vehicleCoverHtml(vehicle, { fill: true })}
                 </div>
                 <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
-                    <div>
+                    <div class="space-y-3">
                         <h1 class="text-3xl font-bold">${escapeHtml(vehicle.brand)} ${escapeHtml(vehicle.model)}</h1>
-                        <p class="text-automotive-600">${escapeHtml(vehicle.year)} · ${escapeHtml(vehicle.color ?? '—')} · ${escapeHtml(vehicle.license_plate)}</p>
+                        <p class="text-automotive-600">${escapeHtml(vehicle.year)} · ${escapeHtml(vehicle.color ?? '—')}</p>
+                        ${renderVehicleIdentity(vehicle, { size: 'hero', editUrl: `/usuario/veiculos/${vehicle.id}/editar` })}
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" data-export-pdf class="btn-secondary">📄 Exportar PDF</button>
@@ -260,6 +271,8 @@ async function loadVehicleShow() {
                         <a href="/usuario/manutencoes/criar?vehicle_id=${vehicle.id}" class="btn-primary">+ Manutenção</a>
                     </div>
                 </div>
+                ${renderProvenanceStrip(vehicle, { basePath: '/usuario' })}
+                ${plateRows ? `<details class="card mb-6"><summary class="cursor-pointer font-semibold text-automotive-900">Histórico de placas</summary><table class="mt-4 w-full text-sm"><thead><tr class="text-left text-automotive-500"><th>Placa</th><th>De</th><th>Até</th><th>Origem</th></tr></thead><tbody>${plateRows}</tbody></table></details>` : ''}
                 <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div class="stat-card"><p class="text-sm text-automotive-600">RENAVAM</p><p class="font-semibold wrap-anywhere">${escapeHtml(vehicle.renavam)}</p></div>
                     <div class="stat-card"><p class="text-sm text-automotive-600">Chassi</p><p class="font-semibold text-sm wrap-anywhere">${escapeHtml(vehicle.chassis ?? '—')}</p></div>
@@ -271,25 +284,15 @@ async function loadVehicleShow() {
                 <div class="space-y-3">
                     ${maintenances.length === 0
                         ? '<div class="card text-center text-automotive-500">Nenhuma manutenção registrada.</div>'
-                        : maintenances.map((maintenance) => `
-                            <a href="/usuario/manutencoes/${maintenance.id}" class="card block hover:border-wrench-300">
-                                <div class="flex justify-between gap-4">
-                                    <div>
-                                        <span class="badge badge-orange">${escapeHtml(categories[maintenance.service_category] ?? maintenance.service_category)}</span>
-                                        <p class="mt-1 font-semibold">${escapeHtml(maintenance.maintenance_type)}</p>
-                                        <p class="text-sm text-automotive-600">${formatKm(maintenance.kilometers)}</p>
-                                    </div>
-                                    <div class="text-right text-sm text-automotive-500">
-                                        <p>${formatDate(maintenance.maintenance_date)}</p>
-                                        ${maintenance.workshop_name ? `<p>🔧 ${escapeHtml(maintenance.workshop_name)}</p>` : ''}
-                                    </div>
-                                </div>
-                            </a>
-                        `).join('')}
+                        : maintenances.map((maintenance) => renderProvenanceCard(maintenance, {
+                            href: `/usuario/manutencoes/${maintenance.id}`,
+                        })).join('')}
                 </div>
             `;
 
             mountVehicleTimeline(content, timeline);
+            initVehicleIdentity(content);
+            initProvenanceActions(content);
         }
 
         const newExportButton = root.querySelector('[data-export-pdf]');
@@ -331,7 +334,11 @@ async function loadMaintenancesIndex() {
     const list = root.querySelector('[data-maintenances-list]');
 
     try {
-        const response = await apiClient.getMaintenances({ per_page: 15 });
+        const verified = new URLSearchParams(window.location.search).get('verified');
+        const response = await apiClient.getMaintenances({
+            per_page: 15,
+            ...(verified === '1' || verified === '0' ? { verified } : {}),
+        });
         const maintenances = response.data.data ?? [];
 
         if (!list) {
@@ -340,21 +347,9 @@ async function loadMaintenancesIndex() {
 
         list.innerHTML = maintenances.length === 0
             ? '<div class="card text-center text-automotive-500"><p>Nenhuma manutenção registrada.</p></div>'
-            : maintenances.map((maintenance) => `
-                <a href="/usuario/manutencoes/${maintenance.id}" class="card mb-3 block hover:border-wrench-300">
-                    <div class="flex justify-between">
-                        <div>
-                            <span class="badge badge-orange">${escapeHtml(categories[maintenance.service_category] ?? '')}</span>
-                            <p class="mt-1 font-semibold">${escapeHtml(maintenance.maintenance_type)}</p>
-                            <p class="text-sm text-automotive-600">${escapeHtml(maintenance.vehicle?.brand ?? '')} ${escapeHtml(maintenance.vehicle?.model ?? '')} · ${escapeHtml(maintenance.vehicle?.license_plate ?? '')}</p>
-                        </div>
-                        <div class="text-right text-sm text-automotive-500">
-                            <p>${formatDate(maintenance.maintenance_date)}</p>
-                            ${maintenance.workshop_name ? `<p>🔧 ${escapeHtml(maintenance.workshop_name)}</p>` : ''}
-                        </div>
-                    </div>
-                </a>
-            `).join('');
+            : maintenances.map((maintenance) => renderProvenanceCard(maintenance, {
+                href: `/usuario/manutencoes/${maintenance.id}`,
+            })).join('');
     } catch (error) {
         console.error('Failed to load maintenances', error);
     }

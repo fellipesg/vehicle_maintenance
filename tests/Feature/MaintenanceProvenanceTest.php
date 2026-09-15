@@ -68,6 +68,64 @@ class MaintenanceProvenanceTest extends TestCase
         $this->assertFalse($owner->can('update', $maintenance));
     }
 
+    public function test_verified_filter_on_maintenances_index(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 10_000,
+            'odometer_at_registration' => 10_000,
+        ]);
+        $this->attachVehicleToUser($user, $vehicle);
+
+        Maintenance::factory()->sealedByWorkshop()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'kilometers' => 10_000,
+        ]);
+        Maintenance::factory()->declaredByOwner()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'kilometers' => 10_000,
+        ]);
+
+        $this->getJson('/api/v1/maintenances?verified=1')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->getJson('/api/v1/maintenances?verified=0')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+    }
+
+    public function test_vehicle_show_includes_provenance_strip_in_order(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        Maintenance::factory()->declaredByOwner()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'maintenance_date' => '2024-01-01',
+        ]);
+        Maintenance::factory()->sealedByWorkshop()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'maintenance_date' => '2024-06-01',
+        ]);
+
+        $response = $this->getJson("/api/v1/vehicles/{$vehicle->id}");
+        $response->assertOk()
+            ->assertJsonPath('data.verified_maintenances_count', 1)
+            ->assertJsonCount(2, 'data.provenance_strip')
+            ->assertJsonPath('data.provenance_strip.0.is_verified', false)
+            ->assertJsonPath('data.provenance_strip.1.is_verified', true);
+    }
+
     public function test_public_verification_page_returns_200_for_valid_code(): void
     {
         $vehicle = Vehicle::factory()->create(['chassis' => '9BWZZZ377VT004251']);

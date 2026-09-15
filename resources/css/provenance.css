@@ -1,0 +1,104 @@
+/* Design system de procedência — tokens compartilhados com Flutter (provenance.dart) */
+.prov-verified {
+    --prov-ink: #0f766e;
+    --prov-surface: #ffffff;
+}
+
+.prov-declared {
+    --prov-ink: #92400e;
+    --prov-surface: #fffbeb;
+}
+
+.prov-rail {
+    width: 3px;
+    flex-shrink: 0;
+    border-radius: 2px;
+    background-color: var(--prov-ink);
+}
+
+.prov-rail--declared {
+    background: transparent;
+    border-left: 3px dashed var(--prov-ink);
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+}
+
+.prov-marker {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
+.prov-marker--verified {
+    background-color: var(--prov-ink);
+    color: #fff;
+}
+
+.prov-marker--declared {
+    background-color: var(--prov-surface);
+    border: 2px solid var(--prov-ink);
+    color: var(--prov-ink);
+}
+
+.prov-card {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e8edf2;
+}
+
+.prov-card--declared {
+    background-color: var(--prov-surface);
+}
+
+.prov-strip {
+    display: flex;
+    gap: 1px;
+    height: 8px;
+    width: 100%;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.prov-strip-segment {
+    flex: 1 1 0;
+    min-width: 4px;
+    display: block;
+    height: 100%;
+}
+
+.prov-strip-segment--verified {
+    background-color: #0f766e;
+}
+
+.prov-strip-segment--declared {
+    background-color: #fffbeb;
+    background-image: repeating-linear-gradient(
+        45deg,
+        #92400e,
+        #92400e 2px,
+        #fffbeb 2px,
+        #fffbeb 4px
+    );
+}
+
+.prov-seal {
+    border: 1px solid var(--prov-ink);
+    box-shadow: 0 0 0 1px #fff, 0 0 0 2px var(--prov-ink);
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+.prov-seal--declared {
+    border-style: dashed;
+    box-shadow: none;
+}

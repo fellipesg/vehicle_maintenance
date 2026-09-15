@@ -100,7 +100,7 @@ class MaintenanceController extends Controller
 
     public function show(Maintenance $maintenance): View
     {
-        $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'photos']);
+        $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'verifiedWorkshop', 'user', 'photos']);
 
         return view('user.maintenances.show', compact('maintenance'));
     }

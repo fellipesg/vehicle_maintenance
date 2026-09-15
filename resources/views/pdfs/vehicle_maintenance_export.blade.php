@@ -408,9 +408,28 @@
                             </table>
                         </div>
 
-                        @if($vehicle->maintenances->count() > 0)
-                            <p style="margin-top: 16px; font-size: 9pt; color: #666;">
-                                {{ $vehicle->maintenances->count() }} manutenção(ões) registrada(s) — detalhes nas páginas seguintes.
+                        @php
+                            $provenanceStrip = \App\Support\VehicleProvenanceStrip::segmentsForVehicle($vehicle);
+                            $verifiedMaintenanceCount = $vehicle->maintenances->filter(fn ($m) => $m->isVerified())->count();
+                            $totalMaintenanceCount = $vehicle->maintenances->count();
+                        @endphp
+                        @if($totalMaintenanceCount > 0)
+                            <p style="margin-top: 12px; font-size: 9pt; color: #333; font-weight: bold;">
+                                {{ $verifiedMaintenanceCount }} de {{ $totalMaintenanceCount }} manutenções com selo de oficina
+                            </p>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 8px; height: 8px; border-collapse: collapse;">
+                                <tr>
+                                    @foreach($provenanceStrip as $segment)
+                                        <td style="padding: 0; height: 8px; background-color: {{ $segment['is_verified'] ? '#0f766e' : '#fffbeb' }}; border: {{ $segment['is_verified'] ? 'none' : '1px dashed #92400e' }};"></td>
+                                    @endforeach
+                                </tr>
+                            </table>
+                            <p style="margin-top: 6px; font-size: 8pt; color: #666;">
+                                <span style="color:#0f766e;">■</span> Selo da oficina
+                                <span style="margin-left: 12px; color:#92400e;">▨</span> Declarada
+                            </p>
+                            <p style="margin-top: 8px; font-size: 9pt; color: #666;">
+                                {{ $totalMaintenanceCount }} manutenção(ões) registrada(s) — detalhes nas páginas seguintes.
                             </p>
                         @endif
                     </div>
@@ -492,6 +511,40 @@
                 <tbody>
                     <tr>
                         <td>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
+                                <tr>
+                                    <td width="6" valign="top" style="background-color: {{ $maintenance->isVerified() ? '#0f766e' : 'transparent' }}; border-left: {{ $maintenance->isVerified() ? 'none' : '3px dashed #92400e' }};"></td>
+                                    <td style="padding-left: 10px;">
+                                        @if($maintenance->isVerified())
+                                            <table cellpadding="4" cellspacing="0" style="border: 2px double #0f766e; font-size: 8pt;">
+                                                <tr>
+                                                    <td valign="middle">
+                                                        @if(! empty($workshopLogo))
+                                                            <img src="{{ $workshopLogo }}" width="40" height="40" alt="">
+                                                        @endif
+                                                    </td>
+                                                    <td valign="middle">
+                                                        <strong>Selo da oficina</strong><br>
+                                                        {{ $maintenance->verified_at?->format('d/m/Y') }}<br>
+                                                        <span style="font-family: DejaVu Sans Mono, monospace;">{{ $maintenance->verification_code }}</span>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        @else
+                                            <table cellpadding="6" cellspacing="0" width="100%" style="border: 1px dashed #92400e; background: #fffbeb; font-size: 8pt;">
+                                                <tr>
+                                                    <td>
+                                                        {{ $maintenance->provenance_label }} · não verificada
+                                                        @if($maintenance->invoices->count() > 0)
+                                                            · NF anexada ({{ $maintenance->invoices->count() }})
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        @endif
+                                    </td>
+                                </tr>
+                            </table>
                             <table class="os-body-card" cellpadding="0" cellspacing="0">
                                 <tr>
                                     <td>
@@ -613,6 +666,7 @@
     @endif
 
     <div class="doc-footer">
+        <p>Valide qualquer selo em revisalog.com.br/v/{código}</p>
         <p>Relatório gerado automaticamente pela Revisalog (revisalog.com.br)</p>
     </div>
 </body>

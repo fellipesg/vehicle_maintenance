@@ -24,17 +24,26 @@ class PublicVehicleController extends Controller
                 $matchedBy = $lookup->matchedBy;
                 $previousPlateEndedAt = $lookup->previousPlateEndedAt;
 
+                $vehicle->loadCount([
+                    'maintenances',
+                    'maintenances as verified_maintenances_count' => fn ($query) => $query->whereNotNull('verified_at'),
+                ]);
                 $vehicle->load([
+                    'provenanceStripMaintenances',
                     'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
-                    'maintenances' => fn ($query) => $query->with([
-                        'items',
-                        'invoices',
-                        'workshop',
-                        'photos' => fn ($photos) => $photos
-                            ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
-                            ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
-                            ->orderBy('sort'),
-                    ]),
+                    'maintenances' => fn ($query) => $query
+                        ->with([
+                            'items',
+                            'invoices',
+                            'workshop',
+                            'verifiedWorkshop',
+                            'user',
+                            'photos' => fn ($photos) => $photos
+                                ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
+                                ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
+                                ->orderBy('sort'),
+                        ])
+                        ->orderByDesc('maintenance_date'),
                 ]);
             }
         }

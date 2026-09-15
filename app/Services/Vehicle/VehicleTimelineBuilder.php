@@ -95,6 +95,9 @@ class VehicleTimelineBuilder
                 'has_invoice' => $maintenance->invoices->isNotEmpty(),
                 'items' => $items,
                 'is_current' => false,
+                'is_verified' => $maintenance->isVerified(),
+                'registered_by_type' => $maintenance->registered_by_type,
+                'provenance_label' => $maintenance->provenance_label,
             ];
         }
 

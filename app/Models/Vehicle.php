@@ -137,6 +137,14 @@ class Vehicle extends Model
         return $this->hasOne(VehiclePlate::class)->whereNull('ended_at')->latestOfMany();
     }
 
+    public function provenanceStripMaintenances(): HasMany
+    {
+        return $this->hasMany(Maintenance::class)
+            ->select(['id', 'vehicle_id', 'maintenance_date', 'verified_at', 'maintenance_type', 'registered_by_type'])
+            ->orderBy('maintenance_date')
+            ->orderBy('id');
+    }
+
     public function owners(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_vehicles')

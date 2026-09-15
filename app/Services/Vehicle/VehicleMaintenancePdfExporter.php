@@ -46,6 +46,7 @@ class VehicleMaintenancePdfExporter
             'maintenances.checklists',
             'maintenances.user',
             'maintenances.workshop',
+            'maintenances.verifiedWorkshop',
             'maintenances.photos' => fn ($query) => $query
                 ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
                 ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
@@ -69,7 +70,8 @@ class VehicleMaintenancePdfExporter
                     continue;
                 }
 
-                $logoPath = $maintenance->workshop?->logo_path;
+                $logoPath = $maintenance->verifiedWorkshop?->logo_path
+                    ?? $maintenance->workshop?->logo_path;
                 if (! is_string($logoPath) || $logoPath === '') {
                     continue;
                 }

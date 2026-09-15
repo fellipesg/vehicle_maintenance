@@ -55,6 +55,41 @@ class Maintenance extends Model
         return $this->isVerified() ? 'verificada' : 'não verificada';
     }
 
+    public function getProvenanceCardLabelAttribute(): string
+    {
+        if ($this->registered_by_type === 'workshop') {
+            $name = $this->verifiedWorkshop?->name
+                ?? $this->workshop?->name
+                ?? $this->workshop_name
+                ?? 'Oficina';
+
+            return 'Selo da oficina · '.$name;
+        }
+
+        return $this->provenance_label;
+    }
+
+    public function getProvenanceMetaAttribute(): string
+    {
+        if ($this->isVerified()) {
+            $date = $this->verified_at?->format('d/m/Y') ?? '';
+            $code = $this->verification_code ?? '';
+
+            return trim("verificada em {$date} · {$code}");
+        }
+
+        $meta = 'não verificada';
+        $invoiceCount = $this->relationLoaded('invoices')
+            ? $this->invoices->count()
+            : $this->invoices()->count();
+
+        if ($invoiceCount > 0) {
+            $meta .= ' · NF anexada ('.$invoiceCount.')';
+        }
+
+        return $meta;
+    }
+
     public function verifiedWorkshop(): BelongsTo
     {
         return $this->belongsTo(Workshop::class, 'verified_workshop_id');

@@ -65,7 +65,10 @@ class VehicleController extends Controller
         Gate::authorize('viewAny', Vehicle::class);
 
         $vehicles = $request->user()->currentVehicles()
-            ->withCount('maintenances')
+            ->withCount([
+                'maintenances',
+                'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+            ])
             ->when($request->search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('license_plate', 'like', "%{$search}%")
@@ -108,8 +111,14 @@ class VehicleController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $vehicle = Vehicle::withCount('maintenances')
-            ->with(['plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at')])
+        $vehicle = Vehicle::withCount([
+            'maintenances',
+            'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+        ])
+            ->with([
+                'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
+                'provenanceStripMaintenances',
+            ])
             ->findOrFail($id);
 
         Gate::authorize('view', $vehicle);
@@ -182,8 +191,13 @@ class VehicleController extends Controller
         }
 
         $vehicle = $lookup->vehicle;
+        $vehicle->loadCount([
+            'maintenances',
+            'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+        ]);
         $vehicle->load([
             'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
+            'provenanceStripMaintenances',
             'maintenances' => function ($query) {
                 $query->orderBy('maintenance_date', 'desc')
                     ->with(['photos' => fn ($photos) => $photos
@@ -215,6 +229,7 @@ class VehicleController extends Controller
         return ApiResponse::success(VehiclePlateResource::collection($plates));
     }
 
+    #[QueryParameter('verified', 'Filter by workshop seal: 1 = verified only, 0 = declared only.', type: 'integer')]
     #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
     #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
     public function maintenances(Request $request, string $id): JsonResponse
@@ -223,7 +238,16 @@ class VehicleController extends Controller
         Gate::authorize('viewMaintenances', $vehicle);
 
         $maintenances = $vehicle->maintenances()
-            ->with(['items.warranty', 'generalWarranty', 'invoices', 'checklists', 'user', 'workshop'])
+            ->with(['items.warranty', 'generalWarranty', 'invoices', 'checklists', 'user', 'workshop', 'verifiedWorkshop'])
+            ->withCount('invoices')
+            ->when($request->has('verified'), function ($query) use ($request) {
+                $verified = filter_var($request->query('verified'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($verified === true) {
+                    $query->verified();
+                } elseif ($verified === false) {
+                    $query->unverified();
+                }
+            })
             ->orderBy('maintenance_date', 'desc')
             ->paginate($this->perPage($request));
 
@@ -264,8 +288,14 @@ class VehicleController extends Controller
         $user = $request->user();
 
         $vehicles = $user->currentVehicles()
-            ->withCount('maintenances')
-            ->with(['plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at')])
+            ->withCount([
+                'maintenances',
+                'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+            ])
+            ->with([
+                'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
+                'provenanceStripMaintenances',
+            ])
             ->orderByDesc('vehicles.created_at')
             ->paginate($this->perPage($request));
 
