@@ -99,6 +99,7 @@ class UserPortalTest extends TestCase
                 'year' => 2020,
                 'color' => 'Prata',
                 'current_kilometers' => 42000,
+                'chassis' => '9BWZZZ377VT004277',
                 'terms_accepted' => '1',
             ])
             ->assertRedirect();

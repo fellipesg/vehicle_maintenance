@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Web\Concerns;
 
 use App\Models\Vehicle;
+use App\Rules\Chassis;
 use App\Services\Crlv\CrlvParseResult;
 use App\Services\Vehicle\VehicleOwnershipService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 
 trait RegistersVehicleWithOwnership
@@ -24,6 +26,12 @@ trait RegistersVehicleWithOwnership
             $renavamRule .= ','.$vehicleId;
         }
 
+        $year = (int) request()->input('year', date('Y'));
+        $chassisRule = Rule::unique('vehicles', 'chassis');
+        if ($vehicleId) {
+            $chassisRule = Rule::unique('vehicles', 'chassis')->ignore($vehicleId);
+        }
+
         return [
             'license_plate' => ['required', 'string', 'max:10', 'regex:/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/', $plateRule],
             'renavam' => ['required', 'digits:11', $renavamRule],
@@ -32,7 +40,7 @@ trait RegistersVehicleWithOwnership
             'model' => ['required', 'string', 'max:100'],
             'year' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'color' => ['nullable', 'string', 'max:50'],
-            'chassis' => ['nullable', 'string', 'max:50'],
+            'chassis' => ['required', 'string', 'max:50', $chassisRule, new Chassis($year)],
             'motorization' => ['nullable', 'string', 'max:100'],
             'engine' => ['nullable', 'string', 'max:50'],
             'current_kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
@@ -87,10 +95,17 @@ trait RegistersVehicleWithOwnership
 
     protected function registerVehicle(Request $request): RedirectResponse
     {
+        $crlvPreview = $this->resolveCrlvFromSession($request);
+        $chassisInput = Vehicle::normalizeChassis((string) $request->input('chassis', ''));
+        if ($chassisInput === '' && $crlvPreview?->chassis) {
+            $chassisInput = Vehicle::normalizeChassis($crlvPreview->chassis);
+        }
+
         $request->merge([
             'license_plate' => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $request->input('license_plate')) ?? ''),
             'renavam' => preg_replace('/\D/', '', (string) $request->input('renavam')) ?? '',
             'crv_number' => preg_replace('/\D/', '', (string) $request->input('crv_number')) ?? '',
+            'chassis' => $chassisInput,
         ]);
 
         $data = $request->validate($this->vehicleValidationRules(), [
@@ -98,7 +113,16 @@ trait RegistersVehicleWithOwnership
             'renavam.digits' => 'O RENAVAM deve ter exatamente 11 dígitos.',
             'crv_number.digits_between' => 'O número do CRV deve ter entre 10 e 12 dígitos.',
             'year.min' => 'O ano do modelo deve ser no mínimo 1900.',
+            'chassis.unique' => 'Já existe um veículo com este chassi. Você pode vinculá-lo em Vincular veículo.',
         ]);
+
+        if (Vehicle::findByChassis($data['chassis'])) {
+            return redirect()->route($this->vehicleClaimRoute())
+                ->withInput(['chassis' => $data['chassis']])
+                ->withErrors([
+                    'chassis' => 'Já existe um veículo com este chassi. Você pode vinculá-lo em Vincular veículo.',
+                ]);
+        }
 
         if (Vehicle::findByRenavam($data['renavam'])) {
             return redirect()->route($this->vehicleClaimRoute())

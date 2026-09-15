@@ -232,6 +232,11 @@ class VehicleController extends Controller
     {
         Gate::authorize('update', $vehicle);
 
+        $chassisRules = ['nullable', 'string', 'max:50', \Illuminate\Validation\Rule::unique('vehicles', 'chassis')->ignore($vehicle->id), new \App\Rules\Chassis((int) $request->input('year', $vehicle->year))];
+        if ($vehicle->chassis === null || $vehicle->chassis === '') {
+            $chassisRules = ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('vehicles', 'chassis')->ignore($vehicle->id), new \App\Rules\Chassis((int) $request->input('year', $vehicle->year))];
+        }
+
         $data = $request->validate([
             'license_plate' => ['required', 'string', 'max:10', 'unique:vehicles,license_plate,'.$vehicle->id],
             'renavam' => ['required', 'string', 'max:20', 'unique:vehicles,renavam,'.$vehicle->id],
@@ -240,7 +245,7 @@ class VehicleController extends Controller
             'model' => ['required', 'string', 'max:100'],
             'year' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'color' => ['nullable', 'string', 'max:50'],
-            'chassis' => ['nullable', 'string', 'max:50'],
+            'chassis' => $chassisRules,
             'motorization' => ['nullable', 'string', 'max:100'],
             'engine' => ['nullable', 'string', 'max:50'],
             'cover' => [
@@ -261,7 +266,24 @@ class VehicleController extends Controller
         $coverPortrait = $request->file('cover_portrait');
         unset($data['cover'], $data['cover_portrait']);
 
+        $previousPlate = $vehicle->license_plate;
+        $newPlate = $data['license_plate'];
+        unset($data['license_plate']);
+
+        if (isset($data['chassis'])) {
+            $data['chassis'] = \App\Models\Vehicle::normalizeChassis((string) $data['chassis']);
+        }
+
         $vehicle->update($data);
+
+        if (strtoupper((string) $newPlate) !== strtoupper((string) $previousPlate)) {
+            app(\App\Services\Vehicle\VehiclePlateHistoryService::class)->changePlate(
+                $vehicle->fresh(),
+                $newPlate,
+                'manual',
+                $request->user(),
+            );
+        }
 
         if ($cover !== null) {
             $covers->storeLandscape($vehicle, $cover);

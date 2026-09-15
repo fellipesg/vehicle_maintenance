@@ -328,9 +328,17 @@
                                         <span class="info-value">{{ $vehicle->year }}</span>
                                     </td>
                                 </tr>
+                                @if($vehicle->chassis)
+                                <tr>
+                                    <td colspan="2">
+                                        <span class="info-label">Chassi:</span>
+                                        <span class="info-value" style="font-family: DejaVu Sans Mono, monospace; font-size: 13px; letter-spacing: 0.05em;">{{ $vehicle->chassis }}</span>
+                                    </td>
+                                </tr>
+                                @endif
                                 <tr>
                                     <td>
-                                        <span class="info-label">Placa:</span>
+                                        <span class="info-label">Placa atual:</span>
                                         <span class="info-value">{{ $vehicle->license_plate }}</span>
                                     </td>
                                     <td>
@@ -346,24 +354,35 @@
                                     </td>
                                 </tr>
                                 @endif
-                                @if($vehicle->color || $vehicle->chassis)
+                                @if($vehicle->color)
                                 <tr>
-                                    @if($vehicle->color)
-                                    <td>
+                                    <td colspan="2">
                                         <span class="info-label">Cor:</span>
                                         <span class="info-value">{{ $vehicle->color }}</span>
                                     </td>
-                                    @else
-                                    <td></td>
-                                    @endif
-                                    @if($vehicle->chassis)
-                                    <td>
-                                        <span class="info-label">Chassi:</span>
-                                        <span class="info-value">{{ $vehicle->chassis }}</span>
+                                </tr>
+                                @endif
+                                @if($vehicle->relationLoaded('plates') && $vehicle->plates->count() > 1)
+                                <tr>
+                                    <td colspan="2">
+                                        <span class="info-label">Histórico de placas</span>
+                                        <table cellpadding="4" cellspacing="0" width="100%" style="margin-top:6px;font-size:10px;border-collapse:collapse;">
+                                            <tr style="background:#f3f4f6;">
+                                                <th align="left">Placa</th>
+                                                <th align="left">De</th>
+                                                <th align="left">Até</th>
+                                                <th align="left">Origem</th>
+                                            </tr>
+                                            @foreach($vehicle->plates as $plateRow)
+                                            <tr>
+                                                <td>{{ $plateRow->plate }}</td>
+                                                <td>{{ $plateRow->started_at?->format('d/m/Y') ?? '—' }}</td>
+                                                <td>{{ $plateRow->ended_at?->format('d/m/Y') ?? 'Vigente' }}</td>
+                                                <td>{{ \App\Models\VehiclePlate::sourceLabel($plateRow->source) }}</td>
+                                            </tr>
+                                            @endforeach
+                                        </table>
                                     </td>
-                                    @else
-                                    <td></td>
-                                    @endif
                                 </tr>
                                 @endif
                                 @if($vehicle->motorization || $vehicle->engine)

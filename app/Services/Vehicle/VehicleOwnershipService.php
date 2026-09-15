@@ -7,6 +7,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleAccessGrant;
 use App\Services\Crlv\CrlvExerciseValidator;
 use App\Services\Crlv\CrlvParseResult;
+use App\Support\VehiclePlateSearch;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -14,6 +15,7 @@ class VehicleOwnershipService
 {
     public function __construct(
         private readonly CrlvExerciseValidator $exerciseValidator,
+        private readonly VehiclePlateHistoryService $plateHistory,
     ) {}
 
     /**
@@ -27,9 +29,16 @@ class VehicleOwnershipService
     ): Vehicle {
         $renavam = $this->normalizeDigits($vehicleData['renavam'] ?? '');
         $crvNumber = $this->normalizeDigits($vehicleData['crv_number'] ?? '');
+        $chassis = isset($vehicleData['chassis'])
+            ? Vehicle::normalizeChassis((string) $vehicleData['chassis'])
+            : '';
 
         if ($renavam === '' || $crvNumber === '') {
             throw new RuntimeException('RENAVAM e número do CRV são obrigatórios para o primeiro cadastro.');
+        }
+
+        if ($chassis !== '' && Vehicle::findByChassis($chassis)) {
+            throw new RuntimeException('Este veículo já está cadastrado. Envie o CRLV-e para vincular à sua conta.');
         }
 
         if (Vehicle::findByRenavam($renavam)) {
@@ -44,7 +53,7 @@ class VehicleOwnershipService
             }
         }
 
-        return DB::transaction(function () use ($user, $vehicleData, $crlv, $renavam, $crvNumber, $ownershipType) {
+        return DB::transaction(function () use ($user, $vehicleData, $crlv, $renavam, $crvNumber, $ownershipType, $chassis) {
             $vehicle = Vehicle::create([
                 'license_plate' => strtoupper($vehicleData['license_plate']),
                 'renavam' => $renavam,
@@ -53,12 +62,18 @@ class VehicleOwnershipService
                 'model' => $vehicleData['model'],
                 'year' => $vehicleData['year'],
                 'color' => $vehicleData['color'] ?? null,
-                'chassis' => isset($vehicleData['chassis']) ? strtoupper($vehicleData['chassis']) : null,
+                'chassis' => $chassis !== '' ? $chassis : null,
                 'motorization' => $vehicleData['motorization'] ?? null,
                 'engine' => $vehicleData['engine'] ?? null,
                 'current_kilometers' => (int) $vehicleData['current_kilometers'],
                 'odometer_at_registration' => (int) $vehicleData['current_kilometers'],
             ]);
+
+            $this->plateHistory->recordInitialPlate(
+                $vehicle,
+                $crlv !== null ? 'crlv_import' : 'manual',
+                $user,
+            );
 
             $this->attachUserToVehicle($user, $vehicle, $crlv, $ownershipType, acceptedTerms: true);
 
@@ -95,9 +110,18 @@ class VehicleOwnershipService
                 ->where('vehicle_id', $vehicle->id)
                 ->update(['is_current_owner' => false]);
 
+            $crlvPlate = VehiclePlateSearch::normalize($crlv->licensePlate);
+            $currentPlate = VehiclePlateSearch::normalize((string) $vehicle->license_plate);
+
+            if ($crlvPlate !== '' && $crlvPlate !== $currentPlate) {
+                $this->plateHistory->changePlate($vehicle, $crlvPlate, 'crlv_import', $user);
+            }
+
             $vehicle->update([
-                'license_plate' => strtoupper($crlv->licensePlate),
                 'crv_number' => $crlv->normalizedCrvNumber() ?? $vehicle->crv_number,
+                'chassis' => $crlv->chassis !== null && $crlv->chassis !== ''
+                    ? Vehicle::normalizeChassis($crlv->chassis)
+                    : $vehicle->chassis,
             ]);
 
             $this->attachUserToVehicle($user, $vehicle, $crlv, 'owner');
@@ -147,6 +171,25 @@ class VehicleOwnershipService
         return $userDocument === $ownerDocument ? 'owner' : 'consignment';
     }
 
+    public static function findExistingVehicle(CrlvParseResult $crlv): ?Vehicle
+    {
+        if ($crlv->chassis !== null && $crlv->chassis !== '') {
+            $byChassis = Vehicle::findByChassis($crlv->chassis);
+            if ($byChassis !== null) {
+                return $byChassis;
+            }
+        }
+
+        $byRenavam = Vehicle::findByRenavam($crlv->renavam);
+        if ($byRenavam !== null) {
+            return $byRenavam;
+        }
+
+        $byPlate = VehiclePlateSearch::findByPlate($crlv->licensePlate);
+
+        return $byPlate?->vehicle;
+    }
+
     /**
      * @param  array<string, mixed>  $vehicleData
      */
@@ -171,12 +214,15 @@ class VehicleOwnershipService
 
     private function assertCrlvMatchesVehicle(CrlvParseResult $crlv, Vehicle $vehicle): void
     {
-        if ($crlv->normalizedRenavam() !== $this->normalizeDigits($vehicle->renavam)) {
-            throw new RuntimeException('O RENAVAM do CRLV-e não confere com o veículo cadastrado.');
+        $crlvChassis = $crlv->chassis !== null ? Vehicle::normalizeChassis($crlv->chassis) : '';
+        $vehicleChassis = $vehicle->chassis !== null ? Vehicle::normalizeChassis((string) $vehicle->chassis) : '';
+
+        if ($crlvChassis !== '' && $vehicleChassis !== '' && $crlvChassis !== $vehicleChassis) {
+            throw new RuntimeException('O chassi do CRLV-e não confere com o veículo cadastrado.');
         }
 
-        if (strtoupper($crlv->licensePlate) !== strtoupper($vehicle->license_plate)) {
-            throw new RuntimeException('A placa do CRLV-e não confere com o veículo cadastrado.');
+        if ($crlv->normalizedRenavam() !== $this->normalizeDigits($vehicle->renavam)) {
+            throw new RuntimeException('O RENAVAM do CRLV-e não confere com o veículo cadastrado.');
         }
 
         if ($vehicle->crv_number && $crlv->normalizedCrvNumber() !== $this->normalizeDigits($vehicle->crv_number)) {

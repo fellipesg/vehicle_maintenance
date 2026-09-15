@@ -52,7 +52,7 @@ class MaintenanceController extends Controller
         $licensePlate = VehiclePlateSearch::normalize((string) $request->query('license_plate', ''));
 
         if ($licensePlate !== '') {
-            $vehicle = VehiclePlateSearch::findByPlate($licensePlate);
+            $vehicle = VehiclePlateSearch::findByPlate($licensePlate)?->vehicle;
         }
 
         return view('workshop.maintenances.create', array_merge(
@@ -95,7 +95,7 @@ class MaintenanceController extends Controller
             'license_plate.required' => 'Informe a placa do veículo.',
         ]);
 
-        $vehicle = VehiclePlateSearch::findByPlate($data['license_plate']);
+        $vehicle = VehiclePlateSearch::findByPlate($data['license_plate'])?->vehicle;
 
         if ($vehicle === null) {
             return redirect()->back()

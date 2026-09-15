@@ -39,6 +39,7 @@ class VehicleMaintenancePdfExporter
     public function generate(Vehicle $vehicle): array
     {
         $vehicle->load([
+            'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
             'maintenances.items.warranty',
             'maintenances.generalWarranty',
             'maintenances.invoices',

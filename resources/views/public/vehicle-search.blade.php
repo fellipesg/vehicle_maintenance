@@ -13,13 +13,13 @@
 <div class="mx-auto max-w-7xl px-4 py-8">
     <div class="mb-8 text-center">
         <h1 class="text-3xl font-bold text-automotive-900">🔍 Buscar Histórico de Veículo</h1>
-        <p class="mt-2 text-automotive-600">Consulte o histórico completo de manutenções por placa ou RENAVAM</p>
+        <p class="mt-2 text-automotive-600">Consulte o histórico completo de manutenções por chassi, placa ou RENAVAM</p>
     </div>
 
     <div class="mx-auto max-w-xl">
         <form method="GET" action="{{ route('vehicle.search') }}" class="card flex gap-3">
             <input type="text" name="identifier" value="{{ $identifier ?? '' }}"
-                   placeholder="Digite a placa ou RENAVAM"
+                   placeholder="Chassi, placa ou RENAVAM"
                    class="form-input flex-1" required>
             <button type="submit" class="btn-primary">Buscar</button>
         </form>
@@ -28,16 +28,22 @@
     @if(isset($identifier) && $identifier)
         @if($vehicle)
             <div class="mt-8">
+                @if(($matchedBy ?? null) === 'previous_plate' && ($previousPlateEndedAt ?? null))
+                    <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        A placa {{ strtoupper($identifier) }} pertenceu a este veículo até {{ $previousPlateEndedAt->format('d/m/Y') }}.
+                        Placa atual: {{ $vehicle->license_plate }}.
+                    </div>
+                @endif
                 <div class="card mb-6 !p-0 overflow-hidden">
                     <x-vehicle-cover :vehicle="$vehicle" variant="card" class="aspect-[21/9] w-full max-h-72" />
                     <div class="flex flex-wrap items-start justify-between gap-4 p-6">
-                        <div>
-                            <h2 class="text-2xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
-                            <p class="text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->color ?? 'Cor não informada' }}</p>
-                        </div>
-                        <div class="text-right">
-                            <span class="badge badge-blue text-base">{{ $vehicle->license_plate }}</span>
-                            <p class="mt-1 text-sm text-automotive-500">RENAVAM: {{ $vehicle->renavam }}</p>
+                        <div class="space-y-3">
+                            <div>
+                                <h2 class="text-2xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
+                                <p class="text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->color ?? 'Cor não informada' }}</p>
+                            </div>
+                            <x-vehicle-identity :vehicle="$vehicle" size="hero" :edit-route="null" />
+                            <p class="text-sm text-automotive-500">RENAVAM: {{ $vehicle->renavam }}</p>
                         </div>
                     </div>
                 </div>

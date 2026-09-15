@@ -16,11 +16,16 @@ class PublicVehicleSearchResource extends JsonResource
         return [
             'id' => $this->id,
             'license_plate' => $this->license_plate,
+            'current_plate' => $this->license_plate,
+            'chassis' => $this->chassis,
             'renavam' => $this->renavam,
             'brand' => $this->brand,
             'model' => $this->model,
             'year' => $this->year,
             'color' => $this->color,
+            'plate_history' => VehiclePlateResource::collection(
+                $this->whenLoaded('plates', fn () => $this->plates->sortByDesc(fn ($p) => $p->started_at ?? $p->created_at)->values())
+            ),
             'maintenances' => $this->whenLoaded('maintenances', function () {
                 return $this->maintenances->map(fn ($maintenance) => [
                     'id' => $maintenance->id,
