@@ -48,6 +48,11 @@ Thumbs.db
 /vehicle_maintenance
 *.sqlite
 
+# Agent / local tooling
+/graphify-out/
+/.cursor/
+/storage/pail/
+
 # Built frontend assets (gerar com npm run build)
 /public/build
 /public/hot
