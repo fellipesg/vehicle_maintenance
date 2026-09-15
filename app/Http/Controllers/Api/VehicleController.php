@@ -216,6 +216,10 @@ class VehicleController extends Controller
         return ApiResponse::success($payload);
     }
 
+    #[Endpoint(
+        title: 'Vehicle plate history',
+        description: 'Returns chronological plate records (current and previous) for a vehicle the caller can view.',
+    )]
     public function plates(Request $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);

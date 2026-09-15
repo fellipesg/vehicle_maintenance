@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Maintenance;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Support\VehicleProvenanceStrip;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,6 +46,21 @@ class ProvenanceComponentsTest extends TestCase
 
         $this->assertSame(3, count(VehicleProvenanceStrip::segmentsForVehicle($vehicle)));
         $this->assertEquals(3, substr_count($html, 'class="prov-strip-segment '));
+    }
+
+    public function test_workshop_maintenances_index_includes_provenance_legend_and_cards(): void
+    {
+        $workshopUser = User::factory()->asWorkshop()->create();
+        $maintenance = Maintenance::factory()->sealedByWorkshop()->create([
+            'workshop_id' => $workshopUser->workshop->id,
+        ]);
+
+        $this->actingAs($workshopUser)
+            ->get(route('workshop.maintenances.index'))
+            ->assertOk()
+            ->assertSee('Selo da oficina', false)
+            ->assertSee('prov-card', false)
+            ->assertSee($maintenance->maintenance_type, false);
     }
 
     public function test_pdf_view_includes_provenance_summary_and_footer(): void

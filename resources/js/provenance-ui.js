@@ -24,7 +24,7 @@ function provenanceRootClass(maintenance) {
     return isVerifiedMaintenance(maintenance) ? 'prov-verified' : 'prov-declared';
 }
 
-function markerHtml(maintenance, size = 'md') {
+export function renderProvenanceMarker(maintenance, size = 'md') {
     const verified = isVerifiedMaintenance(maintenance);
     const sizeClass = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs';
     const logo = maintenance.verified_workshop?.logo_url ?? maintenance.workshop?.logo_url;
@@ -56,7 +56,7 @@ export function renderProvenanceCard(maintenance, { href = null, titleWeight = t
     const type = escapeHtml(maintenance.maintenance_type ?? '');
     const inner = `
         <div class="${railClass} ${provenanceRootClass(maintenance)}"></div>
-        ${markerHtml(maintenance)}
+        ${renderProvenanceMarker(maintenance)}
         <div class="min-w-0 flex-1">
             <p class="${titleClass}">${type}</p>
             <p class="text-sm text-automotive-600">${escapeHtml(label)}</p>

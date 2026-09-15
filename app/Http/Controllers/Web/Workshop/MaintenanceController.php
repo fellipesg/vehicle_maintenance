@@ -37,7 +37,7 @@ class MaintenanceController extends Controller
 
         if ($workshop) {
             $maintenances = Maintenance::where('workshop_id', $workshop->id)
-                ->with(['vehicle', 'user'])
+                ->with(['vehicle', 'user', 'verifiedWorkshop', 'workshop'])
                 ->orderByDesc('maintenance_date')
                 ->paginate(15);
         }

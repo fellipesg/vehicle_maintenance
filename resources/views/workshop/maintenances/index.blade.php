@@ -20,20 +20,22 @@
             <a href="{{ route('workshop.profile.create') }}" class="btn-primary mt-4">Cadastrar oficina</a>
         </div>
     @else
+        <x-provenance-legend class="mb-4" />
+
         @forelse($maintenances as $maintenance)
-            <div class="card mb-3">
-                <a href="{{ route('workshop.maintenances.show', $maintenance) }}" class="block transition hover:text-wrench-700">
-                    <p class="font-semibold">{{ $maintenance->maintenance_type }}</p>
-                    <p class="text-sm text-automotive-600">
-                        {{ $maintenance->vehicle->brand }} {{ $maintenance->vehicle->model }} · {{ $maintenance->vehicle->license_plate }}
-                        · {{ $maintenance->maintenance_date->format('d/m/Y') }}
-                    </p>
-                    @if($maintenance->user)<p class="text-xs text-automotive-500">Registrado por: {{ $maintenance->user->name }}</p>@endif
-                </a>
-                <div class="mt-3 border-t border-automotive-100 pt-3">
-                    <a href="{{ route('workshop.maintenances.show', $maintenance) }}" class="text-sm font-medium text-wrench-600 hover:underline">Ver detalhes →</a>
-                </div>
-            </div>
+            <x-provenance-card
+                :maintenance="$maintenance"
+                :href="route('workshop.maintenances.show', $maintenance)"
+                class="mb-3"
+            />
+            <p class="-mt-2 mb-3 ml-[calc(28px+0.75rem+3px+1rem)] text-sm text-automotive-600">
+                {{ $maintenance->vehicle->brand }} {{ $maintenance->vehicle->model }}
+                · {{ $maintenance->vehicle->license_plate }}
+                · {{ $maintenance->maintenance_date->format('d/m/Y') }}
+                @if($maintenance->user)
+                    · Registrado por: {{ $maintenance->user->name }}
+                @endif
+            </p>
         @empty
             <div class="card text-center text-automotive-500">
                 <p>Nenhum serviço vinculado à sua oficina.</p>

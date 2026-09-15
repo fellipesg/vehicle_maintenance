@@ -94,6 +94,29 @@ class VehicleMileageTest extends TestCase
             ->assertJsonPath('data.events.2.type', 'upcoming');
     }
 
+    public function test_timeline_maintenance_events_include_provenance_fields_for_portal_js(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create(['current_kilometers' => 50_000]);
+        $this->attachVehicleToUser($user, $vehicle);
+
+        Maintenance::factory()->sealedByWorkshop()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'kilometers' => 48_000,
+        ]);
+
+        $response = $this->getJson("/api/v1/vehicles/{$vehicle->id}/timeline")->assertOk();
+        $maintenanceEvent = collect($response->json('data.events'))
+            ->first(fn (array $event) => ($event['type'] ?? '') === 'maintenance');
+
+        $this->assertNotNull($maintenanceEvent);
+        $this->assertTrue($maintenanceEvent['is_verified']);
+        $this->assertSame('workshop', $maintenanceEvent['registered_by_type']);
+        $this->assertStringContainsString('Selo da oficina', (string) ($maintenanceEvent['provenance_label'] ?? ''));
+    }
+
     public function test_timeline_registration_uses_first_maintenance_when_odometer_missing(): void
     {
         $user = $this->actingAsApiUser();
