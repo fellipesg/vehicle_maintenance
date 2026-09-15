@@ -79,8 +79,9 @@ class MaintenanceController extends Controller
 
         $result = $this->storeMaintenanceWithInvoices(
             $request,
-            function () use ($data) {
+            function () use ($data, $request) {
                 $maintenance = Maintenance::create($data);
+                app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
                 app(VehicleMileageService::class)->applyMaintenanceKilometers(
                     Vehicle::findOrFail($data['vehicle_id']),
                     (int) $data['kilometers'],

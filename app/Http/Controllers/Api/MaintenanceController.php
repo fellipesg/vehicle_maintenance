@@ -131,6 +131,8 @@ class MaintenanceController extends Controller
                 'is_manufacturer_required' => $isManufacturerRequired,
             ]);
 
+            app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $user);
+
             if ($request->has('items') && is_array($request->items)) {
                 foreach ($request->items as $itemData) {
                     MaintenanceItem::create([
