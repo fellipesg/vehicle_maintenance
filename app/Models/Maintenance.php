@@ -27,10 +27,92 @@ class Maintenance extends Model
         'is_manufacturer_required',
     ];
 
-    protected $casts = [
-        'maintenance_date' => 'date',
-        'is_manufacturer_required' => 'boolean',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'maintenance_date' => 'date',
+            'is_manufacturer_required' => 'boolean',
+            'verified_at' => 'datetime',
+        ];
+    }
+
+    public function isVerified(): bool
+    {
+        return $this->verified_at !== null;
+    }
+
+    public function getProvenanceLabelAttribute(): string
+    {
+        return match ($this->registered_by_type) {
+            'workshop' => 'Selo da oficina',
+            'garage' => 'Declarada pelo lojista',
+            default => 'Declarada pelo proprietário',
+        };
+    }
+
+    public function getProvenanceSublabelAttribute(): string
+    {
+        return $this->isVerified() ? 'verificada' : 'não verificada';
+    }
+
+    public function getProvenanceCardLabelAttribute(): string
+    {
+        if ($this->registered_by_type === 'workshop') {
+            $name = $this->verifiedWorkshop?->name
+                ?? $this->workshop?->name
+                ?? $this->workshop_name
+                ?? 'Oficina';
+
+            return 'Selo da oficina · '.$name;
+        }
+
+        return $this->provenance_label;
+    }
+
+    public function getProvenanceMetaAttribute(): string
+    {
+        if ($this->isVerified()) {
+            $date = $this->verified_at?->format('d/m/Y') ?? '';
+            $code = $this->verification_code ?? '';
+
+            return trim("verificada em {$date} · {$code}");
+        }
+
+        $meta = 'não verificada';
+        $invoiceCount = $this->relationLoaded('invoices')
+            ? $this->invoices->count()
+            : $this->invoices()->count();
+
+        if ($invoiceCount > 0) {
+            $meta .= ' · NF anexada ('.$invoiceCount.')';
+        }
+
+        return $meta;
+    }
+
+    public function verifiedWorkshop(): BelongsTo
+    {
+        return $this->belongsTo(Workshop::class, 'verified_workshop_id');
+    }
+
+    public function verificationUrl(): ?string
+    {
+        if ($this->verification_code === null) {
+            return null;
+        }
+
+        return url('/v/'.$this->verification_code);
+    }
+
+    public function scopeVerified($query)
+    {
+        return $query->whereNotNull('verified_at');
+    }
+
+    public function scopeUnverified($query)
+    {
+        return $query->whereNull('verified_at');
+    }
 
     /**
      * Get the vehicle that owns this maintenance

@@ -37,7 +37,7 @@ class MaintenanceController extends Controller
 
         if ($workshop) {
             $maintenances = Maintenance::where('workshop_id', $workshop->id)
-                ->with(['vehicle', 'user'])
+                ->with(['vehicle', 'user', 'verifiedWorkshop', 'workshop'])
                 ->orderByDesc('maintenance_date')
                 ->paginate(15);
         }
@@ -52,7 +52,7 @@ class MaintenanceController extends Controller
         $licensePlate = VehiclePlateSearch::normalize((string) $request->query('license_plate', ''));
 
         if ($licensePlate !== '') {
-            $vehicle = VehiclePlateSearch::findByPlate($licensePlate);
+            $vehicle = VehiclePlateSearch::findByPlate($licensePlate)?->vehicle;
         }
 
         return view('workshop.maintenances.create', array_merge(
@@ -95,7 +95,7 @@ class MaintenanceController extends Controller
             'license_plate.required' => 'Informe a placa do veículo.',
         ]);
 
-        $vehicle = VehiclePlateSearch::findByPlate($data['license_plate']);
+        $vehicle = VehiclePlateSearch::findByPlate($data['license_plate'])?->vehicle;
 
         if ($vehicle === null) {
             return redirect()->back()
@@ -134,6 +134,7 @@ class MaintenanceController extends Controller
             $request,
             function () use ($maintenanceData, $vehicle, $data, $request, $workshop) {
                 $maintenance = Maintenance::create($maintenanceData);
+                app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
                 app(VehicleMileageService::class)->applyMaintenanceKilometers(
                     $vehicle,
                     (int) $data['kilometers'],
@@ -158,7 +159,7 @@ class MaintenanceController extends Controller
     {
         Gate::authorize('view', $maintenance);
 
-        $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'photos', 'workshop']);
+        $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'photos', 'workshop', 'verifiedWorkshop', 'user']);
 
         return view('workshop.maintenances.show', compact('maintenance'));
     }

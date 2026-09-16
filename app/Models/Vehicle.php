@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Vehicle extends Model
 {
@@ -44,6 +45,31 @@ class Vehicle extends Model
             'current_kilometers' => 'integer',
             'odometer_at_registration' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Vehicle $vehicle): void {
+            if ($vehicle->chassis !== null && $vehicle->chassis !== '') {
+                $vehicle->chassis = self::normalizeChassis((string) $vehicle->chassis);
+            }
+        });
+    }
+
+    public static function normalizeChassis(string $chassis): string
+    {
+        return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $chassis) ?? '');
+    }
+
+    public static function findByChassis(string $chassis): ?self
+    {
+        $normalized = self::normalizeChassis($chassis);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        return static::query()->where('chassis', $normalized)->first();
     }
 
     protected function coverPhotoUrl(): Attribute
@@ -99,6 +125,24 @@ class Vehicle extends Model
     public function maintenances(): HasMany
     {
         return $this->hasMany(Maintenance::class);
+    }
+
+    public function plates(): HasMany
+    {
+        return $this->hasMany(VehiclePlate::class);
+    }
+
+    public function currentPlate(): HasOne
+    {
+        return $this->hasOne(VehiclePlate::class)->whereNull('ended_at')->latestOfMany();
+    }
+
+    public function provenanceStripMaintenances(): HasMany
+    {
+        return $this->hasMany(Maintenance::class)
+            ->select(['id', 'vehicle_id', 'maintenance_date', 'verified_at', 'maintenance_type', 'registered_by_type'])
+            ->orderBy('maintenance_date')
+            ->orderBy('id');
     }
 
     public function owners(): BelongsToMany

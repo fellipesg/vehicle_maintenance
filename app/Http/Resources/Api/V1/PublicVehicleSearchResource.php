@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\VehicleProvenanceStrip;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,11 +17,25 @@ class PublicVehicleSearchResource extends JsonResource
         return [
             'id' => $this->id,
             'license_plate' => $this->license_plate,
+            'current_plate' => $this->license_plate,
+            'chassis' => $this->chassis,
             'renavam' => $this->renavam,
             'brand' => $this->brand,
             'model' => $this->model,
             'year' => $this->year,
             'color' => $this->color,
+            'plate_history' => VehiclePlateResource::collection(
+                $this->whenLoaded('plates', fn () => $this->plates->sortByDesc(fn ($p) => $p->started_at ?? $p->created_at)->values())
+            ),
+            'maintenances_count' => $this->when(isset($this->maintenances_count), $this->maintenances_count),
+            'verified_maintenances_count' => $this->when(
+                isset($this->verified_maintenances_count),
+                $this->verified_maintenances_count
+            ),
+            'provenance_strip' => $this->when(
+                $this->relationLoaded('provenanceStripMaintenances'),
+                fn () => VehicleProvenanceStrip::segmentsForVehicle($this->resource)
+            ),
             'maintenances' => $this->whenLoaded('maintenances', function () {
                 return $this->maintenances->map(fn ($maintenance) => [
                     'id' => $maintenance->id,

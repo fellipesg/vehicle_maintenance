@@ -11,14 +11,17 @@ use App\Http\Resources\Api\V1\MaintenanceResource;
 use App\Http\Resources\Api\V1\PublicVehicleSearchResource;
 use App\Http\Resources\Api\V1\TimelineResource;
 use App\Http\Resources\Api\V1\VehiclePdfExportResource;
+use App\Http\Resources\Api\V1\VehiclePlateResource;
 use App\Http\Resources\Api\V1\VehicleResource;
 use App\Models\Vehicle;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\VehiclePdfExportService;
+use App\Services\Vehicle\VehiclePlateHistoryService;
 use App\Services\Vehicle\VehicleTimelineBuilder;
 use App\Services\VehicleCatalogService;
 use App\Support\ApiResponse;
+use App\Support\VehiclePlateSearch;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
@@ -62,7 +65,10 @@ class VehicleController extends Controller
         Gate::authorize('viewAny', Vehicle::class);
 
         $vehicles = $request->user()->currentVehicles()
-            ->withCount('maintenances')
+            ->withCount([
+                'maintenances',
+                'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+            ])
             ->when($request->search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('license_plate', 'like', "%{$search}%")
@@ -83,6 +89,7 @@ class VehicleController extends Controller
             ->all();
 
         $vehicle = Vehicle::create($data);
+        app(VehiclePlateHistoryService::class)->recordInitialPlate($vehicle, 'api', $request->user());
         $user = $request->user();
 
         $user->vehicles()->attach($vehicle->id, [
@@ -104,7 +111,15 @@ class VehicleController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $vehicle = Vehicle::withCount('maintenances')->findOrFail($id);
+        $vehicle = Vehicle::withCount([
+            'maintenances',
+            'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+        ])
+            ->with([
+                'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
+                'provenanceStripMaintenances',
+            ])
+            ->findOrFail($id);
 
         Gate::authorize('view', $vehicle);
 
@@ -115,7 +130,26 @@ class VehicleController extends Controller
     {
         $vehicle = Vehicle::findOrFail($id);
 
-        $vehicle->update($request->validated());
+        $validated = $request->validated();
+        $plateChangedAt = $validated['plate_changed_at'] ?? null;
+        unset($validated['plate_changed_at']);
+
+        $newPlate = $validated['license_plate'] ?? null;
+        $previousPlate = $vehicle->license_plate;
+        unset($validated['license_plate']);
+
+        $vehicle->update($validated);
+
+        if ($newPlate !== null && strtoupper($newPlate) !== strtoupper((string) $previousPlate)) {
+            $effective = $plateChangedAt ? \Illuminate\Support\Carbon::parse($plateChangedAt) : null;
+            app(VehiclePlateHistoryService::class)->changePlate(
+                $vehicle->fresh(),
+                $newPlate,
+                'api',
+                $request->user(),
+                $effective,
+            );
+        }
 
         if ($request->has('current_kilometers')) {
             app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
@@ -148,27 +182,58 @@ class VehicleController extends Controller
         title: 'Search vehicle (public)',
         description: 'Public endpoint. Returns maintenance history without owner PII.',
     )]
-    public function search(string $identifier): JsonResponse
+    public function search(Request $request, string $identifier): JsonResponse
     {
-        $vehicle = Vehicle::where('license_plate', $identifier)
-            ->orWhere('renavam', $identifier)
-            ->with(['maintenances' => function ($query) {
+        $lookup = VehiclePlateSearch::findByIdentifier($identifier);
+
+        if ($lookup === null) {
+            return ApiResponse::error('Vehicle not found', 404);
+        }
+
+        $vehicle = $lookup->vehicle;
+        $vehicle->loadCount([
+            'maintenances',
+            'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+        ]);
+        $vehicle->load([
+            'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
+            'provenanceStripMaintenances',
+            'maintenances' => function ($query) {
                 $query->orderBy('maintenance_date', 'desc')
                     ->with(['photos' => fn ($photos) => $photos
                         ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
                         ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
                         ->orderBy('sort'),
                     ]);
-            }, 'maintenances.workshop'])
-            ->first();
+            },
+            'maintenances.workshop',
+        ]);
 
-        if (! $vehicle) {
-            return ApiResponse::error('Vehicle not found', 404);
-        }
+        $payload = (new PublicVehicleSearchResource($vehicle))->toArray($request);
+        $payload['matched_by'] = $lookup->matchedBy;
+        $payload['previous_plate_ended_at'] = $lookup->previousPlateEndedAt?->toDateString();
 
-        return ApiResponse::success(new PublicVehicleSearchResource($vehicle));
+        return ApiResponse::success($payload);
     }
 
+    #[Endpoint(
+        title: 'Vehicle plate history',
+        description: 'Returns chronological plate records (current and previous) for a vehicle the caller can view.',
+    )]
+    public function plates(Request $request, string $id): JsonResponse
+    {
+        $vehicle = Vehicle::findOrFail($id);
+        Gate::authorize('view', $vehicle);
+
+        $plates = $vehicle->plates()
+            ->orderByDesc('started_at')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return ApiResponse::success(VehiclePlateResource::collection($plates));
+    }
+
+    #[QueryParameter('verified', 'Filter by workshop seal: 1 = verified only, 0 = declared only.', type: 'integer')]
     #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
     #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
     public function maintenances(Request $request, string $id): JsonResponse
@@ -177,7 +242,16 @@ class VehicleController extends Controller
         Gate::authorize('viewMaintenances', $vehicle);
 
         $maintenances = $vehicle->maintenances()
-            ->with(['items.warranty', 'generalWarranty', 'invoices', 'checklists', 'user', 'workshop'])
+            ->with(['items.warranty', 'generalWarranty', 'invoices', 'checklists', 'user', 'workshop', 'verifiedWorkshop'])
+            ->withCount('invoices')
+            ->when($request->has('verified'), function ($query) use ($request) {
+                $verified = filter_var($request->query('verified'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($verified === true) {
+                    $query->verified();
+                } elseif ($verified === false) {
+                    $query->unverified();
+                }
+            })
             ->orderBy('maintenance_date', 'desc')
             ->paginate($this->perPage($request));
 
@@ -218,7 +292,14 @@ class VehicleController extends Controller
         $user = $request->user();
 
         $vehicles = $user->currentVehicles()
-            ->withCount('maintenances')
+            ->withCount([
+                'maintenances',
+                'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+            ])
+            ->with([
+                'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
+                'provenanceStripMaintenances',
+            ])
             ->orderByDesc('vehicles.created_at')
             ->paginate($this->perPage($request));
 

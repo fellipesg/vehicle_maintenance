@@ -28,6 +28,10 @@ class MaintenancePolicy
 
     public function update(User $user, Maintenance $maintenance): bool
     {
+        if ($maintenance->isVerified() && ! ($user->isWorkshop() && $user->workshop && $maintenance->workshop_id === $user->workshop->id)) {
+            return false;
+        }
+
         if ($user->isWorkshop() && $user->workshop) {
             return $maintenance->workshop_id === $user->workshop->id;
         }
@@ -37,6 +41,10 @@ class MaintenancePolicy
 
     public function delete(User $user, Maintenance $maintenance): bool
     {
+        if ($maintenance->isVerified() && ! ($user->isWorkshop() && $user->workshop && $maintenance->workshop_id === $user->workshop->id)) {
+            return false;
+        }
+
         if ($user->isWorkshop() && $user->workshop) {
             return $maintenance->workshop_id === $user->workshop->id;
         }

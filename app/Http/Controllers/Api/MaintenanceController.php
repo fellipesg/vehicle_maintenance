@@ -31,6 +31,7 @@ class MaintenanceController extends Controller
 
     #[QueryParameter('vehicle_id', 'Filter by vehicle ID.', type: 'integer')]
     #[QueryParameter('service_category', 'Filter by category: mechanical, electrical, suspension, painting, finishing, interior, other.')]
+    #[QueryParameter('verified', 'Filter by workshop seal: 1 = verified only, 0 = declared only.', type: 'integer')]
     #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
     #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
     public function index(Request $request): JsonResponse
@@ -52,6 +53,15 @@ class MaintenanceController extends Controller
 
         if ($request->service_category) {
             $query->where('service_category', $request->service_category);
+        }
+
+        if ($request->has('verified')) {
+            $verified = filter_var($request->query('verified'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($verified === true) {
+                $query->verified();
+            } elseif ($verified === false) {
+                $query->unverified();
+            }
         }
 
         $maintenances = $query->orderBy('maintenance_date', 'desc')
@@ -130,6 +140,8 @@ class MaintenanceController extends Controller
                 'service_category' => $request->service_category,
                 'is_manufacturer_required' => $isManufacturerRequired,
             ]);
+
+            app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $user);
 
             if ($request->has('items') && is_array($request->items)) {
                 foreach ($request->items as $itemData) {

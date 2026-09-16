@@ -12,13 +12,25 @@
 @endphp
 
 <div class="grid gap-4 sm:grid-cols-2">
+    <div class="sm:col-span-2">
+        <label for="chassis" class="form-label">Chassi *</label>
+        <input type="text" name="chassis" id="chassis"
+               value="{{ old('chassis', $vehicle->chassis ?? '') }}" required
+               class="form-input uppercase font-mono" maxlength="17"
+               data-mask="chassis" autocomplete="off" placeholder="17 caracteres">
+        <p class="mt-1 text-sm text-automotive-500" data-field-hint data-default-hint="O chassi identifica o veículo para sempre. A placa pode mudar." data-idle-class="mt-1 text-sm text-automotive-500">
+            O chassi identifica o veículo para sempre. A placa pode mudar.
+            <span data-chassis-counter class="font-mono"></span>
+        </p>
+        @error('chassis')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+    </div>
     <div>
-        <label for="license_plate" class="form-label">Placa *</label>
+        <label for="license_plate" class="form-label">Placa atual *</label>
         <input type="text" name="license_plate" id="license_plate"
                value="{{ old('license_plate', $vehicle->license_plate ?? '') }}" required
                class="form-input uppercase" placeholder="ABC1D23"
                data-mask="plate" maxlength="7" autocomplete="off">
-        <p class="mt-1 text-sm text-automotive-500" data-field-hint data-default-hint="Formato ABC1D23 ou ABC1234" data-idle-class="mt-1 text-sm text-automotive-500">Formato ABC1D23 ou ABC1234</p>
+        <p class="mt-1 text-sm text-automotive-500" data-field-hint data-default-hint="Placa atual do veículo" data-idle-class="mt-1 text-sm text-automotive-500">Placa atual do veículo</p>
         @error('license_plate')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
     <div>
@@ -69,11 +81,6 @@
         <label for="color" class="form-label">Cor</label>
         <input type="text" name="color" id="color"
                value="{{ old('color', $vehicle->color ?? '') }}" class="form-input" placeholder="Ex: PRETA">
-    </div>
-    <div>
-        <label for="chassis" class="form-label">Chassi</label>
-        <input type="text" name="chassis" id="chassis"
-               value="{{ old('chassis', $vehicle->chassis ?? '') }}" class="form-input uppercase" maxlength="17">
     </div>
     <div>
         <label for="motorization" class="form-label">Motorização</label>

@@ -6,8 +6,11 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Http/Controllers/Api/** | .ai/rules/api.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
+| app/Jobs/** | .ai/rules/jobs.md |
 | resources/js/user-portal.js | .ai/rules/js.md |
+| app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
 | resources/views/pdfs/vehicle_maintenance_export.blade.php | .ai/rules/pdfs.md |
+| scripts/crop-brand-assets.php | .ai/rules/scripts.md |
 | app/Support/DemoWorkshopLogoGenerator.php | .ai/rules/support.md |
 | frontend/lib/views/vehicles/**,resources/views/user/vehicles/** | .ai/rules/user-vehicles.md |
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |

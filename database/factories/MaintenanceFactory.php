@@ -63,4 +63,46 @@ class MaintenanceFactory extends Factory
             }
         });
     }
+
+    public function sealedByWorkshop(): static
+    {
+        return $this->afterCreating(function (Maintenance $maintenance): void {
+            $workshop = $maintenance->workshop_id
+                ? \App\Models\Workshop::find($maintenance->workshop_id)
+                : \App\Models\Workshop::factory()->create();
+
+            $maintenance->forceFill([
+                'workshop_id' => $workshop?->id,
+                'workshop_name' => $workshop?->name ?? $maintenance->workshop_name,
+                'registered_by_type' => 'workshop',
+                'verified_at' => now(),
+                'verified_workshop_id' => $workshop?->id,
+                'verification_code' => 'RVL-'.strtoupper(fake()->unique()->bothify('????')).'-'.strtoupper(fake()->bothify('??')),
+            ])->saveQuietly();
+        });
+    }
+
+    public function declaredByOwner(): static
+    {
+        return $this->afterCreating(function (Maintenance $maintenance): void {
+            $maintenance->forceFill([
+                'registered_by_type' => 'owner',
+                'verified_at' => null,
+                'verified_workshop_id' => null,
+                'verification_code' => null,
+            ])->saveQuietly();
+        });
+    }
+
+    public function declaredByGarage(): static
+    {
+        return $this->afterCreating(function (Maintenance $maintenance): void {
+            $maintenance->forceFill([
+                'registered_by_type' => 'garage',
+                'verified_at' => null,
+                'verified_workshop_id' => null,
+                'verification_code' => null,
+            ])->saveQuietly();
+        });
+    }
 }

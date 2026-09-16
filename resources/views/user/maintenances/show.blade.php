@@ -17,7 +17,9 @@
         <p class="text-automotive-600">{{ $maintenance->vehicle->brand }} {{ $maintenance->vehicle->model }} · {{ $maintenance->vehicle->license_plate }}</p>
     </div>
 
-    <div class="card">
+    <x-provenance-seal :maintenance="$maintenance" class="card" />
+
+    <div class="card mt-6">
         <h2 class="mb-4 font-semibold">Detalhes</h2>
         <dl class="grid gap-2 text-sm sm:grid-cols-2">
             <div class="flex justify-between sm:block"><dt class="text-automotive-600">Categoria</dt><dd><span class="badge badge-orange">{{ $categories[$maintenance->service_category] ?? '' }}</span></dd></div>

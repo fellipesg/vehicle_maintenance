@@ -20,7 +20,7 @@ class MaintenanceController extends Controller
     public function index(Request $request): View
     {
         $maintenances = Maintenance::where('tenant_id', $request->user()->tenant_id)
-            ->with(['vehicle', 'workshop'])
+            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user', 'invoices'])
             ->orderByDesc('maintenance_date')
             ->paginate(15);
 
@@ -72,8 +72,9 @@ class MaintenanceController extends Controller
 
         $result = $this->storeMaintenanceWithInvoices(
             $request,
-            function () use ($data) {
+            function () use ($data, $request) {
                 $maintenance = Maintenance::create($data);
+                app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
                 app(VehicleMileageService::class)->applyMaintenanceKilometers(
                     Vehicle::findOrFail($data['vehicle_id']),
                     (int) $data['kilometers'],

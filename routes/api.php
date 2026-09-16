@@ -51,6 +51,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('ability:vehicles:read');
         Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('ability:vehicles:write');
         Route::get('/vehicles/{id}', [VehicleController::class, 'show'])->middleware('ability:vehicles:read');
+        Route::get('/vehicles/{id}/plates', [VehicleController::class, 'plates'])->middleware('ability:vehicles:read');
         Route::put('/vehicles/{id}', [VehicleController::class, 'update'])->middleware('ability:vehicles:write');
         Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy'])->middleware('ability:vehicles:write');
         Route::post('/vehicles/{id}/cover', [VehicleController::class, 'uploadCover'])->middleware(['ability:vehicles:write', 'throttle:uploads']);

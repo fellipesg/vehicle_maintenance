@@ -81,6 +81,26 @@ class ApiDocumentationTest extends TestCase
         $this->assertTrue($hasBearer);
     }
 
+    public function test_openapi_spec_documents_provenance_and_plate_identity_fields(): void
+    {
+        $spec = json_encode($this->getJson('/docs/api.json')->json());
+        $needles = [
+            'verified',
+            'provenance_strip',
+            'maintenances_count',
+            'verified_maintenances_count',
+            'verification_url',
+            'verification_qr_matrix',
+            'matched_by',
+            'plate_history',
+            'vehicle.plates',
+        ];
+
+        foreach ($needles as $needle) {
+            $this->assertStringContainsString($needle, $spec, "OpenAPI spec should mention {$needle}");
+        }
+    }
+
     public function test_unauthenticated_api_requests_return_json_401(): void
     {
         $this->getJson('/api/v1/vehicles')

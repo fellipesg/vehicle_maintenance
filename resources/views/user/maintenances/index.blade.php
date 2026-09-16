@@ -9,6 +9,8 @@
         <a href="{{ route('user.maintenances.create') }}" class="btn-primary">+ Nova Manutenção</a>
     </div>
 
+    <x-provenance-legend class="mb-4" />
+
     <div data-maintenances-list>
         <div class="card text-center text-automotive-500">Carregando manutenções...</div>
     </div>

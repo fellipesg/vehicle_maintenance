@@ -328,9 +328,17 @@
                                         <span class="info-value">{{ $vehicle->year }}</span>
                                     </td>
                                 </tr>
+                                @if($vehicle->chassis)
+                                <tr>
+                                    <td colspan="2">
+                                        <span class="info-label">Chassi:</span>
+                                        <span class="info-value" style="font-family: DejaVu Sans Mono, monospace; font-size: 13px; letter-spacing: 0.05em;">{{ $vehicle->chassis }}</span>
+                                    </td>
+                                </tr>
+                                @endif
                                 <tr>
                                     <td>
-                                        <span class="info-label">Placa:</span>
+                                        <span class="info-label">Placa atual:</span>
                                         <span class="info-value">{{ $vehicle->license_plate }}</span>
                                     </td>
                                     <td>
@@ -346,24 +354,35 @@
                                     </td>
                                 </tr>
                                 @endif
-                                @if($vehicle->color || $vehicle->chassis)
+                                @if($vehicle->color)
                                 <tr>
-                                    @if($vehicle->color)
-                                    <td>
+                                    <td colspan="2">
                                         <span class="info-label">Cor:</span>
                                         <span class="info-value">{{ $vehicle->color }}</span>
                                     </td>
-                                    @else
-                                    <td></td>
-                                    @endif
-                                    @if($vehicle->chassis)
-                                    <td>
-                                        <span class="info-label">Chassi:</span>
-                                        <span class="info-value">{{ $vehicle->chassis }}</span>
+                                </tr>
+                                @endif
+                                @if($vehicle->relationLoaded('plates') && $vehicle->plates->count() > 1)
+                                <tr>
+                                    <td colspan="2">
+                                        <span class="info-label">Histórico de placas</span>
+                                        <table cellpadding="4" cellspacing="0" width="100%" style="margin-top:6px;font-size:10px;border-collapse:collapse;">
+                                            <tr style="background:#f3f4f6;">
+                                                <th align="left">Placa</th>
+                                                <th align="left">De</th>
+                                                <th align="left">Até</th>
+                                                <th align="left">Origem</th>
+                                            </tr>
+                                            @foreach($vehicle->plates as $plateRow)
+                                            <tr>
+                                                <td>{{ $plateRow->plate }}</td>
+                                                <td>{{ $plateRow->started_at?->format('d/m/Y') ?? '—' }}</td>
+                                                <td>{{ $plateRow->ended_at?->format('d/m/Y') ?? 'Vigente' }}</td>
+                                                <td>{{ \App\Models\VehiclePlate::sourceLabel($plateRow->source) }}</td>
+                                            </tr>
+                                            @endforeach
+                                        </table>
                                     </td>
-                                    @else
-                                    <td></td>
-                                    @endif
                                 </tr>
                                 @endif
                                 @if($vehicle->motorization || $vehicle->engine)
@@ -389,9 +408,28 @@
                             </table>
                         </div>
 
-                        @if($vehicle->maintenances->count() > 0)
-                            <p style="margin-top: 16px; font-size: 9pt; color: #666;">
-                                {{ $vehicle->maintenances->count() }} manutenção(ões) registrada(s) — detalhes nas páginas seguintes.
+                        @php
+                            $provenanceStrip = \App\Support\VehicleProvenanceStrip::segmentsForVehicle($vehicle);
+                            $verifiedMaintenanceCount = $vehicle->maintenances->filter(fn ($m) => $m->isVerified())->count();
+                            $totalMaintenanceCount = $vehicle->maintenances->count();
+                        @endphp
+                        @if($totalMaintenanceCount > 0)
+                            <p style="margin-top: 12px; font-size: 9pt; color: #333; font-weight: bold;">
+                                {{ $verifiedMaintenanceCount }} de {{ $totalMaintenanceCount }} manutenções com selo de oficina
+                            </p>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 8px; height: 8px; border-collapse: collapse;">
+                                <tr>
+                                    @foreach($provenanceStrip as $segment)
+                                        <td style="padding: 0; height: 8px; background-color: {{ $segment['is_verified'] ? '#0f766e' : '#fffbeb' }}; border: {{ $segment['is_verified'] ? 'none' : '1px dashed #92400e' }};"></td>
+                                    @endforeach
+                                </tr>
+                            </table>
+                            <p style="margin-top: 6px; font-size: 8pt; color: #666;">
+                                <span style="color:#0f766e;">■</span> Selo da oficina
+                                <span style="margin-left: 12px; color:#92400e;">▨</span> Declarada
+                            </p>
+                            <p style="margin-top: 8px; font-size: 9pt; color: #666;">
+                                {{ $totalMaintenanceCount }} manutenção(ões) registrada(s) — detalhes nas páginas seguintes.
                             </p>
                         @endif
                     </div>
@@ -473,6 +511,40 @@
                 <tbody>
                     <tr>
                         <td>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
+                                <tr>
+                                    <td width="6" valign="top" style="background-color: {{ $maintenance->isVerified() ? '#0f766e' : 'transparent' }}; border-left: {{ $maintenance->isVerified() ? 'none' : '3px dashed #92400e' }};"></td>
+                                    <td style="padding-left: 10px;">
+                                        @if($maintenance->isVerified())
+                                            <table cellpadding="4" cellspacing="0" style="border: 2px double #0f766e; font-size: 8pt;">
+                                                <tr>
+                                                    <td valign="middle">
+                                                        @if(! empty($workshopLogo))
+                                                            <img src="{{ $workshopLogo }}" width="40" height="40" alt="">
+                                                        @endif
+                                                    </td>
+                                                    <td valign="middle">
+                                                        <strong>Selo da oficina</strong><br>
+                                                        {{ $maintenance->verified_at?->format('d/m/Y') }}<br>
+                                                        <span style="font-family: DejaVu Sans Mono, monospace;">{{ $maintenance->verification_code }}</span>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        @else
+                                            <table cellpadding="6" cellspacing="0" width="100%" style="border: 1px dashed #92400e; background: #fffbeb; font-size: 8pt;">
+                                                <tr>
+                                                    <td>
+                                                        {{ $maintenance->provenance_label }} · não verificada
+                                                        @if($maintenance->invoices->count() > 0)
+                                                            · NF anexada ({{ $maintenance->invoices->count() }})
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        @endif
+                                    </td>
+                                </tr>
+                            </table>
                             <table class="os-body-card" cellpadding="0" cellspacing="0">
                                 <tr>
                                     <td>
@@ -594,6 +666,7 @@
     @endif
 
     <div class="doc-footer">
+        <p>Valide qualquer selo em revisalog.com.br/v/{código}</p>
         <p>Relatório gerado automaticamente pela Revisalog (revisalog.com.br)</p>
     </div>
 </body>

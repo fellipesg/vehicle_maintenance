@@ -123,6 +123,8 @@
 
                         @if($isUpcoming)
                             <span class="box-border h-4 w-4 rounded-full border-2 border-dashed border-automotive-400 bg-white"></span>
+                        @elseif(($event['type'] ?? '') === 'maintenance')
+                            <x-provenance-marker :event="$event" size="sm" />
                         @elseif($isSelected)
                             <span class="box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500"></span>
                         @elseif($index <= $trackCurrentIndex)

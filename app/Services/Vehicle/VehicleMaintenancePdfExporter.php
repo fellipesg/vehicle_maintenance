@@ -39,12 +39,14 @@ class VehicleMaintenancePdfExporter
     public function generate(Vehicle $vehicle): array
     {
         $vehicle->load([
+            'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
             'maintenances.items.warranty',
             'maintenances.generalWarranty',
             'maintenances.invoices',
             'maintenances.checklists',
             'maintenances.user',
             'maintenances.workshop',
+            'maintenances.verifiedWorkshop',
             'maintenances.photos' => fn ($query) => $query
                 ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
                 ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
@@ -68,7 +70,8 @@ class VehicleMaintenancePdfExporter
                     continue;
                 }
 
-                $logoPath = $maintenance->workshop?->logo_path;
+                $logoPath = $maintenance->verifiedWorkshop?->logo_path
+                    ?? $maintenance->workshop?->logo_path;
                 if (! is_string($logoPath) || $logoPath === '') {
                     continue;
                 }

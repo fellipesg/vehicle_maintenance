@@ -57,6 +57,36 @@ function bindDigitMask(input) {
     apply();
 }
 
+function bindChassisMask(input) {
+    const max = Number(input.maxLength || 17);
+
+    const apply = () => {
+        let value = String(input.value || '')
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, '')
+            .slice(0, max);
+        input.value = value;
+        const counter = input.parentElement?.querySelector('[data-chassis-counter]');
+        if (counter) {
+            counter.textContent = `${value.length}/${max}`;
+        }
+        if (!value) {
+            setFieldState(input, true, '');
+            return;
+        }
+        const ok = value.length === max;
+        setFieldState(
+            input,
+            ok,
+            ok ? 'Chassi completo' : `${value.length}/${max} caracteres`,
+        );
+    };
+
+    input.addEventListener('input', apply);
+    input.addEventListener('blur', apply);
+    apply();
+}
+
 function bindPlateMask(input) {
     const apply = () => {
         let value = String(input.value || '')
@@ -177,6 +207,7 @@ function bindPasswordCriteria(form) {
 function initFormUx(root = document) {
     root.querySelectorAll('[data-mask="digits"]').forEach(bindDigitMask);
     root.querySelectorAll('[data-mask="plate"]').forEach(bindPlateMask);
+    root.querySelectorAll('[data-mask="chassis"]').forEach(bindChassisMask);
     root.querySelectorAll('[data-mask="year"]').forEach(bindYearField);
     root.querySelectorAll('[data-mask="document"]').forEach(bindDocumentMask);
     root.querySelectorAll('form[data-password-form]').forEach(bindPasswordCriteria);

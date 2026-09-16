@@ -53,7 +53,7 @@ trait ImportsVehicleFromCrlv
                 ->withErrors(['crlv' => $exception->getMessage()]);
         }
 
-        $existingVehicle = Vehicle::findByRenavam($parsed->renavam);
+        $existingVehicle = \App\Services\Vehicle\VehicleOwnershipService::findExistingVehicle($parsed);
 
         $request->session()->put('crlv_verification', [
             'token' => $parsed->verificationToken(),
@@ -97,7 +97,7 @@ trait ImportsVehicleFromCrlv
                 ->withErrors(['crlv' => $exception->getMessage()]);
         }
 
-        $existingVehicle = Vehicle::findByRenavam($parsed->renavam);
+        $existingVehicle = \App\Services\Vehicle\VehicleOwnershipService::findExistingVehicle($parsed);
 
         if ($existingVehicle === null) {
             return redirect()->route($this->vehicleCreateRoute())

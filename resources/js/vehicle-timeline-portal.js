@@ -1,3 +1,5 @@
+import { renderProvenanceMarker } from './provenance-ui';
+
 function formatTimelineDate(value) {
     if (!value) {
         return '—';
@@ -21,6 +23,43 @@ function formatTimelineKm(value) {
     }
 
     return `${new Intl.NumberFormat('pt-BR').format(value)} km`;
+}
+
+function maintenanceMarkerPayload(event) {
+    return {
+        is_verified: event.is_verified === true,
+        verified_at: event.is_verified ? event.date : null,
+        verified_workshop: event.workshop_logo_url
+            ? { logo_url: event.workshop_logo_url, name: event.workshop_name }
+            : null,
+        workshop_name: event.workshop_name,
+        provenance_label: event.provenance_label,
+        registered_by_type: event.registered_by_type,
+    };
+}
+
+function timelineMarkerHtml(event, { selected = false } = {}) {
+    if (event.type === 'maintenance') {
+        const marker = renderProvenanceMarker(maintenanceMarkerPayload(event));
+        const ring = selected ? ' ring-2 ring-wrench-500 ring-offset-2' : '';
+
+        return `<span class="inline-flex shrink-0${ring}" data-timeline-marker>${marker}</span>`;
+    }
+
+    if (event.type === 'upcoming') {
+        return '<span class="box-border h-4 w-4 rounded-full border-2 border-dashed border-automotive-400 bg-white" data-timeline-marker></span>';
+    }
+
+    const isReached = event.is_current;
+    if (selected) {
+        return '<span class="box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500" data-timeline-marker></span>';
+    }
+
+    if (isReached) {
+        return '<span class="box-border h-4 w-4 rounded-full border-2 border-wrench-500 bg-wrench-500" data-timeline-marker></span>';
+    }
+
+    return '<span class="box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white" data-timeline-marker></span>';
 }
 
 function warrantyItemHtml(item) {
@@ -140,13 +179,7 @@ export function renderVehicleTimeline(timeline) {
                 <span class="text-xs ${isUpcoming ? 'text-automotive-400' : 'text-automotive-500'}">
                     ${event.kilometers != null ? formatTimelineKm(event.kilometers) : '—'}
                 </span>
-                ${isUpcoming
-                    ? '<span class="box-border h-4 w-4 rounded-full border-2 border-dashed border-automotive-400 bg-white"></span>'
-                    : (isSelected
-                        ? '<span class="box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500"></span>'
-                        : (isReached
-                            ? '<span class="box-border h-4 w-4 rounded-full border-2 border-wrench-500 bg-wrench-500"></span>'
-                            : '<span class="box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white"></span>'))}
+                ${timelineMarkerHtml(event, { selected: isSelected && !isUpcoming })}
                 ${event.date
                     ? `<span class="text-[11px] ${isSelected && !isUpcoming ? 'font-medium text-wrench-600' : 'text-automotive-500'}" data-column-date>${formatTimelineDate(event.date)}</span>`
                     : (isUpcoming ? '<span class="text-[11px] text-automotive-400">Agendado</span>' : '')}
@@ -269,15 +302,28 @@ export function mountVehicleTimeline(root, timeline) {
 
             column.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
 
-            const dot = column.querySelector('span.rounded-full');
-            if (dot && !isUpcoming) {
-                if (isSelected) {
-                    dot.className = 'box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500';
-                } else if (index <= trackCurrentIndex) {
-                    dot.className = 'box-border h-4 w-4 rounded-full border-2 border-wrench-500 bg-wrench-500';
-                } else {
-                    dot.className = 'box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white';
+            const markerWrap = column.querySelector('[data-timeline-marker]')?.closest('[data-timeline-marker]')
+                ?? column.querySelector('[data-timeline-marker]');
+            const eventAtIndex = displayEvents[index];
+
+            if (markerWrap && eventAtIndex?.type === 'maintenance') {
+                const parent = markerWrap.parentElement?.matches('[data-timeline-marker]')
+                    ? markerWrap.parentElement
+                    : markerWrap.closest('span.inline-flex') ?? markerWrap;
+                if (parent?.classList) {
+                    parent.classList.toggle('ring-2', isSelected);
+                    parent.classList.toggle('ring-wrench-500', isSelected);
+                    parent.classList.toggle('ring-offset-2', isSelected);
                 }
+            } else if (markerWrap && !isUpcoming) {
+                if (isSelected) {
+                    markerWrap.className = 'box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500';
+                } else if (index <= trackCurrentIndex) {
+                    markerWrap.className = 'box-border h-4 w-4 rounded-full border-2 border-wrench-500 bg-wrench-500';
+                } else {
+                    markerWrap.className = 'box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white';
+                }
+                markerWrap.setAttribute('data-timeline-marker', '');
             }
 
             if (columnDate && !isUpcoming) {

@@ -16,7 +16,7 @@
                 Cuide do seu carro com <span class="text-wrench-400">histórico completo</span>
             </h1>
             <p class="mt-4 text-lg text-automotive-200">
-                Registre manutenções, consulte o histórico por placa ou RENAVAM, e mantenha o valor do seu veículo documentado.
+                Registre manutenções, consulte o histórico por chassi, placa ou RENAVAM, e mantenha o valor do seu veículo documentado.
             </p>
 
             <div class="mt-8 flex flex-wrap gap-4">
@@ -95,7 +95,7 @@
             @foreach([
                 ['icon' => 'clipboard', 'title' => 'Histórico completo', 'desc' => 'Todas as manutenções vinculadas ao veículo'],
                 ['icon' => 'document', 'title' => 'Exportar PDF', 'desc' => 'Relatório com notas fiscais anexadas'],
-                ['icon' => 'search', 'title' => 'Busca pública', 'desc' => 'Consulte por placa ou RENAVAM'],
+                ['icon' => 'search', 'title' => 'Busca pública', 'desc' => 'Consulte por chassi, placa ou RENAVAM'],
                 ['icon' => 'building', 'title' => 'Diretório de oficinas', 'desc' => 'Encontre mecânicas cadastradas'],
             ] as $feature)
                 <div class="card !p-4">

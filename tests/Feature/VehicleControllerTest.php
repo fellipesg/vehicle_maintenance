@@ -61,6 +61,7 @@ class VehicleControllerTest extends TestCase
         $vehicleData = [
             'license_plate' => 'ABC1234',
             'renavam' => '12345678901',
+            'chassis' => '9BWZZZ377VT004251',
             'brand' => 'Toyota',
             'model' => 'Corolla',
             'year' => 2020,
@@ -94,6 +95,7 @@ class VehicleControllerTest extends TestCase
         $this->postJson('/api/v1/vehicles', [
             'license_plate' => 'ABC1234',
             'renavam' => '98765432109',
+            'chassis' => '9BWZZZ377VT004252',
             'brand' => 'Honda',
             'model' => 'Civic',
             'year' => 2021,
@@ -260,7 +262,8 @@ class VehicleControllerTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.license_plate', 'PII1234')
-            ->assertJsonMissingPath('data.chassis')
+            ->assertJsonPath('data.chassis', 'SECRETCHASSIS123')
+            ->assertJsonPath('data.matched_by', 'current_plate')
             ->assertJsonMissingPath('data.owners')
             ->assertJsonMissingPath('data.maintenances.0.user')
             ->assertJsonMissingPath('data.maintenances.0.invoices');
@@ -268,7 +271,6 @@ class VehicleControllerTest extends TestCase
         $payload = json_encode($response->json());
         $this->assertStringNotContainsString('owner-secret@example.com', $payload);
         $this->assertStringNotContainsString('11999998888', $payload);
-        $this->assertStringNotContainsString('SECRETCHASSIS123', $payload);
     }
 
     public function test_can_get_vehicle_maintenances(): void

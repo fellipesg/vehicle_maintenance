@@ -51,6 +51,7 @@ class VehicleOwnershipTest extends TestCase
             'license_plate' => 'QOS6H54',
             'renavam' => '01159110473',
             'crv_number' => '244043259050',
+            'chassis' => '9BMWF4AW9JM008903',
         ]);
         $owner->vehicles()->attach($vehicle->id, [
             'is_current_owner' => true,

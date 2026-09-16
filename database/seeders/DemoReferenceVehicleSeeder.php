@@ -2,13 +2,16 @@
 
 namespace Database\Seeders;
 
+use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Workshop;
+use App\Services\Maintenance\MaintenanceVerificationStamper;
 use App\Services\TenantService;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Vehicle\VehiclePlateHistoryService;
 use Illuminate\Database\Seeder;
 
 /**
@@ -178,7 +181,51 @@ class DemoReferenceVehicleSeeder extends Seeder
 
         app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
 
+        $plateHistory = app(VehiclePlateHistoryService::class);
+        $plateHistory->recordInitialPlate($vehicle->fresh(), 'seed', $user);
+        $plateHistory->changePlate($vehicle->fresh(), 'BR0D3M0', 'seed', $user);
+
+        foreach (Maintenance::where('vehicle_id', $vehicle->id)->whereNotNull('workshop_id')->get() as $sealed) {
+            $workshopUser = User::query()->where('user_type', 'workshop')
+                ->whereHas('workshop', fn ($q) => $q->where('id', $sealed->workshop_id))
+                ->first();
+            if ($workshopUser) {
+                $workshopUser->load('workshop');
+                app(MaintenanceVerificationStamper::class)->stamp($sealed, $workshopUser);
+            }
+        }
+
+        $declaredWithInvoice = Maintenance::create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'maintenance_type' => 'Troca de pastilhas (declarada)',
+            'maintenance_date' => '2025-08-01',
+            'kilometers' => 80_000,
+            'service_category' => 'mechanical',
+            'workshop_name' => 'Oficina de bairro (não cadastrada)',
+            'is_manufacturer_required' => false,
+        ]);
+        app(MaintenanceVerificationStamper::class)->stamp($declaredWithInvoice, $user);
+        Invoice::create([
+            'maintenance_id' => $declaredWithInvoice->id,
+            'file_path' => 'invoices/demo-nfe.xml',
+            'file_name' => 'demo-nfe.xml',
+        ]);
+
+        $declaredOwner = Maintenance::create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'maintenance_type' => 'Lavagem detalhada (declarada)',
+            'maintenance_date' => '2026-01-10',
+            'kilometers' => 90_000,
+            'service_category' => 'finishing',
+            'is_manufacturer_required' => false,
+        ]);
+        app(MaintenanceVerificationStamper::class)->stamp($declaredOwner, $user);
+
         $this->command?->info('Veículo demo XC4D3M0 (Volvo XC40 T4) vinculado a '.$user->email);
-        $this->command?->info('4 manutenções fictícias — odômetro 94.300 km');
+        $this->command?->info('Manutenções demo com selo, declaradas e histórico de placas');
     }
 }
