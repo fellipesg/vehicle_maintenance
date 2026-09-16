@@ -32,6 +32,8 @@ class BrandAppIconCropTest extends TestCase
         );
         $this->assertLessThan(40, $cornerTeal, 'Adaptive foreground still has the outer teal frame in the mask corners.');
 
+        $this->assertMarkIsHorizontallyCentered($image);
+
         imagedestroy($image);
     }
 
@@ -132,5 +134,31 @@ class BrandAppIconCropTest extends TestCase
     private function isTeal(int $r, int $g, int $b): bool
     {
         return $g > 120 && $b > 90 && $g > $r + 20;
+    }
+
+    private function assertMarkIsHorizontallyCentered(\GdImage $image): void
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $sumX = 0;
+        $count = 0;
+
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $rgba = imagecolorat($image, $x, $y);
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+
+                if ($this->isBrightLetter($r, $g, $b) || $this->isTeal($r, $g, $b)) {
+                    $sumX += $x;
+                    $count++;
+                }
+            }
+        }
+
+        $this->assertGreaterThan(0, $count);
+        $centroidX = $sumX / $count;
+        $this->assertEqualsWithDelta($width / 2, $centroidX, 3.0, 'Launcher mark is off-center horizontally.');
     }
 }

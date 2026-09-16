@@ -33,7 +33,7 @@ $sheet3 = loadJpeg("{$sourceDir}/sheet-3-abcd.jpg");
 $crops = [
     // Variation D is the rounded app-icon card under the "D" label — not the label itself.
     // (772, 108, 248, 248) captured the D caption and the top of the mark only.
-    'app-icon.png' => crop($sheet3, 790, 250, 200, 200, solidNavyBg: true),
+    'app-icon.png' => crop($sheet3, 782, 250, 200, 200, solidNavyBg: true),
     'lockup-horizontal.png' => crop($sheet2, 517, 245, 447, 108, solidNavyBg: true),
     'lockup-horizontal-tagline.png' => crop($sheet2, 72, 79, 486, 127, solidNavyBg: true),
     // Skip the A/B caption row above each stacked lockup on sheet-3.
@@ -43,6 +43,10 @@ $crops = [
 ];
 
 foreach ($crops as $filename => $image) {
+    if ($filename === 'app-icon.png') {
+        $image = recenterMark($image);
+    }
+
     savePng($image, "{$outBackend}/{$filename}");
     savePng($image, "{$outFrontend}/{$filename}");
     imagedestroy($image);
@@ -200,6 +204,56 @@ function resize(\GdImage $source, int $w, int $h): \GdImage
  * Variation D includes a teal rounded-rect frame. Android adaptive icons mask the
  * foreground again, so keep only the inner odometer for ic_launcher_foreground.
  */
+function recenterMark(\GdImage $image): \GdImage
+{
+    $w = imagesx($image);
+    $h = imagesy($image);
+    $sumX = 0;
+    $sumY = 0;
+    $n = 0;
+
+    for ($y = 0; $y < $h; $y++) {
+        for ($x = 0; $x < $w; $x++) {
+            $rgba = imagecolorat($image, $x, $y);
+            $r = ($rgba >> 16) & 0xFF;
+            $g = ($rgba >> 8) & 0xFF;
+            $b = $rgba & 0xFF;
+
+            if (isForegroundPixel($r, $g, $b)) {
+                $sumX += $x;
+                $sumY += $y;
+                $n++;
+            }
+        }
+    }
+
+    if ($n === 0) {
+        return $image;
+    }
+
+    $dx = (int) round(($w / 2) - ($sumX / $n));
+    $dy = (int) round(($h / 2) - ($sumY / $n));
+
+    $dest = imagecreatetruecolor($w, $h);
+    $navy = imagecolorallocate($dest, NAVY[0], NAVY[1], NAVY[2]);
+    imagefill($dest, 0, 0, $navy);
+
+    $srcX = max(0, -$dx);
+    $srcY = max(0, -$dy);
+    $dstX = max(0, $dx);
+    $dstY = max(0, $dy);
+    $copyW = $w - abs($dx);
+    $copyH = $h - abs($dy);
+
+    if ($copyW > 0 && $copyH > 0) {
+        imagecopy($dest, $image, $dstX, $dstY, $srcX, $srcY, $copyW, $copyH);
+    }
+
+    imagedestroy($image);
+
+    return $dest;
+}
+
 function innerAppMark(\GdImage $appIcon): \GdImage
 {
     $w = imagesx($appIcon);
@@ -313,8 +367,8 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
 
     $adaptiveDir = "{$frontendRoot}/android/app/src/main/res/drawable";
     if (is_dir($adaptiveDir)) {
-        $mark = innerAppMark($source);
-        $foreground = resizeWithSafeZone($mark, 432, 0.78);
+        $mark = recenterMark(innerAppMark($source));
+        $foreground = recenterMark(resizeWithSafeZone($mark, 432, 0.78));
         imagedestroy($mark);
         savePng($foreground, "{$adaptiveDir}/ic_launcher_foreground.png");
         savePng($foreground, "{$adaptiveDir}/ic_launcher.png");
