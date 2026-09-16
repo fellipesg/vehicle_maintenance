@@ -33,6 +33,7 @@ class BrandAppIconCropTest extends TestCase
         $this->assertLessThan(40, $cornerTeal, 'Adaptive foreground still has the outer teal frame in the mask corners.');
 
         $this->assertMarkIsHorizontallyCentered($image);
+        $this->assertMarkHasBalancedVerticalPadding($image);
 
         imagedestroy($image);
     }
@@ -160,5 +161,36 @@ class BrandAppIconCropTest extends TestCase
         $this->assertGreaterThan(0, $count);
         $centroidX = $sumX / $count;
         $this->assertEqualsWithDelta($width / 2, $centroidX, 3.0, 'Launcher mark is off-center horizontally.');
+    }
+
+    private function assertMarkHasBalancedVerticalPadding(\GdImage $image): void
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $minY = $height;
+        $maxY = 0;
+        $found = false;
+
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $rgba = imagecolorat($image, $x, $y);
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+
+                if ($this->isBrightLetter($r, $g, $b) || $this->isTeal($r, $g, $b)) {
+                    $found = true;
+                    $minY = min($minY, $y);
+                    $maxY = max($maxY, $y);
+                }
+            }
+        }
+
+        $this->assertTrue($found);
+        $topPad = $minY;
+        $bottomPad = ($height - 1) - $maxY;
+        // Launcher circle masks clip the bottom; keep extra navy below the mark in the asset.
+        $this->assertGreaterThanOrEqual(70, $bottomPad, 'Need navy visible below the odometer dots.');
+        $this->assertGreaterThanOrEqual($topPad - 6, $bottomPad, "Bottom padding ({$bottomPad}) should not be less than top ({$topPad}).");
     }
 }

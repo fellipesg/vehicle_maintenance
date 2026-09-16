@@ -204,7 +204,7 @@ function resize(\GdImage $source, int $w, int $h): \GdImage
  * Variation D includes a teal rounded-rect frame. Android adaptive icons mask the
  * foreground again, so keep only the inner odometer for ic_launcher_foreground.
  */
-function recenterMark(\GdImage $image, int $shiftY = 0): \GdImage
+function recenterMark(\GdImage $image, int $shiftY = 0, bool $horizontalOnly = false): \GdImage
 {
     $w = imagesx($image);
     $h = imagesy($image);
@@ -232,7 +232,9 @@ function recenterMark(\GdImage $image, int $shiftY = 0): \GdImage
     }
 
     $dx = (int) round(($w / 2) - ($sumX / $n));
-    $dy = (int) round(($h / 2) - ($sumY / $n)) + $shiftY;
+    $dy = $horizontalOnly
+        ? $shiftY
+        : (int) round(($h / 2) - ($sumY / $n)) + $shiftY;
 
     $dest = imagecreatetruecolor($w, $h);
     $navy = imagecolorallocate($dest, NAVY[0], NAVY[1], NAVY[2]);
@@ -268,20 +270,21 @@ function innerAppMark(\GdImage $appIcon): \GdImage
     return compositeOnExactNavy($cropped);
 }
 
-function resizeWithSafeZone(\GdImage $source, int $size, float $contentRatio = 0.84): \GdImage
+function resizeWithSafeZone(\GdImage $source, int $size, float $contentRatio = 0.84, int $verticalShift = 0): \GdImage
 {
     $dest = imagecreatetruecolor($size, $size);
     $navy = imagecolorallocate($dest, NAVY[0], NAVY[1], NAVY[2]);
     imagefill($dest, 0, 0, $navy);
 
     $content = max(1, (int) round($size * $contentRatio));
-    $offset = (int) round(($size - $content) / 2);
+    $offsetX = (int) round(($size - $content) / 2);
+    $offsetY = $offsetX + $verticalShift;
 
     imagecopyresampled(
         $dest,
         $source,
-        $offset,
-        $offset,
+        $offsetX,
+        $offsetY,
         0,
         0,
         $content,
@@ -291,6 +294,18 @@ function resizeWithSafeZone(\GdImage $source, int $size, float $contentRatio = 0
     );
 
     return $dest;
+}
+
+/**
+ * Android launcher masks crop the bottom of adaptive icons; scale down and bias up.
+ */
+function buildAdaptiveLauncherForeground(\GdImage $appIcon): \GdImage
+{
+    $mark = recenterMark(innerAppMark($appIcon));
+    $sized = resizeWithSafeZone($mark, 432, 0.70, verticalShift: -4);
+    imagedestroy($mark);
+
+    return recenterMark($sized, shiftY: -9, horizontalOnly: true);
 }
 
 function savePng(\GdImage $image, string $path): void
@@ -367,9 +382,7 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
 
     $adaptiveDir = "{$frontendRoot}/android/app/src/main/res/drawable";
     if (is_dir($adaptiveDir)) {
-        $mark = recenterMark(innerAppMark($source));
-        $foreground = recenterMark(resizeWithSafeZone($mark, 432, 0.78), shiftY: -10);
-        imagedestroy($mark);
+        $foreground = buildAdaptiveLauncherForeground($source);
         savePng($foreground, "{$adaptiveDir}/ic_launcher_foreground.png");
         savePng($foreground, "{$adaptiveDir}/ic_launcher.png");
         imagedestroy($foreground);
