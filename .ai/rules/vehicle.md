@@ -1,6 +1,7 @@
 ---
 paths:
   - app/Services/Vehicle/VehicleMaintenancePdfExporter.php
+  - app/Services/Vehicle/VehicleCoverService.php
 ---
 
 # Vehicle
@@ -10,3 +11,6 @@ DomPDF has enable_remote=false and chroot=base_path(). Never pass S3 signed URLs
 
 ## PDF cover crop landscape banner
 coverPathForPdf() prefers cover_photo_path (landscape), then portrait. Center-crop to COVER_CROP_WIDTH×COVER_CROP_HEIGHT (700×220) before data-URI embed. Blade uses .vehicle-cover-photo with width:100%; height:auto — no height:100%.
+
+## Thumbnails obrigatórios para capas
+Todo upload de capa (paisagem/retrato) deve gerar `cover_photo_thumb_path` 192×192 via `VehicleCoverCropper::cropToThumb`. Listagens e avatares devem preferir `cover_photo_thumb_url`.
