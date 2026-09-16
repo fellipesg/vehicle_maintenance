@@ -40,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.type' => \App\Http\Middleware\EnsureUserType::class,
             'tenant' => \App\Http\Middleware\SetTenantContext::class,
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
+            'etag.vehicle_list' => \App\Http\Middleware\EtagForVehicleList::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

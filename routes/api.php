@@ -45,7 +45,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/me/avatar', [ProfileController::class, 'uploadAvatar'])->middleware(['ability:profile:write', 'throttle:uploads']);
 
         // User's vehicles (vehicles owned by authenticated user)
-        Route::get('/my-vehicles', [VehicleController::class, 'myVehicles'])->middleware('ability:vehicles:read');
+        Route::get('/my-vehicles', [VehicleController::class, 'myVehicles'])
+            ->middleware(['ability:vehicles:read', 'etag.vehicle_list']);
 
         // Vehicle routes
         Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('ability:vehicles:read');
