@@ -55,6 +55,26 @@ class ProvenanceComponentsTest extends TestCase
         $this->assertStringContainsString('prov-marker--declared', $declaredHtml);
     }
 
+    public function test_public_vehicle_search_filters_maintenances_by_verified_query(): void
+    {
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        Maintenance::factory()->sealedByWorkshop()->create(['vehicle_id' => $vehicle->id]);
+        Maintenance::factory()->declaredByOwner()->create([
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão declarada',
+        ]);
+
+        $this->get('/buscar-veiculo?identifier=ABC1D23&verified=1')
+            ->assertOk()
+            ->assertSee('Selo da oficina', false)
+            ->assertDontSee('Revisão declarada', false);
+
+        $this->get('/buscar-veiculo?identifier=ABC1D23&verified=0')
+            ->assertOk()
+            ->assertSee('Revisão declarada', false)
+            ->assertDontSee('prov-card prov-verified', false);
+    }
+
     public function test_provenance_strip_renders_one_segment_per_maintenance(): void
     {
         $vehicle = Vehicle::factory()->create();

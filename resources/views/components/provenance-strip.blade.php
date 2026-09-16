@@ -24,9 +24,10 @@
         @foreach ($strip as $segment)
             @php
                 $segmentClass = $segment['is_verified'] ? 'prov-strip-segment--verified' : 'prov-strip-segment--declared';
-                $title = isset($segment['date'])
+                $dateLabel = isset($segment['date'])
                     ? \Carbon\Carbon::parse($segment['date'])->format('d/m/Y')
                     : '—';
+                $title = ($segment['is_verified'] ? 'Selo da oficina' : 'Declarada').' · '.$dateLabel;
                 $href = $segment['maintenance_id']
                     ? $maintenancePathPrefix.'/'.$segment['maintenance_id']
                     : '#';

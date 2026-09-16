@@ -20,6 +20,21 @@ function isVerifiedMaintenance(maintenance) {
     return maintenance.is_verified === true || maintenance.verified_at != null;
 }
 
+/** @param {Array<{ is_verified?: boolean, verified_at?: string|null }>} maintenances */
+export function filterMaintenancesByVerifiedQuery(maintenances, search = '') {
+    const verified = new URLSearchParams(search || window.location.search).get('verified');
+
+    if (verified === '1') {
+        return maintenances.filter((maintenance) => isVerifiedMaintenance(maintenance));
+    }
+
+    if (verified === '0') {
+        return maintenances.filter((maintenance) => ! isVerifiedMaintenance(maintenance));
+    }
+
+    return maintenances;
+}
+
 function provenanceRootClass(maintenance) {
     return isVerifiedMaintenance(maintenance) ? 'prov-verified' : 'prov-declared';
 }
@@ -113,7 +128,8 @@ export function renderProvenanceStrip(vehicle, { basePath = '', filterQuery = ''
     const segments = strip
         .map((segment) => {
             const cls = segment.is_verified ? 'prov-strip-segment--verified' : 'prov-strip-segment--declared';
-            const title = `${formatDate(segment.date)}`;
+            const kind = segment.is_verified ? 'Selo da oficina' : 'Declarada';
+            const title = `${kind} · ${formatDate(segment.date)}`;
             const href = segment.maintenance_id ? `${basePath}/manutencoes/${segment.maintenance_id}` : '#';
 
             return `<a href="${escapeHtml(href)}" class="prov-strip-segment ${cls}" title="${escapeHtml(title)}"></a>`;

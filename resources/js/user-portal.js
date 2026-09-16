@@ -1,6 +1,12 @@
 import apiClient from './api/client';
 import { initProvenanceActions } from './provenance-actions';
-import { renderProvenanceCard, renderProvenanceLegend, renderProvenanceStrip, renderVehicleIdentity } from './provenance-ui';
+import {
+    filterMaintenancesByVerifiedQuery,
+    renderProvenanceCard,
+    renderProvenanceLegend,
+    renderProvenanceStrip,
+    renderVehicleIdentity,
+} from './provenance-ui';
 import { initVehicleIdentity } from './vehicle-identity';
 import { mountVehicleTimeline, renderVehicleTimeline } from './vehicle-timeline-portal';
 
@@ -250,6 +256,8 @@ async function loadVehicleShow() {
                 provenance_meta: event.is_verified ? 'verificada' : 'não verificada',
             }));
 
+        const filteredMaintenances = filterMaintenancesByVerifiedQuery(maintenances);
+
         const plateRows = (vehicle.plate_history ?? [])
             .map((row) => `<tr class="border-t border-automotive-100"><td class="py-2 font-mono">${escapeHtml(row.plate)}</td><td class="py-2">${formatDate(row.started_at)}</td><td class="py-2">${row.ended_at ? formatDate(row.ended_at) : 'Vigente'}</td><td class="py-2">${escapeHtml(row.source)}</td></tr>`)
             .join('');
@@ -280,11 +288,11 @@ async function loadVehicleShow() {
                     <div class="stat-card"><p class="text-sm text-automotive-600">Manutenções</p><p class="text-2xl font-bold">${maintenances.length}</p></div>
                 </div>
                 ${renderVehicleTimeline(timeline)}
-                <h2 class="mb-4 text-xl font-semibold">🔧 Histórico de Manutenções</h2>
+                <h2 class="mb-4 text-xl font-semibold">🔧 Histórico de Manutenções (${filteredMaintenances.length})</h2>
                 <div class="space-y-3">
-                    ${maintenances.length === 0
-                        ? '<div class="card text-center text-automotive-500">Nenhuma manutenção registrada.</div>'
-                        : maintenances.map((maintenance) => renderProvenanceCard(maintenance, {
+                    ${filteredMaintenances.length === 0
+                        ? '<div class="card text-center text-automotive-500">Nenhuma manutenção neste filtro.</div>'
+                        : filteredMaintenances.map((maintenance) => renderProvenanceCard(maintenance, {
                             href: `/usuario/manutencoes/${maintenance.id}`,
                         })).join('')}
                 </div>
