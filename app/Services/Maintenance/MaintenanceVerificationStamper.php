@@ -17,14 +17,11 @@ class MaintenanceVerificationStamper
         }
 
         if ($actor->isWorkshop() && $actor->workshop && $maintenance->workshop_id === $actor->workshop->id) {
-            $maintenance->forceFill([
-                'registered_by_type' => 'workshop',
-                'verified_at' => now(),
-                'verified_workshop_id' => $actor->workshop->id,
-                'verification_code' => $this->generateUniqueCode(),
-            ])->save();
+            return $this->applyWorkshopSeal($maintenance, $actor->workshop->id);
+        }
 
-            return $maintenance->fresh();
+        if (config('maintenance.auto_verify_linked_workshop') && $maintenance->workshop_id !== null) {
+            return $this->applyWorkshopSeal($maintenance, (int) $maintenance->workshop_id);
         }
 
         $type = match (true) {
@@ -37,6 +34,34 @@ class MaintenanceVerificationStamper
             'verified_at' => null,
             'verified_workshop_id' => null,
             'verification_code' => null,
+        ])->save();
+
+        return $maintenance->fresh();
+    }
+
+    public function verifyLinkedWorkshopMaintenances(): int
+    {
+        $count = 0;
+
+        Maintenance::query()
+            ->whereNotNull('workshop_id')
+            ->whereNull('verified_at')
+            ->orderBy('id')
+            ->each(function (Maintenance $maintenance) use (&$count): void {
+                $this->applyWorkshopSeal($maintenance, (int) $maintenance->workshop_id);
+                $count++;
+            });
+
+        return $count;
+    }
+
+    private function applyWorkshopSeal(Maintenance $maintenance, int $workshopId): Maintenance
+    {
+        $maintenance->forceFill([
+            'registered_by_type' => 'workshop',
+            'verified_at' => now(),
+            'verified_workshop_id' => $workshopId,
+            'verification_code' => $this->generateUniqueCode(),
         ])->save();
 
         return $maintenance->fresh();

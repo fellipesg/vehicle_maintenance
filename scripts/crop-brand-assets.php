@@ -204,7 +204,7 @@ function resize(\GdImage $source, int $w, int $h): \GdImage
  * Variation D includes a teal rounded-rect frame. Android adaptive icons mask the
  * foreground again, so keep only the inner odometer for ic_launcher_foreground.
  */
-function recenterMark(\GdImage $image): \GdImage
+function recenterMark(\GdImage $image, int $shiftY = 0): \GdImage
 {
     $w = imagesx($image);
     $h = imagesy($image);
@@ -232,7 +232,7 @@ function recenterMark(\GdImage $image): \GdImage
     }
 
     $dx = (int) round(($w / 2) - ($sumX / $n));
-    $dy = (int) round(($h / 2) - ($sumY / $n));
+    $dy = (int) round(($h / 2) - ($sumY / $n)) + $shiftY;
 
     $dest = imagecreatetruecolor($w, $h);
     $navy = imagecolorallocate($dest, NAVY[0], NAVY[1], NAVY[2]);
@@ -368,7 +368,7 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
     $adaptiveDir = "{$frontendRoot}/android/app/src/main/res/drawable";
     if (is_dir($adaptiveDir)) {
         $mark = recenterMark(innerAppMark($source));
-        $foreground = recenterMark(resizeWithSafeZone($mark, 432, 0.78));
+        $foreground = recenterMark(resizeWithSafeZone($mark, 432, 0.78), shiftY: -10);
         imagedestroy($mark);
         savePng($foreground, "{$adaptiveDir}/ic_launcher_foreground.png");
         savePng($foreground, "{$adaptiveDir}/ic_launcher.png");
