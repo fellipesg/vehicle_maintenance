@@ -36,8 +36,9 @@ $crops = [
     'app-icon.png' => crop($sheet3, 790, 250, 200, 200, solidNavyBg: true),
     'lockup-horizontal.png' => crop($sheet2, 517, 245, 447, 108, solidNavyBg: true),
     'lockup-horizontal-tagline.png' => crop($sheet2, 72, 79, 486, 127, solidNavyBg: true),
-    'lockup-stacked.png' => crop($sheet3, 24, 108, 228, 420, solidNavyBg: true),
-    'lockup-stacked-bar.png' => crop($sheet3, 272, 108, 228, 420, solidNavyBg: true),
+    // Skip the A/B caption row above each stacked lockup on sheet-3.
+    'lockup-stacked.png' => crop($sheet3, 24, 132, 228, 396, solidNavyBg: true),
+    'lockup-stacked-bar.png' => crop($sheet3, 272, 132, 228, 396, solidNavyBg: true),
     'og-image.png' => buildOgImage($sheet2),
 ];
 
@@ -195,6 +196,24 @@ function resize(\GdImage $source, int $w, int $h): \GdImage
  *
  * @param  float  $contentRatio  Fraction of the canvas the source should occupy (0–1).
  */
+/**
+ * Variation D includes a teal rounded-rect frame. Android adaptive icons mask the
+ * foreground again, so keep only the inner odometer for ic_launcher_foreground.
+ */
+function innerAppMark(\GdImage $appIcon): \GdImage
+{
+    $w = imagesx($appIcon);
+    $h = imagesy($appIcon);
+    $inset = (int) round(min($w, $h) * 0.15);
+    $innerW = $w - (2 * $inset);
+    $innerH = $h - (2 * $inset);
+
+    $cropped = imagecreatetruecolor($innerW, $innerH);
+    imagecopy($cropped, $appIcon, 0, 0, $inset, $inset, $innerW, $innerH);
+
+    return compositeOnExactNavy($cropped);
+}
+
 function resizeWithSafeZone(\GdImage $source, int $size, float $contentRatio = 0.84): \GdImage
 {
     $dest = imagecreatetruecolor($size, $size);
@@ -294,7 +313,9 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
 
     $adaptiveDir = "{$frontendRoot}/android/app/src/main/res/drawable";
     if (is_dir($adaptiveDir)) {
-        $foreground = resizeWithSafeZone($source, 432, 0.72);
+        $mark = innerAppMark($source);
+        $foreground = resizeWithSafeZone($mark, 432, 0.78);
+        imagedestroy($mark);
         savePng($foreground, "{$adaptiveDir}/ic_launcher_foreground.png");
         savePng($foreground, "{$adaptiveDir}/ic_launcher.png");
         imagedestroy($foreground);

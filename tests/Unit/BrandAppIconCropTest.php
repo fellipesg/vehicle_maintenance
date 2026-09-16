@@ -17,6 +17,24 @@ class BrandAppIconCropTest extends TestCase
         imagedestroy($image);
     }
 
+    public function test_android_adaptive_foreground_drops_the_teal_card_frame(): void
+    {
+        $path = dirname(__DIR__, 3).'/frontend/android/app/src/main/res/drawable/ic_launcher_foreground.png';
+        $image = $this->loadPng($path);
+
+        $cornerTeal = $this->countMatchingPixels(
+            $image,
+            0,
+            0,
+            (int) floor(imagesx($image) * 0.12),
+            (int) floor(imagesy($image) * 0.12),
+            $this->isTeal(...),
+        );
+        $this->assertLessThan(40, $cornerTeal, 'Adaptive foreground still has the outer teal frame in the mask corners.');
+
+        imagedestroy($image);
+    }
+
     public function test_ios_marketing_icon_keeps_the_odometer_inside_the_safe_zone(): void
     {
         $path = dirname(__DIR__, 3).'/frontend/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png';
