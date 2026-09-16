@@ -2,6 +2,8 @@ import apiClient from './api/client';
 import { initProvenanceActions } from './provenance-actions';
 import {
     filterMaintenancesByVerifiedQuery,
+    initProvenanceStripFilters,
+    renderMaintenanceHistoryList,
     renderProvenanceCard,
     renderProvenanceLegend,
     renderProvenanceStrip,
@@ -279,7 +281,7 @@ async function loadVehicleShow() {
                         <a href="/usuario/manutencoes/criar?vehicle_id=${vehicle.id}" class="btn-primary">+ Manutenção</a>
                     </div>
                 </div>
-                ${renderProvenanceStrip(vehicle, { basePath: '/usuario' })}
+                ${renderProvenanceStrip(vehicle, { basePath: '/usuario', interactiveFilters: true })}
                 ${plateRows ? `<details class="card mb-6"><summary class="cursor-pointer font-semibold text-automotive-900">Histórico de placas</summary><table class="mt-4 w-full text-sm"><thead><tr class="text-left text-automotive-500"><th>Placa</th><th>De</th><th>Até</th><th>Origem</th></tr></thead><tbody>${plateRows}</tbody></table></details>` : ''}
                 <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div class="stat-card"><p class="text-sm text-automotive-600">RENAVAM</p><p class="font-semibold wrap-anywhere">${escapeHtml(vehicle.renavam)}</p></div>
@@ -288,19 +290,16 @@ async function loadVehicleShow() {
                     <div class="stat-card"><p class="text-sm text-automotive-600">Manutenções</p><p class="text-2xl font-bold">${maintenances.length}</p></div>
                 </div>
                 ${renderVehicleTimeline(timeline)}
-                <h2 class="mb-4 text-xl font-semibold">🔧 Histórico de Manutenções (${filteredMaintenances.length})</h2>
-                <div class="space-y-3">
-                    ${filteredMaintenances.length === 0
-                        ? '<div class="card text-center text-automotive-500">Nenhuma manutenção neste filtro.</div>'
-                        : filteredMaintenances.map((maintenance) => renderProvenanceCard(maintenance, {
-                            href: `/usuario/manutencoes/${maintenance.id}`,
-                        })).join('')}
+                <h2 class="mb-4 text-xl font-semibold" data-maintenance-list-title>🔧 Histórico de Manutenções (${filteredMaintenances.length})</h2>
+                <div class="space-y-3" data-maintenance-list>
+                    ${renderMaintenanceHistoryList(filteredMaintenances, { basePath: '/usuario' })}
                 </div>
             `;
 
             mountVehicleTimeline(content, timeline);
             initVehicleIdentity(content);
             initProvenanceActions(content);
+            initProvenanceStripFilters(content, maintenances, { basePath: '/usuario' });
         }
 
         const newExportButton = root.querySelector('[data-export-pdf]');

@@ -21,8 +21,14 @@ function isVerifiedMaintenance(maintenance) {
 }
 
 /** @param {Array<{ is_verified?: boolean, verified_at?: string|null }>} maintenances */
-export function filterMaintenancesByVerifiedQuery(maintenances, search = '') {
-    const verified = new URLSearchParams(search || window.location.search).get('verified');
+export function filterMaintenancesByVerifiedQuery(maintenances, searchOrVerified = '') {
+    let verified = null;
+
+    if (searchOrVerified === '1' || searchOrVerified === '0') {
+        verified = searchOrVerified;
+    } else {
+        verified = new URLSearchParams(searchOrVerified || window.location.search).get('verified');
+    }
 
     if (verified === '1') {
         return maintenances.filter((maintenance) => isVerifiedMaintenance(maintenance));
@@ -33,6 +39,68 @@ export function filterMaintenancesByVerifiedQuery(maintenances, search = '') {
     }
 
     return maintenances;
+}
+
+export function renderMaintenanceHistoryList(maintenances, { basePath = '/usuario' } = {}) {
+    if (maintenances.length === 0) {
+        return '<div class="card text-center text-automotive-500">Nenhuma manutenção neste filtro.</div>';
+    }
+
+    return maintenances
+        .map((maintenance) => renderProvenanceCard(maintenance, {
+            href: `${basePath}/manutencoes/${maintenance.id}`,
+        }))
+        .join('');
+}
+
+function provenanceFilterChipClass(isActive) {
+    return `underline ${isActive ? 'font-semibold text-automotive-900' : ''}`;
+}
+
+export function initProvenanceStripFilters(root, allMaintenances, { basePath = '/usuario' } = {}) {
+    const listHost = root.querySelector('[data-maintenance-list]');
+    const titleEl = root.querySelector('[data-maintenance-list-title]');
+
+    if (!listHost) {
+        return;
+    }
+
+    const applyFilter = (verifiedValue) => {
+        const filtered = filterMaintenancesByVerifiedQuery(
+            allMaintenances,
+            verifiedValue === null ? '' : verifiedValue,
+        );
+
+        const url = new URL(window.location.href);
+        if (verifiedValue === null || verifiedValue === '') {
+            url.searchParams.delete('verified');
+        } else {
+            url.searchParams.set('verified', verifiedValue);
+        }
+        history.replaceState(null, '', url);
+
+        root.querySelectorAll('[data-provenance-filter]').forEach((button) => {
+            const value = button.dataset.provenanceFilter ?? '';
+            const active =
+                (value === '' && !url.searchParams.get('verified'))
+                || url.searchParams.get('verified') === value;
+            button.className = provenanceFilterChipClass(active);
+        });
+
+        listHost.innerHTML = renderMaintenanceHistoryList(filtered, { basePath });
+
+        if (titleEl) {
+            titleEl.textContent = `🔧 Histórico de Manutenções (${filtered.length})`;
+        }
+    };
+
+    root.querySelectorAll('[data-provenance-filter]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            const value = button.dataset.provenanceFilter ?? '';
+            applyFilter(value === '' ? null : value);
+        });
+    });
 }
 
 function provenanceRootClass(maintenance) {
@@ -119,7 +187,7 @@ export function renderVehicleIdentity(vehicle, { size = 'card', editUrl = null }
     `;
 }
 
-export function renderProvenanceStrip(vehicle, { basePath = '', filterQuery = '' } = {}) {
+export function renderProvenanceStrip(vehicle, { basePath = '', interactiveFilters = false } = {}) {
     const strip = vehicle.provenance_strip ?? [];
     const total = vehicle.maintenances_count ?? strip.length;
     const verified = vehicle.verified_maintenances_count ?? strip.filter((s) => s.is_verified).length;
@@ -136,24 +204,43 @@ export function renderProvenanceStrip(vehicle, { basePath = '', filterQuery = ''
         })
         .join('');
 
-    const params = new URLSearchParams(window.location.search);
-    params.delete('verified');
-    params.delete('page');
-    const suffix = params.toString();
-    const prefix = suffix ? `?${suffix}&` : '?';
-    const allHref = suffix ? `?${suffix}` : window.location.pathname;
-    const verifiedHref = `${prefix}verified=1`;
-    const declaredHref = `${prefix}verified=0`;
     const current = new URLSearchParams(window.location.search).get('verified');
 
+    let filterControls = '';
+
+    if (interactiveFilters) {
+        const chip = (value, label) => {
+            const active = (value === '' && current === null) || current === value;
+
+            return `<button type="button" data-provenance-filter="${value}" class="${provenanceFilterChipClass(active)}">${label}</button>`;
+        };
+        filterControls = `
+            ${chip('', 'Todas')}
+            ${chip('1', 'Selo da oficina')}
+            ${chip('0', 'Declaradas')}
+        `;
+    } else {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('verified');
+        params.delete('page');
+        const suffix = params.toString();
+        const prefix = suffix ? `?${suffix}&` : '?';
+        const allHref = suffix ? `?${suffix}` : window.location.pathname;
+        const verifiedHref = `${prefix}verified=1`;
+        const declaredHref = `${prefix}verified=0`;
+        filterControls = `
+            <a href="${escapeHtml(allHref)}" class="${provenanceFilterChipClass(current === null)}">Todas</a>
+            <a href="${escapeHtml(verifiedHref)}" class="${provenanceFilterChipClass(current === '1')}">Selo da oficina</a>
+            <a href="${escapeHtml(declaredHref)}" class="${provenanceFilterChipClass(current === '0')}">Declaradas</a>
+        `;
+    }
+
     return `
-        <div class="mb-4">
+        <div class="mb-4" data-provenance-strip>
             <div class="prov-strip">${segments}</div>
             <p class="mt-2 text-sm text-automotive-600">${total} manutenções · ${verified} com selo de oficina · ${declared} declaradas</p>
             <div class="mt-2 flex flex-wrap gap-3 text-sm">
-                <a href="${escapeHtml(allHref)}" class="underline ${current === null ? 'font-semibold text-automotive-900' : ''}">Todas</a>
-                <a href="${escapeHtml(verifiedHref)}" class="underline ${current === '1' ? 'font-semibold text-automotive-900' : ''}">Selo da oficina</a>
-                <a href="${escapeHtml(declaredHref)}" class="underline ${current === '0' ? 'font-semibold text-automotive-900' : ''}">Declaradas</a>
+                ${filterControls}
             </div>
         </div>
     `;
