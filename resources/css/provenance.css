@@ -12,6 +12,8 @@
 .prov-rail {
     width: 3px;
     flex-shrink: 0;
+    align-self: stretch;
+    min-height: 2.75rem;
     border-radius: 2px;
     background-color: var(--prov-ink);
 }
@@ -64,6 +66,7 @@
     display: flex;
     gap: 1px;
     height: 8px;
+    min-height: 8px;
     width: 100%;
     border-radius: 4px;
     overflow: hidden;
