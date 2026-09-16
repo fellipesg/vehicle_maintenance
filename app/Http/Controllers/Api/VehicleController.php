@@ -21,6 +21,7 @@ use App\Services\Vehicle\VehiclePlateHistoryService;
 use App\Services\Vehicle\VehicleTimelineBuilder;
 use App\Services\VehicleCatalogService;
 use App\Support\ApiResponse;
+use App\Support\VehicleListIncludes;
 use App\Support\VehiclePlateSearch;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
@@ -60,6 +61,11 @@ class VehicleController extends Controller
     #[QueryParameter('search', 'Filter by license plate, RENAVAM, brand, or model.')]
     #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
     #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
+    #[QueryParameter(
+        'include',
+        'Optional comma-separated relations: plates, provenance_strip.',
+        type: 'string',
+    )]
     public function index(Request $request): JsonResponse
     {
         Gate::authorize('viewAny', Vehicle::class);
@@ -76,8 +82,14 @@ class VehicleController extends Controller
                         ->orWhere('brand', 'like', "%{$search}%")
                         ->orWhere('model', 'like', "%{$search}%");
                 });
-            })
-            ->paginate($this->perPage($request));
+            });
+
+        VehicleListIncludes::applyEagerLoads(
+            $vehicles,
+            VehicleListIncludes::parse($request->query('include')),
+        );
+
+        $vehicles = $vehicles->paginate($this->perPage($request));
 
         return ApiResponse::paginated($vehicles, VehicleResource::class);
     }
@@ -287,6 +299,11 @@ class VehicleController extends Controller
 
     #[QueryParameter('page', 'Page number (default 1).', type: 'integer')]
     #[QueryParameter('per_page', 'Results per page (default 15, max 100).', type: 'integer')]
+    #[QueryParameter(
+        'include',
+        'Optional comma-separated relations: plates, provenance_strip.',
+        type: 'string',
+    )]
     public function myVehicles(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -296,14 +313,17 @@ class VehicleController extends Controller
                 'maintenances',
                 'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
             ])
-            ->with([
-                'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
-                'provenanceStripMaintenances',
-            ])
-            ->orderByDesc('vehicles.created_at')
-            ->paginate($this->perPage($request));
+            ->orderByDesc('vehicles.created_at');
 
-        return ApiResponse::paginated($vehicles, VehicleResource::class);
+        VehicleListIncludes::applyEagerLoads(
+            $vehicles,
+            VehicleListIncludes::parse($request->query('include')),
+        );
+
+        return ApiResponse::paginated(
+            $vehicles->paginate($this->perPage($request)),
+            VehicleResource::class,
+        );
     }
 
     public function linkToUser(Request $request, string $id): JsonResponse
