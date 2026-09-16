@@ -31,7 +31,9 @@ $sheet2 = loadJpeg("{$sourceDir}/sheet-2-refined.jpg");
 $sheet3 = loadJpeg("{$sourceDir}/sheet-3-abcd.jpg");
 
 $crops = [
-    'app-icon.png' => crop($sheet3, 772, 108, 248, 248, solidNavyBg: true),
+    // Variation D is the rounded app-icon card under the "D" label — not the label itself.
+    // (772, 108, 248, 248) captured the D caption and the top of the mark only.
+    'app-icon.png' => crop($sheet3, 790, 250, 200, 200, solidNavyBg: true),
     'lockup-horizontal.png' => crop($sheet2, 517, 245, 447, 108, solidNavyBg: true),
     'lockup-horizontal-tagline.png' => crop($sheet2, 72, 79, 486, 127, solidNavyBg: true),
     'lockup-stacked.png' => crop($sheet3, 24, 108, 228, 420, solidNavyBg: true),
@@ -188,6 +190,36 @@ function resize(\GdImage $source, int $w, int $h): \GdImage
     return $dest;
 }
 
+/**
+ * Center the mark on navy with inset so iOS squircle / Android adaptive masks do not clip it.
+ *
+ * @param  float  $contentRatio  Fraction of the canvas the source should occupy (0–1).
+ */
+function resizeWithSafeZone(\GdImage $source, int $size, float $contentRatio = 0.84): \GdImage
+{
+    $dest = imagecreatetruecolor($size, $size);
+    $navy = imagecolorallocate($dest, NAVY[0], NAVY[1], NAVY[2]);
+    imagefill($dest, 0, 0, $navy);
+
+    $content = max(1, (int) round($size * $contentRatio));
+    $offset = (int) round(($size - $content) / 2);
+
+    imagecopyresampled(
+        $dest,
+        $source,
+        $offset,
+        $offset,
+        0,
+        0,
+        $content,
+        $content,
+        imagesx($source),
+        imagesy($source),
+    );
+
+    return $dest;
+}
+
 function savePng(\GdImage $image, string $path): void
 {
     if (! imagepng($image, $path, 6)) {
@@ -219,7 +251,7 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
 
     $iosDir = "{$frontendRoot}/ios/Runner/Assets.xcassets/AppIcon.appiconset";
     foreach ($iosSizes as $filename => $size) {
-        $icon = resize($source, $size, $size);
+        $icon = resizeWithSafeZone($source, $size, 0.84);
         savePng($icon, "{$iosDir}/{$filename}");
         imagedestroy($icon);
     }
@@ -236,7 +268,7 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
 
     $macDir = "{$frontendRoot}/macos/Runner/Assets.xcassets/AppIcon.appiconset";
     foreach ($macSizes as $filename => $size) {
-        $icon = resize($source, $size, $size);
+        $icon = resizeWithSafeZone($source, $size, 0.84);
         savePng($icon, "{$macDir}/{$filename}");
         imagedestroy($icon);
     }
@@ -254,10 +286,18 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
         if (! is_dir($dir)) {
             continue;
         }
-        $icon = resize($source, $size, $size);
+        $icon = resizeWithSafeZone($source, $size, 0.84);
         savePng($icon, "{$dir}/ic_launcher.png");
         savePng($icon, "{$dir}/ic_launcher_round.png");
         imagedestroy($icon);
+    }
+
+    $adaptiveDir = "{$frontendRoot}/android/app/src/main/res/drawable";
+    if (is_dir($adaptiveDir)) {
+        $foreground = resizeWithSafeZone($source, 432, 0.72);
+        savePng($foreground, "{$adaptiveDir}/ic_launcher_foreground.png");
+        savePng($foreground, "{$adaptiveDir}/ic_launcher.png");
+        imagedestroy($foreground);
     }
 
     imagedestroy($source);
