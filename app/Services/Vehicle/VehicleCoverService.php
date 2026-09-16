@@ -8,6 +8,8 @@ use Illuminate\Http\UploadedFile;
 
 class VehicleCoverService
 {
+    public function __construct(private readonly VehicleCoverCropper $cropper) {}
+
     public function store(Vehicle $vehicle, UploadedFile $file): Vehicle
     {
         return $this->storeLandscape($vehicle, $file);
@@ -18,12 +20,18 @@ class VehicleCoverService
         $extension = $file->getClientOriginalExtension() ?: 'jpg';
         $fileName = $vehicle->id.'_landscape_'.time().'.'.$extension;
         $filePath = AppStorage::COVERS_PREFIX.$fileName;
+        $bytes = (string) file_get_contents($file->getRealPath());
 
         $this->deleteStored($vehicle->cover_photo_path);
+        $this->deleteStoredThumb($vehicle);
 
-        AppStorage::putPublic($filePath, (string) file_get_contents($file->getRealPath()));
+        AppStorage::putPublic($filePath, $bytes);
+        $thumbPath = $this->storeThumbBytes($vehicle, $bytes);
 
-        $vehicle->update(['cover_photo_path' => $filePath]);
+        $vehicle->update([
+            'cover_photo_path' => $filePath,
+            'cover_photo_thumb_path' => $thumbPath,
+        ]);
 
         return $vehicle->fresh();
     }
@@ -33,12 +41,20 @@ class VehicleCoverService
         $extension = $file->getClientOriginalExtension() ?: 'jpg';
         $fileName = $vehicle->id.'_portrait_'.time().'.'.$extension;
         $filePath = AppStorage::COVERS_PREFIX.$fileName;
+        $bytes = (string) file_get_contents($file->getRealPath());
 
         $this->deleteStored($vehicle->cover_photo_portrait_path);
 
-        AppStorage::putPublic($filePath, (string) file_get_contents($file->getRealPath()));
+        AppStorage::putPublic($filePath, $bytes);
 
-        $vehicle->update(['cover_photo_portrait_path' => $filePath]);
+        $updates = ['cover_photo_portrait_path' => $filePath];
+
+        if (! $vehicle->hasThumbCover()) {
+            $this->deleteStoredThumb($vehicle);
+            $updates['cover_photo_thumb_path'] = $this->storeThumbBytes($vehicle, $bytes);
+        }
+
+        $vehicle->update($updates);
 
         return $vehicle->fresh();
     }
@@ -48,8 +64,14 @@ class VehicleCoverService
         $filePath = AppStorage::COVERS_PREFIX.$vehicle->id.'_landscape_'.time().'.'.$extension;
 
         $this->deleteStored($vehicle->cover_photo_path);
+        $this->deleteStoredThumb($vehicle);
+
         AppStorage::putPublic($filePath, $bytes);
-        $vehicle->update(['cover_photo_path' => $filePath]);
+
+        $vehicle->update([
+            'cover_photo_path' => $filePath,
+            'cover_photo_thumb_path' => $this->storeThumbBytes($vehicle, $bytes),
+        ]);
 
         return $vehicle->fresh();
     }
@@ -60,9 +82,27 @@ class VehicleCoverService
 
         $this->deleteStored($vehicle->cover_photo_portrait_path);
         AppStorage::putPublic($filePath, $bytes);
-        $vehicle->update(['cover_photo_portrait_path' => $filePath]);
+
+        $updates = ['cover_photo_portrait_path' => $filePath];
+
+        if (! $vehicle->hasThumbCover()) {
+            $this->deleteStoredThumb($vehicle);
+            $updates['cover_photo_thumb_path'] = $this->storeThumbBytes($vehicle, $bytes);
+        }
+
+        $vehicle->update($updates);
 
         return $vehicle->fresh();
+    }
+
+    public function storeThumbBytes(Vehicle $vehicle, string $sourceBytes): string
+    {
+        $thumbBytes = $this->cropper->cropToThumb($sourceBytes);
+        $filePath = AppStorage::COVERS_PREFIX.$vehicle->id.'_thumb_'.time().'.jpg';
+
+        AppStorage::putPublic($filePath, $thumbBytes);
+
+        return $filePath;
     }
 
     public function deleteStored(?string $coverPhotoPath): void
@@ -73,6 +113,19 @@ class VehicleCoverService
 
         if (AppStorage::coversDisk()->exists($coverPhotoPath)) {
             AppStorage::coversDisk()->delete($coverPhotoPath);
+        }
+    }
+
+    public function deleteStoredThumb(Vehicle $vehicle): void
+    {
+        $thumbPath = $vehicle->cover_photo_thumb_path;
+
+        if ($thumbPath === null || $thumbPath === '') {
+            return;
+        }
+
+        if (AppStorage::coversDisk()->exists($thumbPath)) {
+            AppStorage::coversDisk()->delete($thumbPath);
         }
     }
 }

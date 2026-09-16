@@ -30,6 +30,7 @@ class VehicleResource extends JsonResource
             'odometer_at_registration' => $this->odometer_at_registration,
             'cover_photo_url' => $this->cover_photo_url,
             'cover_photo_portrait_url' => $this->cover_photo_portrait_url,
+            'cover_photo_thumb_url' => $this->cover_photo_thumb_url,
             'maintenances_count' => $this->when(isset($this->maintenances_count), $this->maintenances_count),
             'verified_maintenances_count' => $this->when(
                 isset($this->verified_maintenances_count),

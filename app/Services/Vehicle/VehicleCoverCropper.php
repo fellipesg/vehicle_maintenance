@@ -16,6 +16,56 @@ class VehicleCoverCropper
         return $this->centerCrop($imageBytes, 9, 16);
     }
 
+    public function cropToThumb(string $imageBytes): string
+    {
+        if (! function_exists('imagecreatefromstring')) {
+            throw new RuntimeException('GD extension is required to crop vehicle cover photos.');
+        }
+
+        $source = @imagecreatefromstring($imageBytes);
+
+        if ($source === false) {
+            throw new RuntimeException('Unable to decode vehicle cover image.');
+        }
+
+        $sourceWidth = imagesx($source);
+        $sourceHeight = imagesy($source);
+
+        if ($sourceWidth <= 0 || $sourceHeight <= 0) {
+            imagedestroy($source);
+
+            throw new RuntimeException('Invalid vehicle cover image dimensions.');
+        }
+
+        $cropSize = min($sourceWidth, $sourceHeight);
+        $cropX = (int) max(0, floor(($sourceWidth - $cropSize) / 2));
+        $cropY = (int) max(0, floor(($sourceHeight - $cropSize) / 2));
+
+        $outputSize = 192;
+        $dest = imagecreatetruecolor($outputSize, $outputSize);
+        imagecopyresampled(
+            $dest,
+            $source,
+            0,
+            0,
+            $cropX,
+            $cropY,
+            $outputSize,
+            $outputSize,
+            $cropSize,
+            $cropSize,
+        );
+
+        ob_start();
+        imagejpeg($dest, null, 80);
+        $jpeg = (string) ob_get_clean();
+
+        imagedestroy($source);
+        imagedestroy($dest);
+
+        return $jpeg;
+    }
+
     private function centerCrop(string $imageBytes, int $ratioW, int $ratioH): string
     {
         if (! function_exists('imagecreatefromstring')) {

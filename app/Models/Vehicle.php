@@ -20,6 +20,7 @@ class Vehicle extends Model
     protected $appends = [
         'cover_photo_url',
         'cover_photo_portrait_url',
+        'cover_photo_thumb_url',
     ];
 
     protected $fillable = [
@@ -35,6 +36,7 @@ class Vehicle extends Model
         'engine',
         'cover_photo_path',
         'cover_photo_portrait_path',
+        'cover_photo_thumb_path',
         'current_kilometers',
         'odometer_at_registration',
     ];
@@ -94,6 +96,17 @@ class Vehicle extends Model
         });
     }
 
+    protected function coverPhotoThumbUrl(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            if (is_string($this->cover_photo_thumb_path) && $this->cover_photo_thumb_path !== '') {
+                return AppStorage::coversUrl($this->cover_photo_thumb_path);
+            }
+
+            return $this->cover_photo_portrait_url ?? $this->cover_photo_url;
+        });
+    }
+
     public function coverPathForPdf(): ?string
     {
         $landscape = $this->cover_photo_path;
@@ -117,6 +130,11 @@ class Vehicle extends Model
     public function hasPortraitCover(): bool
     {
         return is_string($this->cover_photo_portrait_path) && $this->cover_photo_portrait_path !== '';
+    }
+
+    public function hasThumbCover(): bool
+    {
+        return is_string($this->cover_photo_thumb_path) && $this->cover_photo_thumb_path !== '';
     }
 
     /**

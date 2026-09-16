@@ -24,6 +24,9 @@ class PublicVehicleSearchResource extends JsonResource
             'model' => $this->model,
             'year' => $this->year,
             'color' => $this->color,
+            'cover_photo_url' => $this->cover_photo_url,
+            'cover_photo_portrait_url' => $this->cover_photo_portrait_url,
+            'cover_photo_thumb_url' => $this->cover_photo_thumb_url,
             'plate_history' => VehiclePlateResource::collection(
                 $this->whenLoaded('plates', fn () => $this->plates->sortByDesc(fn ($p) => $p->started_at ?? $p->created_at)->values())
             ),
