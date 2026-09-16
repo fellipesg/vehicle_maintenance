@@ -5,14 +5,39 @@ namespace Tests\Feature;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\Workshop;
+use App\Support\AppStorage;
 use App\Support\VehicleProvenanceStrip;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ProvenanceComponentsTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_provenance_marker_renders_workshop_logo_when_logo_exists(): void
+    {
+        Storage::fake('r2');
+
+        $workshop = Workshop::factory()->create();
+        $logoPath = AppStorage::WORKSHOP_LOGOS_PREFIX.$workshop->id.'_marker_test.jpg';
+        Storage::disk('r2')->put($logoPath, 'fake-logo');
+        $workshop->update(['logo_path' => $logoPath]);
+
+        $maintenance = Maintenance::factory()->sealedByWorkshop()->create([
+            'workshop_id' => $workshop->id,
+            'verified_workshop_id' => $workshop->id,
+        ]);
+
+        $html = Blade::render('<x-provenance-marker :maintenance="$maintenance" />', [
+            'maintenance' => $maintenance->load('verifiedWorkshop'),
+        ]);
+
+        $this->assertStringContainsString('<img', $html);
+        $this->assertStringContainsString($workshop->logoUrl(), $html);
+    }
 
     public function test_provenance_marker_renders_filled_and_ring_variants(): void
     {

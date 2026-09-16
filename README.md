@@ -1,12 +1,16 @@
-# Vehicle Maintenance
+# Revisalog
 
-Laravel API and web portal for vehicle service history. Records stay on the vehicle, not on whoever currently owns it.
+Maintenance history that belongs to the vehicle (chassis/VIN), not to the owner.  
+https://revisalog.com.br
 
-Mobile client: [vehicle_maintenance_frontend](https://github.com/fellipesg/vehicle_maintenance_frontend)
+Laravel API and web portal for vehicle service history. Mobile client: [vehicle_maintenance_frontend](https://github.com/fellipesg/vehicle_maintenance_frontend).
 
 ## What it does
 
 - Register vehicles (plate / RENAVAM) and keep a permanent maintenance log
+- Chassis (VIN) as the primary identity, with plate history over time
+- Maintenance provenance: workshop seal (verifiable via code + QR at `/v/{code}`) vs declared by owner/garage
+- Provenance strip and filters on vehicle timelines (web and API)
 - Workshops, service categories, and checklists
 - Upload invoices (NF-e XML and DANFE PDF); line items can be applied to a maintenance
 - Import vehicles from CRLV PDFs
@@ -136,14 +140,26 @@ Prefix: `/api/v1`. Authenticated routes use Sanctum (`Authorization: Bearer …`
 | Area | Examples |
 | --- | --- |
 | Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me`, OAuth redirect/callback |
-| Vehicles | CRUD, `GET /my-vehicles`, `GET /vehicles/{id}/maintenances`, `GET /vehicles/{id}/export-pdf` |
-| Search | `GET /vehicles/search/{identifier}` (plate or RENAVAM) |
+| Vehicles | CRUD, `GET /my-vehicles`, `GET /vehicles/{id}/maintenances`, `GET /vehicles/{id}/plates`, `GET /vehicles/{id}/export-pdf` |
+| Search | `GET /vehicles/search/{identifier}` (plate, RENAVAM, or chassis); `matched_by` in responses; `?verified=1|0` on maintenance lists |
+| Verification | `GET /v/{code}` (web) — public maintenance seal page |
 | Maintenances | CRUD |
 | Invoices | upload / download / delete |
 | Workshops | public list + authenticated write |
 | FCM | token register / list / delete |
 
 Web (Blade): owner portal, workshop/garage flows, admin brand/model catalog. See `routes/web.php`.
+
+## Screenshots
+
+| | |
+| --- | --- |
+| Owner portal — chassis & plate chip | ![portal chassis](docs/screenshots/portal-chassis.png) |
+| Provenance strip & filters | ![provenance strip](docs/screenshots/provenance-strip.png) |
+| Maintenance with workshop seal | ![maintenance seal](docs/screenshots/maintenance-seal.png) |
+| Exported PDF | ![pdf export](docs/screenshots/pdf-export.png) |
+| Flutter (iOS) | ![app ios](docs/screenshots/app-ios.png) |
+| Flutter (Android) | ![app android](docs/screenshots/app-android.png) |
 
 ## Layout
 

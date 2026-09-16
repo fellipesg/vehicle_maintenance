@@ -12,6 +12,8 @@ use App\Services\Maintenance\MaintenanceVerificationStamper;
 use App\Services\TenantService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\VehiclePlateHistoryService;
+use App\Support\AppStorage;
+use App\Support\DemoWorkshopLogoGenerator;
 use Illuminate\Database\Seeder;
 
 /**
@@ -61,6 +63,9 @@ class DemoReferenceVehicleSeeder extends Seeder
                 'state' => 'PR',
             ]
         );
+
+        $this->ensureWorkshopLogo($vilaVerde, 'vila-verde', 'Mecânica Vila Verde', [15, 118, 110]);
+        $this->ensureWorkshopLogo($autoNorte, 'auto-norte', 'AutoCenter Norte', [30, 64, 175]);
 
         $vehicle = Vehicle::updateOrCreate(
             ['license_plate' => 'XC4D3M0'],
@@ -227,5 +232,26 @@ class DemoReferenceVehicleSeeder extends Seeder
 
         $this->command?->info('Veículo demo XC4D3M0 (Volvo XC40 T4) vinculado a '.$user->email);
         $this->command?->info('Manutenções demo com selo, declaradas e histórico de placas');
+    }
+
+    /**
+     * @param  array{0: int, 1: int, 2: int}  $rgb
+     */
+    private function ensureWorkshopLogo(Workshop $workshop, string $slug, string $label, array $rgb): void
+    {
+        if ($workshop->logo_path !== null
+            && AppStorage::isWorkshopLogoPath($workshop->logo_path)
+            && AppStorage::coversDisk()->exists($workshop->logo_path)) {
+            return;
+        }
+
+        $logoPath = AppStorage::WORKSHOP_LOGOS_PREFIX.$workshop->id.'_'.$slug.'.jpg';
+
+        if (! AppStorage::isWorkshopLogoPath($logoPath) || ! AppStorage::usesCoversDisk($logoPath)) {
+            throw new \RuntimeException("Invalid demo logo path: {$logoPath}");
+        }
+
+        AppStorage::putPublic($logoPath, DemoWorkshopLogoGenerator::jpeg($label, $rgb));
+        $workshop->update(['logo_path' => $logoPath]);
     }
 }
