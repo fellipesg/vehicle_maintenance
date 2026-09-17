@@ -136,7 +136,7 @@ class DemoWarrantyPdfExportTest extends TestCase
 
             $maintenanceCount = $vehicle->fresh()->maintenances->count();
             $pageCount = DemoWarrantyPdfValidator::countPages($file['content']);
-            $this->assertGreaterThanOrEqual(1 + $maintenanceCount, $pageCount);
+            $this->assertSame(1 + $maintenanceCount, $pageCount);
 
             $this->assertTrue(DemoWarrantyPdfValidator::isValid($file['content']));
         } finally {

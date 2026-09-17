@@ -48,10 +48,34 @@ class DemoWarrantyPdfValidator
 
     public static function extractText(string $pdfContent): string
     {
+        if (function_exists('ini_set') && self::memoryLimitBytes(ini_get('memory_limit')) < 512 * 1024 * 1024) {
+            ini_set('memory_limit', '512M');
+        }
+
         $parser = new Parser;
         $pdf = $parser->parseContent($pdfContent);
+        $text = $pdf->getText();
+        unset($pdf, $parser);
 
-        return $pdf->getText();
+        return $text;
+    }
+
+    private static function memoryLimitBytes(string|false $limit): int
+    {
+        if ($limit === false || $limit === '' || $limit === '-1') {
+            return 512 * 1024 * 1024;
+        }
+
+        $limit = trim($limit);
+        $unit = strtolower(substr($limit, -1));
+        $value = (int) $limit;
+
+        return match ($unit) {
+            'g' => $value * 1024 * 1024 * 1024,
+            'm' => $value * 1024 * 1024,
+            'k' => $value * 1024,
+            default => $value,
+        };
     }
 
     public static function countPages(string $pdfContent): int

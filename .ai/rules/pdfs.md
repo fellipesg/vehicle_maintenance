@@ -15,6 +15,8 @@ Cover: landscape photo first (coverPathForPdf prefers cover_photo_path), full-wi
 
 OS (.os-document): thead = letterhead + title-band only (display:table-header-group). tbody = separate tr for meta, items-table, invoices. items-table has its own thead (Item/Qtd/…) that repeats on page breaks. Workshop logo portrait: max-height 64px, max-width 48px.
 
+Page breaks: `.cover-document` uses `page-break-after: always`. Do **not** set `page-break-before: always` on every `.os-document` — that stacks with the cover break and inserts a blank page. Use `.os-document + .os-document { page-break-before: always; }` so only the 2nd+ OS starts on a new page.
+
 ## Letterhead workshop logo size
 Workshop logo in letterhead: portrait 2:3, CSS max-width 72px / max-height 108px, valign middle in .letterhead-logo-cell. Demo source images 200×300 (Picsum or DemoWorkshopLogoGenerator). Do not squash with tiny max-width.
 

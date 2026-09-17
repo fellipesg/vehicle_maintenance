@@ -24,6 +24,10 @@ class ExportDemoWarrantyPdfs extends Command
 
     public function handle(VehicleMaintenancePdfExporter $exporter): int
     {
+        if (function_exists('ini_set')) {
+            ini_set('memory_limit', '512M');
+        }
+
         if (! app()->environment('local', 'testing')) {
             $this->error('demo:export-warranty-pdfs only runs in local or testing environments.');
 

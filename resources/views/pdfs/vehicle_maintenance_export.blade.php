@@ -47,7 +47,7 @@
             padding: 14px 18px 18px;
         }
 
-        .os-document {
+        .os-document + .os-document {
             page-break-before: always;
         }
 

@@ -151,7 +151,7 @@ class VehicleMaintenancePdfExporterTest extends TestCase
             $maintenanceCount = $vehicle->fresh()->maintenances->count();
 
             $this->assertSame(2, $maintenanceCount);
-            $this->assertGreaterThanOrEqual(1 + $maintenanceCount, $pageCount);
+            $this->assertSame(1 + $maintenanceCount, $pageCount);
         } finally {
             $exporter->cleanupTemps($file['temps']);
         }
@@ -176,7 +176,7 @@ class VehicleMaintenancePdfExporterTest extends TestCase
         $file = $exporter->generate($vehicle->fresh());
 
         try {
-            $this->assertGreaterThanOrEqual(3, DemoWarrantyPdfValidator::countPages($file['content']));
+            $this->assertSame(3, DemoWarrantyPdfValidator::countPages($file['content']));
         } finally {
             $exporter->cleanupTemps($file['temps']);
         }
