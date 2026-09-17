@@ -34,6 +34,17 @@ class DemoMaintenanceWarrantiesSeeder extends Seeder
 
     public const DIVESA_INVOICE_PATH = 'invoices/divesa_revisao_b_qos6h54.pdf';
 
+    /**
+     * Titles are the upsert key, so renamed demo OS must be migrated in place
+     * (otherwise a re-run would create a second record next to the legacy one).
+     *
+     * @var array<string, string>
+     */
+    private const LEGACY_TITLE_RENAMES = [
+        'Demo Brothers — pastilhas (vigente)' => 'Demo Brothers — pastilhas (garantia vigente)',
+        'Demo Brothers — alinhamento (expirada)' => 'Demo Brothers — alinhamento (garantia expirada)',
+    ];
+
     public function run(): void
     {
         if (! app()->environment('local', 'testing')) {
@@ -52,6 +63,7 @@ class DemoMaintenanceWarrantiesSeeder extends Seeder
 
         $owner = User::query()->where('email', 'fgoncalves2008@gmail.com')->first();
 
+        $this->renameLegacyDemoTitles($vehicle);
         $this->pruneDuplicateDemoMaintenances($vehicle);
         $this->ensureVehicleOdometer($vehicle);
 
@@ -85,12 +97,22 @@ class DemoMaintenanceWarrantiesSeeder extends Seeder
         $this->command?->info('Demo maintenance warranties ready for '.self::PLATE.'.');
     }
 
+    private function renameLegacyDemoTitles(Vehicle $vehicle): void
+    {
+        foreach (self::LEGACY_TITLE_RENAMES as $legacyTitle => $currentTitle) {
+            Maintenance::query()
+                ->where('vehicle_id', $vehicle->id)
+                ->where('maintenance_type', $legacyTitle)
+                ->update(['maintenance_type' => $currentTitle]);
+        }
+    }
+
     private function pruneDuplicateDemoMaintenances(Vehicle $vehicle): void
     {
         $canonicalTypes = [
             'Demo controle — sem logo/garantia',
-            'Demo Brothers — pastilhas (vigente)',
-            'Demo Brothers — alinhamento (expirada)',
+            'Demo Brothers — pastilhas (garantia vigente)',
+            'Demo Brothers — alinhamento (garantia expirada)',
             'Demo Dev — revisão rápida',
         ];
 
@@ -216,7 +238,7 @@ class DemoMaintenanceWarrantiesSeeder extends Seeder
         $vigente = Maintenance::updateOrCreate(
             [
                 'vehicle_id' => $vehicle->id,
-                'maintenance_type' => 'Demo Brothers — pastilhas (vigente)',
+                'maintenance_type' => 'Demo Brothers — pastilhas (garantia vigente)',
             ],
             [
                 'user_id' => $owner->id,
@@ -250,7 +272,7 @@ class DemoMaintenanceWarrantiesSeeder extends Seeder
         $expired = Maintenance::updateOrCreate(
             [
                 'vehicle_id' => $vehicle->id,
-                'maintenance_type' => 'Demo Brothers — alinhamento (expirada)',
+                'maintenance_type' => 'Demo Brothers — alinhamento (garantia expirada)',
             ],
             [
                 'user_id' => $owner->id,

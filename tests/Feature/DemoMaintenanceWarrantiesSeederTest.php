@@ -117,4 +117,33 @@ class DemoMaintenanceWarrantiesSeederTest extends TestCase
             $batteryItem->fresh()->warranty?->name,
         );
     }
+
+    public function test_seeder_renames_legacy_brothers_titles_in_place_instead_of_duplicating(): void
+    {
+        Workshop::factory()->create(['name' => DemoWorkshopAccountsSeeder::BROTHERS_NAME]);
+
+        (new DevPortalUsersSeeder)->run();
+        (new DemoWorkshopAccountsSeeder)->run();
+        (new FelipeVehicleSeeder)->run();
+        (new DemoMaintenanceWarrantiesSeeder)->run();
+
+        $vehicle = Vehicle::query()->where('license_plate', DemoMaintenanceWarrantiesSeeder::PLATE)->firstOrFail();
+        $legacy = Maintenance::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->where('maintenance_type', 'Demo Brothers — pastilhas (garantia vigente)')
+            ->firstOrFail();
+        $legacy->forceFill(['maintenance_type' => 'Demo Brothers — pastilhas (vigente)'])->save();
+
+        (new DemoMaintenanceWarrantiesSeeder)->run();
+
+        $renamed = Maintenance::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->where('maintenance_type', 'like', 'Demo Brothers — pastilhas%')
+            ->get();
+
+        $this->assertCount(1, $renamed);
+        $this->assertSame($legacy->id, $renamed->first()->id);
+        $this->assertSame('Demo Brothers — pastilhas (garantia vigente)', $renamed->first()->maintenance_type);
+        $this->assertNotNull($renamed->first()->generalWarranty);
+    }
 }
