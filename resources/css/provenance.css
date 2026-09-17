@@ -27,27 +27,53 @@
 }
 
 .prov-marker {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     flex-shrink: 0;
     border-radius: 9999px;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    font-size: 0.65rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
 }
 
+.prov-marker--sm {
+    width: 24px;
+    height: 24px;
+    font-size: 0.6rem;
+}
+
+.prov-marker--lg {
+    width: 44px;
+    height: 44px;
+    font-size: 0.85rem;
+}
+
+/* Selo: disco de tinta com anel; o logo fica num miolo branco para ler mesmo em foto escura */
 .prov-marker--verified {
     background-color: var(--prov-ink);
     color: #fff;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--prov-ink);
 }
 
+.prov-marker--verified img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 9999px;
+    background-color: #fff;
+    border: 2px solid #fff;
+}
+
+/* Declarada: anel tracejado (lápis), vazado */
 .prov-marker--declared {
     background-color: var(--prov-surface);
-    border: 2px solid var(--prov-ink);
+    border: 2px dashed var(--prov-ink);
     color: var(--prov-ink);
+    box-shadow: 0 0 0 2px #fff;
 }
 
 .prov-card {
@@ -62,36 +88,53 @@
     background-color: var(--prov-surface);
 }
 
-.prov-strip {
+/* Resumo web (cards / busca) — espelha a capa do PDF em escala compacta */
+.prov-strip-summary {
+    margin: 0;
+}
+
+.prov-dots-row {
     display: flex;
-    gap: 1px;
-    height: 8px;
-    min-height: 8px;
-    width: 100%;
-    border-radius: 4px;
-    overflow: hidden;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-top: 0.5rem;
 }
 
-.prov-strip-segment {
-    flex: 1 1 0;
-    min-width: 4px;
+.prov-dot-link {
+    display: inline-flex;
+    line-height: 0;
+    border-radius: 9999px;
+}
+
+.prov-dot-link:focus-visible {
+    outline: 2px solid #0f766e;
+    outline-offset: 2px;
+}
+
+.prov-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    flex-shrink: 0;
     display: block;
-    height: 100%;
+    box-sizing: border-box;
 }
 
-.prov-strip-segment--verified {
+.prov-dot--verified {
     background-color: #0f766e;
 }
 
-.prov-strip-segment--declared {
+.prov-dot--declared {
     background-color: #fffbeb;
-    background-image: repeating-linear-gradient(
-        45deg,
-        #92400e,
-        #92400e 2px,
-        #fffbeb 2px,
-        #fffbeb 4px
-    );
+    border: 2px dashed #92400e;
+}
+
+.prov-dots-more {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    padding-left: 2px;
 }
 
 .prov-seal {

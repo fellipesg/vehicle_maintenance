@@ -75,7 +75,7 @@ class ProvenanceComponentsTest extends TestCase
             ->assertDontSee('prov-card prov-verified', false);
     }
 
-    public function test_provenance_strip_renders_one_segment_per_maintenance(): void
+    public function test_provenance_strip_renders_compact_summary_and_dots(): void
     {
         $vehicle = Vehicle::factory()->create();
         Maintenance::factory()->count(2)->sealedByWorkshop()->create(['vehicle_id' => $vehicle->id]);
@@ -90,7 +90,33 @@ class ProvenanceComponentsTest extends TestCase
         $html = Blade::render('<x-provenance-strip :vehicle="$vehicle" />', ['vehicle' => $vehicle]);
 
         $this->assertSame(3, count(VehicleProvenanceStrip::segmentsForVehicle($vehicle)));
-        $this->assertEquals(3, substr_count($html, 'class="prov-strip-segment '));
+        $this->assertStringContainsString('prov-strip-summary', $html);
+        $this->assertStringContainsString('2</span> com selo', $html);
+        $this->assertStringContainsString('1</span> declarada', $html);
+        $this->assertStringContainsString('prov-dots-row', $html);
+        $this->assertSame(
+            3,
+            preg_match_all('/class="prov-dot prov-dot--(verified|declared)"/', $html)
+        );
+        $this->assertStringNotContainsString('prov-strip-segment', $html);
+    }
+
+    public function test_provenance_strip_dots_collapse_overflow_after_sixteen(): void
+    {
+        $vehicle = Vehicle::factory()->create();
+        Maintenance::factory()->count(17)->sealedByWorkshop()->create(['vehicle_id' => $vehicle->id]);
+
+        $vehicle->load('provenanceStripMaintenances');
+        $vehicle->loadCount([
+            'maintenances',
+            'maintenances as verified_maintenances_count' => fn ($query) => $query->whereNotNull('verified_at'),
+        ]);
+
+        $html = Blade::render('<x-provenance-strip :vehicle="$vehicle" />', ['vehicle' => $vehicle]);
+
+        $this->assertSame(16, preg_match_all('/class="prov-dot prov-dot--verified"/', $html));
+        $this->assertStringContainsString('class="prov-dots-more"', $html);
+        $this->assertStringContainsString('+1</span>', $html);
     }
 
     public function test_workshop_maintenances_index_includes_provenance_legend_and_cards(): void
@@ -136,5 +162,20 @@ class ProvenanceComponentsTest extends TestCase
         $this->assertStringContainsString('Declarada', $html);
         $this->assertStringContainsString('manutenções com selo de oficina', $html);
         $this->assertStringContainsString('revisalog.com.br/v/{código}', $html);
+
+        // Capa: contadores + linha de pontos (um por manutenção), sem a barra segmentada.
+        $this->assertStringContainsString('prov-count--verified', $html);
+        $this->assertStringContainsString('prov-count--declared', $html);
+        $this->assertSame(
+            $vehicle->maintenances->count(),
+            preg_match_all('/class="prov-dot prov-dot--(verified|declared)"/', $html)
+        );
+
+        // OS: selo em bloco largo com código e URL de verificação; declarada com evidência.
+        $this->assertStringContainsString('class="seal seal--verified"', $html);
+        $this->assertStringContainsString('class="seal seal--declared"', $html);
+        $this->assertStringContainsString('Registro feito pela própria oficina em', $html);
+        $this->assertStringContainsString('não verificado por oficina cadastrada', $html);
+        $this->assertMatchesRegularExpression('#revisalog\.com\.br/v/RVL-[A-Z0-9]{4}-[A-Z0-9]{2}#', $html);
     }
 }

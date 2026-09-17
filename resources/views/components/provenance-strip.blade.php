@@ -11,37 +11,44 @@
     $total = (int) ($vehicle->maintenances_count ?? $vehicle->maintenances?->count() ?? count($strip));
     $verified = (int) ($vehicle->verified_maintenances_count ?? collect($strip)->where('is_verified', true)->count());
     $declared = max(0, $total - $verified);
+    $visibleDots = array_slice($strip, 0, 16);
+    $overflowDots = max(0, count($strip) - count($visibleDots));
     $baseUrl = $filterBaseUrl ?? request()->url();
     $query = request()->except('verified', 'page');
     $allUrl = $baseUrl.(count($query) ? '?'.http_build_query($query) : '');
     $verifiedUrl = $baseUrl.'?'.http_build_query([...$query, 'verified' => '1']);
     $declaredUrl = $baseUrl.'?'.http_build_query([...$query, 'verified' => '0']);
     $currentFilter = request()->query('verified');
+    $declaredLabel = $declared === 1 ? 'declarada' : 'declaradas';
 @endphp
 
-<div {{ $attributes->class(['mb-4']) }}>
-    <div class="prov-strip" role="img" aria-label="Faixa de procedência das manutenções">
-        @foreach ($strip as $segment)
-            @php
-                $segmentClass = $segment['is_verified'] ? 'prov-strip-segment--verified' : 'prov-strip-segment--declared';
-                $dateLabel = isset($segment['date'])
-                    ? \Carbon\Carbon::parse($segment['date'])->format('d/m/Y')
-                    : '—';
-                $title = ($segment['is_verified'] ? 'Selo da oficina' : 'Declarada').' · '.$dateLabel;
-                $href = $segment['maintenance_id']
-                    ? $maintenancePathPrefix.'/'.$segment['maintenance_id']
-                    : '#';
-            @endphp
-            <a
-                href="{{ $href }}"
-                class="prov-strip-segment {{ $segmentClass }}"
-                title="{{ $title }}"
-            ></a>
-        @endforeach
-    </div>
-    <p class="mt-2 text-sm text-automotive-600">
-        {{ $total }} manutenções · {{ $verified }} com selo de oficina · {{ $declared }} declaradas
+<div {{ $attributes->class(['mb-4']) }} data-provenance-strip>
+    <p class="prov-strip-summary text-sm text-automotive-700">
+        <span class="font-medium text-[#0f766e]">{{ $verified }}</span> com selo ·
+        <span class="font-medium text-[#92400e]">{{ $declared }}</span> {{ $declaredLabel }}
     </p>
+    @if (count($visibleDots) > 0)
+        <div class="prov-dots-row" role="img" aria-label="Linha de procedência das manutenções, da mais antiga à mais recente">
+            @foreach ($visibleDots as $segment)
+                @php
+                    $dotClass = $segment['is_verified'] ? 'prov-dot--verified' : 'prov-dot--declared';
+                    $dateLabel = isset($segment['date'])
+                        ? \Carbon\Carbon::parse($segment['date'])->format('d/m/Y')
+                        : '—';
+                    $title = ($segment['is_verified'] ? 'Selo da oficina' : 'Declarada').' · '.$dateLabel;
+                    $href = $segment['maintenance_id']
+                        ? $maintenancePathPrefix.'/'.$segment['maintenance_id']
+                        : '#';
+                @endphp
+                <a href="{{ $href }}" class="prov-dot-link" title="{{ $title }}">
+                    <span class="prov-dot {{ $dotClass }}"></span>
+                </a>
+            @endforeach
+            @if ($overflowDots > 0)
+                <span class="prov-dots-more" title="{{ $overflowDots }} manutenções a mais">+{{ $overflowDots }}</span>
+            @endif
+        </div>
+    @endif
     <div class="mt-2 flex flex-wrap gap-3 text-sm">
         <a href="{{ $allUrl }}" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === null])>Todas</a>
         <a href="{{ $verifiedUrl }}" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === '1'])>Selo da oficina</a>

@@ -40,8 +40,8 @@ function maintenanceMarkerPayload(event) {
 
 function timelineMarkerHtml(event, { selected = false } = {}) {
     if (event.type === 'maintenance') {
-        const marker = renderProvenanceMarker(maintenanceMarkerPayload(event));
-        const ring = selected ? ' ring-2 ring-wrench-500 ring-offset-2' : '';
+        const marker = renderProvenanceMarker(maintenanceMarkerPayload(event), 'lg');
+        const ring = selected ? ' rounded-full ring-2 ring-wrench-500 ring-offset-4' : '';
 
         return `<span class="inline-flex shrink-0${ring}" data-timeline-marker>${marker}</span>`;
     }

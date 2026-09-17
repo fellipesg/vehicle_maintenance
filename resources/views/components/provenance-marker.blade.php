@@ -9,7 +9,11 @@
         ? $maintenance->isVerified()
         : (bool) ($event['is_verified'] ?? false);
     $rootClass = $verified ? 'prov-verified' : 'prov-declared';
-    $sizeClass = $size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs';
+    $sizeClass = match ($size) {
+        'sm' => 'prov-marker--sm',
+        'lg' => 'prov-marker--lg',
+        default => '',
+    };
 
     $logoUrl = null;
     $labelSource = '?';

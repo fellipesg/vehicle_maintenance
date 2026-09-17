@@ -109,7 +109,7 @@ function provenanceRootClass(maintenance) {
 
 export function renderProvenanceMarker(maintenance, size = 'md') {
     const verified = isVerifiedMaintenance(maintenance);
-    const sizeClass = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs';
+    const sizeClass = size === 'sm' ? 'prov-marker--sm' : size === 'lg' ? 'prov-marker--lg' : '';
     const logo = maintenance.verified_workshop?.logo_url ?? maintenance.workshop?.logo_url;
     const initials = (maintenance.verified_workshop?.name ?? maintenance.workshop_name ?? maintenance.user?.name ?? '?')
         .split(' ')
@@ -187,22 +187,33 @@ export function renderVehicleIdentity(vehicle, { size = 'card', editUrl = null }
     `;
 }
 
+const PROVENANCE_DOTS_MAX = 16;
+
 export function renderProvenanceStrip(vehicle, { basePath = '', interactiveFilters = false } = {}) {
     const strip = vehicle.provenance_strip ?? [];
     const total = vehicle.maintenances_count ?? strip.length;
     const verified = vehicle.verified_maintenances_count ?? strip.filter((s) => s.is_verified).length;
-    const declared = total - verified;
+    const declared = Math.max(0, total - verified);
+    const declaredLabel = declared === 1 ? 'declarada' : 'declaradas';
+    const visibleDots = strip.slice(0, PROVENANCE_DOTS_MAX);
+    const overflowDots = Math.max(0, strip.length - visibleDots.length);
 
-    const segments = strip
+    const dots = visibleDots
         .map((segment) => {
-            const cls = segment.is_verified ? 'prov-strip-segment--verified' : 'prov-strip-segment--declared';
+            const cls = segment.is_verified ? 'prov-dot--verified' : 'prov-dot--declared';
             const kind = segment.is_verified ? 'Selo da oficina' : 'Declarada';
             const title = `${kind} · ${formatDate(segment.date)}`;
             const href = segment.maintenance_id ? `${basePath}/manutencoes/${segment.maintenance_id}` : '#';
 
-            return `<a href="${escapeHtml(href)}" class="prov-strip-segment ${cls}" title="${escapeHtml(title)}"></a>`;
+            return `<a href="${escapeHtml(href)}" class="prov-dot-link" title="${escapeHtml(title)}"><span class="prov-dot ${cls}"></span></a>`;
         })
         .join('');
+    const overflow = overflowDots > 0
+        ? `<span class="prov-dots-more" title="${overflowDots} manutenções a mais">+${overflowDots}</span>`
+        : '';
+    const dotsRow = visibleDots.length > 0
+        ? `<div class="prov-dots-row" role="img" aria-label="Linha de procedência das manutenções, da mais antiga à mais recente">${dots}${overflow}</div>`
+        : '';
 
     const current = new URLSearchParams(window.location.search).get('verified');
 
@@ -237,8 +248,11 @@ export function renderProvenanceStrip(vehicle, { basePath = '', interactiveFilte
 
     return `
         <div class="mb-4" data-provenance-strip>
-            <div class="prov-strip">${segments}</div>
-            <p class="mt-2 text-sm text-automotive-600">${total} manutenções · ${verified} com selo de oficina · ${declared} declaradas</p>
+            <p class="prov-strip-summary text-sm text-automotive-700">
+                <span class="font-medium text-[#0f766e]">${verified}</span> com selo ·
+                <span class="font-medium text-[#92400e]">${declared}</span> ${declaredLabel}
+            </p>
+            ${dotsRow}
             <div class="mt-2 flex flex-wrap gap-3 text-sm">
                 ${filterControls}
             </div>
@@ -250,11 +264,11 @@ export function renderProvenanceLegend() {
     return `
         <div class="flex flex-wrap items-center gap-6 text-sm text-automotive-700">
             <div class="flex items-center gap-2">
-                <div class="prov-marker prov-marker--verified prov-verified w-6 h-6 text-[10px]">OF</div>
+                <div class="prov-marker prov-marker--verified prov-marker--sm prov-verified">OF</div>
                 <span>Selo da oficina <span class="text-automotive-500">(verificada)</span></span>
             </div>
             <div class="flex items-center gap-2">
-                <div class="prov-marker prov-marker--declared prov-declared w-6 h-6 text-[10px]">PR</div>
+                <div class="prov-marker prov-marker--declared prov-marker--sm prov-declared">PR</div>
                 <span>Declarada <span class="text-automotive-500">(não verificada)</span></span>
             </div>
         </div>

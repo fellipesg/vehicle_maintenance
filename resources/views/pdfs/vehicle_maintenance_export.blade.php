@@ -179,6 +179,163 @@
             font-size: 10pt;
         }
 
+        /* Procedência — resumo (capa) */
+        .prov-summary {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px 0;
+            margin: 14px -10px 0;
+        }
+
+        .prov-count {
+            width: 50%;
+            padding: 10px 12px;
+            border-radius: 6px;
+            vertical-align: top;
+        }
+
+        .prov-count--verified {
+            background-color: #f0fdfa;
+            border: 1px solid #99f6e4;
+            border-left: 4px solid #0f766e;
+        }
+
+        .prov-count--declared {
+            background-color: #fffbeb;
+            border: 1px dashed #d97706;
+        }
+
+        .prov-count-num {
+            font-size: 18pt;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .prov-count--verified .prov-count-num { color: #0f766e; }
+        .prov-count--declared .prov-count-num { color: #92400e; }
+
+        .prov-count-label {
+            font-size: 8pt;
+            color: #4b5563;
+            margin-top: 4px;
+        }
+
+        .prov-dots {
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+
+        .prov-dots td {
+            text-align: center;
+            padding: 0 4px;
+            vertical-align: top;
+        }
+
+        .prov-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 6px;
+            margin: 0 auto;
+        }
+
+        .prov-dot--verified {
+            background-color: #0f766e;
+        }
+
+        .prov-dot--declared {
+            width: 7px;
+            height: 7px;
+            background-color: #fffbeb;
+            border: 2px dashed #92400e;
+        }
+
+        .prov-dot-date {
+            font-size: 6.5pt;
+            color: #6b7280;
+            margin-top: 3px;
+            white-space: nowrap;
+        }
+
+        .prov-dots-caption {
+            font-size: 7.5pt;
+            color: #6b7280;
+            margin-top: 6px;
+        }
+
+        /* Procedência — selo por OS */
+        .seal {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        .seal td {
+            vertical-align: middle;
+            padding: 8px 10px;
+        }
+
+        .seal--verified td {
+            background-color: #f0fdfa;
+            border-top: 1px solid #99f6e4;
+            border-bottom: 1px solid #99f6e4;
+        }
+
+        .seal--verified td.seal-first { border-left: 4px solid #0f766e; }
+        .seal--verified td.seal-last { border-right: 1px solid #99f6e4; }
+
+        .seal--declared td {
+            background-color: #fffbeb;
+            border-top: 1px dashed #d97706;
+            border-bottom: 1px dashed #d97706;
+        }
+
+        .seal--declared td.seal-first { border-left: 1px dashed #d97706; }
+        .seal--declared td.seal-last { border-right: 1px dashed #d97706; }
+
+        .seal-kicker {
+            font-size: 7pt;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .seal--verified .seal-kicker { color: #0f766e; }
+        .seal--declared .seal-kicker { color: #92400e; }
+
+        .seal-name {
+            font-size: 10pt;
+            font-weight: bold;
+            color: #111827;
+            margin-top: 2px;
+        }
+
+        .seal-meta {
+            font-size: 7.5pt;
+            color: #4b5563;
+            margin-top: 2px;
+            line-height: 1.35;
+        }
+
+        .seal-code {
+            font-family: "DejaVu Sans Mono", monospace;
+            font-size: 10pt;
+            font-weight: bold;
+            color: #0f766e;
+            letter-spacing: 1px;
+        }
+
+        .seal-verify {
+            font-size: 7pt;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .seal-evidence {
+            font-size: 8pt;
+            font-weight: bold;
+            color: #92400e;
+        }
+
         .os-body-card {
             width: 100%;
             border-collapse: collapse;
@@ -414,22 +571,38 @@
                             $totalMaintenanceCount = $vehicle->maintenances->count();
                         @endphp
                         @if($totalMaintenanceCount > 0)
-                            <p style="margin-top: 12px; font-size: 9pt; color: #333; font-weight: bold;">
-                                {{ $verifiedMaintenanceCount }} de {{ $totalMaintenanceCount }} manutenções com selo de oficina
-                            </p>
-                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 8px; height: 8px; border-collapse: collapse;">
+                            @php
+                                $declaredMaintenanceCount = $totalMaintenanceCount - $verifiedMaintenanceCount;
+                                $provenanceDotRows = array_chunk($provenanceStrip, 12);
+                            @endphp
+                            <table class="prov-summary" cellpadding="0" cellspacing="0">
                                 <tr>
-                                    @foreach($provenanceStrip as $segment)
-                                        <td style="padding: 0; height: 8px; background-color: {{ $segment['is_verified'] ? '#0f766e' : '#fffbeb' }}; border: {{ $segment['is_verified'] ? 'none' : '1px dashed #92400e' }};"></td>
-                                    @endforeach
+                                    <td class="prov-count prov-count--verified">
+                                        <div class="prov-count-num">{{ $verifiedMaintenanceCount }}</div>
+                                        <div class="prov-count-label">Com selo de oficina</div>
+                                    </td>
+                                    <td class="prov-count prov-count--declared">
+                                        <div class="prov-count-num">{{ $declaredMaintenanceCount }}</div>
+                                        <div class="prov-count-label">{{ $declaredMaintenanceCount === 1 ? 'Declarada, sem selo de oficina' : 'Declaradas, sem selo de oficina' }}</div>
+                                    </td>
                                 </tr>
                             </table>
-                            <p style="margin-top: 6px; font-size: 8pt; color: #666;">
-                                <span style="color:#0f766e;">■</span> Selo da oficina
-                                <span style="margin-left: 12px; color:#92400e;">▨</span> Declarada
-                            </p>
-                            <p style="margin-top: 8px; font-size: 9pt; color: #666;">
-                                {{ $totalMaintenanceCount }} manutenção(ões) registrada(s) — detalhes nas páginas seguintes.
+                            @foreach($provenanceDotRows as $dotRow)
+                                <table class="prov-dots" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        @foreach($dotRow as $segment)
+                                            <td>
+                                                <div class="prov-dot {{ $segment['is_verified'] ? 'prov-dot--verified' : 'prov-dot--declared' }}"></div>
+                                                <div class="prov-dot-date">{{ $segment['date'] ? \Carbon\Carbon::parse($segment['date'])->format('m/y') : '—' }}</div>
+                                            </td>
+                                        @endforeach
+                                    </tr>
+                                </table>
+                            @endforeach
+                            <p class="prov-dots-caption">
+                                Linha do tempo das {{ $totalMaintenanceCount }} manutenções, da mais antiga à mais recente:
+                                <span style="color:#0f766e;">●</span> manutenções com selo de oficina ·
+                                <span style="color:#92400e;">◌</span> declaradas. Detalhes nas páginas seguintes.
                             </p>
                         @endif
                     </div>
@@ -511,40 +684,56 @@
                 <tbody>
                     <tr>
                         <td>
-                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
-                                <tr>
-                                    <td width="6" valign="top" style="background-color: {{ $maintenance->isVerified() ? '#0f766e' : 'transparent' }}; border-left: {{ $maintenance->isVerified() ? 'none' : '3px dashed #92400e' }};"></td>
-                                    <td style="padding-left: 10px;">
-                                        @if($maintenance->isVerified())
-                                            <table cellpadding="4" cellspacing="0" style="border: 2px double #0f766e; font-size: 8pt;">
-                                                <tr>
-                                                    <td valign="middle">
-                                                        @if(! empty($workshopLogo))
-                                                            <img src="{{ $workshopLogo }}" width="40" height="40" alt="">
-                                                        @endif
-                                                    </td>
-                                                    <td valign="middle">
-                                                        <strong>Selo da oficina</strong><br>
-                                                        {{ $maintenance->verified_at?->format('d/m/Y') }}<br>
-                                                        <span style="font-family: DejaVu Sans Mono, monospace;">{{ $maintenance->verification_code }}</span>
-                                                    </td>
-                                                </tr>
-                                            </table>
+                            @php
+                                $sealWorkshopName = $maintenance->verifiedWorkshop?->name ?? $workshopName;
+                                $sealInvoiceCount = $maintenance->invoices->count();
+                                $sealActor = $maintenance->registered_by_type === 'garage' ? 'lojista' : 'proprietário';
+                            @endphp
+                            @if($maintenance->isVerified())
+                                <table class="seal seal--verified" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        @if(! empty($workshopLogo))
+                                            <td class="seal-first" width="44">
+                                                <img src="{{ $workshopLogo }}" width="32" height="48" alt="">
+                                            </td>
+                                            <td>
                                         @else
-                                            <table cellpadding="6" cellspacing="0" width="100%" style="border: 1px dashed #92400e; background: #fffbeb; font-size: 8pt;">
-                                                <tr>
-                                                    <td>
-                                                        {{ $maintenance->provenance_label }} · não verificada
-                                                        @if($maintenance->invoices->count() > 0)
-                                                            · NF anexada ({{ $maintenance->invoices->count() }})
-                                                        @endif
-                                                    </td>
-                                                </tr>
-                                            </table>
+                                            <td class="seal-first">
                                         @endif
-                                    </td>
-                                </tr>
-                            </table>
+                                            <div class="seal-kicker">Selo da oficina</div>
+                                            <div class="seal-name">{{ $sealWorkshopName }}</div>
+                                            <div class="seal-meta">
+                                                Registro feito pela própria oficina em {{ $maintenance->verified_at?->format('d/m/Y') }}
+                                                · não pode ser alterado pelo proprietário
+                                            </div>
+                                        </td>
+                                        <td class="seal-last" width="175" align="right">
+                                            <div class="seal-code">{{ $maintenance->verification_code }}</div>
+                                            <div class="seal-verify">revisalog.com.br/v/{{ $maintenance->verification_code }}</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            @else
+                                <table class="seal seal--declared" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td class="seal-first">
+                                            <div class="seal-kicker">{{ $maintenance->provenance_label }}</div>
+                                            <div class="seal-meta">
+                                                Registro feito pelo {{ $sealActor }} do veículo · não verificado por oficina cadastrada
+                                            </div>
+                                        </td>
+                                        <td class="seal-last" width="175" align="right">
+                                            <div class="seal-evidence">
+                                                @if($sealInvoiceCount > 0)
+                                                    NF anexada ({{ $sealInvoiceCount }})
+                                                @else
+                                                    Sem nota fiscal
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            @endif
                             <table class="os-body-card" cellpadding="0" cellspacing="0">
                                 <tr>
                                     <td>
