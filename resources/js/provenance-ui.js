@@ -41,14 +41,17 @@ export function filterMaintenancesByVerifiedQuery(maintenances, searchOrVerified
     return maintenances;
 }
 
-export function renderMaintenanceHistoryList(maintenances, { basePath = '/usuario' } = {}) {
+export function renderMaintenanceHistoryList(
+    maintenances,
+    { basePath = '/usuario', linkMaintenances = true } = {},
+) {
     if (maintenances.length === 0) {
         return '<div class="card text-center text-automotive-500">Nenhuma manutenção neste filtro.</div>';
     }
 
     return maintenances
         .map((maintenance) => renderProvenanceCard(maintenance, {
-            href: `${basePath}/manutencoes/${maintenance.id}`,
+            href: linkMaintenances ? `${basePath}/manutencoes/${maintenance.id}` : null,
         }))
         .join('');
 }
@@ -57,13 +60,20 @@ function provenanceFilterChipClass(isActive) {
     return `underline ${isActive ? 'font-semibold text-automotive-900' : ''}`;
 }
 
-export function initProvenanceStripFilters(root, allMaintenances, { basePath = '/usuario' } = {}) {
+export function initProvenanceStripFilters(
+    root,
+    allMaintenances,
+    { basePath = '/usuario', linkMaintenances = true } = {},
+) {
     const listHost = root.querySelector('[data-maintenance-list]');
     const titleEl = root.querySelector('[data-maintenance-list-title]');
 
     if (!listHost) {
         return;
     }
+
+    const titleTemplate = titleEl?.dataset.titleTemplate
+        ?? '🔧 Histórico de Manutenções ({count})';
 
     const applyFilter = (verifiedValue) => {
         const filtered = filterMaintenancesByVerifiedQuery(
@@ -87,10 +97,13 @@ export function initProvenanceStripFilters(root, allMaintenances, { basePath = '
             button.className = provenanceFilterChipClass(active);
         });
 
-        listHost.innerHTML = renderMaintenanceHistoryList(filtered, { basePath });
+        listHost.innerHTML = renderMaintenanceHistoryList(filtered, {
+            basePath,
+            linkMaintenances,
+        });
 
         if (titleEl) {
-            titleEl.textContent = `🔧 Histórico de Manutenções (${filtered.length})`;
+            titleEl.textContent = titleTemplate.replace('{count}', String(filtered.length));
         }
     };
 
@@ -101,6 +114,9 @@ export function initProvenanceStripFilters(root, allMaintenances, { basePath = '
             applyFilter(value === '' ? null : value);
         });
     });
+
+    const initialVerified = new URLSearchParams(window.location.search).get('verified');
+    applyFilter(initialVerified === '1' || initialVerified === '0' ? initialVerified : null);
 }
 
 function provenanceRootClass(maintenance) {

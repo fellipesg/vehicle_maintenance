@@ -20,7 +20,22 @@
 
     @if(isset($identifier) && $identifier)
         @if($vehicle)
-            <div class="mt-8">
+            @php
+                $maintenancesForFilters = $vehicle->maintenances->map(fn ($maintenance) => [
+                    'id' => $maintenance->id,
+                    'maintenance_type' => $maintenance->maintenance_type,
+                    'is_verified' => $maintenance->isVerified(),
+                    'verified_at' => $maintenance->verified_at?->toIso8601String(),
+                    'provenance_card_label' => $maintenance->provenance_card_label,
+                    'provenance_meta' => $maintenance->provenance_meta,
+                    'workshop_name' => $maintenance->displayWorkshopName(),
+                    'verified_workshop' => $maintenance->verifiedWorkshop ? [
+                        'name' => $maintenance->verifiedWorkshop->name,
+                        'logo_url' => $maintenance->verifiedWorkshop->logoUrl(),
+                    ] : null,
+                ])->values();
+            @endphp
+            <div class="mt-8" data-vehicle-search-results>
                 @if(($matchedBy ?? null) === 'previous_plate' && ($previousPlateEndedAt ?? null))
                     <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                         A placa {{ strtoupper($identifier) }} pertenceu a este veículo até {{ $previousPlateEndedAt->format('d/m/Y') }}.
@@ -44,7 +59,7 @@
                 <x-provenance-strip
                     :vehicle="$vehicle"
                     maintenance-path-prefix="#"
-                    :filter-base-url="route('vehicle.search')"
+                    :interactive-filters="true"
                     class="mb-6"
                 />
 
@@ -86,13 +101,21 @@
                     }
                 @endphp
 
-                <h3 class="mb-4 text-xl font-semibold">Histórico de manutenções ({{ $filtered->count() }})</h3>
+                <h3
+                    class="mb-4 text-xl font-semibold"
+                    data-maintenance-list-title
+                    data-title-template="Histórico de manutenções ({count})"
+                >Histórico de manutenções ({{ $filtered->count() }})</h3>
 
-                @forelse($filtered as $maintenance)
-                    <x-provenance-card :maintenance="$maintenance" class="mb-4" />
-                @empty
-                    <div class="card text-center text-automotive-500">Nenhuma manutenção registrada para este veículo.</div>
-                @endforelse
+                <div data-maintenance-list>
+                    @forelse($filtered as $maintenance)
+                        <x-provenance-card :maintenance="$maintenance" class="mb-4" />
+                    @empty
+                        <div class="card text-center text-automotive-500">Nenhuma manutenção registrada para este veículo.</div>
+                    @endforelse
+                </div>
+
+                <script type="application/json" id="vehicle-search-maintenances-json">@json($maintenancesForFilters)</script>
 
                 <x-provenance-legend class="mt-8" />
             </div>

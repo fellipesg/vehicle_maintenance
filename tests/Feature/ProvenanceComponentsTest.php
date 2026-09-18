@@ -78,7 +78,7 @@ class ProvenanceComponentsTest extends TestCase
             ->assertDontSee('prov-card prov-verified', false);
     }
 
-    public function test_public_vehicle_search_provenance_filter_links_preserve_identifier(): void
+    public function test_public_vehicle_search_uses_client_side_provenance_filters(): void
     {
         $user = User::factory()->create();
         Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
@@ -88,14 +88,11 @@ class ProvenanceComponentsTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertMatchesRegularExpression(
-            '/href="[^"]*identifier=ABC1D23[^"]*verified=1[^"]*"/',
-            $html,
-        );
-        $this->assertDoesNotMatchRegularExpression(
-            '/href="[^"]*\?[^"]*\?[^"]*identifier=/',
-            $html,
-        );
+        $this->assertStringContainsString('data-provenance-filter=""', $html);
+        $this->assertStringContainsString('data-provenance-filter="1"', $html);
+        $this->assertStringContainsString('data-vehicle-search-results', $html);
+        $this->assertStringContainsString('id="vehicle-search-maintenances-json"', $html);
+        $this->assertStringNotContainsString('href="?verified=1"', $html);
     }
 
     public function test_provenance_strip_renders_compact_summary_and_dots(): void

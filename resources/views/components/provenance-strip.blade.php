@@ -2,6 +2,7 @@
     'vehicle',
     'maintenancePathPrefix' => '/usuario/manutencoes',
     'filterBaseUrl' => null,
+    'interactiveFilters' => false,
 ])
 
 @php
@@ -58,8 +59,14 @@
         </div>
     @endif
     <div class="mt-2 flex flex-wrap gap-3 text-sm">
-        <a href="{{ $allUrl }}" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === null])>Todas</a>
-        <a href="{{ $verifiedUrl }}" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === '1'])>Selo da oficina</a>
-        <a href="{{ $declaredUrl }}" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === '0'])>Declaradas</a>
+        @if ($interactiveFilters)
+            <button type="button" data-provenance-filter="" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === null])>Todas</button>
+            <button type="button" data-provenance-filter="1" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === '1'])>Selo da oficina</button>
+            <button type="button" data-provenance-filter="0" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === '0'])>Declaradas</button>
+        @else
+            <a href="{{ $allUrl }}" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === null])>Todas</a>
+            <a href="{{ $verifiedUrl }}" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === '1'])>Selo da oficina</a>
+            <a href="{{ $declaredUrl }}" @class(['underline', 'font-semibold text-automotive-900' => $currentFilter === '0'])>Declaradas</a>
+        @endif
     </div>
 </div>
