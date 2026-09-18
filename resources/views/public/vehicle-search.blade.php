@@ -44,7 +44,7 @@
                 <x-provenance-strip
                     :vehicle="$vehicle"
                     maintenance-path-prefix="#"
-                    :filter-base-url="route('vehicle.search', ['identifier' => $identifier])"
+                    :filter-base-url="route('vehicle.search')"
                     class="mb-6"
                 />
 
@@ -76,8 +76,6 @@
 
                 <x-provenance-legend class="mb-4" />
 
-                <h3 class="mb-4 text-xl font-semibold">Histórico de manutenções ({{ $vehicle->maintenances->count() }})</h3>
-
                 @php
                     $verifiedFilter = request()->query('verified');
                     $filtered = $vehicle->maintenances;
@@ -87,6 +85,8 @@
                         $filtered = $filtered->filter(fn ($m) => ! $m->isVerified());
                     }
                 @endphp
+
+                <h3 class="mb-4 text-xl font-semibold">Histórico de manutenções ({{ $filtered->count() }})</h3>
 
                 @forelse($filtered as $maintenance)
                     <x-provenance-card :maintenance="$maintenance" class="mb-4" />

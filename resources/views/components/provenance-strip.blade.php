@@ -13,11 +13,19 @@
     $declared = max(0, $total - $verified);
     $visibleDots = array_slice($strip, 0, 16);
     $overflowDots = max(0, count($strip) - count($visibleDots));
-    $baseUrl = $filterBaseUrl ?? request()->url();
-    $query = request()->except('verified', 'page');
-    $allUrl = $baseUrl.(count($query) ? '?'.http_build_query($query) : '');
-    $verifiedUrl = $baseUrl.'?'.http_build_query([...$query, 'verified' => '1']);
-    $declaredUrl = $baseUrl.'?'.http_build_query([...$query, 'verified' => '0']);
+    $rawBase = $filterBaseUrl ?? request()->url();
+    $basePath = strtok((string) $rawBase, '?') ?: (string) $rawBase;
+    $embeddedQuery = [];
+    if (str_contains((string) $rawBase, '?')) {
+        parse_str((string) parse_url($rawBase, PHP_URL_QUERY), $embeddedQuery);
+    }
+    $query = array_merge(
+        $embeddedQuery,
+        request()->except(array_merge(['verified', 'page'], array_keys($embeddedQuery))),
+    );
+    $allUrl = $basePath.(count($query) ? '?'.http_build_query($query) : '');
+    $verifiedUrl = $basePath.'?'.http_build_query([...$query, 'verified' => '1']);
+    $declaredUrl = $basePath.'?'.http_build_query([...$query, 'verified' => '0']);
     $currentFilter = request()->query('verified');
     $declaredLabel = $declared === 1 ? 'declarada' : 'declaradas';
 @endphp

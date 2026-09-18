@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehiclePlate;
 use App\Services\Vehicle\VehiclePlateHistoryService;
@@ -134,7 +135,10 @@ class VehicleChassisIdentityTest extends TestCase
             'source' => 'manual',
         ]);
 
-        $this->get(route('vehicle.search', ['identifier' => 'OLD5E67']))
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('vehicle.search', ['identifier' => 'OLD5E67']))
             ->assertOk()
             ->assertSee('OLD5E67', false)
             ->assertSee('CUR4D56', false);

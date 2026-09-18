@@ -23,7 +23,6 @@ use App\Http\Controllers\Web\Workshop\WarrantyTemplateController as WorkshopWarr
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
-Route::get('/buscar-veiculo', [PublicVehicleController::class, 'search'])->name('vehicle.search');
 Route::get('/v/{code}', [\App\Http\Controllers\Web\PublicVerificationController::class, 'show'])
     ->middleware('throttle:search')
     ->name('verification.show');
@@ -43,6 +42,8 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth', 'tenant'])->group(function () {
+    Route::get('/buscar-veiculo', [PublicVehicleController::class, 'search'])->name('vehicle.search');
+
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('notifications.index');

@@ -40,9 +40,11 @@
         </div>
 
         <div class="flex items-center gap-4">
-            <a href="{{ route('vehicle.search') }}" class="hidden text-sm text-automotive-300 hover:text-wrench-400 sm:inline">
-                Buscar veículo
-            </a>
+            @auth
+                <a href="{{ route('vehicle.search') }}" class="hidden text-sm text-automotive-300 hover:text-wrench-400 sm:inline">
+                    Buscar veículo
+                </a>
+            @endauth
 
             @auth
                 <x-notification-bell />

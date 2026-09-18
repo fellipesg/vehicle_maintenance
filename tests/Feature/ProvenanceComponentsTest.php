@@ -57,6 +57,7 @@ class ProvenanceComponentsTest extends TestCase
 
     public function test_public_vehicle_search_filters_maintenances_by_verified_query(): void
     {
+        $user = User::factory()->create();
         $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
         Maintenance::factory()->sealedByWorkshop()->create(['vehicle_id' => $vehicle->id]);
         Maintenance::factory()->declaredByOwner()->create([
@@ -64,15 +65,37 @@ class ProvenanceComponentsTest extends TestCase
             'maintenance_type' => 'Revisão declarada',
         ]);
 
-        $this->get('/buscar-veiculo?identifier=ABC1D23&verified=1')
+        $this->actingAs($user)
+            ->get('/buscar-veiculo?identifier=ABC1D23&verified=1')
             ->assertOk()
             ->assertSee('Selo da oficina', false)
             ->assertDontSee('Revisão declarada', false);
 
-        $this->get('/buscar-veiculo?identifier=ABC1D23&verified=0')
+        $this->actingAs($user)
+            ->get('/buscar-veiculo?identifier=ABC1D23&verified=0')
             ->assertOk()
             ->assertSee('Revisão declarada', false)
             ->assertDontSee('prov-card prov-verified', false);
+    }
+
+    public function test_public_vehicle_search_provenance_filter_links_preserve_identifier(): void
+    {
+        $user = User::factory()->create();
+        Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+
+        $html = $this->actingAs($user)
+            ->get('/buscar-veiculo?identifier=ABC1D23')
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/href="[^"]*identifier=ABC1D23[^"]*verified=1[^"]*"/',
+            $html,
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/href="[^"]*\?[^"]*\?[^"]*identifier=/',
+            $html,
+        );
     }
 
     public function test_provenance_strip_renders_compact_summary_and_dots(): void
