@@ -79,6 +79,58 @@ class BrandAppIconCropTest extends TestCase
         imagedestroy($appleTouch);
     }
 
+    public function test_og_preview_fills_the_whatsapp_square_without_a_left_bar(): void
+    {
+        $path = dirname(__DIR__, 2).'/public/images/brand/og-preview.png';
+        $image = $this->loadPng($path);
+
+        $this->assertSame(1200, imagesx($image));
+        $this->assertSame(630, imagesy($image));
+
+        $squareLeft = (int) floor((1200 - 630) / 2);
+        $leftBar = $this->countMatchingPixels(
+            $image,
+            $squareLeft,
+            0,
+            $squareLeft + (int) floor(630 * 0.06),
+            629,
+            function (int $r, int $g, int $b): bool {
+                return $this->isBrightLetter($r, $g, $b) || $this->isTeal($r, $g, $b);
+            },
+        );
+        $this->assertLessThan(40, $leftBar, 'OG preview still has the stacked-bar rule on the left of the WhatsApp crop.');
+
+        $content = $this->countMatchingPixels(
+            $image,
+            $squareLeft,
+            0,
+            $squareLeft + 629,
+            629,
+            function (int $r, int $g, int $b): bool {
+                return $this->isBrightLetter($r, $g, $b) || $this->isTeal($r, $g, $b);
+            },
+        );
+        $this->assertGreaterThan(12000, $content, 'OG lockup is still a small card in the middle of the square.');
+
+        $minY = 630;
+        $maxY = 0;
+        for ($y = 0; $y < 630; $y++) {
+            for ($x = $squareLeft; $x <= $squareLeft + 629; $x++) {
+                $rgba = imagecolorat($image, $x, $y);
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                if ($this->isBrightLetter($r, $g, $b) || $this->isTeal($r, $g, $b)) {
+                    $minY = min($minY, $y);
+                    $maxY = max($maxY, $y);
+                }
+            }
+        }
+        $this->assertGreaterThan(400, $maxY - $minY, 'WhatsApp square crop should be mostly filled by the lockup.');
+
+        imagedestroy($image);
+    }
+
     private function loadPng(string $path): \GdImage
     {
         $this->assertFileExists($path);

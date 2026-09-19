@@ -31,6 +31,7 @@ class HomePageTest extends TestCase
             ->assertSee('Histórico permanente · Grátis no lançamento')
             ->assertSee('O app de verdade')
             ->assertSee('landing/app-vehicle.png', false)
+            ->assertSee('og-preview.png', false)
             ->assertSee('id="preco"', false)
             ->assertSee('id="como-funciona"', false)
             ->assertSee('id="telas"', false)

@@ -15,11 +15,6 @@ $sourceDir = $root.'/brand/grok-imagine';
 $outBackend = dirname(__DIR__).'/public/images/brand';
 $outFrontend = $root.'/frontend/assets/brand';
 
-if (! is_dir($sourceDir)) {
-    fwrite(STDERR, "Missing source dir: {$sourceDir}\n");
-    exit(1);
-}
-
 foreach ([$outBackend, $outFrontend] as $dir) {
     if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
         fwrite(STDERR, "Cannot create {$dir}\n");
@@ -27,21 +22,52 @@ foreach ([$outBackend, $outFrontend] as $dir) {
     }
 }
 
+if (in_array('--og-from-lockup', $argv ?? [], true)) {
+    $stackedPath = "{$outBackend}/lockup-stacked.png";
+    $stacked = loadPng($stackedPath);
+    $og = buildOgImage($stacked);
+    imagedestroy($stacked);
+
+    foreach (['og-image.png', 'og-preview.png'] as $filename) {
+        savePng($og, "{$outBackend}/{$filename}");
+        if (is_dir($outFrontend)) {
+            savePng($og, "{$outFrontend}/{$filename}");
+        }
+        echo "Wrote {$filename}\n";
+    }
+
+    imagedestroy($og);
+    echo "Done.\n";
+    exit(0);
+}
+
+if (! is_dir($sourceDir)) {
+    fwrite(STDERR, "Missing source dir: {$sourceDir}\n");
+    exit(1);
+}
+
 $sheet2 = loadJpeg("{$sourceDir}/sheet-2-refined.jpg");
 $sheet3 = loadJpeg("{$sourceDir}/sheet-3-abcd.jpg");
+
+$stacked = crop($sheet3, 24, 132, 228, 396, solidNavyBg: true);
 
 $crops = [
     'lockup-horizontal.png' => crop($sheet2, 517, 245, 447, 108, solidNavyBg: true),
     'lockup-horizontal-tagline.png' => crop($sheet2, 72, 79, 486, 127, solidNavyBg: true),
     // Skip the A/B caption row above each stacked lockup on sheet-3.
-    'lockup-stacked.png' => crop($sheet3, 24, 132, 228, 396, solidNavyBg: true),
+    'lockup-stacked.png' => $stacked,
     'lockup-stacked-bar.png' => crop($sheet3, 272, 132, 228, 396, solidNavyBg: true),
-    'og-image.png' => buildOgImage($sheet2),
+    'og-image.png' => buildOgImage(cloneGd($stacked)),
 ];
 
 foreach ($crops as $filename => $image) {
     savePng($image, "{$outBackend}/{$filename}");
     savePng($image, "{$outFrontend}/{$filename}");
+    if ($filename === 'og-image.png') {
+        savePng($image, "{$outBackend}/og-preview.png");
+        savePng($image, "{$outFrontend}/og-preview.png");
+        echo "Wrote og-preview.png\n";
+    }
     imagedestroy($image);
     echo "Wrote {$filename}\n";
 }
@@ -165,22 +191,95 @@ function isSheetBackground(int $r, int $g, int $b): bool
     return false;
 }
 
-function buildOgImage(\GdImage $sheet2): \GdImage
+function cloneGd(\GdImage $source): \GdImage
 {
-    $lockup = crop($sheet2, 72, 79, 486, 127, solidNavyBg: true);
-    $lw = imagesx($lockup);
-    $lh = imagesy($lockup);
+    $copy = imagecreatetruecolor(imagesx($source), imagesy($source));
+    imagecopy($copy, $source, 0, 0, 0, 0, imagesx($source), imagesy($source));
 
-    $og = imagecreatetruecolor(1200, 630);
+    return $copy;
+}
+
+function trimToForeground(\GdImage $image, int $pad = 8): \GdImage
+{
+    $width = imagesx($image);
+    $height = imagesy($image);
+    $minX = $width;
+    $minY = $height;
+    $maxX = 0;
+    $maxY = 0;
+    $found = false;
+
+    for ($y = 0; $y < $height; $y++) {
+        for ($x = 0; $x < $width; $x++) {
+            $rgba = imagecolorat($image, $x, $y);
+            $r = ($rgba >> 16) & 0xFF;
+            $g = ($rgba >> 8) & 0xFF;
+            $b = $rgba & 0xFF;
+
+            if (! isForegroundPixel($r, $g, $b)) {
+                continue;
+            }
+
+            $found = true;
+            $minX = min($minX, $x);
+            $minY = min($minY, $y);
+            $maxX = max($maxX, $x);
+            $maxY = max($maxY, $y);
+        }
+    }
+
+    if (! $found) {
+        return cloneGd($image);
+    }
+
+    $x0 = max(0, $minX - $pad);
+    $y0 = max(0, $minY - $pad);
+    $x1 = min($width - 1, $maxX + $pad);
+    $y1 = min($height - 1, $maxY + $pad);
+    $cropW = $x1 - $x0 + 1;
+    $cropH = $y1 - $y0 + 1;
+
+    $dest = imagecreatetruecolor($cropW, $cropH);
+    imagecopy($dest, $image, 0, 0, $x0, $y0, $cropW, $cropH);
+
+    return $dest;
+}
+
+function prepareStackedLockupForOg(\GdImage $stackedLockup): \GdImage
+{
+    $width = imagesx($stackedLockup);
+    $height = imagesy($stackedLockup);
+    $skipTop = (int) floor($height * 0.32);
+    $withoutCaption = imagecreatetruecolor($width, $height - $skipTop);
+    imagecopy($withoutCaption, $stackedLockup, 0, 0, 0, $skipTop, $width, $height - $skipTop);
+
+    $trimmed = trimToForeground($withoutCaption, 10);
+    imagedestroy($withoutCaption);
+
+    return compositeOnExactNavy($trimmed);
+}
+
+function buildOgImage(\GdImage $stackedLockup): \GdImage
+{
+    $canvasW = 1200;
+    $canvasH = 630;
+    $square = min($canvasW, $canvasH);
+    $lockup = prepareStackedLockupForOg($stackedLockup);
+    $lockupW = imagesx($lockup);
+    $lockupH = imagesy($lockup);
+
+    $maxSide = (int) round($square * 0.90);
+    $scale = min($maxSide / $lockupW, $maxSide / $lockupH);
+    $targetW = (int) round($lockupW * $scale);
+    $targetH = (int) round($lockupH * $scale);
+
+    $og = imagecreatetruecolor($canvasW, $canvasH);
     $navy = imagecolorallocate($og, NAVY[0], NAVY[1], NAVY[2]);
     imagefill($og, 0, 0, $navy);
 
-    $targetH = 280;
-    $targetW = (int) round($lw * ($targetH / $lh));
-    $dstX = (int) ((1200 - $targetW) / 2);
-    $dstY = (int) ((630 - $targetH) / 2);
-
-    imagecopyresampled($og, $lockup, $dstX, $dstY, 0, 0, $targetW, $targetH, $lw, $lh);
+    $dstX = (int) (($canvasW - $targetW) / 2);
+    $dstY = (int) (($canvasH - $targetH) / 2);
+    imagecopyresampled($og, $lockup, $dstX, $dstY, 0, 0, $targetW, $targetH, $lockupW, $lockupH);
     imagedestroy($lockup);
 
     return $og;

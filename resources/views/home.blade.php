@@ -17,6 +17,8 @@
 
 @push('head')
     <meta name="description" content="RevisaLog: histórico permanente de manutenções vinculado ao veículo. Selo da oficina, busca por placa, chassi ou RENAVAM. Grátis no lançamento.">
+    <meta property="og:title" content="Histórico permanente do seu carro">
+    <meta property="og:description" content="RevisaLog: histórico permanente de manutenções vinculado ao veículo. Selo da oficina, busca por placa, chassi ou RENAVAM. Grátis no lançamento.">
 @endpush
 
 @section('content')

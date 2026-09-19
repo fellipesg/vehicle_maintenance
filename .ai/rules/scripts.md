@@ -10,3 +10,6 @@ paths:
 
 ## App icon: lockup odometer, navy above the arc
 Draw the icon as the lockup mark (thin teal stroke, needle pointing into the dial). Use smooth ellipse strokes, not stacked imagearc. Leave ~16% navy above the arc so iOS does not show a teal top border. Do not shrink the mark to 'fix' the border.
+
+## OG preview fills square without left bar
+OG share image is 1200x630 navy with the stacked lockup (no left bar) filling ~90% of the center 630px square so WhatsApp crops do not show a tiny card or a vertical rule. Publish as og-preview.png to bust CDN/WhatsApp cache; do not reuse the cached og-image.png URL.
