@@ -49,6 +49,31 @@ class BrandAppIconCropTest extends TestCase
         imagedestroy($image);
     }
 
+    public function test_favicon_and_apple_touch_icon_are_scaled_from_app_icon_master(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $favicon = $this->loadPng("{$root}/public/favicon.png");
+        $appleTouch = $this->loadPng("{$root}/public/apple-touch-icon.png");
+
+        $this->assertSame(32, imagesx($favicon));
+        $this->assertSame(32, imagesy($favicon));
+        $this->assertSame(180, imagesx($appleTouch));
+        $this->assertSame(180, imagesy($appleTouch));
+
+        $tealPixels = $this->countMatchingPixels(
+            $favicon,
+            0,
+            0,
+            imagesx($favicon) - 1,
+            imagesy($favicon) - 1,
+            $this->isTeal(...),
+        );
+        $this->assertGreaterThan(0, $tealPixels, 'Favicon should show the teal odometer mark from app-icon.png.');
+
+        imagedestroy($favicon);
+        imagedestroy($appleTouch);
+    }
+
     private function loadPng(string $path): \GdImage
     {
         $this->assertFileExists($path);
@@ -77,6 +102,16 @@ class BrandAppIconCropTest extends TestCase
         );
         $this->assertSame(0, $topBandBright, 'Top of the icon still has the "D" caption.');
 
+        $topBandTeal = $this->countMatchingPixels(
+            $image,
+            0,
+            0,
+            $width - 1,
+            (int) floor($height * 0.12),
+            $this->isTeal(...),
+        );
+        $this->assertSame(0, $topBandTeal, 'Teal arc sits on the top edge and reads as a border.');
+
         $leftBandBright = $this->countMatchingPixels(
             $image,
             0,
@@ -87,15 +122,25 @@ class BrandAppIconCropTest extends TestCase
         );
         $this->assertLessThan(8, $leftBandBright, 'Left edge still has leftover lockup letters.');
 
-        $centerTeal = $this->countMatchingPixels(
+        $arcTeal = $this->countMatchingPixels(
             $image,
-            (int) floor($width * 0.30),
-            (int) floor($height * 0.30),
-            (int) floor($width * 0.70),
-            (int) floor($height * 0.70),
+            (int) floor($width * 0.18),
+            (int) floor($height * 0.12),
+            (int) floor($width * 0.82),
+            (int) floor($height * 0.48),
             $this->isTeal(...),
         );
-        $this->assertGreaterThan(80, $centerTeal, 'Center of the icon is missing the odometer.');
+        $this->assertGreaterThan(80, $arcTeal, 'Upper half is missing the odometer arc.');
+
+        $dotTeal = $this->countMatchingPixels(
+            $image,
+            (int) floor($width * 0.35),
+            (int) floor($height * 0.62),
+            (int) floor($width * 0.65),
+            (int) floor($height * 0.88),
+            $this->isTeal(...),
+        );
+        $this->assertGreaterThan(20, $dotTeal, 'Three teal dots are missing below the hub.');
     }
 
     /**
@@ -151,7 +196,7 @@ class BrandAppIconCropTest extends TestCase
                 $g = ($rgba >> 8) & 0xFF;
                 $b = $rgba & 0xFF;
 
-                if ($this->isBrightLetter($r, $g, $b) || $this->isTeal($r, $g, $b)) {
+                if ($this->isTeal($r, $g, $b)) {
                     $sumX += $x;
                     $count++;
                 }
