@@ -31,9 +31,6 @@ $sheet2 = loadJpeg("{$sourceDir}/sheet-2-refined.jpg");
 $sheet3 = loadJpeg("{$sourceDir}/sheet-3-abcd.jpg");
 
 $crops = [
-    // Variation D is the rounded app-icon card under the "D" label — not the label itself.
-    // (772, 108, 248, 248) captured the D caption and the top of the mark only.
-    'app-icon.png' => crop($sheet3, 782, 250, 200, 200, solidNavyBg: true),
     'lockup-horizontal.png' => crop($sheet2, 517, 245, 447, 108, solidNavyBg: true),
     'lockup-horizontal-tagline.png' => crop($sheet2, 72, 79, 486, 127, solidNavyBg: true),
     // Skip the A/B caption row above each stacked lockup on sheet-3.
@@ -43,26 +40,31 @@ $crops = [
 ];
 
 foreach ($crops as $filename => $image) {
-    if ($filename === 'app-icon.png') {
-        $image = recenterMark($image);
-    }
-
     savePng($image, "{$outBackend}/{$filename}");
     savePng($image, "{$outFrontend}/{$filename}");
     imagedestroy($image);
     echo "Wrote {$filename}\n";
 }
 
+$appIcon = renderRevisalogAppIcon(1024);
+savePng($appIcon, "{$outBackend}/app-icon.png");
+savePng($appIcon, "{$outFrontend}/app-icon.png");
+imagedestroy($appIcon);
+echo "Wrote app-icon.png (vector master)\n";
+
 copy("{$outBackend}/lockup-horizontal.png", dirname(__DIR__).'/public/images/revisalog-logo.png');
+copy("{$outBackend}/lockup-horizontal.png", "{$outBackend}/revisalog-logo.png");
 echo "Wrote revisalog-logo.png alias\n";
 
 $icon = loadPng("{$outBackend}/app-icon.png");
 $favicon = resize($icon, 32, 32);
 savePng($favicon, dirname(__DIR__).'/public/favicon.png');
+savePng($favicon, "{$outBackend}/favicon.png");
 imagedestroy($favicon);
 
 $appleTouch = resize($icon, 180, 180);
 savePng($appleTouch, dirname(__DIR__).'/public/apple-touch-icon.png');
+savePng($appleTouch, "{$outBackend}/apple-touch-icon.png");
 imagedestroy($appleTouch);
 imagedestroy($icon);
 
@@ -256,11 +258,14 @@ function recenterMark(\GdImage $image, int $shiftY = 0, bool $horizontalOnly = f
     return $dest;
 }
 
-function innerAppMark(\GdImage $appIcon): \GdImage
+/**
+ * Drop the teal rounded-rect frame; higher inset removes more border residue.
+ */
+function innerAppMark(\GdImage $appIcon, float $insetRatio = 0.15): \GdImage
 {
     $w = imagesx($appIcon);
     $h = imagesy($appIcon);
-    $inset = (int) round(min($w, $h) * 0.15);
+    $inset = (int) round(min($w, $h) * $insetRatio);
     $innerW = $w - (2 * $inset);
     $innerH = $h - (2 * $inset);
 
@@ -268,6 +273,64 @@ function innerAppMark(\GdImage $appIcon): \GdImage
     imagecopy($cropped, $appIcon, 0, 0, $inset, $inset, $innerW, $innerH);
 
     return compositeOnExactNavy($cropped);
+}
+
+function isResidualFramePixel(int $r, int $g, int $b): bool
+{
+    if ($r > 210 && $g > 210 && $b > 210) {
+        return false;
+    }
+
+    if ($g > 75 && $b > 55 && $g >= $r + 8 && ($r + $g + $b) < 430) {
+        return true;
+    }
+
+    $sum = $r + $g + $b;
+    if ($sum < 95 || $sum > 400) {
+        return false;
+    }
+
+    $spread = max($r, $g, $b) - min($r, $g, $b);
+
+    return $spread < 85 && $b >= $g - 25 && $r < 140;
+}
+
+/**
+ * Remove anti-aliased scraps of the old rounded frame (often top-left on iOS squircle).
+ */
+function stripResidualFrame(\GdImage $image): \GdImage
+{
+    $w = imagesx($image);
+    $h = imagesy($image);
+    $edge = (int) round(min($w, $h) * 0.11);
+    $corner = (int) round(min($w, $h) * 0.26);
+    $navy = imagecolorallocate($image, NAVY[0], NAVY[1], NAVY[2]);
+
+    for ($y = 0; $y < $h; $y++) {
+        for ($x = 0; $x < $w; $x++) {
+            $inCorner = $x < $corner && $y < $corner;
+            $nearEdge = $x < $edge || $y < $edge || $x >= $w - $edge || $y >= $h - $edge;
+
+            if (! $inCorner && ! $nearEdge) {
+                continue;
+            }
+
+            $rgba = imagecolorat($image, $x, $y);
+            $r = ($rgba >> 16) & 0xFF;
+            $g = ($rgba >> 8) & 0xFF;
+            $b = $rgba & 0xFF;
+
+            if (! isForegroundPixel($r, $g, $b)) {
+                continue;
+            }
+
+            if ($inCorner || isResidualFramePixel($r, $g, $b)) {
+                imagesetpixel($image, $x, $y, $navy);
+            }
+        }
+    }
+
+    return $image;
 }
 
 function resizeWithSafeZone(\GdImage $source, int $size, float $contentRatio = 0.84, int $verticalShift = 0): \GdImage
@@ -301,11 +364,121 @@ function resizeWithSafeZone(\GdImage $source, int $size, float $contentRatio = 0
  */
 function buildAdaptiveLauncherForeground(\GdImage $appIcon): \GdImage
 {
-    $mark = recenterMark(innerAppMark($appIcon));
-    $sized = resizeWithSafeZone($mark, 432, 0.70, verticalShift: -4);
-    imagedestroy($mark);
+    return resize($appIcon, 432, 432);
+}
 
-    return recenterMark($sized, shiftY: -9, horizontalOnly: true);
+/**
+ * Variation D odometer (sheet-3 / home-screen icon): thin teal arc, thin needle, three dots.
+ * Same mark as the existing logo — only the scale inside the 1024 square changes.
+ */
+function renderRevisalogAppIcon(int $size = 1024): \GdImage
+{
+    $img = imagecreatetruecolor($size, $size);
+    $navy = imagecolorallocate($img, NAVY[0], NAVY[1], NAVY[2]);
+    $teal = imagecolorallocate($img, TEAL[0], TEAL[1], TEAL[2]);
+    $white = imagecolorallocate($img, 255, 255, 255);
+    imagefill($img, 0, 0, $navy);
+
+    $cx = $size / 2;
+    $radius = $size * 0.43;
+    $topInset = $size * 0.135;
+    $cy = $topInset + $radius;
+    $arcStart = 158.0;
+    $arcEnd = 22.0;
+    $arcEndDrawn = $arcEnd < $arcStart ? $arcEnd + 360.0 : $arcEnd;
+
+    drawSmoothArc($img, $cx, $cy, $radius, $arcStart, $arcEnd, $teal, $size * 0.020);
+
+    for ($deg = $arcStart + 22; $deg <= $arcEndDrawn - 22; $deg += 20) {
+        [$x1, $y1] = polarToXY($cx, $cy, $radius - $size * 0.018, $deg);
+        [$x2, $y2] = polarToXY($cx, $cy, $radius - $size * 0.040, $deg);
+        drawSmoothLine($img, $x1, $y1, $x2, $y2, $white, $size * 0.005);
+    }
+
+    [$nx, $ny] = polarToXY($cx, $cy, $radius * 0.66, 306.0);
+    drawSmoothLine($img, $cx, $cy, $nx, $ny, $white, $size * 0.026);
+
+    $hub = (int) max(8, round($size * 0.032));
+    imagefilledellipse($img, (int) round($cx), (int) round($cy), $hub, $hub, $white);
+
+    $dotD = (int) max(5, round($size * 0.022));
+    $dotY = $cy + $radius * 0.50;
+    $dotGap = $size * 0.048;
+    foreach ([-1.0, 0.0, 1.0] as $offset) {
+        imagefilledellipse(
+            $img,
+            (int) round($cx + ($offset * $dotGap)),
+            (int) round($dotY),
+            $dotD,
+            $dotD,
+            $teal,
+        );
+    }
+
+    return $img;
+}
+
+/**
+ * @return array{0: float, 1: float}
+ */
+function polarToXY(float $cx, float $cy, float $radius, float $degClockwiseFromEast): array
+{
+    $rad = deg2rad($degClockwiseFromEast);
+
+    return [
+        $cx + cos($rad) * $radius,
+        $cy + sin($rad) * $radius,
+    ];
+}
+
+function drawSmoothArc(
+    \GdImage $img,
+    float $cx,
+    float $cy,
+    float $radius,
+    float $startDeg,
+    float $endDeg,
+    int $color,
+    float $thickness,
+): void {
+    if ($endDeg < $startDeg) {
+        $endDeg += 360;
+    }
+
+    $sweep = $endDeg - $startDeg;
+    $steps = max(48, (int) ceil($sweep * $radius / 1.6));
+    $diameter = max(2, (int) round($thickness));
+
+    for ($i = 0; $i <= $steps; $i++) {
+        [$x, $y] = polarToXY($cx, $cy, $radius, $startDeg + ($sweep * $i / $steps));
+        imagefilledellipse($img, (int) round($x), (int) round($y), $diameter, $diameter, $color);
+    }
+}
+
+function drawSmoothLine(
+    \GdImage $img,
+    float $x1,
+    float $y1,
+    float $x2,
+    float $y2,
+    int $color,
+    float $thickness,
+): void {
+    $length = hypot($x2 - $x1, $y2 - $y1);
+    $steps = max(2, (int) ceil($length));
+    $diameter = max(2, (int) round($thickness));
+
+    for ($i = 0; $i <= $steps; $i++) {
+        $t = $i / $steps;
+        imagefilledellipse(
+            $img,
+            (int) round($x1 + (($x2 - $x1) * $t)),
+            (int) round($y1 + (($y2 - $y1) * $t)),
+            $diameter,
+            $diameter,
+            $color,
+        );
+    }
 }
 
 function savePng(\GdImage $image, string $path): void
@@ -339,7 +512,7 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
 
     $iosDir = "{$frontendRoot}/ios/Runner/Assets.xcassets/AppIcon.appiconset";
     foreach ($iosSizes as $filename => $size) {
-        $icon = resizeWithSafeZone($source, $size, 0.84);
+        $icon = resize($source, $size, $size);
         savePng($icon, "{$iosDir}/{$filename}");
         imagedestroy($icon);
     }
@@ -356,7 +529,7 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
 
     $macDir = "{$frontendRoot}/macos/Runner/Assets.xcassets/AppIcon.appiconset";
     foreach ($macSizes as $filename => $size) {
-        $icon = resizeWithSafeZone($source, $size, 0.84);
+        $icon = resize($source, $size, $size);
         savePng($icon, "{$macDir}/{$filename}");
         imagedestroy($icon);
     }
@@ -374,7 +547,7 @@ function generateAppIcons(string $sourcePath, string $frontendRoot): void
         if (! is_dir($dir)) {
             continue;
         }
-        $icon = resizeWithSafeZone($source, $size, 0.84);
+        $icon = resize($source, $size, $size);
         savePng($icon, "{$dir}/ic_launcher.png");
         savePng($icon, "{$dir}/ic_launcher_round.png");
         imagedestroy($icon);

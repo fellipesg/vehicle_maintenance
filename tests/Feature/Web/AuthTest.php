@@ -25,7 +25,7 @@ class AuthTest extends TestCase
             ->assertOk()
             ->assertSee('Como você deseja entrar?')
             ->assertSee('Oficina')
-            ->assertSee('images/brand/lockup-horizontal-tagline.png', false)
+            ->assertSee('lockup-horizontal-tagline.png', false)
             ->assertSee('alt="RevisaLog"', false);
     }
 

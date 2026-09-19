@@ -60,6 +60,11 @@ class BrandAppIconCropTest extends TestCase
         $this->assertSame(180, imagesx($appleTouch));
         $this->assertSame(180, imagesy($appleTouch));
 
+        $brandFavicon = "{$root}/public/images/brand/favicon.png";
+        $brandAppleTouch = "{$root}/public/images/brand/apple-touch-icon.png";
+        $this->assertFileExists($brandFavicon);
+        $this->assertFileExists($brandAppleTouch);
+
         $tealPixels = $this->countMatchingPixels(
             $favicon,
             0,

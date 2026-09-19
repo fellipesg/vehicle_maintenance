@@ -25,4 +25,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
 | frontend/lib/views/vehicles/** | .ai/rules/vehicles.md |
 | resources/views/layouts/**,resources/views/admin/** | .ai/rules/views-admin.md |
+| resources/views/** | .ai/rules/views.md |
 | app/Http/Controllers/{Web,Api}/AuthController.php | .ai/rules/web-api.md |

@@ -16,12 +16,12 @@
         <div class="flex items-center gap-6">
             <a href="{{ route($portal['route']) }}" class="flex items-center gap-2 font-bold">
                 <img
-                    src="{{ asset('images/brand/app-icon.png') }}"
+                    src="{{ \App\Support\AppStorage::brandUrl('app-icon.png') }}"
                     alt="RevisaLog"
                     class="h-9 w-9 shrink-0 sm:hidden"
                 >
                 <img
-                    src="{{ asset('images/brand/lockup-horizontal.png') }}"
+                    src="{{ \App\Support\AppStorage::brandUrl('lockup-horizontal.png') }}"
                     alt="RevisaLog"
                     class="hidden h-9 w-auto sm:block"
                 >

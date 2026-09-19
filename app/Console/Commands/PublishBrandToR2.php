@@ -12,7 +12,7 @@ class PublishBrandToR2 extends Command
         {--dry-run : List what would be uploaded without writing}
         {--force-remote : Exit with failure when R2 is not configured}';
 
-    protected $description = 'Upload backend/public/images/brand/* to the public R2 covers bucket';
+    protected $description = 'Upload public/images/brand/* (lockups, app icon, favicon, og-image) to the public R2 CDN bucket';
 
     public function handle(): int
     {

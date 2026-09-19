@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin') — Revisalog</title>
-    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />
+    <x-brand-head-icons />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
@@ -29,7 +28,7 @@
         >
             <div class="flex h-14 shrink-0 items-center border-b border-automotive-800 px-4">
                 <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-2">
-                    <img src="{{ asset('images/brand/app-icon.png') }}" alt="" class="h-8 w-8 shrink-0">
+                    <img src="{{ \App\Support\AppStorage::brandUrl('app-icon.png') }}" alt="" class="h-8 w-8 shrink-0">
                     <span class="font-semibold tracking-tight">Revisalog</span>
                 </a>
             </div>

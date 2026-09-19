@@ -4,9 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'Entrar') — Revisalog</title>
-    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
-    <meta property="og:image" content="{{ \App\Support\AppStorage::brandUrl('og-image.png') }}">
+    <x-brand-head-icons include-og-image />
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -21,7 +19,7 @@
             <div class="mb-8 flex w-full justify-center">
                 <a href="{{ route('home') }}" class="inline-flex items-center justify-center">
                     <img
-                        src="{{ asset('images/brand/lockup-horizontal-tagline.png') }}"
+                        src="{{ \App\Support\AppStorage::brandUrl('lockup-horizontal-tagline.png') }}"
                         alt="RevisaLog"
                         class="h-16 w-auto max-w-full"
                     >

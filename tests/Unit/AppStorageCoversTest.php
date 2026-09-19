@@ -55,6 +55,18 @@ class AppStorageCoversTest extends TestCase
         $this->assertStringContainsString('/images/brand/lockup-horizontal.png', $url);
     }
 
+    public function test_brand_url_serves_favicon_from_cdn_when_remote(): void
+    {
+        $this->configurePublicCoversDisk();
+
+        $url = AppStorage::brandUrl('favicon.png');
+
+        $this->assertSame(
+            'https://cdn.example.test/vehicle-maintenance/brand/revisalog/favicon.png',
+            $url
+        );
+    }
+
     public function test_local_copies_prefers_public_http_for_remote_covers(): void
     {
         $this->configurePublicCoversDisk();
