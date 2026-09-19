@@ -50,13 +50,25 @@ class VehicleController extends Controller
         ]);
     }
 
-    public function show(Vehicle $vehicle): View
+    public function show(Request $request, Vehicle $vehicle): View
     {
+        $verified = $request->query('verified');
+        $maintenanceCount = $vehicle->maintenances()->count();
+
         $vehicle->load([
             'owners' => fn ($query) => $query->wherePivot('is_current_owner', true),
-            'maintenances' => fn ($query) => $query->orderByDesc('maintenance_date')->with('workshop'),
+            'maintenances' => fn ($query) => $query
+                ->orderByDesc('maintenance_date')
+                ->orderByDesc('id')
+                ->when($verified === '1', fn ($q) => $q->whereNotNull('verified_at'))
+                ->when($verified === '0', fn ($q) => $q->whereNull('verified_at'))
+                ->with(['workshop', 'verifiedWorkshop', 'user']),
         ]);
 
-        return view('admin.vehicles.show', compact('vehicle'));
+        return view('admin.vehicles.show', [
+            'vehicle' => $vehicle,
+            'verified' => $verified,
+            'showMaintenanceFilter' => $maintenanceCount > 5,
+        ]);
     }
 }

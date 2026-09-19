@@ -14,7 +14,7 @@ class MaintenanceController extends Controller
         $verified = $request->query('verified');
 
         $maintenances = Maintenance::query()
-            ->with(['vehicle', 'workshop'])
+            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user'])
             ->when($verified === '1', fn ($query) => $query->whereNotNull('verified_at'))
             ->when($verified === '0', fn ($query) => $query->whereNull('verified_at'))
             ->orderByDesc('maintenance_date')

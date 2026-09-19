@@ -4,6 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| resources/views/admin/maintenances/**,resources/views/admin/vehicles/show.blade.php | .ai/rules/admin-vehicles.md |
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
 | app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
@@ -23,4 +24,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |
 | app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
 | frontend/lib/views/vehicles/** | .ai/rules/vehicles.md |
+| resources/views/layouts/**,resources/views/admin/** | .ai/rules/views-admin.md |
 | app/Http/Controllers/{Web,Api}/AuthController.php | .ai/rules/web-api.md |

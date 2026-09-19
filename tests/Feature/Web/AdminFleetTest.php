@@ -28,8 +28,56 @@ class AdminFleetTest extends TestCase
         $this->actingAs($admin)
             ->get('/admin/dashboard')
             ->assertOk()
+            ->assertSee('id="nav-admin"', false)
+            ->assertSee('Mapas', false)
             ->assertSee('Veículos', false)
             ->assertDontSee('Meus Veículos');
+    }
+
+    public function test_admin_maintenance_index_shows_provenance_markers_and_filter_labels(): void
+    {
+        $admin = User::factory()->asUser()->asAdmin()->create();
+        $owner = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create();
+        $owner->vehicles()->attach($vehicle->id, [
+            'purchase_date' => now(),
+            'is_current_owner' => true,
+            'tenant_id' => $owner->tenant_id,
+        ]);
+
+        Maintenance::factory()
+            ->for($vehicle)
+            ->for($owner)
+            ->sealedByWorkshop()
+            ->create(['maintenance_type' => 'Revisão selo QA']);
+
+        Maintenance::factory()
+            ->for($vehicle)
+            ->for($owner)
+            ->declaredByOwner()
+            ->create(['maintenance_type' => 'Troca declarada QA']);
+
+        $this->actingAs($admin)
+            ->get('/admin/manutencoes')
+            ->assertOk()
+            ->assertSee('Selo da oficina', false)
+            ->assertSee('Declaradas', false)
+            ->assertSee('prov-verified', false)
+            ->assertSee('prov-declared', false)
+            ->assertSee('Revisão selo QA', false)
+            ->assertSee('Troca declarada QA', false);
+
+        $this->actingAs($admin)
+            ->get('/admin/manutencoes?verified=1')
+            ->assertOk()
+            ->assertSee('Revisão selo QA', false)
+            ->assertDontSee('Troca declarada QA', false);
+
+        $this->actingAs($admin)
+            ->get('/admin/manutencoes?verified=0')
+            ->assertOk()
+            ->assertSee('Troca declarada QA', false)
+            ->assertDontSee('Revisão selo QA', false);
     }
 
     public function test_admin_vehicle_index_lists_all_vehicles(): void

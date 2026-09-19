@@ -29,11 +29,8 @@
 
             @auth
                 <div class="hidden items-center gap-4 md:flex">
-                @if($onAdminRoutes)
-                    @include('layouts.partials.nav-admin')
-                @else
                     @if(auth()->user()->isAdmin())
-                        @include('layouts.partials.nav-admin')
+                        <a href="{{ route('admin.dashboard') }}" class="text-sm text-automotive-300 hover:text-wrench-400">Painel Admin</a>
                     @endif
                     @if(auth()->user()->isUser())
                         @include('layouts.partials.nav-user')
@@ -42,7 +39,6 @@
                     @elseif(auth()->user()->isWorkshop())
                         @include('layouts.partials.nav-workshop')
                     @endif
-                @endif
                 </div>
             @endauth
         </div>

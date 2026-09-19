@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', 'Painel Admin')
 
@@ -32,7 +32,7 @@
         </div>
     </div>
 
-    <div class="card overflow-hidden !p-0">
+    <div id="usuarios" class="card overflow-hidden !p-0 scroll-mt-4">
         <div class="border-b border-automotive-200 px-5 py-4">
             <h2 class="text-lg font-semibold text-automotive-900">Todos os usuários</h2>
             <p class="text-sm text-automotive-500">Clique em um usuário para ver veículos e manutenções</p>
