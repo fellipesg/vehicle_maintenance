@@ -67,6 +67,28 @@ class AppStorageCoversTest extends TestCase
         );
     }
 
+    public function test_landing_url_uses_public_r2_base_when_remote(): void
+    {
+        $this->configurePublicCoversDisk();
+
+        $url = AppStorage::landingUrl('app-vehicle.png');
+
+        $this->assertSame(
+            'https://cdn.example.test/vehicle-maintenance/landing/app-vehicle.png',
+            $url
+        );
+    }
+
+    public function test_landing_url_falls_back_to_local_asset_when_not_remote(): void
+    {
+        Config::set('filesystems.covers_disk', 'public');
+        Storage::fake('public');
+
+        $url = AppStorage::landingUrl('app-vehicle.png');
+
+        $this->assertStringContainsString('/images/landing/app-vehicle.png', $url);
+    }
+
     public function test_local_copies_prefers_public_http_for_remote_covers(): void
     {
         $this->configurePublicCoversDisk();
@@ -119,6 +141,17 @@ class AppStorageCoversTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         AppStorage::putPublic('maintenance-photos/1.jpg', 'bytes');
+    }
+
+    public function test_put_public_accepts_landing_paths(): void
+    {
+        $this->fakeCoversDisk('r2');
+
+        $path = AppStorage::LANDING_PREFIX.'app-vehicle.png';
+
+        AppStorage::putPublic($path, 'bytes');
+
+        Storage::disk('r2')->assertExists($path);
     }
 
     public function test_local_copies_uses_local_disk_without_http(): void

@@ -6,6 +6,7 @@ import { initVehicleIdentity } from './vehicle-identity';
 import { initProvenanceActions } from './provenance-actions';
 import { initVehicleSearchFilters } from './vehicle-search-filters';
 import { initAdminMaintenancesFilters } from './admin-maintenances-filters';
+import { initLanding } from './landing';
 
 document.addEventListener('DOMContentLoaded', () => {
     initFormUx();
@@ -14,4 +15,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initProvenanceActions();
     initVehicleSearchFilters();
     initAdminMaintenancesFilters();
+    initLanding();
 });

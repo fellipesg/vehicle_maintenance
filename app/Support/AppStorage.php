@@ -21,6 +21,8 @@ class AppStorage
 
     public const BRAND_PREFIX = 'brand/revisalog/';
 
+    public const LANDING_PREFIX = 'landing/';
+
     public const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
     public static function diskName(): string
@@ -64,11 +66,17 @@ class AppStorage
         return str_starts_with($storagePath, self::BRAND_PREFIX);
     }
 
+    public static function isLandingPath(string $storagePath): bool
+    {
+        return str_starts_with($storagePath, self::LANDING_PREFIX);
+    }
+
     public static function isPublicCacheEligiblePath(string $storagePath): bool
     {
         return self::isCoverPath($storagePath)
             || self::isWorkshopLogoPath($storagePath)
-            || self::isBrandPath($storagePath);
+            || self::isBrandPath($storagePath)
+            || self::isLandingPath($storagePath);
     }
 
     /**
@@ -95,7 +103,8 @@ class AppStorage
     {
         return self::isCoverPath($storagePath)
             || self::isWorkshopLogoPath($storagePath)
-            || self::isBrandPath($storagePath);
+            || self::isBrandPath($storagePath)
+            || self::isLandingPath($storagePath);
     }
 
     public static function diskForPath(string $storagePath): Filesystem
@@ -500,6 +509,17 @@ class AppStorage
         }
 
         return asset('images/brand/'.ltrim($filename, '/'));
+    }
+
+    public static function landingUrl(string $filename): string
+    {
+        $path = self::LANDING_PREFIX.ltrim($filename, '/');
+
+        if (self::isCoversRemote() && self::isPublicRemotePath($path)) {
+            return self::coversUrl($path);
+        }
+
+        return asset('images/landing/'.ltrim($filename, '/'));
     }
 
     public static function url(string $path, ?\DateTimeInterface $expiresAt = null): string

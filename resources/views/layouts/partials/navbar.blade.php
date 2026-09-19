@@ -11,10 +11,10 @@
     }
 @endphp
 
-<nav class="border-b border-automotive-800 bg-automotive-950 text-white shadow-lg">
+<nav class="sticky top-0 z-50 border-b border-automotive-800 bg-automotive-950 text-white shadow-lg">
     <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div class="flex items-center gap-6">
-            <a href="{{ route($portal['route']) }}" class="flex items-center gap-2 font-bold">
+            <a href="{{ auth()->check() ? route($portal['route']) : route('home') }}" class="flex items-center gap-2 font-bold">
                 <img
                     src="{{ \App\Support\AppStorage::brandUrl('app-icon.png') }}"
                     alt="RevisaLog"
@@ -63,6 +63,12 @@
                     <button type="submit" class="text-sm text-automotive-400 hover:text-wrench-400">Sair</button>
                 </form>
             @else
+                @if (request()->routeIs('home'))
+                    <a href="#como-funciona" class="text-sm text-automotive-300 hover:text-wrench-400 max-md:hidden">Como funciona</a>
+                    <a href="#recursos" class="text-sm text-automotive-300 hover:text-wrench-400 max-lg:hidden">Recursos</a>
+                    <a href="#telas" class="text-sm text-automotive-300 hover:text-wrench-400 max-lg:hidden">Telas</a>
+                    <a href="#preco" class="text-sm text-automotive-300 hover:text-wrench-400 max-md:hidden">Preço</a>
+                @endif
                 <a href="{{ route('login') }}" class="text-sm text-automotive-300 hover:text-wrench-400">Entrar</a>
                 <a href="{{ route('register') }}" class="btn-primary !py-1.5 !text-xs">Cadastrar</a>
             @endauth

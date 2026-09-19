@@ -13,7 +13,63 @@ class HomePageTest extends TestCase
 
     public function test_home_page_is_accessible(): void
     {
-        $this->get('/')->assertOk()->assertSee('Vehicle Maintenance');
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Vehicle Maintenance')
+            ->assertSee('O histórico do carro')
+            ->assertSee('Começar grátis')
+            ->assertSee('Grátis enquanto a rede cresce')
+            ->assertSee('Selo da oficina')
+            ->assertSee('Para quem é o sistema?')
+            ->assertSee('R$ 0')
+            ->assertSee('Placa atual')
+            ->assertSee('93HFB1640NZ004251')
+            ->assertSee('00384719256')
+            ->assertSeeInOrder(['40.012 km', '40.580 km', '41.240 km', '42.180 km'])
+            ->assertSee('Dono do carro')
+            ->assertSee('Linha do tempo permanente')
+            ->assertSee('Histórico permanente · Grátis no lançamento')
+            ->assertSee('O app de verdade')
+            ->assertSee('landing/app-vehicle.png', false)
+            ->assertSee('id="preco"', false)
+            ->assertSee('id="como-funciona"', false)
+            ->assertSee('id="telas"', false)
+            ->assertSee('id="recursos"', false)
+            ->assertSee('id="app"', false);
+    }
+
+    public function test_guest_home_links_logo_to_home_and_shows_landing_anchors(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('href="'.route('home').'"', false)
+            ->assertSee('href="#como-funciona"', false)
+            ->assertSee('href="#recursos"', false)
+            ->assertSee('href="#telas"', false)
+            ->assertSee('href="#preco"', false)
+            ->assertDontSee('Ir para o painel')
+            ->assertDontSee(route('user.dashboard'), false);
+    }
+
+    public function test_authenticated_user_sees_dashboard_cta(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/')
+            ->assertOk()
+            ->assertSee('Ir para o painel')
+            ->assertDontSee('Começar grátis');
+    }
+
+    public function test_workshop_and_garage_cards_link_to_typed_logins(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee(route('login.lojista'), false)
+            ->assertSee(route('login.oficina'), false)
+            ->assertSee('Entrar como lojista')
+            ->assertSee('Entrar como oficina');
     }
 
     public function test_vehicle_search_requires_authentication(): void

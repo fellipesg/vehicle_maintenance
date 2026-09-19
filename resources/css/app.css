@@ -83,6 +83,125 @@
     .stat-card {
         @apply min-w-0 overflow-hidden rounded-xl border border-automotive-200 bg-gradient-to-br from-white to-automotive-100/60 p-5 shadow-sm;
     }
+
+    .landing-float {
+        animation: landing-float 5s ease-in-out infinite;
+    }
+
+    .landing-float-delay {
+        animation-delay: 1.4s;
+    }
+
+    .landing-scroller {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-automotive-300) transparent;
+    }
+
+    .landing-faq summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .landing-reveal {
+        transition:
+            opacity 0.7s ease,
+            transform 0.7s ease;
+    }
+
+    .landing-reveal.is-pending {
+        opacity: 0;
+        transform: translateY(1.5rem);
+    }
+
+    .landing-reveal.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .landing-bounce {
+        animation: landing-bounce 2s ease-in-out infinite;
+    }
+
+    .landing-dot-pulse {
+        animation: landing-dot-pulse 2.4s ease-in-out infinite;
+    }
+
+    .landing-marquee {
+        overflow: hidden;
+        width: 100%;
+        mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+    }
+
+    .landing-marquee-track {
+        display: flex;
+        width: max-content;
+        animation: landing-marquee 40s linear infinite;
+    }
+
+    .landing-marquee:hover .landing-marquee-track {
+        animation-play-state: paused;
+    }
+}
+
+@keyframes landing-float {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes landing-bounce {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(6px);
+    }
+}
+
+@keyframes landing-dot-pulse {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.45;
+        transform: scale(0.85);
+    }
+}
+
+@keyframes landing-marquee {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .landing-float,
+    .landing-float-delay,
+    .landing-bounce,
+    .landing-dot-pulse,
+    .landing-marquee-track {
+        animation: none !important;
+    }
+
+    .landing-reveal,
+    .landing-reveal.is-pending {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
 }
 
 @import './provenance.css';

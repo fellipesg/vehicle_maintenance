@@ -10,6 +10,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
 | app/Jobs/** | .ai/rules/jobs.md |
 | resources/js/user-portal.js | .ai/rules/js.md |
+| resources/views/components/landing/**,resources/views/home.blade.php | .ai/rules/landing-views.md |
 | resources/views/layouts/** | .ai/rules/layouts.md |
 | frontend/lib/models/maintenance_item.dart | .ai/rules/lib-models.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
@@ -25,5 +26,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
 | frontend/lib/views/vehicles/** | .ai/rules/vehicles.md |
 | resources/views/layouts/**,resources/views/admin/** | .ai/rules/views-admin.md |
-| resources/views/** | .ai/rules/views.md |
+| resources/views/**, resources/views/home.blade.php | .ai/rules/views.md |
 | app/Http/Controllers/{Web,Api}/AuthController.php | .ai/rules/web-api.md |
