@@ -80,6 +80,20 @@ class AdminFleetTest extends TestCase
             ->assertDontSee('Revisão selo QA', false);
     }
 
+    public function test_admin_maintenance_index_ajax_returns_table_fragment_only(): void
+    {
+        $admin = User::factory()->asUser()->asAdmin()->create();
+
+        $this->actingAs($admin)
+            ->get('/admin/manutencoes?verified=1', [
+                'X-Requested-With' => 'XMLHttpRequest',
+            ])
+            ->assertOk()
+            ->assertSee('data-admin-maintenances-pagination', false)
+            ->assertDontSee('data-maintenance-filter', false)
+            ->assertDontSee('id="nav-admin"', false);
+    }
+
     public function test_admin_vehicle_index_lists_all_vehicles(): void
     {
         $admin = User::factory()->asUser()->asAdmin()->create();
