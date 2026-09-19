@@ -46,6 +46,8 @@ class User extends Authenticatable
         'city',
         'state',
         'country',
+        'latitude',
+        'longitude',
         'provider',
         'provider_id',
         'avatar',
@@ -77,6 +79,8 @@ class User extends Authenticatable
             'document' => 'encrypted',
             'is_admin' => 'boolean',
             'subscription_active' => 'boolean',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
             'two_factor_secret' => 'encrypted',
             'two_factor_confirmed_at' => 'datetime',
         ];

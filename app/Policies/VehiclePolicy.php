@@ -14,6 +14,10 @@ class VehiclePolicy
 
     public function view(User $user, Vehicle $vehicle): bool
     {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
         return $this->tenantOwnsVehicle($user, $vehicle);
     }
 

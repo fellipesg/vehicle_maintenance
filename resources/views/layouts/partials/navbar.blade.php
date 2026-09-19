@@ -4,7 +4,11 @@
         'workshop' => ['label' => 'Oficina', 'route' => 'workshop.dashboard'],
         default => ['label' => 'Usuário', 'route' => 'user.dashboard'],
     };
-    $showAdminBadge = auth()->user()?->isAdmin() && request()->routeIs('admin.*');
+    $onAdminRoutes = auth()->user()?->isAdmin() && request()->routeIs('admin.*');
+    $showAdminBadge = $onAdminRoutes;
+    if ($onAdminRoutes) {
+        $portal = ['label' => 'Admin', 'route' => 'admin.dashboard'];
+    }
 @endphp
 
 <nav class="border-b border-automotive-800 bg-automotive-950 text-white shadow-lg">
@@ -25,15 +29,19 @@
 
             @auth
                 <div class="hidden items-center gap-4 md:flex">
-                @if(auth()->user()->isAdmin())
+                @if($onAdminRoutes)
                     @include('layouts.partials.nav-admin')
-                @endif
-                @if(auth()->user()->isUser())
-                    @include('layouts.partials.nav-user')
-                @elseif(auth()->user()->isGarage())
-                    @include('layouts.partials.nav-garage')
-                @elseif(auth()->user()->isWorkshop())
-                    @include('layouts.partials.nav-workshop')
+                @else
+                    @if(auth()->user()->isAdmin())
+                        @include('layouts.partials.nav-admin')
+                    @endif
+                    @if(auth()->user()->isUser())
+                        @include('layouts.partials.nav-user')
+                    @elseif(auth()->user()->isGarage())
+                        @include('layouts.partials.nav-garage')
+                    @elseif(auth()->user()->isWorkshop())
+                        @include('layouts.partials.nav-workshop')
+                    @endif
                 @endif
                 </div>
             @endauth

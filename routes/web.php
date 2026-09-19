@@ -1,9 +1,13 @@
 <?php
 
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Web\Admin\MaintenanceController as AdminMaintenanceController;
+use App\Http\Controllers\Web\Admin\MapController as AdminMapController;
 use App\Http\Controllers\Web\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Web\Admin\VehicleBrandController as AdminVehicleBrandController;
+use App\Http\Controllers\Web\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Web\Admin\VehicleModelController as AdminVehicleModelController;
+use App\Http\Controllers\Web\Admin\WorkshopController as AdminWorkshopController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
@@ -125,6 +129,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::prefix('admin')->middleware('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('/usuarios/{user}', [AdminUserController::class, 'show'])->name('users.show');
+        Route::get('/veiculos', [AdminVehicleController::class, 'index'])->name('vehicles.index');
+        Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
+        Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
+        Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
+        Route::get('/mapa/oficinas', [AdminMapController::class, 'workshops'])->name('maps.workshops');
+        Route::get('/mapa/usuarios', [AdminMapController::class, 'users'])->name('maps.users');
         Route::get('/marcas', [AdminVehicleBrandController::class, 'index'])->name('brands.index');
         Route::get('/marcas/nova', [AdminVehicleBrandController::class, 'create'])->name('brands.create');
         Route::post('/marcas', [AdminVehicleBrandController::class, 'store'])->name('brands.store');

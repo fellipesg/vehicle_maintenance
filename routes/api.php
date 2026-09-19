@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\LegalController;
@@ -47,6 +48,9 @@ Route::prefix('v1')->group(function () {
         // User's vehicles (vehicles owned by authenticated user)
         Route::get('/my-vehicles', [VehicleController::class, 'myVehicles'])
             ->middleware(['ability:vehicles:read', 'etag.vehicle_list']);
+
+        Route::get('/admin/vehicles', [AdminVehicleController::class, 'index'])
+            ->middleware('ability:vehicles:read');
 
         // Vehicle routes
         Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('ability:vehicles:read');

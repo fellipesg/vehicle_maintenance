@@ -29,6 +29,8 @@ class Workshop extends Model
         'neighborhood',
         'city',
         'state',
+        'latitude',
+        'longitude',
         'logo_path',
     ];
 
