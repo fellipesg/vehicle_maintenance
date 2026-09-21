@@ -297,6 +297,38 @@ class AuthControllerTest extends TestCase
             ->assertJsonPath('message', 'Too many attempts. Please try again later.');
     }
 
+    public function test_login_is_limited_per_ip_across_different_emails(): void
+    {
+        for ($attempt = 1; $attempt <= 30; $attempt++) {
+            $this->postJson('/api/v1/login', [
+                'email' => "spray-{$attempt}@example.com",
+                'password' => 'wrong-password',
+            ])->assertUnauthorized();
+        }
+
+        $this->postJson('/api/v1/login', [
+            'email' => 'spray-31@example.com',
+            'password' => 'wrong-password',
+        ])->assertStatus(429)
+            ->assertJsonPath('message', 'Too many attempts. Please try again later.');
+    }
+
+    public function test_two_factor_challenge_is_limited_per_ip_across_tokens(): void
+    {
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
+            $response = $this->postJson('/api/v1/two-factor/challenge', [
+                'challenge_token' => "token-{$attempt}",
+                'code' => '123456',
+            ]);
+            $this->assertNotSame(429, $response->status());
+        }
+
+        $this->postJson('/api/v1/two-factor/challenge', [
+            'challenge_token' => 'token-11',
+            'code' => '123456',
+        ])->assertStatus(429);
+    }
+
     public function test_sixth_register_in_a_minute_returns_429(): void
     {
         for ($attempt = 1; $attempt <= 5; $attempt++) {

@@ -30,10 +30,10 @@ if (! function_exists('cors_allowed_origin_patterns')) {
     {
         $raw = env('CORS_ALLOWED_ORIGIN_PATTERNS');
 
+        // No wildcard default: credentialed CORS must only be granted to origins
+        // explicitly listed in CORS_ALLOWED_ORIGINS / CORS_ALLOWED_ORIGIN_PATTERNS.
         if (! is_string($raw) || trim($raw) === '') {
-            return env('APP_ENV') === 'production'
-                ? ['#^https://[a-z0-9-]+\.laravel\.cloud$#']
-                : [];
+            return [];
         }
 
         return array_values(array_filter(array_map('trim', explode(',', $raw))));
