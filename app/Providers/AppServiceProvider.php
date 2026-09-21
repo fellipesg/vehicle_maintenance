@@ -26,6 +26,8 @@ use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
+    private const AUTH_PER_IP_PER_MINUTE = 30;
+
     public function register(): void
     {
         Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
@@ -71,9 +73,12 @@ class AppServiceProvider extends ServiceProvider
             'uploads|'.($request->user()?->id ?: $request->ip()),
         ));
 
-        RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by(
-            '2fa|'.strtolower((string) $request->input('email', '')).'|'.$request->ip(),
-        ));
+        // The challenge payload carries challenge_token (not email): 5 guesses per
+        // challenge, plus a per-IP cap across challenges.
+        RateLimiter::for('two-factor', fn (Request $request) => [
+            Limit::perMinute(5)->by('2fa|'.hash('sha256', (string) $request->input('challenge_token', '')).'|'.$request->ip()),
+            Limit::perMinute(10)->by('2fa-ip|'.$request->ip()),
+        ]);
 
         Gate::policy(Vehicle::class, VehiclePolicy::class);
         Gate::policy(Maintenance::class, MaintenancePolicy::class);
@@ -86,11 +91,32 @@ class AppServiceProvider extends ServiceProvider
         ));
     }
 
-    private function buildAuthRateLimit(Request $request, callable $response): Limit
+    /**
+     * Login is keyed on email+IP, so it also gets a per-IP cap to stop one IP
+     * spraying many emails. Register and OAuth buckets are already per-IP.
+     *
+     * @return list<Limit>
+     */
+    private function buildAuthRateLimit(Request $request, callable $response): array
     {
-        return Limit::perMinute(5)
-            ->by($this->authRateLimitKey($request))
-            ->response($response);
+        $limits = [
+            Limit::perMinute(5)
+                ->by($this->authRateLimitKey($request))
+                ->response($response),
+        ];
+
+        if ($this->isLoginRequest($request)) {
+            $limits[] = Limit::perMinute(self::AUTH_PER_IP_PER_MINUTE)
+                ->by('login-ip|'.$request->ip())
+                ->response($response);
+        }
+
+        return $limits;
+    }
+
+    private function isLoginRequest(Request $request): bool
+    {
+        return ! $request->is('api/v1/register', 'register', 'api/v1/auth/*/callback');
     }
 
     private function authRateLimitKey(Request $request): string

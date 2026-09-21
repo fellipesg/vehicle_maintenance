@@ -58,6 +58,36 @@ class ApiDocumentationTest extends TestCase
             ->assertOk();
     }
 
+    public function test_docs_basic_auth_rejects_wrong_username_or_password(): void
+    {
+        Config::set('api-docs.username', 'qa');
+        Config::set('api-docs.password', 'secret');
+
+        $this->withBasicAuth('qa', 'wrong')->get('/docs/api')->assertUnauthorized();
+        $this->withBasicAuth('other', 'secret')->get('/docs/api')->assertUnauthorized();
+    }
+
+    public function test_docs_return_404_in_production_when_credentials_not_configured(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+
+        $this->get('/docs/api')->assertNotFound();
+        $this->getJson('/docs/api.json')->assertNotFound();
+    }
+
+    public function test_docs_require_basic_auth_in_production_when_credentials_configured(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+        Config::set('api-docs.username', 'qa');
+        Config::set('api-docs.password', 'secret');
+
+        $this->get('/docs/api')->assertUnauthorized();
+
+        $this->withBasicAuth('qa', 'secret')
+            ->getJson('/docs/api.json')
+            ->assertOk();
+    }
+
     public function test_openapi_spec_contains_login_and_security_scheme(): void
     {
         $response = $this->getJson('/docs/api.json');
