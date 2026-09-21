@@ -19,8 +19,7 @@ class BrandAppIconCropTest extends TestCase
 
     public function test_android_adaptive_foreground_drops_the_teal_card_frame(): void
     {
-        $path = dirname(__DIR__, 3).'/frontend/android/app/src/main/res/drawable/ic_launcher_foreground.png';
-        $image = $this->loadPng($path);
+        $image = $this->loadFrontendPng('android/app/src/main/res/drawable/ic_launcher_foreground.png');
 
         $cornerTeal = $this->countMatchingPixels(
             $image,
@@ -40,8 +39,7 @@ class BrandAppIconCropTest extends TestCase
 
     public function test_ios_marketing_icon_keeps_the_odometer_inside_the_safe_zone(): void
     {
-        $path = dirname(__DIR__, 3).'/frontend/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png';
-        $image = $this->loadPng($path);
+        $image = $this->loadFrontendPng('ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png');
 
         $this->assertSame(1024, imagesx($image));
         $this->assertSame(1024, imagesy($image));
@@ -129,6 +127,20 @@ class BrandAppIconCropTest extends TestCase
         $this->assertGreaterThan(400, $maxY - $minY, 'WhatsApp square crop should be mostly filled by the lockup.');
 
         imagedestroy($image);
+    }
+
+    /**
+     * Launcher icons live in the Flutter repo, checked out as a sibling `frontend/` directory.
+     */
+    private function loadFrontendPng(string $relativePath): \GdImage
+    {
+        $path = dirname(__DIR__, 3).'/frontend/'.$relativePath;
+
+        if (! is_dir(dirname(__DIR__, 3).'/frontend')) {
+            $this->markTestSkipped('Flutter repo not checked out as a sibling frontend/ directory.');
+        }
+
+        return $this->loadPng($path);
     }
 
     private function loadPng(string $path): \GdImage

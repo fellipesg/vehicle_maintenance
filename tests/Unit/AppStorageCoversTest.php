@@ -11,6 +11,17 @@ use Tests\TestCase;
 
 class AppStorageCoversTest extends TestCase
 {
+    /**
+     * Env changes outlive the app instance, so restore them or later tests build R2 URLs without credentials.
+     */
+    protected function tearDown(): void
+    {
+        putenv('VEHICLE_COVERS_DISK');
+        unset($_ENV['VEHICLE_COVERS_DISK']);
+
+        parent::tearDown();
+    }
+
     public function test_covers_url_uses_public_r2_base_when_configured(): void
     {
         Config::set('filesystems.covers_disk', 'r2');
