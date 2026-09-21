@@ -1,45 +1,40 @@
 FROM php:8.4-fpm
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    libzip-dev \
-    libfreetype6-dev \
-    libjpeg62-turbo-dev \
+# System libs + PHP extensions. pdo_pgsql matches production (Neon);
+# pdo_sqlite ships with the base image and is used by the default test suite.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git curl unzip zip \
+        libpq-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
+        libzip-dev libonig-dev libxml2-dev libicu-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && docker-php-ext-install -j"$(nproc)" \
+        pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip intl \
     && pecl install xdebug \
     && docker-php-ext-enable xdebug \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/pear
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Set permissions for storage and cache directories
-RUN mkdir -p /var/www/html/storage/framework/cache \
-    && mkdir -p /var/www/html/storage/framework/sessions \
-    && mkdir -p /var/www/html/storage/framework/views \
-    && mkdir -p /var/www/html/storage/logs \
-    && mkdir -p /var/www/html/bootstrap/cache \
-    && chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache
+# Run as www-data remapped to the host user's UID/GID so files written to the
+# bind mount (storage/, vendor/, bootstrap/cache) are owned by you on Linux.
+# (Docker Desktop on macOS maps ownership automatically.)
+ARG WWWUSER=1000
+ARG WWWGROUP=1000
+RUN groupmod -o -g "${WWWGROUP}" www-data \
+    && usermod -o -u "${WWWUSER}" -g "${WWWGROUP}" www-data \
+    && mkdir -p /tmp/composer && chown -R www-data:www-data /tmp/composer /var/www
 
-# Copy PHP and Xdebug configurations
-COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
+COPY docker/php/php.ini /usr/local/etc/php/conf.d/zz-custom.ini
 COPY docker/php/xdebug.ini /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
 
-# Expose port 9000 for PHP-FPM and 9003 for Xdebug
-EXPOSE 9000 9003
+# Xdebug is installed but off unless XDEBUG_MODE is overridden (e.g. debug).
+ENV XDEBUG_MODE=off \
+    COMPOSER_HOME=/tmp/composer
+
+USER www-data
+
+EXPOSE 9000
 
 CMD ["php-fpm"]
-

@@ -39,9 +39,6 @@ Thumbs.db
 /bootstrap/cache/*
 !/bootstrap/cache/.gitkeep
 
-# Docker volumes
-/docker/nginx/.gitkeep
-
 # Local SQLite / binary DB dumps
 /database/*.sqlite
 /database/*.sqlite-journal
