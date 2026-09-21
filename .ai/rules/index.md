@@ -28,6 +28,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |
 | app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
 | frontend/lib/views/vehicles/** | .ai/rules/vehicles.md |
+| resources/views/vendor/mail/** | .ai/rules/vendor-mail.md |
 | resources/views/layouts/**,resources/views/admin/** | .ai/rules/views-admin.md |
 | resources/views/**, resources/views/home.blade.php | .ai/rules/views.md |
 | app/Http/Controllers/{Web,Api}/AuthController.php | .ai/rules/web-api.md |

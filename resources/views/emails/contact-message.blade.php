@@ -6,6 +6,5 @@
 
 {{ $body }}
 
-Thanks,<br>
-{{ config('app.name') }}
+Revisalog
 </x-mail::message>
