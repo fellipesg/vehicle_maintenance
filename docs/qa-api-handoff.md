@@ -20,12 +20,9 @@ A documentação interativa exige Basic Auth quando `API_DOCS_USERNAME` e `API_D
 
 ## Conta demo
 
-```
-E-mail: fgoncalves2008@gmail.com
-Senha:  password123
-```
+> **Enviar ao QA por canal privado** (não commitar): e-mail e senha da conta demo.
 
-Conta com veículos e manutenções reais para teste de ponta a ponta.
+Conta com veículos e manutenções para teste de ponta a ponta.
 
 ---
 
@@ -38,8 +35,8 @@ POST /api/v1/login
 Content-Type: application/json
 
 {
-  "email": "fgoncalves2008@gmail.com",
-  "password": "password123"
+  "email": "<email-da-conta-demo>",
+  "password": "<senha-da-conta-demo>"
 }
 ```
 
