@@ -145,7 +145,7 @@ class VehicleController extends Controller
                 $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
                 $request->session()->forget(['consignment_pending', 'crlv_verification', 'crlv_preview', 'claim_vehicle_id']);
 
-                return redirect()->route('user.vehicles.show', $vehicle)
+                return redirect()->route('user.vehicles.index')
                     ->with('success', 'Procuração enviada. O histórico ficará disponível após análise.');
             }
 
@@ -158,7 +158,7 @@ class VehicleController extends Controller
             $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
             $request->session()->forget(['consignment_pending', 'crlv_verification', 'crlv_preview']);
 
-            return redirect()->route('user.vehicles.show', $vehicle)
+            return redirect()->route('user.vehicles.index')
                 ->with('success', 'Veículo cadastrado em consignação. A procuração será analisada pela equipe.');
         } catch (RuntimeException $exception) {
             return back()->withErrors(['power_of_attorney' => $exception->getMessage()]);
@@ -299,6 +299,8 @@ class VehicleController extends Controller
 
     public function exportPdf(Vehicle $vehicle): RedirectResponse
     {
+        Gate::authorize('viewMaintenances', $vehicle);
+
         $user = request()->user();
 
         EmailVehicleMaintenancePdf::dispatch($user, $vehicle);
