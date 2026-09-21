@@ -8,7 +8,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
 | app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
-| config/legal.php | .ai/rules/config.md |
+| config/legal.php, config/mail.php | .ai/rules/config.md |
 | app/Jobs/** | .ai/rules/jobs.md |
 | resources/js/user-portal.js | .ai/rules/js.md |
 | resources/views/components/landing/**,resources/views/home.blade.php | .ai/rules/landing-views.md |
