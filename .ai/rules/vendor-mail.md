@@ -6,4 +6,4 @@ paths:
 # Vendor Mail
 
 ## Mail chrome uses mail.from.name, not APP_NAME
-Published markdown wrappers in resources/views/vendor/mail/html/{message,layout}.blade.php and text/message.blade.php must brand as config('mail.from.name') (Revisalog). Do not use config('app.name') in mail title, header, or footer — Cloud APP_NAME is still vehicle_maintenance.
+Header, title, and footer are the literal brand Revisalog. Do not interpolate APP_NAME, SMTP_FROM_NAME, or mail.from.name — those Cloud values are still Vehicle Maintenance System.

@@ -115,8 +115,8 @@ return [
     */
 
     'from' => [
-        'address' => env('SMTP_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'noreply@revisalog.com.br')),
-        'name' => env('SMTP_FROM_NAME', env('MAIL_FROM_NAME', 'Revisalog')),
+        'address' => env('MAIL_FROM_ADDRESS', 'noreply@revisalog.com.br'),
+        'name' => 'Revisalog',
     ],
 
     'reply_to' => [

@@ -27,10 +27,11 @@ class WelcomeUserMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: new Address('noreply@revisalog.com.br', 'Revisalog'),
             replyTo: [
                 new Address(
                     (string) config('mail.reply_to.address'),
-                    (string) config('mail.reply_to.name'),
+                    'Revisalog',
                 ),
             ],
             subject: 'Bem-vindo à Revisalog',

@@ -31,6 +31,7 @@ class NewUserSignupAlertNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
+            ->from('noreply@revisalog.com.br', 'Revisalog')
             ->subject("Novo cadastro — {$this->user->name}")
             ->greeting('Novo cadastro na Revisalog')
             ->line("**Nome:** {$this->user->name}")
