@@ -12,13 +12,20 @@ class MaintenancePolicy
         return $user->tenant_id !== null;
     }
 
+    /**
+     * Anyone who may view the vehicle may view its full history, including records from previous owners.
+     */
     public function view(User $user, Maintenance $maintenance): bool
     {
         if ($user->isWorkshop() && $user->workshop) {
             return $maintenance->workshop_id === $user->workshop->id;
         }
 
-        return $maintenance->tenant_id === $user->tenant_id;
+        if ($user->tenant_id !== null && $maintenance->tenant_id === $user->tenant_id) {
+            return true;
+        }
+
+        return $maintenance->vehicle !== null && $user->can('view', $maintenance->vehicle);
     }
 
     public function create(User $user): bool

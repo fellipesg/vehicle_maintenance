@@ -12,6 +12,7 @@ use App\Rules\RequiresInvoiceWhenWorkshopAssigned;
 use App\Services\Vehicle\VehicleMileageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class MaintenanceController extends Controller
@@ -72,6 +73,8 @@ class MaintenanceController extends Controller
         $data['is_manufacturer_required'] = $request->boolean('is_manufacturer_required');
 
         $vehicle = Vehicle::findOrFail($data['vehicle_id']);
+        Gate::authorize('addMaintenance', $vehicle);
+
         app(VehicleMileageService::class)->assertMaintenanceKilometers(
             $vehicle,
             (int) $data['kilometers'],
@@ -100,6 +103,8 @@ class MaintenanceController extends Controller
 
     public function show(Maintenance $maintenance): View
     {
+        Gate::authorize('view', $maintenance);
+
         $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'verifiedWorkshop', 'user', 'photos']);
 
         return view('user.maintenances.show', compact('maintenance'));

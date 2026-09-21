@@ -11,6 +11,7 @@ use App\Rules\InvoiceFile;
 use App\Services\Vehicle\VehicleMileageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class MaintenanceController extends Controller
@@ -65,6 +66,8 @@ class MaintenanceController extends Controller
         $data['is_manufacturer_required'] = $request->boolean('is_manufacturer_required');
 
         $vehicle = Vehicle::findOrFail($data['vehicle_id']);
+        Gate::authorize('addMaintenance', $vehicle);
+
         app(VehicleMileageService::class)->assertMaintenanceKilometers(
             $vehicle,
             (int) $data['kilometers'],

@@ -18,7 +18,8 @@ class VehiclePolicy
             return true;
         }
 
-        return $this->tenantOwnsVehicle($user, $vehicle);
+        return $this->tenantOwnsVehicle($user, $vehicle)
+            || $this->hasApprovedConsignmentGrant($user, $vehicle);
     }
 
     public function create(User $user): bool
@@ -38,6 +39,15 @@ class VehiclePolicy
 
     public function viewMaintenances(User $user, Vehicle $vehicle): bool
     {
+        return $this->tenantOwnsVehicle($user, $vehicle)
+            || $this->hasApprovedConsignmentGrant($user, $vehicle);
+    }
+
+    /**
+     * Registering a maintenance also moves the vehicle odometer, so only the current owner may do it.
+     */
+    public function addMaintenance(User $user, Vehicle $vehicle): bool
+    {
         return $this->tenantOwnsVehicle($user, $vehicle);
     }
 
@@ -54,6 +64,18 @@ class VehiclePolicy
         return ! $vehicle->owners()
             ->wherePivot('is_current_owner', true)
             ->wherePivot('tenant_id', '!=', $user->tenant_id)
+            ->exists();
+    }
+
+    /**
+     * Garages selling a vehicle on consignment get read access once staff approve the power of attorney.
+     */
+    private function hasApprovedConsignmentGrant(User $user, Vehicle $vehicle): bool
+    {
+        return $vehicle->accessGrants()
+            ->where('user_id', $user->id)
+            ->where('grant_type', 'consignment')
+            ->where('status', 'approved')
             ->exists();
     }
 
