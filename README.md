@@ -23,7 +23,7 @@ Laravel API and web portal for vehicle service history. Mobile client: [vehicle_
 | Layer | Local | Production |
 | --- | --- | --- |
 | Runtime | PHP 8.4, Laravel 12 | Laravel Cloud |
-| Database | SQLite or MySQL 8 | Neon Postgres |
+| Database | Postgres 17 (Docker) or SQLite | Neon Postgres |
 | Files | Local disk | Amazon S3 |
 | Queue | `database` driver (`queue:listen`) | Same driver, workers on Cloud |
 | Auth | Sanctum, Socialite | Same |
@@ -34,17 +34,44 @@ PDF: DomPDF, smalot/pdfparser, FPDI. Push: Firebase Admin (FCM).
 
 ## Requirements
 
-- PHP 8.4+ (`pdo_sqlite` or `pdo_mysql` / `pdo_pgsql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`, `fileinfo`, `gd`)
-- Composer 2.x
-- Node.js 20+ (Vite)
-- Or Docker Compose (MySQL 8, Redis 7, PHP-FPM, Nginx)
+Docker (Compose v2, or v1 via `make ... DC=docker-compose`) and `make`. Nothing else is needed on the host: PHP 8.4, Postgres 17 and Node 22 all run in containers, so the host PHP/Node versions don't matter.
+
+Running without Docker needs PHP 8.4+ (`pdo_sqlite` / `pdo_pgsql`, `mbstring`, `xml`, `bcmath`, `fileinfo`, `gd`, `intl`), Composer 2 and Node 20.19+ (Vite 7).
+
+## Quick start (Docker)
+
+```bash
+git clone https://github.com/fellipesg/vehicle_maintenance.git
+cd vehicle_maintenance
+make install   # .env, composer + npm deps, APP_KEY, migrations, asset build
+make dev       # optional: Vite dev server with HMR (Ctrl-C to stop)
+```
+
+- App: http://localhost:8080 (API: `/api/v1`)
+- Postgres from the host: `localhost:5433`, db `vehicle_maintenance`, user `vehicle`, password `secret`
+
+| Command | What it does |
+| --- | --- |
+| `make up` / `make down` | Start / stop app (php-fpm), nginx, db, queue, scheduler. `down` keeps the DB volume |
+| `make dev` | Vite dev server in a Node 22 container on :5173 |
+| `make build` | Production assets into `public/build` |
+| `make test` | Test suite in the container (SQLite in-memory, `phpunit.xml`) |
+| `make test-pgsql` | Same suite against the compose Postgres (`phpunit.pgsql.xml`, db `vehicle_maintenance_test`) |
+| `make migrate` / `make shell` / `make logs` | Migrations, bash in the app container, follow logs |
+
+`make help` lists everything. Without make: `docker compose up -d --build`, `docker compose exec app php artisan …`.
+
+Notes:
+
+- The compose `environment:` overrides `.env` for the database (`DB_CONNECTION=pgsql`, `DB_HOST=db`, …), so `.env` can stay on SQLite.
+- Ports: `APP_PORT` (8080) and `FORWARD_DB_PORT` (5433), e.g. `APP_PORT=8090 make up`.
+- `queue` runs `queue:work database --timeout=300 --tries=2`, like production.
+- Xdebug is installed but off: `XDEBUG_MODE=debug make up`.
+- Linux: `WWWUSER=$(id -u) WWWGROUP=$(id -g) make up` so files written by the containers are owned by you.
 
 ## Quick start (no Docker)
 
 ```bash
-git clone https://github.com/fellipesg/vehicle_maintenance.git
-cd vehicle_maintenance/backend
-
 composer install
 cp .env.example .env
 php artisan key:generate
@@ -54,29 +81,7 @@ npm install && npm run build
 composer run dev
 ```
 
-`composer run dev` starts the HTTP server, a queue worker, Vite, and log tailing.
-
-- App: http://127.0.0.1:8000
-- API: `http://127.0.0.1:8000/api/v1`
-
-If port 8000 is taken: `php artisan serve --port=8080` and set `APP_URL`.
-
-## Docker
-
-From `backend/`:
-
-```bash
-cp .env.example .env
-# Set DB_CONNECTION=mysql, DB_HOST=db, DB_PORT=3306,
-# DB_DATABASE=vehicle_maintenance, DB_USERNAME=vehicle_user, DB_PASSWORD=root
-
-docker compose up -d --build
-docker compose exec app composer install
-docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate
-```
-
-Nginx listens on **8080** by default (`APP_PORT`).
+`composer run dev` starts the HTTP server (http://127.0.0.1:8000), a queue worker, Vite, and log tailing.
 
 ## Production notes (Laravel Cloud + Neon + S3)
 
@@ -112,7 +117,7 @@ Never commit `.env`, AWS keys, or Firebase service-account JSON.
 | --- | --- |
 | `APP_KEY` | `php artisan key:generate` |
 | `APP_URL` | Public URL (OAuth and signed links) |
-| `DB_*` | SQLite, MySQL, or Postgres/Neon |
+| `DB_*` | SQLite or Postgres/Neon (Docker sets these itself) |
 | `FILESYSTEM_DISK` | `local` or `s3` |
 | `AWS_*` | S3 bucket and credentials |
 | `QUEUE_CONNECTION` | `database` in this project |
@@ -129,7 +134,7 @@ composer test
 php artisan test
 ```
 
-Docker: `docker compose exec app php artisan test`
+Docker: `make test` (SQLite) or `make test-pgsql` (Postgres, closer to production).
 
 Coverage includes invoice parsers, CRLV import, ownership, portals, and Postgres boolean binding.
 

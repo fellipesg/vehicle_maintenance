@@ -1,47 +1,17 @@
-# Git
+# Only docker/php/* is COPY'd into the image; the app is bind-mounted.
 .git
-.gitignore
-.gitattributes
-
-# Documentation
-README.md
-*.md
-
-# IDE
-.vscode
+.github
 .idea
-*.swp
-*.swo
-*~
-
-# OS
+.vscode
 .DS_Store
-Thumbs.db
-
-# Dependencies
 vendor
 node_modules
-
-# Environment
+public/build
+public/hot
+storage
+bootstrap/cache/*.php
 .env
-.env.backup
-.env.production
-
-# Storage (will be mounted as volume)
-storage/logs/*
-storage/framework/cache/*
-storage/framework/sessions/*
-storage/framework/views/*
-!storage/logs/.gitkeep
-!storage/framework/cache/.gitkeep
-!storage/framework/sessions/.gitkeep
-!storage/framework/views/.gitkeep
-
-# Bootstrap cache
-bootstrap/cache/*
-!bootstrap/cache/.gitkeep
-
-# Testing
+.env.*
+*.sqlite
 .phpunit.result.cache
 coverage
-
