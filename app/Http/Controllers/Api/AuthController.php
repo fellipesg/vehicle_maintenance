@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\RegistrationSource;
+use App\Events\UserRegistered;
 use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\LoginRequest;
 use App\Http\Requests\Api\V1\RegisterRequest;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\User;
-use App\Services\FcmService;
 use App\Services\TenantService;
 use App\Support\ApiResponse;
 use App\Support\SanctumMobileToken;
@@ -17,6 +18,7 @@ use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
@@ -34,31 +36,34 @@ class AuthController extends Controller
     #[Endpoint(title: 'Register')]
     public function register(RegisterRequest $request): JsonResponse
     {
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'user_type' => 'user',
-            'phone' => $request->phone,
-            'postal_code' => $request->postal_code,
-            'street' => $request->street,
-            'number' => $request->number,
-            'complement' => $request->complement,
-            'city' => $request->city,
-            'state' => $request->state,
-            'country' => $request->country ?? 'Brasil',
-        ]);
+        $user = DB::transaction(function () use ($request): User {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'user_type' => 'user',
+                'phone' => $request->phone,
+                'postal_code' => $request->postal_code,
+                'street' => $request->street,
+                'number' => $request->number,
+                'complement' => $request->complement,
+                'city' => $request->city,
+                'state' => $request->state,
+                'country' => $request->country ?? 'Brasil',
+            ]);
 
-        (new TenantService)->createForUser($user);
-        $user->refresh();
+            (new TenantService)->createForUser($user);
+
+            return $user->refresh();
+        });
+
+        UserRegistered::dispatch($user, RegistrationSource::Api);
 
         if ($twoFactorResponse = $this->maybeIssueTwoFactorChallenge($user)) {
             return $twoFactorResponse;
         }
 
         $token = SanctumMobileToken::issue($user);
-
-        $this->sendWelcomeNotification($user, true);
 
         return ApiResponse::created([
             'user' => new UserResource($user),
@@ -88,8 +93,6 @@ class AuthController extends Controller
         if ($twoFactorResponse = $this->maybeIssueTwoFactorChallenge($user)) {
             return $twoFactorResponse;
         }
-
-        $this->sendWelcomeNotification($user, false);
 
         return SanctumMobileToken::loginResponse($user);
     }
@@ -198,27 +201,32 @@ class AuthController extends Controller
                         'avatar' => $socialUser->getAvatar(),
                     ]);
                 } else {
-                    $user = User::create([
-                        'name' => $socialUser->getName(),
-                        'email' => $socialUser->getEmail(),
-                        'provider' => $provider,
-                        'provider_id' => $socialUser->getId(),
-                        'avatar' => $socialUser->getAvatar(),
-                        'password' => Hash::make(uniqid()),
-                    ]);
-                    (new TenantService)->createForUser($user);
-                    $user->refresh();
+                    $user = DB::transaction(function () use ($socialUser, $provider): User {
+                        $user = User::create([
+                            'name' => $socialUser->getName(),
+                            'email' => $socialUser->getEmail(),
+                            'provider' => $provider,
+                            'provider_id' => $socialUser->getId(),
+                            'avatar' => $socialUser->getAvatar(),
+                            'password' => Hash::make(uniqid()),
+                        ]);
+                        (new TenantService)->createForUser($user);
+
+                        return $user->refresh();
+                    });
                     $isNewUser = true;
                 }
             } elseif ($socialUser->getAvatar() && $user->avatar !== $socialUser->getAvatar()) {
                 $user->update(['avatar' => $socialUser->getAvatar()]);
             }
 
+            if ($isNewUser) {
+                UserRegistered::dispatch($user, RegistrationSource::Oauth);
+            }
+
             if ($twoFactorResponse = $this->maybeIssueTwoFactorChallenge($user)) {
                 return $twoFactorResponse;
             }
-
-            $this->sendWelcomeNotification($user, $isNewUser);
 
             return SanctumMobileToken::loginResponse($user);
         } catch (\Exception $e) {
@@ -257,35 +265,5 @@ class AuthController extends Controller
             'oficina' => $user->isWorkshop(),
             default => false,
         };
-    }
-
-    private function sendWelcomeNotification(User $user, bool $isNewUser): void
-    {
-        try {
-            $fcmService = new FcmService;
-            if ($isNewUser) {
-                $fcmService->sendToUser(
-                    $user->id,
-                    'Bem-vindo ao Vehicle Maintenance! 🚗',
-                    "Olá {$user->name}! Sua conta foi criada com sucesso. Comece a gerenciar suas manutenções!",
-                    [
-                        'type' => 'welcome',
-                        'user_id' => (string) $user->id,
-                    ]
-                );
-            } else {
-                $fcmService->sendToUser(
-                    $user->id,
-                    'Bem-vindo de volta! 👋',
-                    "Olá {$user->name}! Você entrou no Vehicle Maintenance.",
-                    [
-                        'type' => 'welcome',
-                        'user_id' => (string) $user->id,
-                    ]
-                );
-            }
-        } catch (\Exception $e) {
-            Log::warning('Failed to send welcome notification: '.$e->getMessage());
-        }
     }
 }

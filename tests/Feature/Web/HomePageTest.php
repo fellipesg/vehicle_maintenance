@@ -15,7 +15,11 @@ class HomePageTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('Vehicle Maintenance')
+            ->assertSee('RevisaLog')
+            ->assertSee(route('legal.terms'), false)
+            ->assertSee(route('legal.privacy'), false)
+            ->assertSee(route('contact.show'), false)
+            ->assertSee('suporte@revisalog.com.br')
             ->assertSee('O histórico do carro')
             ->assertSee('Começar grátis')
             ->assertSee('Grátis enquanto a rede cresce')

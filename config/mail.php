@@ -65,6 +65,10 @@ return [
             'transport' => 'resend',
         ],
 
+        'resend' => [
+            'transport' => 'resend',
+        ],
+
         'sendmail' => [
             'transport' => 'sendmail',
             'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -bs -i'),
@@ -111,8 +115,13 @@ return [
     */
 
     'from' => [
-        'address' => env('SMTP_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
-        'name' => env('SMTP_FROM_NAME', env('MAIL_FROM_NAME', 'Example')),
+        'address' => env('SMTP_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'noreply@revisalog.com.br')),
+        'name' => env('SMTP_FROM_NAME', env('MAIL_FROM_NAME', 'Revisalog')),
+    ],
+
+    'reply_to' => [
+        'address' => env('MAIL_REPLY_TO_ADDRESS', env('MAIL_SUPPORT_ADDRESS', 'suporte@revisalog.com.br')),
+        'name' => env('MAIL_REPLY_TO_NAME', env('MAIL_FROM_NAME', 'Revisalog')),
     ],
 
 ];

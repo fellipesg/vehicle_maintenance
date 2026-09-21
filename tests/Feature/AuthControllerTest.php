@@ -2,10 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RegistrationSource;
+use App\Mail\WelcomeUserMail;
 use App\Models\User;
+use App\Notifications\NewUserSignupAlertNotification;
 use App\Support\SanctumMobileToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
@@ -39,6 +44,9 @@ class AuthControllerTest extends TestCase
 
     public function test_can_register_user_with_tenant(): void
     {
+        Mail::fake();
+        Notification::fake();
+
         $response = $this->postJson('/api/v1/register', [
             'name' => 'João Silva',
             'email' => 'joao@example.com',
@@ -56,6 +64,21 @@ class AuthControllerTest extends TestCase
             'id' => $user->tenant_id,
             'type' => 'individual',
         ]);
+
+        Mail::assertQueued(WelcomeUserMail::class, function (WelcomeUserMail $mail) use ($user) {
+            return $mail->hasTo($user->email)
+                && $mail->hasReplyTo((string) config('mail.reply_to.address'))
+                && $mail->source === RegistrationSource::Api;
+        });
+
+        Notification::assertSentOnDemand(
+            NewUserSignupAlertNotification::class,
+            function (NewUserSignupAlertNotification $notification, array $channels, object $notifiable) use ($user) {
+                return $notifiable->routes['mail'] === (string) config('legal.support_email')
+                    && $notification->user->is($user)
+                    && $notification->source === RegistrationSource::Api;
+            }
+        );
     }
 
     public function test_can_register_garage_with_tenant(): void
@@ -92,7 +115,10 @@ class AuthControllerTest extends TestCase
 
     public function test_can_login(): void
     {
-        $user = User::factory()->asUser()->create([
+        Mail::fake();
+        Notification::fake();
+
+        User::factory()->asUser()->create([
             'email' => 'login@example.com',
             'password' => bcrypt('password123'),
         ]);
@@ -102,6 +128,9 @@ class AuthControllerTest extends TestCase
             'password' => 'password123',
         ])->assertOk()
             ->assertJsonStructure(['data' => ['token', 'user']]);
+
+        Mail::assertNothingQueued();
+        Notification::assertNothingSent();
     }
 
     public function test_can_login_via_matching_portal(): void

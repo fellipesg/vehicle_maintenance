@@ -2,8 +2,13 @@
 
 namespace Tests\Feature\Web;
 
+use App\Enums\RegistrationSource;
+use App\Mail\WelcomeUserMail;
 use App\Models\User;
+use App\Notifications\NewUserSignupAlertNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
@@ -48,6 +53,9 @@ class AuthTest extends TestCase
 
     public function test_user_can_register_as_common_user(): void
     {
+        Mail::fake();
+        Notification::fake();
+
         $response = $this->post('/register', [
             'name' => 'João Silva',
             'email' => 'joao@example.com',
@@ -65,6 +73,21 @@ class AuthTest extends TestCase
         $this->assertNotNull($user);
         $this->assertSame('52998224725', $user->normalizedDocument());
         $this->assertNotSame('52998224725', $user->getRawOriginal('document'));
+
+        Mail::assertQueued(WelcomeUserMail::class, function (WelcomeUserMail $mail) use ($user) {
+            return $mail->hasTo($user->email)
+                && $mail->hasReplyTo((string) config('mail.reply_to.address'))
+                && $mail->source === RegistrationSource::Web;
+        });
+
+        Notification::assertSentOnDemand(
+            NewUserSignupAlertNotification::class,
+            function (NewUserSignupAlertNotification $notification, array $channels, object $notifiable) use ($user) {
+                return $notifiable->routes['mail'] === (string) config('legal.support_email')
+                    && $notification->user->is($user)
+                    && $notification->source === RegistrationSource::Web;
+            }
+        );
     }
 
     public function test_user_can_register_as_garage(): void
@@ -84,6 +107,9 @@ class AuthTest extends TestCase
 
     public function test_user_can_login_via_user_portal(): void
     {
+        Mail::fake();
+        Notification::fake();
+
         $user = User::factory()->asUser()->create([
             'email' => 'test@example.com',
             'password' => bcrypt('password123'),
@@ -95,6 +121,8 @@ class AuthTest extends TestCase
         ])->assertRedirect(route('user.dashboard'));
 
         $this->assertAuthenticatedAs($user);
+        Mail::assertNothingQueued();
+        Notification::assertNothingSent();
     }
 
     public function test_garage_can_login_via_lojista_portal(): void
@@ -228,6 +256,9 @@ class AuthTest extends TestCase
 
     public function test_web_register_rate_limit_returns_redirect_not_json(): void
     {
+        Mail::fake();
+        Notification::fake();
+
         for ($attempt = 1; $attempt <= 5; $attempt++) {
             $this->from('/register')
                 ->post('/register', [

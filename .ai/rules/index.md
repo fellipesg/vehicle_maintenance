@@ -8,11 +8,14 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
 | app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
+| config/legal.php | .ai/rules/config.md |
 | app/Jobs/** | .ai/rules/jobs.md |
 | resources/js/user-portal.js | .ai/rules/js.md |
 | resources/views/components/landing/**,resources/views/home.blade.php | .ai/rules/landing-views.md |
 | resources/views/layouts/** | .ai/rules/layouts.md |
 | frontend/lib/models/maintenance_item.dart | .ai/rules/lib-models.md |
+| app/Listeners/** | .ai/rules/listeners.md |
+| app/Mail/** | .ai/rules/mail.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
 | app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php | .ai/rules/models.md |
 | resources/views/pdfs/vehicle_maintenance_export.blade.php | .ai/rules/pdfs.md |

@@ -59,6 +59,10 @@ class MaintenanceKmReminderNotification extends Notification implements ShouldQu
 
         return (new MailMessage)
             ->subject($subject)
+            ->replyTo(
+                (string) config('mail.reply_to.address'),
+                (string) config('mail.reply_to.name'),
+            )
             ->greeting("Olá, {$ownerName}!")
             ->line($intro)
             ->line("Próxima revisão estimada: **{$formattedNextDue} km**.")

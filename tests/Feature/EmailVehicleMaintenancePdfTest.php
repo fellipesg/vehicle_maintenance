@@ -60,4 +60,21 @@ class EmailVehicleMaintenancePdfTest extends TestCase
 
         Storage::disk('public')->assertExists($xmlPath);
     }
+
+    public function test_pdf_mail_uses_revisalog_copy_and_support_reply_to(): void
+    {
+        $vehicle = Vehicle::factory()->create([
+            'brand' => 'Honda',
+            'model' => 'Civic',
+            'license_plate' => 'ABC1D23',
+        ]);
+
+        $mailable = new VehicleMaintenancePdfMail($vehicle, '%PDF', 'historico.pdf');
+
+        $mailable->assertHasReplyTo((string) config('mail.reply_to.address'));
+        $mailable->assertSeeInHtml('Honda Civic');
+        $mailable->assertSeeInHtml('ABC1D23');
+        $mailable->assertSeeInHtml('Revisalog');
+        $mailable->assertDontSeeInHtml('Vehicle Maintenance');
+    }
 }

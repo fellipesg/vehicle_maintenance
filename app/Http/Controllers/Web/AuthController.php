@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Enums\RegistrationSource;
+use App\Events\UserRegistered;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\TenantService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
@@ -94,17 +97,23 @@ class AuthController extends Controller
             'document.regex' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.',
         ]);
 
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'user_type' => 'user',
-            'phone' => $data['phone'] ?? null,
-            'document' => $data['document'] ?? null,
-            'country' => 'Brasil',
-        ]);
+        $user = DB::transaction(function () use ($data): User {
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'user_type' => 'user',
+                'phone' => $data['phone'] ?? null,
+                'document' => $data['document'] ?? null,
+                'country' => 'Brasil',
+            ]);
 
-        (new TenantService)->createForUser($user);
+            (new TenantService)->createForUser($user);
+
+            return $user;
+        });
+
+        UserRegistered::dispatch($user, RegistrationSource::Web);
 
         Auth::login($user);
         $request->session()->regenerate();

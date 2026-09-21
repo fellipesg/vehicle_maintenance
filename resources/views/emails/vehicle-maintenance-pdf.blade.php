@@ -12,4 +12,4 @@
     @endif
 </p>
 
-<p>Este e-mail foi gerado automaticamente pelo Vehicle Maintenance.</p>
+<p>Este e-mail foi gerado automaticamente pela Revisalog.</p>

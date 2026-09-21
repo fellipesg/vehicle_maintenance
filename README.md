@@ -121,7 +121,7 @@ Never commit `.env`, AWS keys, or Firebase service-account JSON.
 | `FILESYSTEM_DISK` | `local` or `s3` |
 | `AWS_*` | S3 bucket and credentials |
 | `QUEUE_CONNECTION` | `database` in this project |
-| `MAIL_*` | `log` locally; SMTP (or Cloud mail) in prod |
+| `MAIL_*` | Machine: `log` only (never Mailpit / local SMTP). Production (Laravel Cloud): `resend` + `RESEND_API_KEY`. From `noreply@revisalog.com.br`, reply-to `suporte@revisalog.com.br` |
 | `SENTRY_DSN` | Exception reporting |
 | `GOOGLE_*` / `FACEBOOK_*` / `TWITTER_*` | Socialite |
 | Firebase | Service account for FCM (not in git) |

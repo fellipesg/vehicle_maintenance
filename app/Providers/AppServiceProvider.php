@@ -80,6 +80,10 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(10)->by('2fa-ip|'.$request->ip()),
         ]);
 
+        RateLimiter::for('contact', fn (Request $request) => Limit::perMinute(5)->by(
+            'contact|'.$request->ip(),
+        ));
+
         Gate::policy(Vehicle::class, VehiclePolicy::class);
         Gate::policy(Maintenance::class, MaintenancePolicy::class);
         Gate::policy(MaintenancePhoto::class, MaintenancePhotoPolicy::class);
