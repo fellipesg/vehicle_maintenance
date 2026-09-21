@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd /Users/felipegoncalves/vehicle_maintenance/backend
-exec php artisan boost:mcp
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+exec "${PHP_BIN:-php}" artisan boost:mcp
