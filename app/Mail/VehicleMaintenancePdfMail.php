@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Models\Vehicle;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -25,6 +26,12 @@ class VehicleMaintenancePdfMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            replyTo: [
+                new Address(
+                    (string) config('mail.reply_to.address'),
+                    (string) config('mail.reply_to.name'),
+                ),
+            ],
             subject: "Histórico de manutenções — {$this->vehicle->brand} {$this->vehicle->model}",
         );
     }

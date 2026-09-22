@@ -41,11 +41,15 @@ class WorkshopFollowUpNotification extends Notification implements ShouldQueue
     {
         $ownerName = $this->ownerFirstName($notifiable);
 
+        [$replyToAddress, $replyToName] = $this->replyTo();
+
         return (new MailMessage)
             ->subject($this->renderedTitle)
+            ->replyTo($replyToAddress, $replyToName)
             ->greeting("Olá, {$ownerName}!")
             ->line($this->renderedBody)
-            ->action('Ver veículo', $this->vehicleUrl($notifiable));
+            ->action('Ver veículo', $this->vehicleUrl($notifiable))
+            ->salutation('Revisalog');
     }
 
     /**
@@ -79,6 +83,26 @@ class WorkshopFollowUpNotification extends Notification implements ShouldQueue
             : 'user.vehicles.show';
 
         return route($routeName, $this->vehicle, absolute: $absolute);
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function replyTo(): array
+    {
+        $this->template->loadMissing('workshop');
+
+        $workshop = $this->template->workshop;
+        $workshopEmail = is_string($workshop?->email) ? trim($workshop->email) : '';
+
+        if ($workshopEmail !== '' && filter_var($workshopEmail, FILTER_VALIDATE_EMAIL) !== false) {
+            return [$workshopEmail, (string) $workshop->name];
+        }
+
+        return [
+            (string) config('mail.reply_to.address'),
+            (string) config('mail.reply_to.name'),
+        ];
     }
 
     private function ownerFirstName(object $notifiable): string

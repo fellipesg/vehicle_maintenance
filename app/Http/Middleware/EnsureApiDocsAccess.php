@@ -14,17 +14,20 @@ class EnsureApiDocsAccess
             abort(404);
         }
 
-        $username = config('api-docs.username');
-        $password = config('api-docs.password');
+        $username = (string) config('api-docs.username', '');
+        $password = (string) config('api-docs.password', '');
 
-        if ($username === null || $username === '' || $password === null || $password === '') {
+        if ($username === '' || $password === '') {
+            // Never expose the docs publicly in production without credentials.
+            abort_if(app()->isProduction(), 404);
+
             return $next($request);
         }
 
-        $providedUsername = $request->getUser();
-        $providedPassword = $request->getPassword();
+        $usernameMatches = hash_equals($username, (string) $request->getUser());
+        $passwordMatches = hash_equals($password, (string) $request->getPassword());
 
-        if ($providedUsername !== $username || $providedPassword !== $password) {
+        if (! $usernameMatches || ! $passwordMatches) {
             return response('Unauthorized.', 401, [
                 'WWW-Authenticate' => 'Basic realm="API Documentation"',
             ]);

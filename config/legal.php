@@ -2,22 +2,16 @@
 
 return [
 
-    'company' => [
-        'brand' => 'RevisaLog',
-        // Preencher quando a empresa estiver constituída — aparece no rodapé e como controlador na política.
-        'legal_name' => env('LEGAL_COMPANY_NAME'),
-        'cnpj' => env('LEGAL_COMPANY_CNPJ'),
-    ],
+    'support_email' => env('MAIL_SUPPORT_ADDRESS', env('MAIL_REPLY_TO_ADDRESS', 'suporte@revisalog.com.br')),
 
-    'contact' => [
-        'general' => env('LEGAL_CONTACT_EMAIL', 'contato@revisalog.com.br'),
-        'privacy' => env('LEGAL_PRIVACY_EMAIL', 'privacidade@revisalog.com.br'),
-    ],
+    'terms_version' => '2026-09-21',
 
-    'terms_version' => '2026-08-21',
+    'privacy_version' => '2026-09-21',
 
     'terms_of_use' => <<<'TEXT'
-Termos de Uso — RevisaLog
+Termos de Uso — Revisalog
+
+Estes termos regem o uso da plataforma Revisalog (revisalog.com.br), que registra o histórico de manutenções vinculado ao veículo (chassi/VIN), e não à conta do proprietário.
 
 1. Responsabilidade pelas informações
 Ao cadastrar veículos, quilometragens, datas de manutenção, notas fiscais e demais dados, você declara que as informações são verdadeiras e de sua responsabilidade como proprietário ou representante autorizado.
@@ -26,7 +20,7 @@ Ao cadastrar veículos, quilometragens, datas de manutenção, notas fiscais e d
 A quilometragem informada deve refletir o hodômetro do veículo no momento do registro. Manutenções devem ser registradas com a quilometragem e a data corretas. O sistema utiliza esses dados para compor o histórico do veículo.
 
 3. Isenção de responsabilidade
-A plataforma RevisaLog atua como repositório do histórico informado pelos usuários. Não verificamos, em regra, a veracidade dos dados, não garantimos a completude do histórico e não nos responsabilizamos por informações falsas, incompletas ou desatualizadas fornecidas por terceiros.
+A Revisalog atua como repositório do histórico informado pelos usuários. Não verificamos, em regra, a veracidade dos dados, não garantimos a completude do histórico e não nos responsabilizamos por informações falsas, incompletas ou desatualizadas fornecidas por terceiros. Selos de oficina identificam registros feitos pela oficina cadastrada; registros declarados pelo dono ou lojista não passam por essa verificação.
 
 4. Uso do histórico
 O histórico exportado ou consultado reflete exclusivamente o que foi registrado na plataforma. Decisões de compra, venda, revisão ou garantia devem considerar fontes adicionais e inspeção presencial quando aplicável.
@@ -34,58 +28,43 @@ O histórico exportado ou consultado reflete exclusivamente o que foi registrado
 5. Notas fiscais e documentos
 Documentos enviados (NF-e, DANFE, CRLV) são de responsabilidade de quem os anexa. O parse automático pode conter imprecisões; confira sempre os dados antes de salvar.
 
-6. Aceite
+6. Contato
+Dúvidas, solicitações e reclamações: suporte@revisalog.com.br ou a página de contato em revisalog.com.br/contato.
+
+7. Aceite
 Ao marcar que leu e aceita estes termos, você confirma ciência das condições acima e concorda em mantê-las atualizadas conforme alterações futuras publicadas nesta versão.
 TEXT,
 
-    'privacy_version' => '2026-09-21',
-
     'privacy_policy' => <<<'TEXT'
-Política de Privacidade — RevisaLog
+Política de Privacidade — Revisalog
 
-Esta política explica quais dados pessoais o RevisaLog trata, para quê e quais são os seus direitos, nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD).
+Esta política descreve como a Revisalog (revisalog.com.br) trata dados pessoais, em linha com a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018).
 
-1. Quem é o controlador
-O controlador dos dados é o RevisaLog, identificado no rodapé do site. Dúvidas e solicitações sobre privacidade devem ser enviadas ao encarregado pelo e-mail privacidade@revisalog.com.br.
+1. Controlador e contato
+O tratamento é feito pela Revisalog. Para exercer seus direitos ou tirar dúvidas: suporte@revisalog.com.br.
 
 2. Dados que coletamos
-- Cadastro: nome, e-mail, telefone, CPF ou CNPJ, senha (armazenada com hash) e, quando você entra com Google, Facebook ou X, o identificador fornecido por esse provedor.
-- Endereço: CEP, logradouro, cidade e estado, e as coordenadas geográficas derivadas do endereço (usadas para localizar oficinas).
-- Veículo: placa, chassi, RENAVAM, marca, modelo, ano, quilometragem e documentos como o CRLV.
-- Manutenções: datas, quilometragem, serviços, peças, valores, notas fiscais (NF-e/DANFE), fotos e garantias.
-- Uso do app: token de notificação push do dispositivo e registros técnicos de acesso (IP, data e hora), mantidos por 6 meses conforme o Marco Civil da Internet.
-- Contato: nome, e-mail e mensagem enviados pelo formulário Fale conosco.
+- Conta: nome, e-mail, senha (armazenada de forma irreversível), telefone e CPF/CNPJ quando informados.
+- Veículos e histórico: chassi, placa, RENAVAM, quilometragem, manutenções, fotos, notas fiscais (NF-e/DANFE) e CRLV enviados por você.
+- Uso do serviço: notificações (e-mail e no aplicativo), tokens de dispositivo para aviso push, e registros técnicos necessários para segurança e funcionamento.
 
-3. Para que usamos os dados
-- Prestar o serviço: manter o histórico de manutenções vinculado ao veículo, gerar o PDF do histórico e permitir a consulta por placa, chassi ou RENAVAM (execução de contrato).
-- Segurança: autenticação, verificação em duas etapas, prevenção de fraude e de abuso (legítimo interesse).
-- Comunicação: lembretes de manutenção, avisos de garantia e respostas a solicitações (execução de contrato e legítimo interesse).
-- Obrigações legais e regulatórias, incluindo a guarda de registros de acesso (cumprimento de obrigação legal).
+3. Para que usamos
+Prestar o serviço de histórico do veículo, autenticar o acesso, enviar relatórios e notificações que você solicita ou configura, melhorar a plataforma e cumprir obrigações legais.
 
-4. O histórico fica com o veículo
-O histórico de manutenções é vinculado ao veículo, não ao proprietário. Quando o veículo muda de dono, o novo proprietário passa a ver os registros de manutenção anteriores, mas não os seus dados pessoais de cadastro (nome, e-mail, telefone, documento ou endereço).
+4. Compartilhamento
+Oficinas e lojistas veem os dados do veículo e das manutenções no contexto do serviço. Não vendemos seus dados. Prestadores de infraestrutura (hospedagem, armazenamento de arquivos e envio de e-mail) tratam dados só para operar a plataforma.
 
-5. Com quem compartilhamos
-Não vendemos dados pessoais. Compartilhamos apenas o necessário com:
-- Oficinas e lojistas que você autorizar a registrar ou consultar manutenções do seu veículo;
-- Prestadores de infraestrutura que operam em nosso nome: Cloudflare (hospedagem, rede e armazenamento de arquivos), Twilio SendGrid (envio de e-mails), Google Firebase (notificações push) e OpenStreetMap/Nominatim (geolocalização de endereços);
-- Autoridades públicas, quando exigido por lei ou ordem judicial.
-Alguns desses prestadores armazenam dados fora do Brasil, com as salvaguardas previstas no art. 33 da LGPD.
+5. Conservação
+Mantemos os dados enquanto a conta e o histórico do veículo forem necessários ao serviço, ou pelo prazo exigido por lei. Você pode pedir correção ou exclusão pelo e-mail de suporte, ressalvadas obrigações legais de retenção.
 
-6. Por quanto tempo guardamos
-Mantemos os dados da conta enquanto ela estiver ativa. Ao excluir a conta, apagamos ou anonimizamos os dados pessoais, exceto os que precisamos manter por obrigação legal. Os registros de manutenção continuam vinculados ao veículo, sem identificar você.
+6. Seus direitos
+Você pode solicitar confirmação de tratamento, acesso, correção, anonimização, portabilidade e eliminação dos dados, além de informação sobre compartilhamentos e revogação de consentimento, quando aplicável.
 
-7. Seus direitos
-Você pode, a qualquer momento, solicitar: confirmação e acesso aos dados, correção, anonimização, bloqueio ou eliminação, portabilidade, informação sobre compartilhamento, e revogação do consentimento. Envie o pedido para privacidade@revisalog.com.br. Respondemos em até 15 dias. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
+7. Segurança
+Adotamos medidas técnicas e organizacionais razoáveis. Nenhum sistema é isento de risco; evite reutilizar senhas e proteja o acesso à sua conta.
 
-8. Segurança
-Usamos conexão criptografada (HTTPS), senhas com hash, verificação em duas etapas e controle de acesso por perfil. Nenhum sistema é totalmente imune a incidentes; se houver um incidente relevante, avisaremos você e a ANPD.
-
-9. Cookies
-Usamos apenas cookies essenciais para manter a sua sessão e proteger os formulários. Não usamos cookies de publicidade.
-
-10. Alterações
-Podemos atualizar esta política. A versão e a data em vigor aparecem no topo da página e, em caso de mudança relevante, avisaremos você.
+8. Alterações
+Esta política pode ser atualizada. A versão vigente é a publicada em revisalog.com.br/privacidade.
 TEXT,
 
 ];

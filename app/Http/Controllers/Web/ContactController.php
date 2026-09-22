@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Web\ContactMessageRequest;
+use App\Http\Requests\Web\StoreContactRequest;
 use App\Mail\ContactMessageMail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Mail;
@@ -13,33 +13,30 @@ class ContactController extends Controller
 {
     public function show(): View
     {
-        return view('contact', [
-            'subjects' => ContactMessageRequest::SUBJECTS,
-            'turnstileSiteKey' => config('services.turnstile.site_key'),
+        return view('legal.contact', [
+            'supportEmail' => config('legal.support_email'),
         ]);
     }
 
-    public function store(ContactMessageRequest $request): RedirectResponse
+    public function store(StoreContactRequest $request): RedirectResponse
     {
-        // Honeypot preenchido: finge sucesso para não ensinar o bot.
-        if ($request->filled('website')) {
-            return redirect()->route('contact.show')->with('success', 'Mensagem enviada. Responderemos em breve.');
+        if (filled($request->input('website'))) {
+            return redirect()
+                ->route('contact.show')
+                ->with('success', 'Mensagem enviada. Responderemos em breve.');
         }
 
-        $subject = $request->validated('subject');
-        $recipient = $subject === 'privacy'
-            ? config('legal.contact.privacy')
-            : config('legal.contact.general');
+        $validated = $request->safe()->only(['name', 'email', 'message']);
 
-        // Fila: falha do SendGrid vira nova tentativa em vez de 500 com a mensagem perdida.
-        Mail::to($recipient)->queue(new ContactMessageMail(
-            senderName: $request->validated('name'),
-            senderEmail: $request->validated('email'),
-            subjectLabel: ContactMessageRequest::SUBJECTS[$subject],
-            body: $request->validated('message'),
-            userId: $request->user()?->id,
-        ));
+        Mail::to((string) config('legal.support_email'))
+            ->send(new ContactMessageMail(
+                name: $validated['name'],
+                email: $validated['email'],
+                body: $validated['message'],
+            ));
 
-        return redirect()->route('contact.show')->with('success', 'Mensagem enviada. Responderemos em breve.');
+        return redirect()
+            ->route('contact.show')
+            ->with('success', 'Mensagem enviada. Responderemos em breve.');
     }
 }

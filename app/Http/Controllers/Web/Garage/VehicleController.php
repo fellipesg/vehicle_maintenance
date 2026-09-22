@@ -12,6 +12,7 @@ use App\Services\VehicleCatalogService;
 use App\Support\AppStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -140,7 +141,7 @@ class VehicleController extends Controller
                 $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
                 $request->session()->forget(['consignment_pending', 'crlv_verification', 'crlv_preview', 'claim_vehicle_id']);
 
-                return redirect()->route('garage.vehicles.show', $vehicle)
+                return redirect()->route('garage.vehicles.index')
                     ->with('success', 'Procuração enviada para análise.');
             }
 
@@ -148,7 +149,7 @@ class VehicleController extends Controller
             $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
             $request->session()->forget(['consignment_pending', 'crlv_verification', 'crlv_preview']);
 
-            return redirect()->route('garage.vehicles.show', $vehicle)
+            return redirect()->route('garage.vehicles.index')
                 ->with('success', 'Veículo adicionado em consignação.');
         } catch (RuntimeException $exception) {
             return back()->withErrors(['power_of_attorney' => $exception->getMessage()]);
@@ -157,6 +158,8 @@ class VehicleController extends Controller
 
     public function show(Vehicle $vehicle): View
     {
+        Gate::authorize('view', $vehicle);
+
         $vehicle->loadCount([
             'maintenances',
             'maintenances as verified_maintenances_count' => fn ($query) => $query->whereNotNull('verified_at'),

@@ -1,11 +1,10 @@
-Nova mensagem pelo Fale conosco
+<x-mail::message>
+# Contato pelo site
 
-Assunto: {!! $subjectLabel !!}
-Nome: {!! $senderName !!}
-E-mail: {!! $senderEmail !!}
-Usuário logado: {{ $userId ? '#'.$userId : 'não' }}
+**Nome:** {{ $name }}  
+**E-mail:** {{ $email }}
 
-{!! $body !!}
+{{ $body }}
 
-—
-Responda este e-mail para falar direto com {!! $senderName !!}.
+Revisalog
+</x-mail::message>

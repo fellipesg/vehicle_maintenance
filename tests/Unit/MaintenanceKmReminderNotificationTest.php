@@ -37,6 +37,7 @@ class MaintenanceKmReminderNotificationTest extends TestCase
             ->toMail($user);
 
         $this->assertSame('Olá, Felipe!', $mail->greeting);
+        $this->assertSame('Revisalog', $mail->salutation);
     }
 
     public function test_database_payload_uses_relative_vehicle_url(): void

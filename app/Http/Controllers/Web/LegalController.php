@@ -10,7 +10,7 @@ class LegalController extends Controller
     public function terms(): View
     {
         return view('legal.document', [
-            'title' => 'Termos de Uso',
+            'title' => 'Termos de uso',
             'version' => config('legal.terms_version'),
             'content' => config('legal.terms_of_use'),
         ]);
@@ -19,7 +19,7 @@ class LegalController extends Controller
     public function privacy(): View
     {
         return view('legal.document', [
-            'title' => 'Política de Privacidade',
+            'title' => 'Política de privacidade',
             'version' => config('legal.privacy_version'),
             'content' => config('legal.privacy_policy'),
         ]);
