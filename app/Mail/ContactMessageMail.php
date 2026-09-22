@@ -13,6 +13,11 @@ class ContactMessageMail extends Mailable
 {
     use Queueable, SerializesModels;
 
+    public int $tries = 5;
+
+    /** @var list<int> */
+    public array $backoff = [60, 300, 900, 3600];
+
     public function __construct(
         public string $senderName,
         public string $senderEmail,

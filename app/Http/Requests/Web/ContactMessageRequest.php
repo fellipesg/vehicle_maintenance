@@ -4,6 +4,7 @@ namespace App\Http\Requests\Web;
 
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class ContactMessageRequest extends FormRequest
@@ -52,13 +53,20 @@ class ContactMessageRequest extends FormRequest
 
     private function passesTurnstile(string $attribute, mixed $value, Closure $fail): void
     {
-        $response = Http::asForm()
-            ->timeout(5)
-            ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
-                'secret' => config('services.turnstile.secret_key'),
-                'response' => $value,
-                'remoteip' => $this->ip(),
-            ]);
+        try {
+            $response = Http::asForm()
+                ->timeout(5)
+                ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                    'secret' => config('services.turnstile.secret_key'),
+                    'response' => $value,
+                    'remoteip' => $this->ip(),
+                ]);
+        } catch (ConnectionException $exception) {
+            report($exception);
+            $fail('Não foi possível confirmar que você não é um robô. Tente novamente.');
+
+            return;
+        }
 
         if (! $response->successful() || $response->json('success') !== true) {
             $fail('Não foi possível confirmar que você não é um robô. Tente novamente.');

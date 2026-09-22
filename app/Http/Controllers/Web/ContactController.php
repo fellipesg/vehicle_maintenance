@@ -31,7 +31,8 @@ class ContactController extends Controller
             ? config('legal.contact.privacy')
             : config('legal.contact.general');
 
-        Mail::to($recipient)->send(new ContactMessageMail(
+        // Fila: falha do SendGrid vira nova tentativa em vez de 500 com a mensagem perdida.
+        Mail::to($recipient)->queue(new ContactMessageMail(
             senderName: $request->validated('name'),
             senderEmail: $request->validated('email'),
             subjectLabel: ContactMessageRequest::SUBJECTS[$subject],
