@@ -18,4 +18,12 @@ class LegalController extends Controller
             'content' => config('legal.terms_of_use'),
         ]));
     }
+
+    public function privacyPolicy(): JsonResponse
+    {
+        return ApiResponse::success(new LegalDocumentResource([
+            'version' => config('legal.privacy_version'),
+            'content' => config('legal.privacy_policy'),
+        ]));
+    }
 }

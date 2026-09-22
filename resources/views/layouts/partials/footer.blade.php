@@ -40,6 +40,14 @@
                 <a href="mailto:{{ config('legal.support_email') }}" class="hover:text-wrench-700">{{ config('legal.support_email') }}</a>
             </nav>
         </div>
-        <p class="mt-10 text-center text-xs text-automotive-400">O histórico fica vinculado ao veículo, não ao proprietário</p>
+        <div class="mt-10 flex flex-col gap-2 border-t border-automotive-200 pt-6 text-xs text-automotive-400 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+                © {{ now()->year }} {{ config('legal.company.legal_name') ?: 'Revisalog' }}
+                @if(config('legal.company.cnpj'))
+                    · CNPJ {{ config('legal.company.cnpj') }}
+                @endif
+            </p>
+            <p>O histórico fica vinculado ao veículo, não ao proprietário</p>
+        </div>
     </div>
 </footer>

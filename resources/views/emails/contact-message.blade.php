@@ -2,7 +2,10 @@
 # Contato pelo site
 
 **Nome:** {{ $name }}  
-**E-mail:** {{ $email }}
+**E-mail:** {{ $email }}  
+@if($topic)
+**Assunto:** {{ $topic }}
+@endif
 
 {{ $body }}
 

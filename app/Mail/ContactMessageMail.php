@@ -14,10 +14,17 @@ class ContactMessageMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
+    // Falha do provedor vira nova tentativa, não mensagem perdida.
+    public int $tries = 5;
+
+    /** @var list<int> */
+    public array $backoff = [60, 300, 900, 3600];
+
     public function __construct(
         public string $name,
         public string $email,
         public string $body,
+        public ?string $topic = null,
     ) {}
 
     public function envelope(): Envelope
@@ -26,7 +33,9 @@ class ContactMessageMail extends Mailable implements ShouldQueue
             replyTo: [
                 new Address($this->email, $this->name),
             ],
-            subject: "Contato pelo site — {$this->name}",
+            subject: $this->topic
+                ? "Contato pelo site — {$this->topic} — {$this->name}"
+                : "Contato pelo site — {$this->name}",
         );
     }
 

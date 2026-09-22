@@ -15,6 +15,8 @@ class ContactController extends Controller
     {
         return view('legal.contact', [
             'supportEmail' => config('legal.support_email'),
+            'subjects' => StoreContactRequest::SUBJECTS,
+            'turnstileSiteKey' => config('services.turnstile.site_key'),
         ]);
     }
 
@@ -26,13 +28,14 @@ class ContactController extends Controller
                 ->with('success', 'Mensagem enviada. Responderemos em breve.');
         }
 
-        $validated = $request->safe()->only(['name', 'email', 'message']);
+        $validated = $request->safe()->only(['name', 'email', 'subject', 'message']);
 
         Mail::to((string) config('legal.support_email'))
             ->send(new ContactMessageMail(
                 name: $validated['name'],
                 email: $validated['email'],
                 body: $validated['message'],
+                topic: StoreContactRequest::SUBJECTS[$validated['subject']],
             ));
 
         return redirect()
