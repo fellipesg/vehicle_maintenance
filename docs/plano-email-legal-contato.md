@@ -124,7 +124,7 @@ O item **não fica no menu do domínio** (lá, em Email, só aparece Gerenciamen
 3. **Onboard Domain** → escolher `revisalog.com.br`. A Cloudflare cria sozinha os **MX** de recebimento. Aceite; não apague MX depois.
 3. Em **Destination addresses**, adicionar o e-mail que deve receber as mensagens (Gmail etc.) e **confirmar o link** que chegar nesse e-mail.
 4. Em **Custom addresses**, criar `suporte` → destino = o e-mail verificado. Status Active.
-5. Se ela oferecer um TXT SPF (`include:_spf.mx.cloudflare.net`), deixe. Mais tarde o Resend entra no **mesmo** TXT (só pode haver **um** SPF no apex).
+5. Se ela oferecer um TXT SPF (`include:_spf.mx.cloudflare.net`), deixe como está. O Resend **não** entra nesse registro: ele envia pelo subdomínio `send.revisalog.com.br` e publica o SPF dele lá (ver B).
 
 Teste: de outro e-mail (não o de destino), mandar para `suporte@revisalog.com.br` e ver se cai na caixa verificada.
 
@@ -134,9 +134,10 @@ No Resend: **Domains** → Add `revisalog.com.br`. Ele mostra 2–4 registros. V
 
 | Tipo | O que o Resend pede (exemplo) | Nota |
 | --- | --- | --- |
-| TXT ou CNAME | DKIM (`resend._domainkey` ou similar) | Copiar do painel Resend |
-| TXT | SPF `include:_spf.resend.com` | **Mesclar** no SPF único: `v=spf1 include:_spf.mx.cloudflare.net include:_spf.resend.com ~all` |
-| TXT | `_dmarc` | `v=DMARC1; p=none;` no começo |
+| TXT | DKIM (`resend._domainkey`) | Copiar do painel Resend |
+| MX | `send` → `feedback-smtp.<região>.amazonses.com` | Bounces do Resend; não conflita com os MX do Email Routing, que ficam no apex |
+| TXT | `send` → `v=spf1 include:amazonses.com ~all` | SPF do Resend, **no subdomínio `send`**. Não mexer no SPF do apex |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:suporte@revisalog.com.br` no começo |
 
 No Laravel Cloud (não é Registro.br nem Cloudflare): `MAIL_MAILER=resend`, `RESEND_API_KEY`, `MAIL_FROM_ADDRESS=noreply@revisalog.com.br`.
 
@@ -196,7 +197,7 @@ Prompt do Composer 2.5: [`prompt-composer-emails-transacionais.md`](prompt-compo
 
 Fluxo: Laravel Cloud (fila) → Resend → inbox do usuário, com `From: Revisalog <noreply@…>` e `Reply-To: suporte@…`. Se a pessoa clicar em Responder, a resposta cai no Gmail de `suporte@`, não no noreply.
 
-O Resend só envia depois que o domínio `revisalog.com.br` estiver verificado (DKIM + SPF mesclado com o da Cloudflare). Sem isso, Gmail/Outlook rejeitam.
+O Resend só envia depois que o domínio `revisalog.com.br` estiver verificado (DKIM no apex + MX/SPF no subdomínio `send`). Sem isso, Gmail/Outlook rejeitam.
 
 Não criar `noreply@` no Email Routing. Não enviar From `suporte@`.
 
