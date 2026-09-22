@@ -19,8 +19,9 @@
             'catalog' => $catalog,
             'vehicle' => (object) $preview,
         ])
+        <x-terms-scroll-accept class="mt-2" />
         <div class="flex gap-3 pt-2">
-            <button type="submit" class="btn-primary">Confirmar e salvar veículo</button>
+            <button type="submit" class="btn-primary" data-terms-submit disabled>Confirmar e salvar veículo</button>
             <a href="{{ route($createRoute) }}" class="btn-secondary">Cancelar</a>
         </div>
     </form>
