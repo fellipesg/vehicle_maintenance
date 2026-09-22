@@ -113,6 +113,8 @@ trait RegistersVehicleWithOwnership
             'renavam.digits' => 'O RENAVAM deve ter exatamente 11 dígitos.',
             'crv_number.digits_between' => 'O número do CRV deve ter entre 10 e 12 dígitos.',
             'year.min' => 'O ano do modelo deve ser no mínimo 1900.',
+            'terms_accepted.required' => 'Role os termos de uso até o final e marque o aceite para continuar.',
+            'terms_accepted.accepted' => 'Role os termos de uso até o final e marque o aceite para continuar.',
             'chassis.unique' => 'Já existe um veículo com este chassi. Você pode vinculá-lo em Vincular veículo.',
         ]);
 

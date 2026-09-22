@@ -148,6 +148,167 @@ class CrlvVehicleImportTest extends TestCase
             ->assertSessionHasErrors('crlv');
     }
 
+    public function test_claim_import_without_existing_vehicle_goes_to_preview(): void
+    {
+        $file = new UploadedFile(
+            base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
+            'CRLV-e.pdf',
+            'application/pdf',
+            null,
+            true
+        );
+
+        $this->actingAs($this->user)
+            ->post('/usuario/veiculos/vincular/crlv', ['crlv' => $file])
+            ->assertRedirect(route('user.vehicles.import.preview'))
+            ->assertSessionHas('crlv_preview.license_plate', 'PHF9J95')
+            ->assertSessionMissing('claim_vehicle_id');
+
+        $this->actingAs($this->user)
+            ->get('/usuario/veiculos/importar-crlv/preview')
+            ->assertOk()
+            ->assertSee('PHF9J95')
+            ->assertSee('01050047521')
+            ->assertSee('Confirmar e salvar veículo');
+    }
+
+    public function test_garage_claim_import_without_existing_vehicle_goes_to_preview(): void
+    {
+        $garage = User::factory()->asGarage()->create();
+
+        $file = new UploadedFile(
+            base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
+            'CRLV-e.pdf',
+            'application/pdf',
+            null,
+            true
+        );
+
+        $this->actingAs($garage)
+            ->post('/garagem/estoque/vincular/crlv', ['crlv' => $file])
+            ->assertRedirect(route('garage.vehicles.import.preview'))
+            ->assertSessionHas('crlv_preview.license_plate', 'PHF9J95')
+            ->assertSessionMissing('claim_vehicle_id');
+
+        $this->actingAs($garage)
+            ->get('/garagem/estoque/importar-crlv/preview')
+            ->assertOk()
+            ->assertSee('PHF9J95');
+    }
+
+    /**
+     * O formulário de confirmação precisa carregar tudo que o cadastro exige:
+     * sem o aceite dos termos ou sem o token, o botão "Confirmar" não salva nada.
+     */
+    #[DataProvider('previewPageProvider')]
+    public function test_preview_form_carries_terms_and_verification_token(string $role, string $importPath, string $previewPath): void
+    {
+        $actor = $role === 'garage'
+            ? User::factory()->asGarage()->create()
+            : $this->user;
+
+        $file = new UploadedFile(
+            base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
+            'CRLV-e.pdf',
+            'application/pdf',
+            null,
+            true
+        );
+
+        $this->actingAs($actor)->post($importPath, ['crlv' => $file]);
+
+        $this->actingAs($actor)
+            ->get($previewPath)
+            ->assertOk()
+            ->assertSee('name="terms_accepted"', false)
+            ->assertSee('name="crlv_verification_token"', false)
+            ->assertSee(session('crlv_verification.token'), false);
+    }
+
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function previewPageProvider(): array
+    {
+        return [
+            'usuario' => ['user', '/usuario/veiculos/importar-crlv', '/usuario/veiculos/importar-crlv/preview'],
+            'garagem' => ['garage', '/garagem/estoque/importar-crlv', '/garagem/estoque/importar-crlv/preview'],
+        ];
+    }
+
+    /**
+     * Regressão: submeter exatamente os campos renderizados na tela de
+     * confirmação precisa gravar o veículo, sem erro de validação.
+     */
+    public function test_confirming_the_rendered_preview_form_saves_the_vehicle(): void
+    {
+        $file = new UploadedFile(
+            base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
+            'CRLV-e.pdf',
+            'application/pdf',
+            null,
+            true
+        );
+
+        $this->actingAs($this->user)->post('/usuario/veiculos/importar-crlv', ['crlv' => $file]);
+
+        $html = $this->actingAs($this->user)
+            ->get('/usuario/veiculos/importar-crlv/preview')
+            ->getContent();
+
+        $payload = $this->formPayloadFrom($html);
+        $payload['current_kilometers'] = 50_000;
+
+        $this->actingAs($this->user)
+            ->post('/usuario/veiculos', $payload)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('vehicles', [
+            'license_plate' => 'PHF9J95',
+            'renavam' => '01050047521',
+        ]);
+    }
+
+    /**
+     * Extrai do HTML os campos que o navegador enviaria ao submeter o formulário.
+     *
+     * @return array<string, string>
+     */
+    private function formPayloadFrom(string $html): array
+    {
+        $payload = [];
+
+        preg_match_all('/<(?:input|select)\b[^>]*name="([a-z_]+)"[^>]*>/i', $html, $fields, PREG_SET_ORDER);
+
+        foreach ($fields as [$tag, $name]) {
+            if ($name === '_token' || isset($payload[$name])) {
+                continue;
+            }
+
+            if (preg_match('/type="checkbox"/i', $tag)) {
+                $payload[$name] = '1';
+
+                continue;
+            }
+
+            $payload[$name] = preg_match('/value="([^"]*)"/i', $tag, $value) ? $value[1] : '';
+        }
+
+        // Marca vem de <select> com <option selected>.
+        if (preg_match('/<select\b[^>]*name="brand".*?<option[^>]*selected[^>]*value="([^"]*)"/is', $html, $option)) {
+            $payload['brand'] = $option[1];
+        } elseif (preg_match('/<select\b[^>]*name="brand".*?<option[^>]*value="([^"]*)"[^>]*selected/is', $html, $option)) {
+            $payload['brand'] = $option[1];
+        }
+
+        // O modelo é montado no navegador a partir do catálogo da marca.
+        if (preg_match('/const selectedModel = ("(?:[^"\\\\]|\\\\.)*")/', $html, $model)) {
+            $payload['model'] = json_decode($model[1]);
+        }
+
+        return $payload;
+    }
+
     public function test_preview_redirects_without_session(): void
     {
         $this->actingAs($this->user)

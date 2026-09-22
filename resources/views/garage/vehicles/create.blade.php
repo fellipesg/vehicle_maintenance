@@ -18,8 +18,9 @@
     <form method="POST" action="{{ route('garage.vehicles.store') }}" class="card space-y-4">
         @csrf
         @include('user.vehicles._form', ['catalog' => $catalog])
+        <x-terms-scroll-accept class="mt-2" />
         <div class="flex gap-3 pt-2">
-            <button type="submit" class="btn-primary">Adicionar ao estoque</button>
+            <button type="submit" class="btn-primary" data-terms-submit disabled>Adicionar ao estoque</button>
             <a href="{{ route('garage.vehicles.index') }}" class="btn-secondary">Cancelar</a>
         </div>
     </form>

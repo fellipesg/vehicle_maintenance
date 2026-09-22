@@ -99,23 +99,22 @@ trait ImportsVehicleFromCrlv
 
         $existingVehicle = \App\Services\Vehicle\VehicleOwnershipService::findExistingVehicle($parsed);
 
-        if ($existingVehicle === null) {
-            return redirect()->route($this->vehicleCreateRoute())
-                ->with('info', 'Veículo não encontrado. Você pode cadastrá-lo como primeiro proprietário.')
-                ->with('crlv_verification', [
-                    'token' => $parsed->verificationToken(),
-                    'parsed' => $parsed->toPreview(),
-                ])
-                ->with('crlv_preview', $parsed->toPreview())
-                ->with('crlv_source', $request->file('crlv')->getClientOriginalName());
-        }
-
         $request->session()->put('crlv_verification', [
             'token' => $parsed->verificationToken(),
             'parsed' => $parsed->toPreview(),
         ]);
         $request->session()->put('crlv_preview', $parsed->toPreview());
         $request->session()->put('crlv_source', $request->file('crlv')->getClientOriginalName());
+
+        // Sem veículo na base, o CRLV-e já lido vale para o cadastro:
+        // leva à mesma tela de confirmação, em vez de descartar a leitura.
+        if ($existingVehicle === null) {
+            $request->session()->forget(['claim_vehicle_id', 'crlv_mode']);
+
+            return redirect()->route($this->vehiclePreviewRoute())
+                ->with('info', 'Veículo ainda não cadastrado. Confirme os dados do CRLV-e para cadastrá-lo como primeiro proprietário.');
+        }
+
         $request->session()->put('claim_vehicle_id', $existingVehicle->id);
         $request->session()->put('crlv_mode', 'claim');
 
