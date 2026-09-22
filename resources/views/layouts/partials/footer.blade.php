@@ -1,7 +1,7 @@
 <footer class="border-t border-automotive-200 bg-automotive-50 py-12 text-sm text-automotive-600">
     <div class="mx-auto max-w-7xl px-4">
-        <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
+        <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="sm:col-span-2 lg:col-span-1">
                 <p class="inline-flex items-center gap-2 font-semibold text-automotive-800">
                     <span class="inline-flex h-5 w-5 items-center justify-center rounded bg-automotive-800 text-wrench-500">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-3 w-3" aria-hidden="true">
@@ -9,17 +9,18 @@
                             <path d="M15.5 3.5 14 5l1.5 1.5L14 8l1.5 1.5L17 8l1.5 1.5L20 8l-1.5-1.5L20 5l-1.5-1.5L17 5l-1.5-1.5Z"/>
                         </svg>
                     </span>
-                    Vehicle Maintenance
+                    RevisaLog
                 </p>
                 <p class="mt-3 text-xs leading-relaxed text-automotive-500">Histórico permanente de manutenções veiculares. O registro fica no carro, não na conta.</p>
             </div>
             <nav class="flex flex-col gap-2 text-xs" aria-label="Produto">
                 <p class="font-semibold uppercase tracking-wide text-automotive-800">Produto</p>
-                <a href="{{ route('home') }}" class="hover:text-wrench-700">Início</a>
                 <a href="{{ route('home') }}#como-funciona" class="hover:text-wrench-700">Como funciona</a>
                 <a href="{{ route('home') }}#recursos" class="hover:text-wrench-700">Recursos</a>
                 <a href="{{ route('home') }}#telas" class="hover:text-wrench-700">Telas</a>
                 <a href="{{ route('home') }}#preco" class="hover:text-wrench-700">Preço</a>
+                <a href="{{ route('home') }}#app" class="hover:text-wrench-700">App</a>
+                <a href="{{ route('home') }}#faq" class="hover:text-wrench-700">Perguntas</a>
             </nav>
             <nav class="flex flex-col gap-2 text-xs" aria-label="Conta">
                 <p class="font-semibold uppercase tracking-wide text-automotive-800">Conta</p>
@@ -27,14 +28,28 @@
                 <a href="{{ route('register') }}" class="hover:text-wrench-700">Cadastrar</a>
                 <a href="{{ route('login.lojista') }}" class="hover:text-wrench-700">Lojista</a>
                 <a href="{{ route('login.oficina') }}" class="hover:text-wrench-700">Oficina</a>
-            </nav>
-            <nav class="flex flex-col gap-2 text-xs" aria-label="Plataforma">
-                <p class="font-semibold uppercase tracking-wide text-automotive-800">Plataforma</p>
                 <a href="{{ route('vehicle.search') }}" class="hover:text-wrench-700">Buscar veículo</a>
-                <a href="{{ route('home') }}#app" class="hover:text-wrench-700">App</a>
-                <a href="{{ route('home') }}#faq" class="hover:text-wrench-700">Perguntas</a>
+            </nav>
+            <nav class="flex flex-col gap-2 text-xs" aria-label="Legal">
+                <p class="font-semibold uppercase tracking-wide text-automotive-800">Legal</p>
+                <a href="{{ route('legal.terms') }}" class="hover:text-wrench-700">Termos de Uso</a>
+                <a href="{{ route('legal.privacy') }}" class="hover:text-wrench-700">Política de Privacidade</a>
+            </nav>
+            <nav class="flex flex-col gap-2 text-xs" aria-label="Contato">
+                <p class="font-semibold uppercase tracking-wide text-automotive-800">Contato</p>
+                <a href="{{ route('contact.show') }}" class="hover:text-wrench-700">Fale conosco</a>
+                <a href="mailto:{{ config('legal.contact.general') }}" class="break-all hover:text-wrench-700">{{ config('legal.contact.general') }}</a>
+                <a href="mailto:{{ config('legal.contact.privacy') }}" class="break-all hover:text-wrench-700">{{ config('legal.contact.privacy') }}</a>
             </nav>
         </div>
-        <p class="mt-10 text-center text-xs text-automotive-400">O histórico fica vinculado ao veículo, não ao proprietário</p>
+        <div class="mt-10 flex flex-col gap-2 border-t border-automotive-200 pt-6 text-xs text-automotive-400 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+                © {{ now()->year }} {{ config('legal.company.legal_name') ?: config('legal.company.brand') }}
+                @if(config('legal.company.cnpj'))
+                    · CNPJ {{ config('legal.company.cnpj') }}
+                @endif
+            </p>
+            <p>O histórico fica vinculado ao veículo, não ao proprietário</p>
+        </div>
     </div>
 </footer>

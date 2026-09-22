@@ -15,7 +15,7 @@ class HomePageTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('Vehicle Maintenance')
+            ->assertSee('RevisaLog')
             ->assertSee('O histórico do carro')
             ->assertSee('Começar grátis')
             ->assertSee('Grátis enquanto a rede cresce')

@@ -67,6 +67,11 @@ class AppServiceProvider extends ServiceProvider
             'search|'.$request->ip(),
         ));
 
+        RateLimiter::for('contact', fn (Request $request) => [
+            Limit::perMinute(3)->by('contact|'.$request->ip()),
+            Limit::perDay(20)->by('contact-day|'.$request->ip()),
+        ]);
+
         RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(10)->by(
             'uploads|'.($request->user()?->id ?: $request->ip()),
         ));

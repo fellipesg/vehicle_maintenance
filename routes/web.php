@@ -9,10 +9,12 @@ use App\Http\Controllers\Web\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Web\Admin\VehicleModelController as AdminVehicleModelController;
 use App\Http\Controllers\Web\Admin\WorkshopController as AdminWorkshopController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\ContactController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
 use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
+use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\PublicVehicleController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
@@ -27,6 +29,12 @@ use App\Http\Controllers\Web\Workshop\WarrantyTemplateController as WorkshopWarr
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::get('/termos', [LegalController::class, 'terms'])->name('legal.terms');
+Route::get('/privacidade', [LegalController::class, 'privacy'])->name('legal.privacy');
+Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
+Route::post('/contato', [ContactController::class, 'store'])
+    ->middleware('throttle:contact')
+    ->name('contact.store');
 Route::get('/v/{code}', [\App\Http\Controllers\Web\PublicVerificationController::class, 'show'])
     ->middleware('throttle:search')
     ->name('verification.show');

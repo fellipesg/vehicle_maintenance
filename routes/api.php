@@ -32,6 +32,8 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:api');
     Route::get('/legal/terms-of-use', [LegalController::class, 'termsOfUse'])
         ->middleware('throttle:api');
+    Route::get('/legal/privacy-policy', [LegalController::class, 'privacyPolicy'])
+        ->middleware('throttle:api');
 
     // Workshop routes (public - visible to all users)
     Route::get('/workshops', [WorkshopController::class, 'index'])->middleware('throttle:api');
