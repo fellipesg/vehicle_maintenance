@@ -48,7 +48,8 @@ class WorkshopFollowUpNotification extends Notification implements ShouldQueue
             ->replyTo($replyToAddress, $replyToName)
             ->greeting("Olá, {$ownerName}!")
             ->line($this->renderedBody)
-            ->action('Ver veículo', $this->vehicleUrl($notifiable));
+            ->action('Ver veículo', $this->vehicleUrl($notifiable))
+            ->salutation('Revisalog');
     }
 
     /**

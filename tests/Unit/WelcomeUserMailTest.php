@@ -30,6 +30,7 @@ class WelcomeUserMailTest extends TestCase
         $mailable->assertSeeInHtml('João');
         $mailable->assertSeeInHtml('no veículo');
         $mailable->assertSeeInHtml('Revisalog');
+        $mailable->assertSeeInHtml('lockup-horizontal.png');
         $mailable->assertSeeInHtml('Todos os direitos reservados');
         $mailable->assertDontSeeInHtml('Vehicle Maintenance');
         $mailable->assertDontSeeInHtml('Vehicle Maintenance System');

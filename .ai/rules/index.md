@@ -18,6 +18,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Mail/** | .ai/rules/mail.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
 | app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php | .ai/rules/models.md |
+| app/Notifications/** | .ai/rules/notifications.md |
 | resources/views/pdfs/vehicle_maintenance_export.blade.php | .ai/rules/pdfs.md |
 | frontend/lib/widgets/provenance/** | .ai/rules/provenance.md |
 | frontend/lib/repositories/vehicle_repository.dart | .ai/rules/repositories.md |

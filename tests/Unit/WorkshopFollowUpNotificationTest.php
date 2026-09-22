@@ -33,6 +33,7 @@ class WorkshopFollowUpNotificationTest extends TestCase
         ))->toMail($owner);
 
         $this->assertSame([['oficina@example.com', 'Oficina Central']], $mail->replyTo);
+        $this->assertSame('Revisalog', $mail->salutation);
     }
 
     public function test_mail_reply_to_falls_back_to_support_when_workshop_email_is_invalid(): void

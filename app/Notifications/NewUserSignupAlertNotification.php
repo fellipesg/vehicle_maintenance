@@ -37,7 +37,8 @@ class NewUserSignupAlertNotification extends Notification implements ShouldQueue
             ->line("**Nome:** {$this->user->name}")
             ->line("**E-mail:** {$this->user->email}")
             ->line("**Tipo:** {$this->user->user_type}")
-            ->line("**Origem:** {$this->source->value}");
+            ->line("**Origem:** {$this->source->value}")
+            ->salutation('Revisalog');
     }
 
     /**
