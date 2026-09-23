@@ -48,7 +48,7 @@ class VehicleMileageTest extends TestCase
         $this->assertSame(52000, $vehicle->fresh()->current_kilometers);
     }
 
-    public function test_maintenance_cannot_use_lower_kilometers_than_current(): void
+    public function test_maintenance_can_use_lower_kilometers_than_current_without_lowering_odometer(): void
     {
         $user = $this->actingAsApiUser();
 
@@ -64,8 +64,10 @@ class VehicleMileageTest extends TestCase
             'maintenance_date' => '2024-06-01',
             'kilometers' => 79000,
             'service_category' => 'mechanical',
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['kilometers']);
+        ])->assertCreated();
+
+        $this->assertSame(80000, $vehicle->fresh()->current_kilometers);
+        $this->assertTrue($vehicle->maintenances()->where('kilometers', 79000)->exists());
     }
 
     public function test_vehicle_timeline_endpoint_returns_events(): void

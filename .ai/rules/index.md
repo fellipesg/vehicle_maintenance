@@ -28,7 +28,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | frontend/lib/views/vehicles/**,resources/views/user/vehicles/** | .ai/rules/user-vehicles.md |
 | app/Services/User/** | .ai/rules/user.md |
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |
-| app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
+| app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php, app/Services/Vehicle/VehicleMileageService.php | .ai/rules/vehicle.md |
 | frontend/lib/views/vehicles/** | .ai/rules/vehicles.md |
 | resources/views/vendor/mail/** | .ai/rules/vendor-mail.md |
 | resources/views/layouts/**,resources/views/admin/** | .ai/rules/views-admin.md |

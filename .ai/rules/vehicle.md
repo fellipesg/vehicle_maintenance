@@ -2,6 +2,7 @@
 paths:
   - app/Services/Vehicle/VehicleMaintenancePdfExporter.php
   - app/Services/Vehicle/VehicleCoverService.php
+  - app/Services/Vehicle/VehicleMileageService.php
 ---
 
 # Vehicle
@@ -14,3 +15,6 @@ coverPathForPdf() prefers cover_photo_path (landscape), then portrait. Center-cr
 
 ## Thumbnails obrigatórios para capas
 Todo upload de capa (paisagem/retrato) deve gerar `cover_photo_thumb_path` 192×192 via `VehicleCoverCropper::cropToThumb`. Listagens e avatares devem preferir `cover_photo_thumb_url`.
+
+## Allow historical maintenance km below odometer
+Maintenance km may be lower than vehicle current_kilometers so users can backfill history after registering the odometer. Do not set HTML min to current km and do not reject lower km in VehicleMileageService. current_kilometers stays the max of registration, existing maintenances, and the new reading.
