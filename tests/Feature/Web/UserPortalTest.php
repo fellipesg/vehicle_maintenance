@@ -65,7 +65,7 @@ class UserPortalTest extends TestCase
                 'year' => 2018,
                 'current_kilometers' => 95000,
                 'terms_accepted' => '1',
-                'crlv_verification_token' => session('crlv_verification.token'),
+                'crlv_verification_token' => \App\Models\CrlvImport::latest()->first()->token,
             ])
             ->assertRedirect();
 

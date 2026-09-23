@@ -9,7 +9,6 @@ use App\Jobs\EmailVehicleMaintenancePdf;
 use App\Models\Vehicle;
 use App\Rules\CrlvPdfFile;
 use App\Services\Crlv\CrlvExerciseValidator;
-use App\Services\Crlv\CrlvParseResult;
 use App\Services\Crlv\CrlvPdfParser;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleOwnershipService;
@@ -113,20 +112,22 @@ class VehicleController extends Controller
 
     public function showConsignmentForm(Request $request): View|RedirectResponse
     {
-        if (! session('consignment_pending')) {
+        $import = $this->currentCrlvImport($request);
+
+        if ($import === null || $import->mode !== 'consignment') {
             return redirect()->route('user.vehicles.index');
         }
 
         return view('user.vehicles.consignment', [
-            'pending' => session('consignment_pending'),
+            'pending' => $import,
         ]);
     }
 
     public function storeConsignment(Request $request): RedirectResponse
     {
-        $pending = session('consignment_pending');
+        $import = $this->currentCrlvImport($request);
 
-        if (! is_array($pending)) {
+        if ($import === null || $import->mode !== 'consignment') {
             return redirect()->route('user.vehicles.index');
         }
 
@@ -135,15 +136,15 @@ class VehicleController extends Controller
         ]);
 
         $path = $request->file('power_of_attorney')->store('procuracoes', AppStorage::diskName());
-        $crlv = $this->crlvFromVerification($pending['crlv_verification'] ?? session('crlv_verification'));
+        $crlv = $import->toParseResult();
         $ownership = app(VehicleOwnershipService::class);
 
         try {
-            if (isset($pending['vehicle_id'])) {
-                $vehicle = Vehicle::findOrFail($pending['vehicle_id']);
+            if ($import->vehicle_id !== null) {
+                $vehicle = Vehicle::findOrFail($import->vehicle_id);
                 $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
                 $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
-                $request->session()->forget(['consignment_pending', 'crlv_verification', 'claim_vehicle_id']);
+                $this->finishCrlvImport($request, $import);
 
                 return redirect()->route('user.vehicles.index')
                     ->with('success', 'Procuração enviada. O histórico ficará disponível após análise.');
@@ -151,12 +152,12 @@ class VehicleController extends Controller
 
             $vehicle = $ownership->registerNew(
                 $request->user(),
-                $pending['vehicle_data'],
+                $import->pending_vehicle_data ?? [],
                 $crlv,
                 'consignment',
             );
             $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-            $request->session()->forget(['consignment_pending', 'crlv_verification']);
+            $this->finishCrlvImport($request, $import);
 
             return redirect()->route('user.vehicles.index')
                 ->with('success', 'Veículo cadastrado em consignação. A procuração será analisada pela equipe.');
@@ -310,35 +311,6 @@ class VehicleController extends Controller
         return back()->with(
             'success',
             "O relatório será processado e enviado para {$user->email}."
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $verification
-     */
-    private function crlvFromVerification(?array $verification): CrlvParseResult
-    {
-        $preview = $verification['parsed'] ?? null;
-
-        if (! is_array($preview)) {
-            throw new RuntimeException('Dados do CRLV-e não encontrados. Envie o documento novamente.');
-        }
-
-        return new CrlvParseResult(
-            licensePlate: $preview['license_plate'],
-            renavam: $preview['renavam'],
-            brand: $preview['brand'],
-            model: $preview['model'],
-            year: (int) $preview['year'],
-            color: $preview['color'] ?? null,
-            chassis: $preview['chassis'] ?? null,
-            engine: $preview['engine'] ?? null,
-            motorization: $preview['motorization'] ?? null,
-            crvNumber: $preview['crv_number'] ?? null,
-            exerciseYear: isset($preview['exercise_year']) ? (int) $preview['exercise_year'] : null,
-            manufacturingYear: isset($preview['manufacturing_year']) ? (int) $preview['manufacturing_year'] : null,
-            ownerName: $preview['owner_name'] ?? null,
-            ownerDocument: $preview['owner_document'] ?? null,
         );
     }
 }

@@ -54,7 +54,7 @@ class GaragePortalTest extends TestCase
                 'year' => 2016,
                 'current_kilometers' => 85_000,
                 'terms_accepted' => '1',
-                'crlv_verification_token' => session('crlv_verification.token'),
+                'crlv_verification_token' => \App\Models\CrlvImport::latest()->first()->token,
             ])
             ->assertRedirect();
 

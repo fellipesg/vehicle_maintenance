@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Concerns;
 
+use App\Models\CrlvImport;
 use App\Models\Vehicle;
 use App\Rules\Chassis;
 use App\Services\Crlv\CrlvParseResult;
@@ -49,48 +50,25 @@ trait RegistersVehicleWithOwnership
         ];
     }
 
+    /**
+     * Só aceita o CRLV-e cujo token o formulário devolveu: garante que os
+     * dados de propriedade vieram de um documento lido por este usuário.
+     */
     protected function resolveCrlvFromSession(Request $request): ?CrlvParseResult
     {
-        $verification = session('crlv_verification');
+        $import = $this->currentCrlvImport($request);
 
-        if (! is_array($verification)) {
+        if ($import === null) {
             return null;
         }
 
         $token = $request->input('crlv_verification_token');
 
-        if ($token === null || $token !== ($verification['token'] ?? null)) {
+        if ($token === null || ! hash_equals($import->token, (string) $token)) {
             return null;
         }
 
-        $preview = $verification['parsed'] ?? null;
-
-        if (! is_array($preview)) {
-            return null;
-        }
-
-        return new CrlvParseResult(
-            licensePlate: $preview['license_plate'],
-            renavam: $preview['renavam'],
-            brand: $preview['brand'],
-            model: $preview['model'],
-            year: (int) $preview['year'],
-            color: $preview['color'] ?? null,
-            chassis: $preview['chassis'] ?? null,
-            engine: $preview['engine'] ?? null,
-            motorization: $preview['motorization'] ?? null,
-            brandRaw: $preview['brand_raw'] ?? '',
-            modelRaw: $preview['model_raw'] ?? '',
-            brandMatched: (bool) ($preview['brand_matched'] ?? false),
-            modelMatched: (bool) ($preview['model_matched'] ?? false),
-            detranState: $preview['detran_state'] ?? null,
-            fuel: $preview['fuel'] ?? null,
-            crvNumber: $preview['crv_number'] ?? null,
-            exerciseYear: isset($preview['exercise_year']) ? (int) $preview['exercise_year'] : null,
-            manufacturingYear: isset($preview['manufacturing_year']) ? (int) $preview['manufacturing_year'] : null,
-            ownerName: $preview['owner_name'] ?? null,
-            ownerDocument: $preview['owner_document'] ?? null,
-        );
+        return $import->toParseResult();
     }
 
     protected function registerVehicle(Request $request): RedirectResponse
@@ -134,6 +112,7 @@ trait RegistersVehicleWithOwnership
                 ]);
         }
 
+        $import = $this->currentCrlvImport($request);
         $crlv = $this->resolveCrlvFromSession($request);
         $ownership = app(VehicleOwnershipService::class);
 
@@ -142,12 +121,10 @@ trait RegistersVehicleWithOwnership
                 $ownershipType = $ownership->resolveOwnershipType($request->user(), $crlv);
 
                 if ($ownershipType === 'consignment') {
-                    session([
-                        'consignment_pending' => [
-                            'vehicle_data' => $data,
-                            'crlv_verification' => session('crlv_verification'),
-                        ],
-                    ]);
+                    $import?->forceFill([
+                        'mode' => 'consignment',
+                        'pending_vehicle_data' => $data,
+                    ])->save();
 
                     return redirect()->route($this->vehicleConsignmentRoute())
                         ->with('warning', 'O CPF/CNPJ do CRLV-e não é o seu. Envie a procuração do proprietário para acessar o histórico em consignação.');
@@ -161,7 +138,7 @@ trait RegistersVehicleWithOwnership
             return back()->withInput()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
-        $request->session()->forget(['crlv_verification', 'crlv_source']);
+        $this->finishCrlvImport($request, $import);
 
         $successMessage = $crlv !== null
             ? 'Veículo cadastrado com sucesso!'
@@ -177,8 +154,9 @@ trait RegistersVehicleWithOwnership
             'crlv_verification_token' => ['required', 'string'],
         ]);
 
-        $vehicle = session('claim_vehicle_id')
-            ? Vehicle::find(session('claim_vehicle_id'))
+        $import = $this->currentCrlvImport($request);
+        $vehicle = $import?->vehicle_id
+            ? Vehicle::find($import->vehicle_id)
             : null;
 
         $crlv = $this->resolveCrlvFromSession($request);
@@ -194,12 +172,7 @@ trait RegistersVehicleWithOwnership
             $ownershipType = $ownership->resolveOwnershipType($request->user(), $crlv);
 
             if ($ownershipType === 'consignment') {
-                session([
-                    'consignment_pending' => [
-                        'vehicle_id' => $vehicle->id,
-                        'crlv_verification' => session('crlv_verification'),
-                    ],
-                ]);
+                $import->forceFill(['mode' => 'consignment'])->save();
 
                 return redirect()->route($this->vehicleConsignmentRoute())
                     ->with('warning', 'O veículo não está no seu CPF/CNPJ. Envie a procuração do proprietário para acessar o histórico em consignação.');
@@ -214,10 +187,17 @@ trait RegistersVehicleWithOwnership
             return back()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
-        $request->session()->forget(['crlv_verification', 'crlv_source', 'claim_vehicle_id', 'crlv_mode']);
+        $this->finishCrlvImport($request, $import);
 
         return redirect()->route($this->vehicleShowRoute(), $vehicle)
             ->with('success', 'Veículo vinculado à sua conta com sucesso!');
+    }
+
+    /** Cadastro concluído: o documento lido não serve mais e sai da base. */
+    protected function finishCrlvImport(Request $request, ?CrlvImport $import): void
+    {
+        $import?->markConsumed();
+        $request->session()->forget('crlv_import_id');
     }
 
     abstract protected function vehicleShowRoute(): string;

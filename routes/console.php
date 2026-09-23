@@ -12,6 +12,9 @@ Schedule::command('sanctum:prune-expired --hours=24')->daily();
 Schedule::command('maintenance:check-km-reminders')->dailyAt('08:00');
 Schedule::command('vehicle-pdf-exports:cleanup')->daily();
 
+// CRLV-e lido traz nome e CPF do proprietário: sai da base assim que expira.
+Schedule::command('model:prune', ['--model' => \App\Models\CrlvImport::class])->hourly();
+
 Schedule::command('queue:work --stop-when-empty --max-time=25 --tries=1')
     ->everyThirtySeconds()
     ->withoutOverlapping()

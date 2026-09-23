@@ -3,6 +3,7 @@
 namespace Tests\Feature\Web;
 
 use App\Mail\CrlvImportFailureMail;
+use App\Models\CrlvImport;
 use App\Models\User;
 use App\Services\Crlv\CrlvExerciseValidator;
 use App\Services\Crlv\CrlvParseException;
@@ -90,10 +91,14 @@ class CrlvVehicleImportTest extends TestCase
         $this->actingAs($this->user)
             ->post('/usuario/veiculos/importar-crlv', ['crlv' => $file])
             ->assertRedirect(route('user.vehicles.import.preview'))
-            ->assertSessionHas('crlv_verification.parsed.license_plate', $expected['license_plate'])
-            ->assertSessionHas('crlv_verification.parsed.renavam', $expected['renavam'])
-            ->assertSessionHas('crlv_verification.parsed.brand', $expected['brand'])
-            ->assertSessionHas('crlv_verification.parsed.model', $expected['model']);
+            ->assertSessionHas('crlv_import_id');
+
+        // O CRLV-e lido fica na tabela; a sessão guarda só o id.
+        $import = CrlvImport::latest()->firstOrFail();
+        $this->assertSame($expected['license_plate'], $import->parsed['license_plate']);
+        $this->assertSame($expected['renavam'], $import->parsed['renavam']);
+        $this->assertSame($expected['brand'], $import->parsed['brand']);
+        $this->assertSame($expected['model'], $import->parsed['model']);
 
         $this->actingAs($this->user)
             ->get('/usuario/veiculos/importar-crlv/preview')
@@ -116,7 +121,7 @@ class CrlvVehicleImportTest extends TestCase
 
         $this->actingAs($this->user)->post('/usuario/veiculos/importar-crlv', ['crlv' => $file]);
 
-        $token = session('crlv_verification.token');
+        $token = CrlvImport::latest()->first()->token;
 
         $this->actingAs($this->user)
             ->post('/usuario/veiculos', [
@@ -168,8 +173,9 @@ class CrlvVehicleImportTest extends TestCase
         $this->actingAs($this->user)
             ->post('/usuario/veiculos/vincular/crlv', ['crlv' => $file])
             ->assertRedirect(route('user.vehicles.import.preview'))
-            ->assertSessionHas('crlv_verification.parsed.license_plate', 'PHF9J95')
-            ->assertSessionMissing('claim_vehicle_id');
+            ->assertSessionHas('crlv_import_id');
+
+        $this->assertSame('PHF9J95', CrlvImport::latest()->firstOrFail()->parsed['license_plate']);
 
         $this->actingAs($this->user)
             ->get('/usuario/veiculos/importar-crlv/preview')
@@ -194,8 +200,9 @@ class CrlvVehicleImportTest extends TestCase
         $this->actingAs($garage)
             ->post('/garagem/estoque/vincular/crlv', ['crlv' => $file])
             ->assertRedirect(route('garage.vehicles.import.preview'))
-            ->assertSessionHas('crlv_verification.parsed.license_plate', 'PHF9J95')
-            ->assertSessionMissing('claim_vehicle_id');
+            ->assertSessionHas('crlv_import_id');
+
+        $this->assertSame('PHF9J95', CrlvImport::latest()->firstOrFail()->parsed['license_plate']);
 
         $this->actingAs($garage)
             ->get('/garagem/estoque/importar-crlv/preview')
@@ -229,7 +236,7 @@ class CrlvVehicleImportTest extends TestCase
             ->assertOk()
             ->assertSee('name="terms_accepted"', false)
             ->assertSee('name="crlv_verification_token"', false)
-            ->assertSee(session('crlv_verification.token'), false);
+            ->assertSee(CrlvImport::latest()->first()->token, false);
     }
 
     /**

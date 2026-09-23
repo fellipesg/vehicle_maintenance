@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Concerns;
 
+use App\Models\CrlvImport;
 use App\Models\Vehicle;
 use App\Rules\CrlvPdfFile;
 use App\Services\Crlv\CrlvPdfParser;
@@ -57,17 +58,12 @@ trait ImportsVehicleFromCrlv
 
         $existingVehicle = \App\Services\Vehicle\VehicleOwnershipService::findExistingVehicle($parsed);
 
-        $this->putCrlvInSession($request, $parsed);
+        $this->startCrlvImport($request, $parsed, $existingVehicle);
 
         if ($existingVehicle) {
-            $request->session()->put('claim_vehicle_id', $existingVehicle->id);
-            $request->session()->put('crlv_mode', 'claim');
-
             return redirect()->route($this->vehicleClaimPreviewRoute())
                 ->with('info', 'Este veículo já está cadastrado. Confirme os dados do CRLV-e para vincular à sua conta.');
         }
-
-        $request->session()->forget(['claim_vehicle_id', 'crlv_mode']);
 
         return redirect()->route($this->vehiclePreviewRoute());
     }
@@ -98,19 +94,14 @@ trait ImportsVehicleFromCrlv
 
         $existingVehicle = \App\Services\Vehicle\VehicleOwnershipService::findExistingVehicle($parsed);
 
-        $this->putCrlvInSession($request, $parsed);
+        $this->startCrlvImport($request, $parsed, $existingVehicle);
 
         // Sem veículo na base, o CRLV-e já lido vale para o cadastro:
         // leva à mesma tela de confirmação, em vez de descartar a leitura.
         if ($existingVehicle === null) {
-            $request->session()->forget(['claim_vehicle_id', 'crlv_mode']);
-
             return redirect()->route($this->vehiclePreviewRoute())
                 ->with('info', 'Veículo ainda não cadastrado. Confirme os dados do CRLV-e para cadastrá-lo como primeiro proprietário.');
         }
-
-        $request->session()->put('claim_vehicle_id', $existingVehicle->id);
-        $request->session()->put('crlv_mode', 'claim');
 
         return redirect()->route($this->vehicleClaimPreviewRoute());
     }
@@ -134,30 +125,58 @@ trait ImportsVehicleFromCrlv
     }
 
     /**
-     * Guarda o CRLV-e lido em uma cópia só: em produção a sessão viaja dentro
-     * de um cookie, e o navegador descarta tudo acima de 4 KB sem avisar.
+     * O CRLV-e lido fica em `crlv_imports`; a sessão guarda só o id. Em
+     * produção a sessão viaja dentro de um cookie, e o navegador descarta
+     * tudo acima de 4 KB sem avisar.
      */
-    private function putCrlvInSession(Request $request, \App\Services\Crlv\CrlvParseResult $parsed): void
-    {
-        $request->session()->put('crlv_verification', [
+    private function startCrlvImport(
+        Request $request,
+        \App\Services\Crlv\CrlvParseResult $parsed,
+        ?Vehicle $existingVehicle,
+    ): CrlvImport {
+        $import = CrlvImport::create([
+            'user_id' => $request->user()->getAuthIdentifier(),
             'token' => $parsed->verificationToken(),
+            'mode' => $existingVehicle ? 'claim' : 'import',
+            'vehicle_id' => $existingVehicle?->id,
             'parsed' => $parsed->toPreview(),
+            'source_filename' => $request->file('crlv')->getClientOriginalName(),
+            'expires_at' => now()->addMinutes(CrlvImport::LIFETIME_MINUTES),
         ]);
-        $request->session()->put('crlv_source', $request->file('crlv')->getClientOriginalName());
+
+        $request->session()->put('crlv_import_id', $import->id);
+
+        return $import;
+    }
+
+    /** Import em andamento desta sessão, se ainda valer e for de quem pediu. */
+    protected function currentCrlvImport(Request $request): ?CrlvImport
+    {
+        $id = $request->session()->get('crlv_import_id');
+
+        if (! is_string($id)) {
+            return null;
+        }
+
+        return CrlvImport::query()
+            ->usable()
+            ->whereKey($id)
+            ->where('user_id', $request->user()?->getAuthIdentifier())
+            ->first();
     }
 
     public function previewCrlvImport(Request $request, VehicleCatalogService $catalog): View|RedirectResponse
     {
-        $preview = session('crlv_verification.parsed');
+        $import = $this->currentCrlvImport($request);
 
-        if (! is_array($preview)) {
+        if ($import === null) {
             return redirect()->route($this->vehicleCreateRoute());
         }
 
         return view($this->vehiclePreviewView(), [
             'catalog' => $catalog->all(),
-            'preview' => $preview,
-            'sourceFile' => session('crlv_source'),
+            'preview' => $import->parsed,
+            'sourceFile' => $import->source_filename,
             'storeRoute' => $this->vehicleStoreRoute(),
             'createRoute' => $this->vehicleCreateRoute(),
         ]);
@@ -165,14 +184,14 @@ trait ImportsVehicleFromCrlv
 
     public function previewCrlvClaim(Request $request, VehicleCatalogService $catalog): View|RedirectResponse
     {
-        $preview = session('crlv_verification.parsed');
-        $vehicleId = session('claim_vehicle_id');
+        $import = $this->currentCrlvImport($request);
 
-        if (! is_array($preview) || ! $vehicleId) {
+        if ($import === null || $import->vehicle_id === null) {
             return redirect()->route($this->vehicleClaimRoute());
         }
 
-        $vehicle = Vehicle::find($vehicleId);
+        $preview = $import->parsed;
+        $vehicle = Vehicle::find($import->vehicle_id);
 
         if ($vehicle === null) {
             return redirect()->route($this->vehicleClaimRoute());
@@ -182,7 +201,7 @@ trait ImportsVehicleFromCrlv
             'catalog' => $catalog->all(),
             'preview' => $preview,
             'vehicle' => $vehicle,
-            'sourceFile' => session('crlv_source'),
+            'sourceFile' => $import->source_filename,
             'claimStoreRoute' => $this->vehicleClaimStoreRoute(),
             'claimRoute' => $this->vehicleClaimRoute(),
         ]);

@@ -41,7 +41,7 @@ class VehicleOwnershipTest extends TestCase
         $this->actingAs($this->user)
             ->post('/usuario/veiculos/importar-crlv', ['crlv' => $file])
             ->assertRedirect(route('user.vehicles.claim.preview'))
-            ->assertSessionHas('claim_vehicle_id');
+            ->assertSessionHas('crlv_import_id');
     }
 
     public function test_user_can_claim_existing_vehicle_with_crlv(): void
@@ -70,7 +70,7 @@ class VehicleOwnershipTest extends TestCase
 
         $this->actingAs($this->user)
             ->post('/usuario/veiculos/vincular', [
-                'crlv_verification_token' => session('crlv_verification.token'),
+                'crlv_verification_token' => \App\Models\CrlvImport::latest()->first()->token,
             ])
             ->assertRedirect();
 
