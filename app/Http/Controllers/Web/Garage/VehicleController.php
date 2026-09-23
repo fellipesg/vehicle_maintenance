@@ -139,7 +139,7 @@ class VehicleController extends Controller
                 $vehicle = Vehicle::findOrFail($pending['vehicle_id']);
                 $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
                 $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
-                $request->session()->forget(['consignment_pending', 'crlv_verification', 'crlv_preview', 'claim_vehicle_id']);
+                $request->session()->forget(['consignment_pending', 'crlv_verification', 'claim_vehicle_id']);
 
                 return redirect()->route('garage.vehicles.index')
                     ->with('success', 'Procuração enviada para análise.');
@@ -147,7 +147,7 @@ class VehicleController extends Controller
 
             $vehicle = $ownership->registerNew($request->user(), $pending['vehicle_data'], $crlv, 'consignment');
             $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-            $request->session()->forget(['consignment_pending', 'crlv_verification', 'crlv_preview']);
+            $request->session()->forget(['consignment_pending', 'crlv_verification']);
 
             return redirect()->route('garage.vehicles.index')
                 ->with('success', 'Veículo adicionado em consignação.');

@@ -83,10 +83,10 @@ class CrlvVehicleImportTest extends TestCase
         $this->actingAs($this->user)
             ->post('/usuario/veiculos/importar-crlv', ['crlv' => $file])
             ->assertRedirect(route('user.vehicles.import.preview'))
-            ->assertSessionHas('crlv_preview.license_plate', $expected['license_plate'])
-            ->assertSessionHas('crlv_preview.renavam', $expected['renavam'])
-            ->assertSessionHas('crlv_preview.brand', $expected['brand'])
-            ->assertSessionHas('crlv_preview.model', $expected['model']);
+            ->assertSessionHas('crlv_verification.parsed.license_plate', $expected['license_plate'])
+            ->assertSessionHas('crlv_verification.parsed.renavam', $expected['renavam'])
+            ->assertSessionHas('crlv_verification.parsed.brand', $expected['brand'])
+            ->assertSessionHas('crlv_verification.parsed.model', $expected['model']);
 
         $this->actingAs($this->user)
             ->get('/usuario/veiculos/importar-crlv/preview')
@@ -161,7 +161,7 @@ class CrlvVehicleImportTest extends TestCase
         $this->actingAs($this->user)
             ->post('/usuario/veiculos/vincular/crlv', ['crlv' => $file])
             ->assertRedirect(route('user.vehicles.import.preview'))
-            ->assertSessionHas('crlv_preview.license_plate', 'PHF9J95')
+            ->assertSessionHas('crlv_verification.parsed.license_plate', 'PHF9J95')
             ->assertSessionMissing('claim_vehicle_id');
 
         $this->actingAs($this->user)
@@ -187,7 +187,7 @@ class CrlvVehicleImportTest extends TestCase
         $this->actingAs($garage)
             ->post('/garagem/estoque/vincular/crlv', ['crlv' => $file])
             ->assertRedirect(route('garage.vehicles.import.preview'))
-            ->assertSessionHas('crlv_preview.license_plate', 'PHF9J95')
+            ->assertSessionHas('crlv_verification.parsed.license_plate', 'PHF9J95')
             ->assertSessionMissing('claim_vehicle_id');
 
         $this->actingAs($garage)
@@ -307,6 +307,40 @@ class CrlvVehicleImportTest extends TestCase
         }
 
         return $payload;
+    }
+
+    /**
+     * Em produção a sessão viaja dentro de um cookie (SESSION_DRIVER=cookie) e
+     * o navegador descarta em silêncio qualquer cookie acima de 4096 bytes —
+     * era isso que apagava o CRLV-e lido antes da tela de confirmação.
+     */
+    public function test_imported_crlv_session_fits_in_a_cookie(): void
+    {
+        config(['session.driver' => 'cookie']);
+
+        $file = new UploadedFile(
+            base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
+            'CRLV-e.pdf',
+            'application/pdf',
+            null,
+            true
+        );
+
+        $response = $this->actingAs($this->user)
+            ->post('/usuario/veiculos/importar-crlv', ['crlv' => $file]);
+
+        $largest = 0;
+
+        foreach ($response->headers->getCookies() as $cookie) {
+            $largest = max($largest, strlen($cookie->getName()) + strlen((string) $cookie->getValue()));
+        }
+
+        $this->assertGreaterThan(0, $largest);
+        $this->assertLessThan(
+            4096,
+            $largest,
+            "A sessão com o CRLV-e ocupa {$largest} bytes e não cabe em um cookie."
+        );
     }
 
     public function test_preview_redirects_without_session(): void
