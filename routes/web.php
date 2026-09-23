@@ -88,7 +88,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/manutencoes', [UserMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [UserMaintenanceController::class, 'create'])->name('maintenances.create');
         Route::post('/manutencoes', [UserMaintenanceController::class, 'store'])->name('maintenances.store');
-        Route::get('/manutencoes/{maintenance}', [UserMaintenanceController::class, 'show'])->name('maintenances.show');
+        Route::get('/manutencoes/{maintenance}', [UserMaintenanceController::class, 'show'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.show');
         Route::get('/oficinas', [WorkshopDirectoryController::class, 'index'])->name('workshops.index');
     });
 
@@ -123,12 +125,19 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/manutencoes', [WorkshopMaintenanceController::class, 'store'])
             ->middleware('throttle:uploads')
             ->name('maintenances.store');
-        Route::get('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'show'])->name('maintenances.show');
-        Route::get('/manutencoes/{maintenance}/editar', [WorkshopMaintenanceController::class, 'edit'])->name('maintenances.edit');
+        Route::get('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'show'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.show');
+        Route::get('/manutencoes/{maintenance}/editar', [WorkshopMaintenanceController::class, 'edit'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.edit');
         Route::put('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'update'])
+            ->whereNumber('maintenance')
             ->middleware('throttle:uploads')
             ->name('maintenances.update');
-        Route::delete('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'destroy'])->name('maintenances.destroy');
+        Route::delete('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'destroy'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.destroy');
         Route::resource('garantias/templates', WorkshopWarrantyTemplateController::class)
             ->names('warranty-templates')
             ->parameters(['templates' => 'warranty_template']);

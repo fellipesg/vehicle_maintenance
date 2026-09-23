@@ -278,7 +278,7 @@ async function loadVehicleShow() {
                     <div class="flex flex-wrap gap-2">
                         <button type="button" data-export-pdf class="btn-secondary">📄 Exportar PDF</button>
                         <a href="/usuario/veiculos/${vehicle.id}/editar" class="btn-secondary">Editar</a>
-                        <a href="/usuario/manutencoes/criar?vehicle_id=${vehicle.id}" class="btn-primary">+ Manutenção</a>
+                        <a href="/usuario/manutencoes/nova?vehicle_id=${vehicle.id}" class="btn-primary">+ Manutenção</a>
                     </div>
                 </div>
                 ${renderProvenanceStrip(vehicle, { basePath: '/usuario', interactiveFilters: true })}
