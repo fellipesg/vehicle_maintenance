@@ -125,6 +125,28 @@ class UserPortalTest extends TestCase
             ->assertSee('Manutenções');
     }
 
+    public function test_maintenance_create_page_preselects_vehicle_from_query(): void
+    {
+        $vehicle = Vehicle::factory()->create();
+        $this->user->vehicles()->attach($vehicle->id, [
+            'is_current_owner' => true,
+            'purchase_date' => now(),
+            'tenant_id' => $this->user->tenant_id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->get("/usuario/manutencoes/nova?vehicle_id={$vehicle->id}")
+            ->assertOk()
+            ->assertSee("value=\"{$vehicle->id}\" selected", false);
+    }
+
+    public function test_maintenance_show_rejects_non_numeric_id_without_database_error(): void
+    {
+        $this->actingAs($this->user)
+            ->get('/usuario/manutencoes/criar')
+            ->assertNotFound();
+    }
+
     public function test_user_can_create_maintenance(): void
     {
         $vehicle = Vehicle::factory()->create();
