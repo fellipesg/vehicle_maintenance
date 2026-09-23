@@ -9,6 +9,12 @@ class CrlvBrandModelResolver
     /** @var array<string, string> */
     private array $brandAliases;
 
+    /** Prefixos de importação que o CRLV-e escreve no lugar da marca. */
+    private const IMPORT_PREFIXES = ['I', 'IMP'];
+
+    /** Marcas do catálogo com mais de uma palavra ("MERCEDES BENZ"). */
+    private const MAX_BRAND_TOKENS = 2;
+
     /** @var string[] */
     private const MODEL_SUFFIXES = [
         '4X4', '4X2', 'FLEX', 'FF', 'TURBO', 'AUT', 'MEC', 'CVT', 'AT', 'MT',
@@ -52,13 +58,65 @@ class CrlvBrandModelResolver
     {
         $line = trim($line);
 
-        if (str_contains($line, '/')) {
-            [$brand, $model] = explode('/', $line, 2);
-
-            return [trim($brand), trim($model)];
+        if (! str_contains($line, '/')) {
+            return ['', $line];
         }
 
-        return ['', $line];
+        [$brand, $model] = explode('/', $line, 2);
+        $brand = trim($brand);
+        $model = trim($model);
+
+        // Em importados o CRLV-e escreve "I/AUDI Q3 150CV": o "I/" é a marca
+        // de importação, não a montadora.
+        if (in_array($this->normalizeToken($brand), self::IMPORT_PREFIXES, true)) {
+            return str_contains($model, '/')
+                ? $this->splitBrandModel($model)
+                : $this->splitLeadingBrand($model);
+        }
+
+        return [$brand, $model];
+    }
+
+    /**
+     * Separa marca e modelo quando vêm sem barra ("AUDI Q3 150CV"), preferindo
+     * a maior marca conhecida no início da linha.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function splitLeadingBrand(string $line): array
+    {
+        $tokens = preg_split('/\s+/', trim($line)) ?: [];
+
+        if ($tokens === []) {
+            return ['', ''];
+        }
+
+        for ($take = min(self::MAX_BRAND_TOKENS, count($tokens)); $take >= 1; $take--) {
+            $candidate = implode(' ', array_slice($tokens, 0, $take));
+
+            if ($take === 1 || $this->isKnownBrand($candidate)) {
+                return [$candidate, trim(implode(' ', array_slice($tokens, $take)))];
+            }
+        }
+
+        return [$line, ''];
+    }
+
+    private function isKnownBrand(string $candidate): bool
+    {
+        $normalized = $this->normalizeToken($candidate);
+
+        if ($normalized === '' || isset($this->brandAliases[$normalized])) {
+            return $normalized !== '';
+        }
+
+        foreach (array_keys($this->catalog->all()) as $catalogBrand) {
+            if ($this->normalizeToken($catalogBrand) === $normalized) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

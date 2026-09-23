@@ -3,7 +3,6 @@
 namespace App\Services\Crlv;
 
 use Illuminate\Http\UploadedFile;
-use RuntimeException;
 use Smalot\PdfParser\Parser;
 
 class CrlvPdfParser
@@ -45,13 +44,13 @@ class CrlvPdfParser
     public function parseText(string $text): CrlvParseResult
     {
         if (! $this->looksLikeCrlv($text)) {
-            throw new RuntimeException('O PDF não parece ser um CRLV-e digital da SENATRAN.');
+            throw new CrlvParseException('O PDF não parece ser um CRLV-e digital da SENATRAN.');
         }
 
         $block = $this->extractDataBlock($text);
 
         if ($block === null) {
-            throw new RuntimeException('Não foi possível localizar os dados do veículo no CRLV-e.');
+            throw new CrlvParseException('Não foi possível localizar os dados do veículo no CRLV-e.');
         }
 
         return $this->parseDataBlock($block, $text);
@@ -86,21 +85,21 @@ class CrlvPdfParser
         $lines = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $block) ?: [])));
 
         if (count($lines) < 10) {
-            throw new RuntimeException('O CRLV-e não contém linhas suficientes para importação.');
+            throw new CrlvParseException('O CRLV-e não contém linhas suficientes para importação.');
         }
 
         if (! preg_match('/^(\d{9,11})$/', $lines[0], $renavamMatch)) {
-            throw new RuntimeException('RENAVAM não encontrado no CRLV-e.');
+            throw new CrlvParseException('RENAVAM não encontrado no CRLV-e.');
         }
 
         if (! preg_match('/^([A-Z0-9]{7})\s+(\d{4})$/', $lines[1], $plateMatch)) {
-            throw new RuntimeException('Placa não encontrada no CRLV-e.');
+            throw new CrlvParseException('Placa não encontrada no CRLV-e.');
         }
 
         $exerciseYear = (int) $plateMatch[2];
 
         if (! preg_match('/^(\d{4})\s+(\d{4})$/', $lines[2], $yearMatch)) {
-            throw new RuntimeException('Ano do veículo não encontrado no CRLV-e.');
+            throw new CrlvParseException('Ano do veículo não encontrado no CRLV-e.');
         }
 
         $manufacturingYear = (int) $yearMatch[1];
@@ -110,14 +109,14 @@ class CrlvPdfParser
         $brandModelLine = $this->findBrandModelLine($lines);
 
         if ($brandModelLine === null) {
-            throw new RuntimeException('Marca e modelo não encontrados no CRLV-e.');
+            throw new CrlvParseException('Marca e modelo não encontrados no CRLV-e.');
         }
 
         $resolved = $this->brandModelResolver->resolve($brandModelLine);
         $brandModelIndex = array_search($brandModelLine, $lines, true);
 
         if ($brandModelIndex === false || ! isset($lines[$brandModelIndex + 3])) {
-            throw new RuntimeException('Estrutura do CRLV-e não reconhecida.');
+            throw new CrlvParseException('Estrutura do CRLV-e não reconhecida.');
         }
 
         $plateChassisLine = $lines[$brandModelIndex + 2];

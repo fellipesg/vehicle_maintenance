@@ -143,7 +143,7 @@ class VehicleController extends Controller
                 $vehicle = Vehicle::findOrFail($pending['vehicle_id']);
                 $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
                 $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
-                $request->session()->forget(['consignment_pending', 'crlv_verification', 'crlv_preview', 'claim_vehicle_id']);
+                $request->session()->forget(['consignment_pending', 'crlv_verification', 'claim_vehicle_id']);
 
                 return redirect()->route('user.vehicles.index')
                     ->with('success', 'Procuração enviada. O histórico ficará disponível após análise.');
@@ -156,7 +156,7 @@ class VehicleController extends Controller
                 'consignment',
             );
             $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-            $request->session()->forget(['consignment_pending', 'crlv_verification', 'crlv_preview']);
+            $request->session()->forget(['consignment_pending', 'crlv_verification']);
 
             return redirect()->route('user.vehicles.index')
                 ->with('success', 'Veículo cadastrado em consignação. A procuração será analisada pela equipe.');
@@ -203,6 +203,8 @@ class VehicleController extends Controller
             $parsed = app(CrlvPdfParser::class)->parseUpload($request->file('crlv'));
             app(CrlvExerciseValidator::class)->assertAcceptable($parsed->exerciseYear);
         } catch (RuntimeException $exception) {
+            $this->reportCrlvFailure($request, $exception, 'user.vehicles.edit');
+
             return redirect()->route('user.vehicles.edit', $vehicle)
                 ->withErrors(['crlv' => $exception->getMessage()]);
         }

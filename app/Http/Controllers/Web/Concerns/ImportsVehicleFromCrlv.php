@@ -48,6 +48,8 @@ trait ImportsVehicleFromCrlv
             $parsed = app(CrlvPdfParser::class)->parseUpload($request->file('crlv'));
             app(\App\Services\Crlv\CrlvExerciseValidator::class)->assertAcceptable($parsed->exerciseYear);
         } catch (RuntimeException $exception) {
+            $this->reportCrlvFailure($request, $exception, $this->vehicleCreateRoute());
+
             return redirect()->route($this->vehicleCreateRoute())
                 ->withInput()
                 ->withErrors(['crlv' => $exception->getMessage()]);
@@ -55,12 +57,7 @@ trait ImportsVehicleFromCrlv
 
         $existingVehicle = \App\Services\Vehicle\VehicleOwnershipService::findExistingVehicle($parsed);
 
-        $request->session()->put('crlv_verification', [
-            'token' => $parsed->verificationToken(),
-            'parsed' => $parsed->toPreview(),
-        ]);
-        $request->session()->put('crlv_preview', $parsed->toPreview());
-        $request->session()->put('crlv_source', $request->file('crlv')->getClientOriginalName());
+        $this->putCrlvInSession($request, $parsed);
 
         if ($existingVehicle) {
             $request->session()->put('claim_vehicle_id', $existingVehicle->id);
@@ -92,6 +89,8 @@ trait ImportsVehicleFromCrlv
             $parsed = app(CrlvPdfParser::class)->parseUpload($request->file('crlv'));
             app(\App\Services\Crlv\CrlvExerciseValidator::class)->assertAcceptable($parsed->exerciseYear);
         } catch (RuntimeException $exception) {
+            $this->reportCrlvFailure($request, $exception, $this->vehicleClaimRoute());
+
             return redirect()->route($this->vehicleClaimRoute())
                 ->withInput()
                 ->withErrors(['crlv' => $exception->getMessage()]);
@@ -99,12 +98,7 @@ trait ImportsVehicleFromCrlv
 
         $existingVehicle = \App\Services\Vehicle\VehicleOwnershipService::findExistingVehicle($parsed);
 
-        $request->session()->put('crlv_verification', [
-            'token' => $parsed->verificationToken(),
-            'parsed' => $parsed->toPreview(),
-        ]);
-        $request->session()->put('crlv_preview', $parsed->toPreview());
-        $request->session()->put('crlv_source', $request->file('crlv')->getClientOriginalName());
+        $this->putCrlvInSession($request, $parsed);
 
         // Sem veículo na base, o CRLV-e já lido vale para o cadastro:
         // leva à mesma tela de confirmação, em vez de descartar a leitura.
@@ -121,9 +115,40 @@ trait ImportsVehicleFromCrlv
         return redirect()->route($this->vehicleClaimPreviewRoute());
     }
 
+    /**
+     * Documento que o leitor não entendeu vira alerta no Sentry e e-mail para
+     * o suporte. Recusa por exercício vencido é erro de quem envia: não avisa.
+     */
+    protected function reportCrlvFailure(Request $request, RuntimeException $exception, string $origin): void
+    {
+        if (! $exception instanceof \App\Services\Crlv\CrlvParseException) {
+            return;
+        }
+
+        app(\App\Services\Crlv\CrlvImportFailureReporter::class)->report(
+            $exception,
+            $request->file('crlv'),
+            $request->user(),
+            $origin,
+        );
+    }
+
+    /**
+     * Guarda o CRLV-e lido em uma cópia só: em produção a sessão viaja dentro
+     * de um cookie, e o navegador descarta tudo acima de 4 KB sem avisar.
+     */
+    private function putCrlvInSession(Request $request, \App\Services\Crlv\CrlvParseResult $parsed): void
+    {
+        $request->session()->put('crlv_verification', [
+            'token' => $parsed->verificationToken(),
+            'parsed' => $parsed->toPreview(),
+        ]);
+        $request->session()->put('crlv_source', $request->file('crlv')->getClientOriginalName());
+    }
+
     public function previewCrlvImport(Request $request, VehicleCatalogService $catalog): View|RedirectResponse
     {
-        $preview = session('crlv_preview');
+        $preview = session('crlv_verification.parsed');
 
         if (! is_array($preview)) {
             return redirect()->route($this->vehicleCreateRoute());
@@ -140,7 +165,7 @@ trait ImportsVehicleFromCrlv
 
     public function previewCrlvClaim(Request $request, VehicleCatalogService $catalog): View|RedirectResponse
     {
-        $preview = session('crlv_preview');
+        $preview = session('crlv_verification.parsed');
         $vehicleId = session('claim_vehicle_id');
 
         if (! is_array($preview) || ! $vehicleId) {

@@ -161,7 +161,7 @@ trait RegistersVehicleWithOwnership
             return back()->withInput()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
-        $request->session()->forget(['crlv_verification', 'crlv_preview', 'crlv_source']);
+        $request->session()->forget(['crlv_verification', 'crlv_source']);
 
         $successMessage = $crlv !== null
             ? 'Veículo cadastrado com sucesso!'
@@ -214,7 +214,7 @@ trait RegistersVehicleWithOwnership
             return back()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
-        $request->session()->forget(['crlv_verification', 'crlv_preview', 'crlv_source', 'claim_vehicle_id', 'crlv_mode']);
+        $request->session()->forget(['crlv_verification', 'crlv_source', 'claim_vehicle_id', 'crlv_mode']);
 
         return redirect()->route($this->vehicleShowRoute(), $vehicle)
             ->with('success', 'Veículo vinculado à sua conta com sucesso!');
