@@ -160,7 +160,7 @@ class UserPortalTest extends TestCase
             ->post('/usuario/manutencoes', [
                 'vehicle_id' => $vehicle->id,
                 'maintenance_type' => 'Revisão',
-                'maintenance_date' => '2025-06-01',
+                'maintenance_date' => now()->toDateString(),
                 'kilometers' => ($vehicle->current_kilometers ?? 0) + 500,
                 'service_category' => 'mechanical',
             ])
@@ -190,7 +190,7 @@ class UserPortalTest extends TestCase
             ->post('/usuario/manutencoes', [
                 'vehicle_id' => $vehicle->id,
                 'maintenance_type' => 'Revisão',
-                'maintenance_date' => '2025-06-01',
+                'maintenance_date' => now()->toDateString(),
                 'kilometers' => ($vehicle->current_kilometers ?? 0) + 500,
                 'service_category' => 'mechanical',
                 'invoices' => [$pdf],
@@ -225,7 +225,7 @@ class UserPortalTest extends TestCase
             ->post('/usuario/manutencoes', [
                 'vehicle_id' => $vehicle->id,
                 'maintenance_type' => 'Revisão',
-                'maintenance_date' => '2025-06-01',
+                'maintenance_date' => now()->toDateString(),
                 'kilometers' => ($vehicle->current_kilometers ?? 0) + 500,
                 'service_category' => 'mechanical',
                 'invoices' => [$pdf],

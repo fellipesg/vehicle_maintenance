@@ -78,6 +78,7 @@ class MaintenanceController extends Controller
         app(VehicleMileageService::class)->assertMaintenanceKilometers(
             $vehicle,
             (int) $data['kilometers'],
+            $data['maintenance_date'],
         );
 
         $result = $this->storeMaintenanceWithInvoices(

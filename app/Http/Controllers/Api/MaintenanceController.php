@@ -89,6 +89,7 @@ class MaintenanceController extends Controller
             app(VehicleMileageService::class)->assertMaintenanceKilometers(
                 $vehicle,
                 (int) $request->integer('kilometers'),
+                $request->input('maintenance_date'),
             );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return ApiResponse::validation($e->errors());
@@ -271,6 +272,7 @@ class MaintenanceController extends Controller
                 app(VehicleMileageService::class)->assertMaintenanceKilometers(
                     $maintenance->vehicle,
                     (int) $data['kilometers'],
+                    $data['maintenance_date'] ?? $maintenance->maintenance_date,
                     $maintenance,
                 );
             } catch (\Illuminate\Validation\ValidationException $e) {

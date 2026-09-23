@@ -70,7 +70,7 @@ class MaintenanceControllerTest extends TestCase
             'maintenance_type' => 'Revisão 10.000 km',
             'description' => 'Troca de óleo e filtros',
             'workshop_name' => 'Oficina Teste',
-            'maintenance_date' => '2024-01-15',
+            'maintenance_date' => now()->toDateString(),
             'kilometers' => ($vehicle->current_kilometers ?? 0) + 1000,
             'service_category' => 'mechanical',
             'is_manufacturer_required' => true,
