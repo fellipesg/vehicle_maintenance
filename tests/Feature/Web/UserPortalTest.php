@@ -173,6 +173,41 @@ class UserPortalTest extends TestCase
         ]);
     }
 
+    public function test_user_can_create_maintenance_with_kilometers_below_vehicle_odometer(): void
+    {
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 110_000,
+            'odometer_at_registration' => 110_000,
+        ]);
+        $this->user->vehicles()->attach($vehicle->id, [
+            'is_current_owner' => true,
+            'purchase_date' => now(),
+            'tenant_id' => $this->user->tenant_id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->post('/usuario/manutencoes', [
+                'vehicle_id' => $vehicle->id,
+                'maintenance_type' => 'Teste quilometragem antiga',
+                'maintenance_date' => '2026-09-23',
+                'kilometers' => 96_000,
+                'service_category' => 'other',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue($vehicle->maintenances()->where('kilometers', 96_000)->exists());
+        $this->assertSame(110_000, $vehicle->fresh()->current_kilometers);
+    }
+
+    public function test_maintenance_form_does_not_lock_kilometers_input_to_current_odometer(): void
+    {
+        $source = file_get_contents(resource_path('views/partials/maintenance-form.blade.php'));
+
+        $this->assertStringContainsString('kmInput.min = 0;', $source);
+        $this->assertStringNotContainsString('kmInput.min = vehicle.current_kilometers;', $source);
+    }
+
     public function test_user_can_create_maintenance_with_invoice_pdf(): void
     {
         Storage::fake('public');

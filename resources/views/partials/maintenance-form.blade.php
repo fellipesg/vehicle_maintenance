@@ -73,11 +73,11 @@
             return;
         }
 
-        hint.textContent = `Hodômetro atual do veículo: ${new Intl.NumberFormat('pt-BR').format(vehicle.current_kilometers)} km. Informe um valor igual ou maior.`;
+        hint.textContent = `Hodômetro atual do veículo: ${new Intl.NumberFormat('pt-BR').format(vehicle.current_kilometers)} km. Pode registrar manutenções anteriores com km menor.`;
         if (!kmInput.value) {
             kmInput.value = vehicle.current_kilometers;
         }
-        kmInput.min = vehicle.current_kilometers;
+        kmInput.min = 0;
     };
 
     select?.addEventListener('change', syncHint);

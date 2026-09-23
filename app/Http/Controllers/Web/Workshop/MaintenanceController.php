@@ -211,7 +211,6 @@ class MaintenanceController extends Controller
         app(VehicleMileageService::class)->assertMaintenanceKilometers(
             $maintenance->vehicle,
             (int) $data['kilometers'],
-            $maintenance,
         );
 
         $previousDate = $maintenance->maintenance_date?->toDateString();

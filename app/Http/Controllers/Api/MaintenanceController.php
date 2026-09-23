@@ -271,7 +271,6 @@ class MaintenanceController extends Controller
                 app(VehicleMileageService::class)->assertMaintenanceKilometers(
                     $maintenance->vehicle,
                     (int) $data['kilometers'],
-                    $maintenance,
                 );
             } catch (\Illuminate\Validation\ValidationException $e) {
                 return ApiResponse::validation($e->errors());
