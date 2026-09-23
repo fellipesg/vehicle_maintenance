@@ -203,6 +203,8 @@ class VehicleController extends Controller
             $parsed = app(CrlvPdfParser::class)->parseUpload($request->file('crlv'));
             app(CrlvExerciseValidator::class)->assertAcceptable($parsed->exerciseYear);
         } catch (RuntimeException $exception) {
+            $this->reportCrlvFailure($request, $exception, 'user.vehicles.edit');
+
             return redirect()->route('user.vehicles.edit', $vehicle)
                 ->withErrors(['crlv' => $exception->getMessage()]);
         }

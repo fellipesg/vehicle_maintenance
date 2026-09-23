@@ -48,6 +48,8 @@ trait ImportsVehicleFromCrlv
             $parsed = app(CrlvPdfParser::class)->parseUpload($request->file('crlv'));
             app(\App\Services\Crlv\CrlvExerciseValidator::class)->assertAcceptable($parsed->exerciseYear);
         } catch (RuntimeException $exception) {
+            $this->reportCrlvFailure($request, $exception, $this->vehicleCreateRoute());
+
             return redirect()->route($this->vehicleCreateRoute())
                 ->withInput()
                 ->withErrors(['crlv' => $exception->getMessage()]);
@@ -87,6 +89,8 @@ trait ImportsVehicleFromCrlv
             $parsed = app(CrlvPdfParser::class)->parseUpload($request->file('crlv'));
             app(\App\Services\Crlv\CrlvExerciseValidator::class)->assertAcceptable($parsed->exerciseYear);
         } catch (RuntimeException $exception) {
+            $this->reportCrlvFailure($request, $exception, $this->vehicleClaimRoute());
+
             return redirect()->route($this->vehicleClaimRoute())
                 ->withInput()
                 ->withErrors(['crlv' => $exception->getMessage()]);
@@ -109,6 +113,24 @@ trait ImportsVehicleFromCrlv
         $request->session()->put('crlv_mode', 'claim');
 
         return redirect()->route($this->vehicleClaimPreviewRoute());
+    }
+
+    /**
+     * Documento que o leitor não entendeu vira alerta no Sentry e e-mail para
+     * o suporte. Recusa por exercício vencido é erro de quem envia: não avisa.
+     */
+    protected function reportCrlvFailure(Request $request, RuntimeException $exception, string $origin): void
+    {
+        if (! $exception instanceof \App\Services\Crlv\CrlvParseException) {
+            return;
+        }
+
+        app(\App\Services\Crlv\CrlvImportFailureReporter::class)->report(
+            $exception,
+            $request->file('crlv'),
+            $request->user(),
+            $origin,
+        );
     }
 
     /**

@@ -2,11 +2,17 @@
 
 namespace Tests\Feature\Web;
 
+use App\Mail\CrlvImportFailureMail;
 use App\Models\User;
+use App\Services\Crlv\CrlvExerciseValidator;
+use App\Services\Crlv\CrlvParseException;
+use App\Services\Crlv\CrlvPdfParser;
 use Database\Seeders\VehicleCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 class CrlvVehicleImportTest extends TestCase
@@ -341,6 +347,85 @@ class CrlvVehicleImportTest extends TestCase
             $largest,
             "A sessão com o CRLV-e ocupa {$largest} bytes e não cabe em um cookie."
         );
+    }
+
+    /**
+     * CRLV-e que parece válido mas o leitor não entende é layout novo de
+     * DETRAN: o suporte precisa saber para cobrir o modelo.
+     */
+    public function test_unreadable_crlv_alerts_support(): void
+    {
+        Mail::fake();
+
+        $this->mock(CrlvPdfParser::class, function ($parser): void {
+            $parser->shouldReceive('isCrlvDocument')->andReturn(true);
+            $parser->shouldReceive('parseUpload')
+                ->andThrow(new CrlvParseException('Estrutura do CRLV-e não reconhecida.'));
+        });
+
+        $file = UploadedFile::fake()->create('CRLV-e.pdf', 120, 'application/pdf');
+
+        $this->actingAs($this->user)
+            ->from(route('user.vehicles.create'))
+            ->post('/usuario/veiculos/importar-crlv', ['crlv' => $file])
+            ->assertRedirect(route('user.vehicles.create'))
+            ->assertSessionHasErrors('crlv');
+
+        Mail::assertQueued(
+            CrlvImportFailureMail::class,
+            fn (CrlvImportFailureMail $mail) => $mail->hasTo((string) config('legal.support_email'))
+                && $mail->reason === 'Estrutura do CRLV-e não reconhecida.'
+                && $mail->context['arquivo'] === 'CRLV-e.pdf'
+                && $mail->context['usuario_id'] === $this->user->id
+        );
+    }
+
+    /**
+     * Exercício vencido é erro de quem envia, não falha do leitor: avisar o
+     * suporte a cada documento velho só geraria ruído.
+     */
+    public function test_expired_exercise_does_not_alert_support(): void
+    {
+        Mail::fake();
+
+        $this->mock(CrlvExerciseValidator::class, function ($validator): void {
+            $validator->shouldReceive('assertAcceptable')
+                ->andThrow(new RuntimeException('O CRLV-e precisa ser do exercício 2025 ou 2026.'));
+        });
+
+        $file = new UploadedFile(
+            base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
+            'CRLV-e.pdf',
+            'application/pdf',
+            null,
+            true
+        );
+
+        $this->actingAs($this->user)
+            ->from(route('user.vehicles.create'))
+            ->post('/usuario/veiculos/importar-crlv', ['crlv' => $file])
+            ->assertRedirect(route('user.vehicles.create'))
+            ->assertSessionHasErrors('crlv');
+
+        Mail::assertNothingQueued();
+    }
+
+    public function test_support_alert_email_renders(): void
+    {
+        $html = (new CrlvImportFailureMail(
+            reason: 'Estrutura do CRLV-e não reconhecida.',
+            context: [
+                'origem' => 'user.vehicles.create',
+                'arquivo' => 'CRLV-e.pdf',
+                'tamanho_kb' => 120,
+                'usuario_id' => 7,
+                'usuario_email' => null,
+            ],
+        ))->render();
+
+        $this->assertStringContainsString('Estrutura do CRLV-e não reconhecida.', $html);
+        $this->assertStringContainsString('CRLV-e.pdf', $html);
+        $this->assertStringContainsString('Usuario id', $html);
     }
 
     public function test_preview_redirects_without_session(): void
