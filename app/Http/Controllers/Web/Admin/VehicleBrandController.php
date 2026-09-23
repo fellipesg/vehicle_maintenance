@@ -58,7 +58,7 @@ class VehicleBrandController extends Controller
     public function update(Request $request, VehicleBrand $brand): RedirectResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:100', 'unique:vehicle_brands,name,' . $brand->id],
+            'name' => ['required', 'string', 'max:100', 'unique:vehicle_brands,name,'.$brand->id],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 

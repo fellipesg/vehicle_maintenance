@@ -19,7 +19,7 @@ return new class extends Migration
             $table->date('sale_date')->nullable()->comment('Data de venda do veículo');
             $table->boolean('is_current_owner')->default(true)->comment('Se é o proprietário atual');
             $table->timestamps();
-            
+
             $table->unique(['user_id', 'vehicle_id']);
         });
     }
