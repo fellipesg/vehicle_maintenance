@@ -2,6 +2,19 @@
 
 Este guia explica passo a passo como obter as credenciais OAuth do Google para habilitar login social no aplicativo.
 
+O backend usa Laravel Socialite. As rotas envolvidas (ver `routes/api.php` e `config/services.php`):
+
+| Rota | Papel |
+| --- | --- |
+| `GET /api/v1/auth/google/redirect` | Manda o usuário para a tela do Google |
+| `GET /api/v1/auth/google/callback` | Recebe o retorno e emite o token Sanctum |
+
+O mesmo par existe para `facebook` e `twitter` (`FACEBOOK_*` / `TWITTER_*`).
+
+> O Google Cloud Console muda de layout com frequência. Os nomes abaixo refletem o console atual
+> ("APIs e serviços" → "Credenciais" e a seção "Google Auth Platform"); se um menu aparecer com outro
+> nome, procure por "Tela de permissão OAuth" e "Clientes".
+
 ## 📋 Pré-requisitos
 
 - Conta Google (Gmail)
@@ -24,13 +37,13 @@ Este guia explica passo a passo como obter as credenciais OAuth do Google para h
 4. Clique em **"CRIAR"**
 5. Aguarde alguns segundos e selecione o projeto recém-criado
 
-### 3. Ativar a API do Google+
+### 3. Nenhuma API extra para ativar
 
-1. No menu lateral esquerdo, vá em **"APIs e serviços"** → **"Biblioteca"**
-2. Na barra de pesquisa, digite: `Google+ API`
-3. Clique no resultado **"Google+ API"**
-4. Clique no botão **"ATIVAR"**
-5. Aguarde a ativação (pode levar alguns segundos)
+A antiga **Google+ API** foi desativada em 2019 e não existe mais no console. Para "Entrar com o Google"
+(OpenID Connect), **não é preciso ativar API nenhuma**: basta a tela de permissão OAuth e um ID de cliente.
+
+Só ative a **People API** (em "APIs e serviços" → "Biblioteca") se o app for ler dados adicionais do perfil
+além de `openid`, `email` e `profile` — o Socialite não precisa dela para o login usado aqui.
 
 ### 4. Criar Credenciais OAuth 2.0
 
@@ -42,12 +55,12 @@ Este guia explica passo a passo como obter as credenciais OAuth do Google para h
 
 **Se for a primeira vez configurando OAuth neste projeto:**
 
-1. Você será redirecionado para a **"Tela de consentimento OAuth"**
+1. Você será redirecionado para a **"Tela de permissão OAuth"** (em consoles novos: **"Google Auth Platform"** → **"Branding"**)
 2. Selecione **"Externo"** (para desenvolvimento/teste)
 3. Clique em **"CRIAR"**
 4. Preencha os campos obrigatórios:
-   - **Nome do aplicativo**: `Vehicle Maintenance`
-   - **Email de suporte do usuário**: Seu email
+   - **Nome do aplicativo**: `Revisalog`
+   - **Email de suporte do usuário**: `suporte@revisalog.com.br` (ou seu e-mail)
    - **Email de contato do desenvolvedor**: Seu email
 5. Clique em **"SALVAR E CONTINUAR"**
 6. Na próxima tela (Escopos), clique em **"SALVAR E CONTINUAR"**
@@ -60,15 +73,20 @@ Este guia explica passo a passo como obter as credenciais OAuth do Google para h
 2. Clique em **"+ CRIAR CREDENCIAIS"** → **"ID do cliente OAuth 2.0"**
 3. Preencha o formulário:
    - **Tipo de aplicativo**: Selecione **"Aplicativo da Web"**
-   - **Nome**: `Vehicle Maintenance Web Client` (ou outro nome)
-   - **Origens JavaScript autorizadas**: 
-     - `http://localhost:8080` (para desenvolvimento)
-     - `http://127.0.0.1:8080` (para desenvolvimento)
-   - **URIs de redirecionamento autorizados**: 
+   - **Nome**: `Revisalog Web Client` (ou outro nome)
+   - **Origens JavaScript autorizadas**:
+     - `http://localhost:8080` (stack Docker, `make up` — porta `APP_PORT`)
+     - `http://localhost:8000` (sem Docker, `composer run dev`)
+     - `https://revisalog.com.br` (produção)
+   - **URIs de redirecionamento autorizados** — sempre `{APP_URL}/api/v1/auth/google/callback`:
      - `http://localhost:8080/api/v1/auth/google/callback`
-     - `http://127.0.0.1:8080/api/v1/auth/google/callback`
-     - `http://192.168.3.11:8080/api/v1/auth/google/callback` (se usar IP local)
+     - `http://localhost:8000/api/v1/auth/google/callback`
+     - `https://revisalog.com.br/api/v1/auth/google/callback`
 4. Clique em **"CRIAR"**
+
+> A URI de redirecionamento tem que bater **exatamente** com `GOOGLE_REDIRECT_URI` no `.env` (mesmo
+> esquema, host, porta e caminho). Se usar um IP da rede local para testar no celular
+> (`http://192.168.x.x:8080/...`), cadastre esse endereço também.
 
 ### 7. Copiar as Credenciais
 
@@ -80,33 +98,37 @@ Este guia explica passo a passo como obter as credenciais OAuth do Google para h
 
 ### 8. Configurar no Backend
 
-1. Abra o arquivo `.env` do backend:
-   ```bash
-   cd backend
-   # Se estiver usando Docker:
-   docker compose exec app nano .env
-   # Ou edite diretamente: backend/.env
-   ```
+1. Edite o `.env` na raiz deste repositório (as chaves comentadas já estão no `.env.example`).
 
-2. Adicione as seguintes linhas (substitua pelos valores reais):
+2. Preencha as três variáveis (substitua pelos valores reais):
    ```env
    GOOGLE_CLIENT_ID=seu_client_id_aqui.apps.googleusercontent.com
    GOOGLE_CLIENT_SECRET=GOCSPX-seu_client_secret_aqui
    GOOGLE_REDIRECT_URI=http://localhost:8080/api/v1/auth/google/callback
    ```
 
-3. Salve o arquivo
+3. Salve o arquivo. Nunca commite o `.env` nem o client secret.
 
-4. Reinicie o container do backend:
+4. Recarregue a configuração:
    ```bash
+   # Docker (Makefile):
+   make shell   # depois, no container: php artisan config:clear
+   # ou simplesmente:
    docker compose restart app
+
+   # Sem Docker:
+   php artisan config:clear
    ```
+
+5. Em produção (Laravel Cloud) as mesmas variáveis entram no painel do ambiente, com
+   `GOOGLE_REDIRECT_URI=https://revisalog.com.br/api/v1/auth/google/callback`.
 
 ### 9. Testar a Configuração
 
-1. No Flutter app, tente fazer login com Google
+1. No Flutter app, tente fazer login com Google (ou abra `{APP_URL}/api/v1/auth/google/redirect` no navegador)
 2. O navegador deve abrir e mostrar a tela de login do Google
-3. Após autenticar, você será redirecionado de volta
+3. Após autenticar, o Google volta em `/api/v1/auth/google/callback` e a API responde com o token Sanctum
+4. O callback tem rate limit (`throttle:auth`); tentativas repetidas em sequência podem responder 429
 
 ## 🔍 Verificar Credenciais Existentes
 
@@ -137,11 +159,12 @@ Se você já criou credenciais e precisa visualizá-las novamente:
 ### "invalid_client"
 - Verifique se o `GOOGLE_CLIENT_ID` está correto
 - Verifique se o `GOOGLE_CLIENT_SECRET` está correto
-- Certifique-se de que reiniciou o container após alterar o `.env`
+- Certifique-se de que limpou o cache de config (`php artisan config:clear`) ou reiniciou o container após alterar o `.env`
 
 ### "Access blocked: Authorization Error"
-- Verifique se a API "Google+ API" está ativada
+- Com o app em modo **Teste**, só entram as contas listadas em "Usuários de teste" na tela de permissão OAuth
 - Verifique se as credenciais estão configuradas corretamente no `.env`
+- Não procure pela "Google+ API": ela não existe mais e não é necessária
 
 ## 📚 Recursos Adicionais
 

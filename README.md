@@ -13,10 +13,14 @@ Laravel API and web portal for vehicle service history. Mobile client: [vehicle_
 - Provenance strip and filters on vehicle timelines (web and API)
 - Workshops, service categories, and checklists
 - Upload invoices (NF-e XML and DANFE PDF); line items can be applied to a maintenance
-- Import vehicles from CRLV PDFs
+- Import vehicles from a CRLV-e PDF with a preview/confirmation step before saving; unreadable files are reported to Sentry and e-mailed to support
+- Maintenance mileage validated against the service date (floor from the previous record/odometer, ceiling from the next one)
 - Export a history PDF and email it to the owner with invoice files attached (queued job)
 - Web portals for owners, workshops/garages, and catalog admin
-- REST API (`/api/v1`) for the Flutter app (Sanctum)
+- Legal pages (`/termos`, `/privacidade`) and a contact form (`/contato`) with honeypot, throttle and optional Cloudflare Turnstile
+- Account deletion from the app (`DELETE /api/v1/me`): anonymizes the user, revokes tokens/FCM, keeps the maintenance history on the VIN
+- Queued welcome e-mail and internal new-signup alert, on Revisalog-branded transactional templates
+- REST API (`/api/v1`) for the Flutter app (Sanctum, per-token abilities)
 
 ## Stack
 
@@ -24,7 +28,7 @@ Laravel API and web portal for vehicle service history. Mobile client: [vehicle_
 | --- | --- | --- |
 | Runtime | PHP 8.4, Laravel 12 | Laravel Cloud |
 | Database | Postgres 17 (Docker) or SQLite | Neon Postgres |
-| Files | Local disk | Amazon S3 |
+| Files | Local disk | Amazon S3 (optional Cloudflare R2 for vehicle covers) |
 | Queue | `database` driver (`queue:listen`) | Same driver, workers on Cloud |
 | Auth | Sanctum, Socialite | Same |
 | Observability | Log / Telescope (dev) | Sentry |
@@ -121,10 +125,16 @@ Never commit `.env`, AWS keys, or Firebase service-account JSON.
 | `FILESYSTEM_DISK` | `local` or `s3` |
 | `AWS_*` | S3 bucket and credentials |
 | `QUEUE_CONNECTION` | `database` in this project |
-| `MAIL_*` | Machine: `log` only (never Mailpit / local SMTP). Production (Laravel Cloud): `resend` + `RESEND_API_KEY`. From `noreply@revisalog.com.br`, reply-to `suporte@revisalog.com.br` |
+| `MAIL_*` | Machine: `log` only (never Mailpit / local SMTP). Production (Laravel Cloud): `resend` + `RESEND_API_KEY`. From `noreply@revisalog.com.br`, reply-to `suporte@revisalog.com.br` (`MAIL_SUPPORT_ADDRESS` also receives contact-form and CRLV-failure mail) |
 | `SENTRY_DSN` | Exception reporting |
-| `GOOGLE_*` / `FACEBOOK_*` / `TWITTER_*` | Socialite |
-| Firebase | Service account for FCM (not in git) |
+| `GOOGLE_*` / `FACEBOOK_*` / `TWITTER_*` | Socialite (`*_CLIENT_ID`, `*_CLIENT_SECRET`, `*_REDIRECT_URI` — see [OAUTH_SETUP.md](OAUTH_SETUP.md)) |
+| Firebase | `FIREBASE_CREDENTIALS_PATH` locally, `FIREBASE_CREDENTIALS_BASE64` on Cloud. Service account never in git |
+| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Captcha on `/contato`. Empty: captcha off, honeypot + throttle stay on |
+| `LEGAL_COMPANY_NAME` / `LEGAL_COMPANY_CNPJ` | Footer © line, once the company exists |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated. Empty: `*` locally, only `APP_URL` in production. Credentials are enabled whenever the list is not `*` |
+| `API_DOCS_ENABLED` / `API_DOCS_USERNAME` / `API_DOCS_PASSWORD` | Scramble docs at `/docs/api`. Basic Auth required in production (404 there when unset) |
+| `VEHICLE_COVERS_DISK` / `R2_*` | Optional Cloudflare R2 disk for vehicle covers |
+| `DB_QUEUE_RETRY_AFTER` | Must exceed the longest job timeout (PDF job: 300s) |
 
 ## Tests
 
@@ -136,24 +146,34 @@ php artisan test
 
 Docker: `make test` (SQLite) or `make test-pgsql` (Postgres, closer to production).
 
-Coverage includes invoice parsers, CRLV import, ownership, portals, and Postgres boolean binding.
+Current state: 463 passing, 2 skipped. The two skipped ones are the Flutter launcher-icon checks in `tests/Unit/BrandAppIconCropTest.php`; they only run when the mobile repo is checked out as a sibling `frontend/` directory next to this one.
+
+Coverage includes invoice parsers, CRLV import and preview, mileage validation, portal authorization, CORS and API-docs access, contact form, account deletion, and Postgres boolean binding.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push to `main` and on every pull request, twice — SQLite and Postgres 17 — plus `vendor/bin/pint --test` in a separate job. Pint currently fails on 15 pre-existing files, so that job is red until they are formatted.
 
 ## API (overview)
 
-Prefix: `/api/v1`. Authenticated routes use Sanctum (`Authorization: Bearer …`) and tenant middleware.
+Prefix: `/api/v1`. Authenticated routes use Sanctum (`Authorization: Bearer …`), the `tenant` middleware and per-token abilities (`vehicles:read`, `maintenances:write`, `profile:write`, …). Full list: `php artisan route:list --except-vendor --path=api`, or the OpenAPI docs at `/docs/api`.
 
 | Area | Examples |
 | --- | --- |
-| Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me`, OAuth redirect/callback |
-| Vehicles | CRUD, `GET /my-vehicles`, `GET /vehicles/{id}/maintenances`, `GET /vehicles/{id}/plates`, `GET /vehicles/{id}/export-pdf` |
-| Search | `GET /vehicles/search/{identifier}` (plate, RENAVAM, or chassis); `matched_by` in responses; `?verified=1|0` on maintenance lists |
+| Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me`, `GET /auth/{provider}/redirect` + `/callback` |
+| Two-factor | `POST /two-factor/challenge` (public), `enable` / `confirm` / `disable` / `recovery-codes` (authenticated) |
+| Profile | `PUT /me`, `POST /me/avatar`, `DELETE /me` (anonymizes the account, keeps the VIN history) |
+| Vehicles | CRUD, `GET /my-vehicles` (ETag), `GET /vehicles/{id}/maintenances`, `GET /vehicles/{id}/plates`, `GET /vehicles/{id}/timeline`, `POST /vehicles/{id}/cover`, `POST /vehicles/{id}/link` |
+| PDF export | `POST /vehicles/{id}/export-pdf` → `GET /vehicle-pdf-exports/{id}` (poll) → `GET /vehicle-pdf-exports/{id}/download` |
+| Search | `GET /vehicles/search/{identifier}` (plate, RENAVAM, or chassis); `matched_by` in responses; `?verified=1` / `?verified=0` on maintenance lists |
 | Verification | `GET /v/{code}` (web) — public maintenance seal page |
-| Maintenances | CRUD |
+| Maintenances | CRUD + photo upload/delete on `/maintenances/{id}/photos` |
 | Invoices | upload / download / delete |
-| Workshops | public list + authenticated write |
+| Workshops | public list/show + authenticated write, plus `workshops/{id}/message-templates` and `workshops/{id}/warranty-templates` |
+| Legal | `GET /legal/terms-of-use`, `GET /legal/privacy-policy` (public) |
 | FCM | token register / list / delete |
 
-Web (Blade): owner portal, workshop/garage flows, admin brand/model catalog. See `routes/web.php`.
+Rate limits (`app/Providers/AppServiceProvider.php`): `auth` on login/register/OAuth callback, `api` 60/min per user or IP, `search` 20/min per IP, `uploads` 10/min, `two-factor` 5 tries per challenge plus a per-IP cap, `contact` 5/min per IP.
+
+Web (Blade): owner portal, workshop/garage flows, admin brand/model catalog, legal pages and contact form. See `routes/web.php`.
 
 ## Screenshots
 
@@ -171,14 +191,21 @@ Web (Blade): owner portal, workshop/garage flows, admin brand/model catalog. See
 ```
 app/
   Http/Controllers/Api/    REST
-  Http/Controllers/Web/    Blade portals
+  Http/Controllers/Web/    Blade portals (User, Garage, Workshop, Admin, Legal, Contact)
   Jobs/                    EmailVehicleMaintenancePdf
-  Services/                Invoice, CRLV, ownership, PDF export
+  Events/ Listeners/       UserRegistered → welcome mail, ops alert, welcome push
+  Mail/ Notifications/     Transactional mail and database/FCM notifications
+  Policies/                Vehicle, Maintenance, Invoice, Workshop authorization
+  Services/                Crlv, Invoice, Maintenance, User, Vehicle, Workshop, Geo
+  Support/                 AppStorage, Firebase credentials, plate search helpers
   Database/                PostgresConnection (boolean binding)
+config/                    legal.php (terms/privacy copy), cors.php, maintenance_intervals.php
 database/migrations/
-resources/views/
-routes/api.php
+resources/views/           portals, legal/, emails/, vendor/mail/ (Revisalog chrome)
+routes/api.php             + routes/api-two-factor.php
 routes/web.php
+docker/                    nginx, php (+ xdebug), postgres init
+.ai/rules/                 committed rules; read .ai/rules/index.md before editing
 tests/
 ```
 
@@ -190,6 +217,12 @@ composer run dev      # serve + queue + vite + logs
 composer run test
 vendor/bin/pint       # code style
 ```
+
+## More docs
+
+- [OAUTH_SETUP.md](OAUTH_SETUP.md) — Google/Socialite credentials and callback URLs
+- [docs/qa-api-handoff.md](docs/qa-api-handoff.md) — API and portal test guide for QA (no credentials in the file)
+- [AGENTS.md](AGENTS.md) and `.ai/rules/` — conventions and committed rules for coding agents
 
 ## License
 
