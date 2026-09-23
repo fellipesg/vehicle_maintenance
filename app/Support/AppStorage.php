@@ -19,6 +19,8 @@ class AppStorage
 
     public const MAINTENANCE_PHOTOS_PREFIX = 'maintenance-photos/';
 
+    public const BLOG_COVERS_PREFIX = 'blog-covers/';
+
     public const BRAND_PREFIX = 'brand/revisalog/';
 
     public const LANDING_PREFIX = 'landing/';
@@ -61,6 +63,11 @@ class AppStorage
         return str_starts_with($storagePath, self::WORKSHOP_LOGOS_PREFIX);
     }
 
+    public static function isBlogCoverPath(string $storagePath): bool
+    {
+        return str_starts_with($storagePath, self::BLOG_COVERS_PREFIX);
+    }
+
     public static function isBrandPath(string $storagePath): bool
     {
         return str_starts_with($storagePath, self::BRAND_PREFIX);
@@ -75,6 +82,7 @@ class AppStorage
     {
         return self::isCoverPath($storagePath)
             || self::isWorkshopLogoPath($storagePath)
+            || self::isBlogCoverPath($storagePath)
             || self::isBrandPath($storagePath)
             || self::isLandingPath($storagePath);
     }
@@ -103,6 +111,7 @@ class AppStorage
     {
         return self::isCoverPath($storagePath)
             || self::isWorkshopLogoPath($storagePath)
+            || self::isBlogCoverPath($storagePath)
             || self::isBrandPath($storagePath)
             || self::isLandingPath($storagePath);
     }

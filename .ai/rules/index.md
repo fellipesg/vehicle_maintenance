@@ -7,6 +7,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/admin/maintenances/**,resources/views/admin/vehicles/show.blade.php | .ai/rules/admin-vehicles.md |
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
 | app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
+| app/Http/Controllers/Web/BlogController.php,app/Http/Controllers/Web/Admin/BlogPostController.php,app/Models/BlogPost.php,resources/views/blog/**,resources/views/admin/blog/** | .ai/rules/blog.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
 | config/legal.php, config/mail.php | .ai/rules/config.md |
 | app/Jobs/** | .ai/rules/jobs.md |

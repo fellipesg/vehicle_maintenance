@@ -18,6 +18,7 @@
                 <a href="{{ route('home') }}#recursos" class="hover:text-wrench-700">Recursos</a>
                 <a href="{{ route('home') }}#telas" class="hover:text-wrench-700">Telas</a>
                 <a href="{{ route('home') }}#preco" class="hover:text-wrench-700">Preço</a>
+                <a href="{{ route('blog.index') }}" class="hover:text-wrench-700">Blog</a>
             </nav>
             <nav class="flex flex-col gap-2 text-xs" aria-label="Conta">
                 <p class="font-semibold uppercase tracking-wide text-automotive-800">Conta</p>

@@ -80,6 +80,78 @@
         @apply border border-automotive-400/40 bg-automotive-200/80 text-automotive-700;
     }
 
+    .blog-content {
+        @apply text-base leading-relaxed text-automotive-700;
+    }
+
+    .blog-content > * + * {
+        @apply mt-4;
+    }
+
+    .blog-content h2 {
+        @apply mt-10 text-2xl font-bold text-automotive-900;
+    }
+
+    .blog-content h3 {
+        @apply mt-8 text-xl font-semibold text-automotive-900;
+    }
+
+    .blog-content h4 {
+        @apply mt-6 text-lg font-semibold text-automotive-900;
+    }
+
+    .blog-content a {
+        @apply font-medium text-wrench-700 underline underline-offset-2 hover:text-wrench-600;
+    }
+
+    .blog-content strong {
+        @apply font-semibold text-automotive-900;
+    }
+
+    .blog-content ul {
+        @apply list-disc space-y-2 pl-6;
+    }
+
+    .blog-content ol {
+        @apply list-decimal space-y-2 pl-6;
+    }
+
+    .blog-content blockquote {
+        @apply border-l-4 border-wrench-500 bg-automotive-50 px-4 py-3 italic text-automotive-700;
+    }
+
+    .blog-content img {
+        @apply w-full rounded-xl border border-automotive-200 shadow-sm;
+    }
+
+    .blog-content code {
+        @apply rounded bg-automotive-100 px-1.5 py-0.5 text-sm text-automotive-800;
+    }
+
+    .blog-content pre {
+        @apply overflow-x-auto rounded-lg bg-automotive-950 p-4 text-sm text-automotive-100;
+    }
+
+    .blog-content pre code {
+        @apply bg-transparent p-0 text-automotive-100;
+    }
+
+    .blog-content hr {
+        @apply my-8 border-automotive-200;
+    }
+
+    .blog-content table {
+        @apply w-full border-collapse overflow-hidden rounded-lg border border-automotive-200 text-sm;
+    }
+
+    .blog-content th {
+        @apply border-b border-automotive-200 bg-automotive-50 px-3 py-2 text-left font-semibold text-automotive-800;
+    }
+
+    .blog-content td {
+        @apply border-b border-automotive-100 px-3 py-2;
+    }
+
     .stat-card {
         @apply min-w-0 overflow-hidden rounded-xl border border-automotive-200 bg-gradient-to-br from-white to-automotive-100/60 p-5 shadow-sm;
     }
