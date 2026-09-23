@@ -34,24 +34,19 @@ class CrlvImportFailureReporter
     }
 
     /**
+     * O handler da aplicação já entrega exceções reportadas ao Sentry
+     * (Integration::handles, em bootstrap/app.php).
+     *
      * @param  array<string, mixed>  $context
      */
     private function captureOnSentry(Throwable $exception, array $context): void
     {
-        if (! app()->bound('sentry')) {
-            return;
-        }
-
         try {
-            \Sentry\withScope(function (\Sentry\State\Scope $scope) use ($exception, $context): void {
-                $scope->setContext('crlv', $context);
-                $scope->setTag('crlv.import', 'parse_failure');
-
-                \Sentry\captureException($exception);
-            });
-        } catch (Throwable $sentryFailure) {
-            Log::warning('Falha ao enviar erro de CRLV-e ao Sentry.', [
-                'erro' => $sentryFailure->getMessage(),
+            report($exception);
+            Log::warning('CRLV-e não lido.', $context);
+        } catch (Throwable $reportFailure) {
+            Log::warning('Falha ao reportar erro de CRLV-e.', [
+                'erro' => $reportFailure->getMessage(),
             ]);
         }
     }

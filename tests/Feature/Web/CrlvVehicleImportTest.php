@@ -10,6 +10,7 @@ use App\Services\Crlv\CrlvPdfParser;
 use Database\Seeders\VehicleCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -356,6 +357,7 @@ class CrlvVehicleImportTest extends TestCase
     public function test_unreadable_crlv_alerts_support(): void
     {
         Mail::fake();
+        Exceptions::fake();
 
         $this->mock(CrlvPdfParser::class, function ($parser): void {
             $parser->shouldReceive('isCrlvDocument')->andReturn(true);
@@ -370,6 +372,9 @@ class CrlvVehicleImportTest extends TestCase
             ->post('/usuario/veiculos/importar-crlv', ['crlv' => $file])
             ->assertRedirect(route('user.vehicles.create'))
             ->assertSessionHasErrors('crlv');
+
+        // Exceção reportada é o que o handler entrega ao Sentry.
+        Exceptions::assertReported(CrlvParseException::class);
 
         Mail::assertQueued(
             CrlvImportFailureMail::class,
@@ -387,6 +392,7 @@ class CrlvVehicleImportTest extends TestCase
     public function test_expired_exercise_does_not_alert_support(): void
     {
         Mail::fake();
+        Exceptions::fake();
 
         $this->mock(CrlvExerciseValidator::class, function ($validator): void {
             $validator->shouldReceive('assertAcceptable')
@@ -407,6 +413,7 @@ class CrlvVehicleImportTest extends TestCase
             ->assertRedirect(route('user.vehicles.create'))
             ->assertSessionHasErrors('crlv');
 
+        Exceptions::assertNothingReported();
         Mail::assertNothingQueued();
     }
 
