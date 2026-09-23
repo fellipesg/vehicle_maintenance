@@ -40,7 +40,7 @@ class VehicleMileageTest extends TestCase
         $this->postJson('/api/v1/maintenances', [
             'vehicle_id' => $vehicle->id,
             'maintenance_type' => 'Revisão',
-            'maintenance_date' => '2024-06-01',
+            'maintenance_date' => now()->toDateString(),
             'kilometers' => 52000,
             'service_category' => 'mechanical',
         ])->assertCreated();
@@ -61,11 +61,97 @@ class VehicleMileageTest extends TestCase
         $this->postJson('/api/v1/maintenances', [
             'vehicle_id' => $vehicle->id,
             'maintenance_type' => 'Revisão',
-            'maintenance_date' => '2024-06-01',
+            'maintenance_date' => now()->toDateString(),
             'kilometers' => 79000,
             'service_category' => 'mechanical',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['kilometers']);
+    }
+
+    public function test_maintenance_before_vehicle_registration_accepts_lower_kilometers(): void
+    {
+        $user = $this->actingAsApiUser();
+
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 77_000,
+            'odometer_at_registration' => 77_000,
+        ]);
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Troca de óleo',
+            'maintenance_date' => now()->subMonths(2)->toDateString(),
+            'kilometers' => 75_600,
+            'service_category' => 'mechanical',
+        ])->assertCreated();
+
+        $this->assertSame(77_000, $vehicle->fresh()->current_kilometers);
+    }
+
+    public function test_maintenance_before_vehicle_registration_cannot_exceed_registration_kilometers(): void
+    {
+        $user = $this->actingAsApiUser();
+
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 77_000,
+            'odometer_at_registration' => 77_000,
+        ]);
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Troca de óleo',
+            'maintenance_date' => now()->subMonths(2)->toDateString(),
+            'kilometers' => 80_000,
+            'service_category' => 'mechanical',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['kilometers']);
+    }
+
+    public function test_historical_maintenance_must_respect_neighbour_records(): void
+    {
+        $user = $this->actingAsApiUser();
+
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 77_000,
+            'odometer_at_registration' => 77_000,
+        ]);
+        $this->attachVehicleToUser($user, $vehicle);
+
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'kilometers' => 60_000,
+            'maintenance_date' => now()->subMonths(6)->toDateString(),
+        ]);
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão anterior',
+            'maintenance_date' => now()->subMonths(3)->toDateString(),
+            'kilometers' => 55_000,
+            'service_category' => 'mechanical',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['kilometers']);
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão mais antiga',
+            'maintenance_date' => now()->subMonths(9)->toDateString(),
+            'kilometers' => 65_000,
+            'service_category' => 'mechanical',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['kilometers']);
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão intermediária',
+            'maintenance_date' => now()->subMonths(3)->toDateString(),
+            'kilometers' => 70_000,
+            'service_category' => 'mechanical',
+        ])->assertCreated();
     }
 
     public function test_vehicle_timeline_endpoint_returns_events(): void

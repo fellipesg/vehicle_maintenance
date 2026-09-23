@@ -55,25 +55,46 @@
     </div>
 </div>
 
+@php
+    $vehicleKilometerOptions = $vehicles->map(fn ($vehicle) => [
+        'id' => $vehicle->id,
+        'current_kilometers' => $vehicle->current_kilometers,
+        'registration_kilometers' => $vehicle->odometer_at_registration ?? $vehicle->current_kilometers,
+        'registered_on' => $vehicle->created_at?->toDateString(),
+    ])->values();
+@endphp
+
 @push('scripts')
 <script>
 (() => {
-    const vehicles = @json($vehicles->map(fn ($vehicle) => [
-        'id' => $vehicle->id,
-        'current_kilometers' => $vehicle->current_kilometers,
-    ])->values());
+    const vehicles = @json($vehicleKilometerOptions);
     const select = document.getElementById('vehicle_id');
+    const dateInput = document.getElementById('maintenance_date');
     const kmInput = document.getElementById('kilometers');
     const hint = document.getElementById('kilometers-hint');
+    const formatKm = (value) => new Intl.NumberFormat('pt-BR').format(value);
+    const formatDate = (value) => value.split('-').reverse().join('/');
 
     const syncHint = () => {
         const vehicle = vehicles.find((item) => String(item.id) === String(select.value));
+        kmInput.max = 9999999;
+
         if (!vehicle || vehicle.current_kilometers == null) {
             hint.textContent = 'Informe a quilometragem do hodômetro nesta manutenção.';
+            kmInput.min = 0;
             return;
         }
 
-        hint.textContent = `Hodômetro atual do veículo: ${new Intl.NumberFormat('pt-BR').format(vehicle.current_kilometers)} km. Informe um valor igual ou maior.`;
+        const isBeforeRegistration = vehicle.registered_on && dateInput?.value && dateInput.value < vehicle.registered_on;
+
+        if (isBeforeRegistration) {
+            hint.textContent = `Manutenção anterior ao cadastro do veículo (${formatDate(vehicle.registered_on)}). Informe a quilometragem da época, no máximo ${formatKm(vehicle.registration_kilometers)} km.`;
+            kmInput.min = 0;
+            kmInput.max = vehicle.registration_kilometers;
+            return;
+        }
+
+        hint.textContent = `Hodômetro atual do veículo: ${formatKm(vehicle.current_kilometers)} km. Informe um valor igual ou maior.`;
         if (!kmInput.value) {
             kmInput.value = vehicle.current_kilometers;
         }
@@ -81,6 +102,8 @@
     };
 
     select?.addEventListener('change', syncHint);
+    dateInput?.addEventListener('change', syncHint);
+    dateInput?.addEventListener('input', syncHint);
     syncHint();
 })();
 </script>

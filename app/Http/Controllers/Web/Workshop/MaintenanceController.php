@@ -114,6 +114,7 @@ class MaintenanceController extends Controller
         app(VehicleMileageService::class)->assertMaintenanceKilometers(
             $vehicle,
             (int) $data['kilometers'],
+            $data['maintenance_date'],
         );
 
         $maintenanceData = [
@@ -211,6 +212,7 @@ class MaintenanceController extends Controller
         app(VehicleMileageService::class)->assertMaintenanceKilometers(
             $maintenance->vehicle,
             (int) $data['kilometers'],
+            $data['maintenance_date'],
             $maintenance,
         );
 
