@@ -45,6 +45,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me'])->middleware('ability:profile:read');
         Route::put('/me', [ProfileController::class, 'update'])->middleware('ability:profile:write');
+        Route::delete('/me', [ProfileController::class, 'destroy'])->middleware('ability:profile:write');
         Route::post('/me/avatar', [ProfileController::class, 'uploadAvatar'])->middleware(['ability:profile:write', 'throttle:uploads']);
 
         // User's vehicles (vehicles owned by authenticated user)

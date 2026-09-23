@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\UpdateProfileRequest;
 use App\Http\Requests\Api\V1\UploadAvatarRequest;
 use App\Http\Resources\Api\V1\UserResource;
+use App\Services\User\DeleteUserAccount;
 use App\Support\ApiResponse;
 use App\Support\AppStorage;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 #[Group('Profile', weight: 15)]
 class ProfileController extends Controller
@@ -42,6 +44,19 @@ class ProfileController extends Controller
         $user->load('currentVehicles');
 
         return ApiResponse::success(new UserResource($user->fresh()->load('currentVehicles')), 'Avatar uploaded successfully');
+    }
+
+    /**
+     * Delete the authenticated account and associated personal data.
+     *
+     * Vehicle maintenance history remains attached to the chassis/VIN.
+     */
+    #[Endpoint(title: 'Delete account')]
+    public function destroy(Request $request, DeleteUserAccount $deleteUserAccount): JsonResponse
+    {
+        $deleteUserAccount->handle($request->user());
+
+        return ApiResponse::success(message: 'Account deleted successfully');
     }
 
     private function deleteStoredAvatar(?string $avatar): void

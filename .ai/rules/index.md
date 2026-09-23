@@ -26,6 +26,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Support/DemoWorkshopLogoGenerator.php | .ai/rules/support.md |
 | resources/css/provenance.css,frontend/lib/theme/provenance.dart | .ai/rules/theme.md |
 | frontend/lib/views/vehicles/**,resources/views/user/vehicles/** | .ai/rules/user-vehicles.md |
+| app/Services/User/** | .ai/rules/user.md |
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |
 | app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
 | frontend/lib/views/vehicles/** | .ai/rules/vehicles.md |

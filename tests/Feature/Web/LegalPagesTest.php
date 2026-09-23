@@ -22,6 +22,7 @@ class LegalPagesTest extends TestCase
             ->assertOk()
             ->assertSee('Política de privacidade')
             ->assertSee('Lei Geral de Proteção de Dados')
+            ->assertSee('Excluir conta')
             ->assertSee((string) config('legal.support_email'));
     }
 
