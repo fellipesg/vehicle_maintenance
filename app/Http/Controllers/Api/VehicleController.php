@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\LinkVehicleRequest;
 use App\Http\Requests\Api\V1\StoreVehicleRequest;
 use App\Http\Requests\Api\V1\UpdateVehicleRequest;
 use App\Http\Requests\Api\V1\UploadVehicleCoverRequest;
@@ -16,6 +17,7 @@ use App\Http\Resources\Api\V1\VehicleResource;
 use App\Models\Vehicle;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Vehicle\VehicleOwnershipService;
 use App\Services\Vehicle\VehiclePdfExportService;
 use App\Services\Vehicle\VehiclePlateHistoryService;
 use App\Services\Vehicle\VehicleTimelineBuilder;
@@ -29,6 +31,7 @@ use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 #[Group('Vehicles', weight: 10)]
 class VehicleController extends Controller
@@ -326,10 +329,28 @@ class VehicleController extends Controller
         );
     }
 
-    public function linkToUser(Request $request, string $id): JsonResponse
+    #[Endpoint(
+        title: 'Link vehicle to the authenticated user',
+        description: 'Claims a vehicle that has no current owner. Requires the plate and RENAVAM '.
+            'printed on the vehicle document as proof; they must match the stored vehicle. '.
+            'Ownership claimed this way is not marked as verified — only a CRLV-e import verifies it.',
+    )]
+    public function linkToUser(LinkVehicleRequest $request, string $id, VehicleOwnershipService $ownership): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
         Gate::authorize('link', $vehicle);
+
+        if (! $request->alreadyCurrentOwner() && ! $ownership->documentMatchesVehicle(
+            $vehicle,
+            (string) $request->input('license_plate'),
+            (string) $request->input('renavam'),
+        )) {
+            // One generic message: telling which field failed would let a caller
+            // brute-force the plate and the RENAVAM independently.
+            throw ValidationException::withMessages([
+                'license_plate' => 'A placa e o RENAVAM informados não conferem com o veículo.',
+            ]);
+        }
 
         $user = $request->user();
 

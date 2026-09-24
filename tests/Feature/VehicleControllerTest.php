@@ -175,8 +175,89 @@ class VehicleControllerTest extends TestCase
         $vehicle = Vehicle::factory()->create();
         $this->attachVehicleToUser($otherUser, $vehicle);
 
+        $this->postJson("/api/v1/vehicles/{$vehicle->id}/link", [
+            'license_plate' => $vehicle->license_plate,
+            'renavam' => $vehicle->renavam,
+        ])->assertForbidden();
+    }
+
+    public function test_can_link_unowned_vehicle_with_matching_document(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create([
+            'license_plate' => 'ABC1D23',
+            'renavam' => '12345678901',
+        ]);
+
+        $this->postJson("/api/v1/vehicles/{$vehicle->id}/link", [
+            'license_plate' => 'abc-1d23',
+            'renavam' => '123.456.789-01',
+        ])->assertOk();
+
+        $pivot = $user->vehicles()->where('vehicle_id', $vehicle->id)->first()->pivot;
+        $this->assertTrue((bool) $pivot->is_current_owner);
+        $this->assertSame($user->tenant_id, $pivot->tenant_id);
+        $this->assertNull($pivot->ownership_verified_at, 'Only a CRLV-e import may verify ownership.');
+    }
+
+    public function test_cannot_link_unowned_vehicle_without_the_document_fields(): void
+    {
+        $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+
         $this->postJson("/api/v1/vehicles/{$vehicle->id}/link")
-            ->assertForbidden();
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['license_plate', 'renavam']);
+
+        $this->assertDatabaseMissing('user_vehicles', ['vehicle_id' => $vehicle->id]);
+    }
+
+    public function test_cannot_link_unowned_vehicle_by_guessing_the_id(): void
+    {
+        $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create([
+            'license_plate' => 'ABC1D23',
+            'renavam' => '12345678901',
+        ]);
+
+        $this->postJson("/api/v1/vehicles/{$vehicle->id}/link", [
+            'license_plate' => 'ABC1D23',
+            'renavam' => '99999999999',
+        ])->assertStatus(422);
+
+        $this->postJson("/api/v1/vehicles/{$vehicle->id}/link", [
+            'license_plate' => 'XYZ9K88',
+            'renavam' => '12345678901',
+        ])->assertStatus(422);
+
+        $this->assertDatabaseMissing('user_vehicles', ['vehicle_id' => $vehicle->id]);
+    }
+
+    public function test_current_owner_can_relink_without_resending_the_document(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $this->postJson("/api/v1/vehicles/{$vehicle->id}/link")->assertOk();
+    }
+
+    public function test_link_attempts_are_rate_limited(): void
+    {
+        $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $this->postJson("/api/v1/vehicles/{$vehicle->id}/link", [
+                'license_plate' => 'XYZ9K88',
+                'renavam' => '99999999999',
+            ])->assertStatus(422);
+        }
+
+        $this->postJson("/api/v1/vehicles/{$vehicle->id}/link", [
+            'license_plate' => 'XYZ9K88',
+            'renavam' => '99999999999',
+        ])->assertStatus(429);
     }
 
     public function test_cannot_show_nonexistent_vehicle(): void

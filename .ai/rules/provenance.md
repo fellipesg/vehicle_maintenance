@@ -5,6 +5,8 @@ paths:
 
 # Provenance
 
+> Flutter app (`vehicle_maintenance_frontend`), not this repository. Paths are relative to a sibling `frontend/` checkout. The Blade/CSS side of the same contract is in `.ai/rules/theme.md`.
+
 ## Flutter strip: dots only, no count caption
 ProvenanceStrip on vehicle detail shows only the teal/amber dots (plus overflow +N). Do not render the visible caption "N com selo · M declarada(s)" — counts stay in Semantics for a11y. Filters Todas/Selo/Declaradas sit below the timeline, not next to the strip.
 
