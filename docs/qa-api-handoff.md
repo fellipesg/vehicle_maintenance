@@ -121,6 +121,7 @@ Listagens paginadas: `page` (default 1) e `per_page` (default 15, máx. 100).
 | Placas do veículo | GET | `/vehicles/{id}/plates` | Sim |
 | Manutenções do veículo | GET | `/vehicles/{id}/maintenances` | Sim |
 | Timeline (km) | GET | `/vehicles/{id}/timeline` | Sim |
+| Vincular veículo | POST | `/vehicles/{id}/link` | Sim |
 | Listar manutenções | GET | `/maintenances?page=1&per_page=15` | Sim |
 | Detalhe manutenção | GET | `/maintenances/{id}` | Sim |
 | Fotos da manutenção | POST/DELETE | `/maintenances/{id}/photos[/{photo}]` | Sim |
@@ -130,6 +131,18 @@ Listagens paginadas: `page` (default 1) e `per_page` (default 15, máx. 100).
 | Política de privacidade | GET | `/legal/privacy-policy` | Não |
 | Catálogo marcas | GET | `/vehicle-catalog/brands` | Não |
 | Catálogo modelos | GET | `/vehicle-catalog/models` | Não |
+
+### Vincular veículo (`POST /vehicles/{id}/link`)
+
+Só aceita veículo **sem dono atual** em outro tenant. Exige `license_plate` e `renavam` como constam no documento do veículo; ambos precisam bater com o cadastro. Casos de teste:
+
+- placa e RENAVAM corretos (aceita qualquer formatação, `abc-1d23` e `123.456.789-01`) → **200**;
+- um dos dois errado → **422** com mensagem genérica (não revela qual campo falhou);
+- sem os campos → **422**;
+- veículo com dono em outro tenant → **403**;
+- mais de 10 tentativas por minuto → **429**.
+
+O vínculo feito assim **não** marca a posse como verificada: só a importação de CRLV-e faz isso.
 
 Lista completa e sempre atualizada: `/docs/api` (Swagger) ou, no repositório, `php artisan route:list --except-vendor --path=api`.
 

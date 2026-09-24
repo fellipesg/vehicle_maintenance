@@ -161,7 +161,7 @@ Prefix: `/api/v1`. Authenticated routes use Sanctum (`Authorization: Bearer …`
 | Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me`, `GET /auth/{provider}/redirect` + `/callback` |
 | Two-factor | `POST /two-factor/challenge` (public), `enable` / `confirm` / `disable` / `recovery-codes` (authenticated) |
 | Profile | `PUT /me`, `POST /me/avatar`, `DELETE /me` (anonymizes the account, keeps the VIN history) |
-| Vehicles | CRUD, `GET /my-vehicles` (ETag), `GET /vehicles/{id}/maintenances`, `GET /vehicles/{id}/plates`, `GET /vehicles/{id}/timeline`, `POST /vehicles/{id}/cover`, `POST /vehicles/{id}/link` |
+| Vehicles | CRUD, `GET /my-vehicles` (ETag), `GET /vehicles/{id}/maintenances`, `GET /vehicles/{id}/plates`, `GET /vehicles/{id}/timeline`, `POST /vehicles/{id}/cover`, `POST /vehicles/{id}/link` (claim an unowned vehicle; requires `license_plate` + `renavam` from the vehicle document, 10 attempts/min) |
 | PDF export | `POST /vehicles/{id}/export-pdf` → `GET /vehicle-pdf-exports/{id}` (poll) → `GET /vehicle-pdf-exports/{id}/download` |
 | Search | `GET /vehicles/search/{identifier}` (plate, RENAVAM, or chassis); `matched_by` in responses; `?verified=1` / `?verified=0` on maintenance lists |
 | Verification | `GET /v/{code}` (web) — public maintenance seal page |
