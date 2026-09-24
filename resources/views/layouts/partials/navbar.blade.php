@@ -69,6 +69,7 @@
                     <a href="#telas" class="text-sm text-automotive-300 hover:text-wrench-400 max-lg:hidden">Telas</a>
                     <a href="#preco" class="text-sm text-automotive-300 hover:text-wrench-400 max-md:hidden">Preço</a>
                 @endif
+                <a href="{{ route('blog.index') }}" class="text-sm text-automotive-300 hover:text-wrench-400 max-md:hidden">Blog</a>
                 <a href="{{ route('login') }}" class="text-sm text-automotive-300 hover:text-wrench-400">Entrar</a>
                 <a href="{{ route('register') }}" class="btn-primary !py-1.5 !text-xs">Cadastrar</a>
             @endauth

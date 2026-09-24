@@ -497,6 +497,13 @@
                 O site já funciona no celular. O app nativo usa o mesmo histórico. Ainda não publicamos links de loja — o cadastro abre no navegador.
             </x-landing.faq-item>
         </div>
+
+        <div class="mt-10 rounded-xl border border-automotive-200 bg-automotive-50 p-6 text-center">
+            <p class="text-automotive-700">
+                Ficou com outra dúvida? No blog escrevemos sobre manutenção, documentação e o que pesa na hora de vender o carro.
+            </p>
+            <a href="{{ route('blog.index') }}" class="btn-secondary mt-4">Ir para o blog</a>
+        </div>
     </div>
 </section>
 

@@ -64,6 +64,28 @@
     </div>
 
     <div>
+        <p class="mb-2 px-3 text-[0.65rem] font-semibold uppercase tracking-wider text-automotive-500">Conteúdo</p>
+        <ul class="space-y-0.5">
+            <li>
+                <a
+                    href="{{ route('admin.blog.index') }}"
+                    class="{{ $itemClass(request()->routeIs('admin.blog.index') || request()->routeIs('admin.blog.create') || request()->routeIs('admin.blog.edit')) }}"
+                >
+                    Blog
+                </a>
+            </li>
+            <li>
+                <a
+                    href="{{ route('admin.blog.categories.index') }}"
+                    class="{{ $itemClass(request()->routeIs('admin.blog.categories.*')) }}"
+                >
+                    Categorias
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div>
         <p class="mb-2 px-3 text-[0.65rem] font-semibold uppercase tracking-wider text-automotive-500">Catálogo</p>
         <ul class="space-y-0.5">
             <li>

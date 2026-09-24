@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryController;
+use App\Http\Controllers\Web\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Web\Admin\MaintenanceController as AdminMaintenanceController;
 use App\Http\Controllers\Web\Admin\MapController as AdminMapController;
@@ -9,6 +11,8 @@ use App\Http\Controllers\Web\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Web\Admin\VehicleModelController as AdminVehicleModelController;
 use App\Http\Controllers\Web\Admin\WorkshopController as AdminWorkshopController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\BlogController;
+use App\Http\Controllers\Web\BlogFeedController;
 use App\Http\Controllers\Web\ContactController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
@@ -17,6 +21,7 @@ use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\PublicVehicleController;
+use App\Http\Controllers\Web\SitemapController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\Web\User\MaintenanceController as UserMaintenanceController;
 use App\Http\Controllers\Web\User\VehicleController as UserVehicleController;
@@ -31,6 +36,11 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', HomeController::class)->name('home');
 Route::get('/termos', [LegalController::class, 'terms'])->name('legal.terms');
 Route::get('/privacidade', [LegalController::class, 'privacy'])->name('legal.privacy');
+Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/feed', BlogFeedController::class)->name('blog.feed');
+Route::get('/blog/categoria/{category}', [BlogController::class, 'category'])->name('blog.category');
+Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
 Route::post('/contato', [ContactController::class, 'store'])
     ->middleware('throttle:contact')
@@ -159,6 +169,16 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/marcas/{brand}/editar', [AdminVehicleBrandController::class, 'edit'])->name('brands.edit');
         Route::put('/marcas/{brand}', [AdminVehicleBrandController::class, 'update'])->name('brands.update');
         Route::delete('/marcas/{brand}', [AdminVehicleBrandController::class, 'destroy'])->name('brands.destroy');
+        Route::get('/blog', [AdminBlogPostController::class, 'index'])->name('blog.index');
+        Route::get('/blog/novo', [AdminBlogPostController::class, 'create'])->name('blog.create');
+        Route::post('/blog', [AdminBlogPostController::class, 'store'])->name('blog.store');
+        Route::get('/blog/categorias', [AdminBlogCategoryController::class, 'index'])->name('blog.categories.index');
+        Route::post('/blog/categorias', [AdminBlogCategoryController::class, 'store'])->name('blog.categories.store');
+        Route::put('/blog/categorias/{category}', [AdminBlogCategoryController::class, 'update'])->name('blog.categories.update');
+        Route::delete('/blog/categorias/{category}', [AdminBlogCategoryController::class, 'destroy'])->name('blog.categories.destroy');
+        Route::get('/blog/{post}/editar', [AdminBlogPostController::class, 'edit'])->name('blog.edit');
+        Route::put('/blog/{post}', [AdminBlogPostController::class, 'update'])->name('blog.update');
+        Route::delete('/blog/{post}', [AdminBlogPostController::class, 'destroy'])->name('blog.destroy');
         Route::post('/marcas/{brand}/modelos', [AdminVehicleModelController::class, 'store'])->name('brands.models.store');
         Route::put('/modelos/{model}', [AdminVehicleModelController::class, 'update'])->name('models.update');
         Route::delete('/modelos/{model}', [AdminVehicleModelController::class, 'destroy'])->name('models.destroy');
