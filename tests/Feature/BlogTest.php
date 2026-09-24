@@ -109,6 +109,18 @@ class BlogTest extends TestCase
             ->assertSee(route('blog.index'), false);
     }
 
+    public function test_home_has_a_button_to_the_blog_for_visitors_and_logged_users(): void
+    {
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('Ir para o blog');
+
+        $this->actingAs(User::factory()->asUser()->create())
+            ->get(route('home'))
+            ->assertOk()
+            ->assertSee('Ir para o blog');
+    }
+
     public function test_post_without_cover_photo_gets_generated_art(): void
     {
         $category = BlogCategory::factory()->create(['name' => 'Manutenção', 'slug' => 'manutencao']);
