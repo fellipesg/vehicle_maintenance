@@ -13,13 +13,16 @@
 
     @include('user.vehicles._preview-import-summary', ['preview' => $preview])
 
-    <form method="POST" action="{{ route($storeRoute) }}" class="card space-y-4">
+    <form method="POST" action="{{ route($storeRoute) }}" enctype="multipart/form-data" class="card space-y-4">
         @csrf
         <input type="hidden" name="crlv_verification_token" value="{{ old('crlv_verification_token', $preview['crlv_verification_token'] ?? '') }}">
         @include('user.vehicles._form', [
             'catalog' => $catalog,
             'vehicle' => (object) $preview,
         ])
+        @if(($consignment['available'] ?? false))
+            @include('partials.consignment-fields', ['consignment' => $consignment])
+        @endif
         <x-terms-scroll-accept class="mt-2" />
         <div class="flex gap-3 pt-2">
             <button type="submit" class="btn-primary" data-terms-submit disabled>Confirmar e adicionar ao estoque</button>

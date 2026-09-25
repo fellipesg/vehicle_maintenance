@@ -15,7 +15,8 @@ class VehiclePdfExportService
 {
     public function createExport(User $user, Vehicle $vehicle): VehiclePdfExport
     {
-        Gate::authorize('view', $vehicle);
+        // The PDF is the whole history, so a consigning garage must not be able to pull it.
+        Gate::authorize('viewFullHistory', $vehicle);
 
         $export = VehiclePdfExport::create([
             'vehicle_id' => $vehicle->id,

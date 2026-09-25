@@ -82,8 +82,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/veiculos/vincular/crlv', [UserVehicleController::class, 'importCrlvForClaim'])->name('vehicles.claim.import-crlv');
         Route::get('/veiculos/vincular/preview', [UserVehicleController::class, 'previewCrlvClaim'])->name('vehicles.claim.preview');
         Route::post('/veiculos/vincular', [UserVehicleController::class, 'claim'])->name('vehicles.claim.store');
-        Route::get('/veiculos/consignacao', [UserVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
-        Route::post('/veiculos/consignacao', [UserVehicleController::class, 'storeConsignment'])->name('vehicles.consignment.store');
         Route::post('/veiculos', [UserVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/veiculos/{vehicle}', [UserVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/veiculos/{vehicle}/editar', [UserVehicleController::class, 'edit'])->name('vehicles.edit');
@@ -114,10 +112,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/estoque/vincular/crlv', [GarageVehicleController::class, 'importCrlvForClaim'])->name('vehicles.claim.import-crlv');
         Route::get('/estoque/vincular/preview', [GarageVehicleController::class, 'previewCrlvClaim'])->name('vehicles.claim.preview');
         Route::post('/estoque/vincular', [GarageVehicleController::class, 'claim'])->name('vehicles.claim.store');
-        Route::get('/estoque/consignacao', [GarageVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
-        Route::post('/estoque/consignacao', [GarageVehicleController::class, 'storeConsignment'])->name('vehicles.consignment.store');
         Route::post('/estoque', [GarageVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/estoque/{vehicle}', [GarageVehicleController::class, 'show'])->name('vehicles.show');
+        Route::post('/estoque/{vehicle}/encerrar-consignacao', [GarageVehicleController::class, 'endConsignment'])
+            ->name('vehicles.consignment.end');
         Route::get('/manutencoes', [GarageMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [GarageMaintenanceController::class, 'create'])->name('maintenances.create');
         Route::post('/manutencoes', [GarageMaintenanceController::class, 'store'])->name('maintenances.store');

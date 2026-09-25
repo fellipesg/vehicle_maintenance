@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Support\AppStorage;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -119,6 +120,36 @@ class User extends Authenticatable
         }
 
         return $query;
+    }
+
+    /**
+     * Consignments this user holds as a garage.
+     */
+    public function consignments(): HasMany
+    {
+        return $this->hasMany(VehicleConsignment::class, 'garage_user_id');
+    }
+
+    /**
+     * Vehicles a garage can work on: the ones it owns plus the ones it holds on consignment.
+     *
+     * @return Builder<Vehicle>
+     */
+    public function stockVehicles(): Builder
+    {
+        return Vehicle::query()->where(function (Builder $query): void {
+            $query->whereHas('owners', function ($owners): void {
+                $owners->where('users.id', $this->id)
+                    ->whereRaw('user_vehicles.is_current_owner = true');
+
+                if ($this->tenant_id) {
+                    $owners->where('user_vehicles.tenant_id', $this->tenant_id);
+                }
+            })->orWhereHas('consignments', function ($consignments): void {
+                $consignments->where('garage_user_id', $this->id)
+                    ->where('status', VehicleConsignment::STATUS_ACTIVE);
+            });
+        });
     }
 
     public function tenant()

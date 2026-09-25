@@ -30,7 +30,7 @@ class MaintenanceController extends Controller
 
     public function create(Request $request): View
     {
-        $vehicles = $request->user()->currentVehicles()->get();
+        $vehicles = $request->user()->stockVehicles()->orderBy('brand')->orderBy('model')->get();
         $workshops = Workshop::orderBy('name')->get();
 
         return view('garage.maintenances.create', compact('vehicles', 'workshops'));

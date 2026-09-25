@@ -160,6 +160,7 @@ trait ImportsVehicleFromCrlv
             'sourceFile' => session('crlv_source'),
             'storeRoute' => $this->vehicleStoreRoute(),
             'createRoute' => $this->vehicleCreateRoute(),
+            'consignment' => $this->consignmentContext($request, $preview),
         ]);
     }
 
@@ -185,6 +186,7 @@ trait ImportsVehicleFromCrlv
             'sourceFile' => session('crlv_source'),
             'claimStoreRoute' => $this->vehicleClaimStoreRoute(),
             'claimRoute' => $this->vehicleClaimRoute(),
+            'consignment' => $this->consignmentContext($request, $preview, $vehicle),
         ]);
     }
 

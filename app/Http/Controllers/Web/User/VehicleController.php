@@ -9,12 +9,9 @@ use App\Jobs\EmailVehicleMaintenancePdf;
 use App\Models\Vehicle;
 use App\Rules\CrlvPdfFile;
 use App\Services\Crlv\CrlvExerciseValidator;
-use App\Services\Crlv\CrlvParseResult;
 use App\Services\Crlv\CrlvPdfParser;
 use App\Services\Vehicle\VehicleCoverService;
-use App\Services\Vehicle\VehicleOwnershipService;
 use App\Services\VehicleCatalogService;
-use App\Support\AppStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -84,11 +81,6 @@ class VehicleController extends Controller
         return 'user.vehicles.claim';
     }
 
-    protected function vehicleConsignmentRoute(): string
-    {
-        return 'user.vehicles.consignment';
-    }
-
     public function index(Request $request): View
     {
         return view('user.vehicles.index');
@@ -109,60 +101,6 @@ class VehicleController extends Controller
     public function claim(Request $request): RedirectResponse
     {
         return $this->claimVehicle($request);
-    }
-
-    public function showConsignmentForm(Request $request): View|RedirectResponse
-    {
-        if (! session('consignment_pending')) {
-            return redirect()->route('user.vehicles.index');
-        }
-
-        return view('user.vehicles.consignment', [
-            'pending' => session('consignment_pending'),
-        ]);
-    }
-
-    public function storeConsignment(Request $request): RedirectResponse
-    {
-        $pending = session('consignment_pending');
-
-        if (! is_array($pending)) {
-            return redirect()->route('user.vehicles.index');
-        }
-
-        $request->validate([
-            'power_of_attorney' => ['required', 'file', 'mimes:pdf', 'max:10240'],
-        ]);
-
-        $path = $request->file('power_of_attorney')->store('procuracoes', AppStorage::diskName());
-        $crlv = $this->crlvFromVerification($pending['crlv_verification'] ?? session('crlv_verification'));
-        $ownership = app(VehicleOwnershipService::class);
-
-        try {
-            if (isset($pending['vehicle_id'])) {
-                $vehicle = Vehicle::findOrFail($pending['vehicle_id']);
-                $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-                $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
-                $request->session()->forget(['consignment_pending', 'crlv_verification', 'claim_vehicle_id']);
-
-                return redirect()->route('user.vehicles.index')
-                    ->with('success', 'Procuração enviada. O histórico ficará disponível após análise.');
-            }
-
-            $vehicle = $ownership->registerNew(
-                $request->user(),
-                $pending['vehicle_data'],
-                $crlv,
-                'consignment',
-            );
-            $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-            $request->session()->forget(['consignment_pending', 'crlv_verification']);
-
-            return redirect()->route('user.vehicles.index')
-                ->with('success', 'Veículo cadastrado em consignação. A procuração será analisada pela equipe.');
-        } catch (RuntimeException $exception) {
-            return back()->withErrors(['power_of_attorney' => $exception->getMessage()]);
-        }
     }
 
     public function show(Vehicle $vehicle): View
@@ -301,7 +239,7 @@ class VehicleController extends Controller
 
     public function exportPdf(Vehicle $vehicle): RedirectResponse
     {
-        Gate::authorize('viewMaintenances', $vehicle);
+        Gate::authorize('viewFullHistory', $vehicle);
 
         $user = request()->user();
 
@@ -310,35 +248,6 @@ class VehicleController extends Controller
         return back()->with(
             'success',
             "O relatório será processado e enviado para {$user->email}."
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $verification
-     */
-    private function crlvFromVerification(?array $verification): CrlvParseResult
-    {
-        $preview = $verification['parsed'] ?? null;
-
-        if (! is_array($preview)) {
-            throw new RuntimeException('Dados do CRLV-e não encontrados. Envie o documento novamente.');
-        }
-
-        return new CrlvParseResult(
-            licensePlate: $preview['license_plate'],
-            renavam: $preview['renavam'],
-            brand: $preview['brand'],
-            model: $preview['model'],
-            year: (int) $preview['year'],
-            color: $preview['color'] ?? null,
-            chassis: $preview['chassis'] ?? null,
-            engine: $preview['engine'] ?? null,
-            motorization: $preview['motorization'] ?? null,
-            crvNumber: $preview['crv_number'] ?? null,
-            exerciseYear: isset($preview['exercise_year']) ? (int) $preview['exercise_year'] : null,
-            manufacturingYear: isset($preview['manufacturing_year']) ? (int) $preview['manufacturing_year'] : null,
-            ownerName: $preview['owner_name'] ?? null,
-            ownerDocument: $preview['owner_document'] ?? null,
         );
     }
 }
