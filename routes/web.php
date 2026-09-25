@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryController;
 use App\Http\Controllers\Web\Admin\BlogPostController as AdminBlogPostController;
+use App\Http\Controllers\Web\Admin\ConsignmentController as AdminConsignmentController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Web\Admin\MaintenanceController as AdminMaintenanceController;
 use App\Http\Controllers\Web\Admin\MapController as AdminMapController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Web\Admin\WorkshopController as AdminWorkshopController
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BlogController;
 use App\Http\Controllers\Web\BlogFeedController;
+use App\Http\Controllers\Web\ConsignmentOwnerController;
 use App\Http\Controllers\Web\ContactController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
@@ -45,6 +47,12 @@ Route::get('/contato', [ContactController::class, 'show'])->name('contact.show')
 Route::post('/contato', [ContactController::class, 'store'])
     ->middleware('throttle:contact')
     ->name('contact.store');
+Route::prefix('consignacao')->name('consignments.owner.')->middleware('throttle:search')->group(function () {
+    Route::get('/{token}', [ConsignmentOwnerController::class, 'show'])->name('show');
+    Route::post('/{token}/liberar-historico', [ConsignmentOwnerController::class, 'approveHistory'])->name('approve');
+    Route::post('/{token}/contestar', [ConsignmentOwnerController::class, 'dispute'])->name('dispute');
+});
+
 Route::get('/v/{code}', [\App\Http\Controllers\Web\PublicVerificationController::class, 'show'])
     ->middleware('throttle:search')
     ->name('verification.show');
@@ -82,8 +90,6 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/veiculos/vincular/crlv', [UserVehicleController::class, 'importCrlvForClaim'])->name('vehicles.claim.import-crlv');
         Route::get('/veiculos/vincular/preview', [UserVehicleController::class, 'previewCrlvClaim'])->name('vehicles.claim.preview');
         Route::post('/veiculos/vincular', [UserVehicleController::class, 'claim'])->name('vehicles.claim.store');
-        Route::get('/veiculos/consignacao', [UserVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
-        Route::post('/veiculos/consignacao', [UserVehicleController::class, 'storeConsignment'])->name('vehicles.consignment.store');
         Route::post('/veiculos', [UserVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/veiculos/{vehicle}', [UserVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/veiculos/{vehicle}/editar', [UserVehicleController::class, 'edit'])->name('vehicles.edit');
@@ -114,10 +120,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/estoque/vincular/crlv', [GarageVehicleController::class, 'importCrlvForClaim'])->name('vehicles.claim.import-crlv');
         Route::get('/estoque/vincular/preview', [GarageVehicleController::class, 'previewCrlvClaim'])->name('vehicles.claim.preview');
         Route::post('/estoque/vincular', [GarageVehicleController::class, 'claim'])->name('vehicles.claim.store');
-        Route::get('/estoque/consignacao', [GarageVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
-        Route::post('/estoque/consignacao', [GarageVehicleController::class, 'storeConsignment'])->name('vehicles.consignment.store');
         Route::post('/estoque', [GarageVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/estoque/{vehicle}', [GarageVehicleController::class, 'show'])->name('vehicles.show');
+        Route::post('/estoque/{vehicle}/encerrar-consignacao', [GarageVehicleController::class, 'endConsignment'])
+            ->name('vehicles.consignment.end');
+        Route::post('/estoque/{vehicle}/pedir-historico', [GarageVehicleController::class, 'requestHistoryAccess'])
+            ->name('vehicles.consignment.request-history');
         Route::get('/manutencoes', [GarageMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [GarageMaintenanceController::class, 'create'])->name('maintenances.create');
         Route::post('/manutencoes', [GarageMaintenanceController::class, 'store'])->name('maintenances.store');
@@ -160,6 +168,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
+        Route::get('/consignacoes', [AdminConsignmentController::class, 'index'])->name('consignments.index');
+        Route::get('/consignacoes/{consignment}/procuracao', [AdminConsignmentController::class, 'downloadPowerOfAttorney'])
+            ->name('consignments.power-of-attorney');
+        Route::post('/consignacoes/{consignment}/aprovar', [AdminConsignmentController::class, 'approve'])->name('consignments.approve');
+        Route::post('/consignacoes/{consignment}/recusar', [AdminConsignmentController::class, 'reject'])->name('consignments.reject');
+        Route::post('/consignacoes/{consignment}/revogar', [AdminConsignmentController::class, 'revoke'])->name('consignments.revoke');
+        Route::post('/consignacoes/{consignment}/arquivar-contestacao', [AdminConsignmentController::class, 'clearDispute'])
+            ->name('consignments.clear-dispute');
         Route::get('/mapa/oficinas', [AdminMapController::class, 'workshops'])->name('maps.workshops');
         Route::get('/mapa/usuarios', [AdminMapController::class, 'users'])->name('maps.users');
         Route::get('/marcas', [AdminVehicleBrandController::class, 'index'])->name('brands.index');

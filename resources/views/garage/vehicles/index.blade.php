@@ -19,7 +19,13 @@
                 <div class="p-6">
                     <h2 class="text-lg font-semibold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
                     <p class="text-sm text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->license_plate }}</p>
-                    <p class="mt-2 text-sm text-automotive-500">{{ $vehicle->maintenances_count }} revisões documentadas</p>
+                    @if($vehicle->activeConsignment)
+                        <span class="badge badge-orange mt-2">Consignação</span>
+                        <p class="mt-1 text-sm text-automotive-500">
+                            Proprietário: {{ $vehicle->activeConsignment->owner_name }}
+                        </p>
+                    @endif
+                    <p class="mt-2 text-sm text-automotive-500">{{ $vehicle->maintenances_count }} revisões registradas por você</p>
                     <a href="{{ route('garage.vehicles.show', $vehicle) }}" class="btn-primary mt-4 !py-1.5 !text-xs w-full text-center">Ver detalhes</a>
                 </div>
             </div>

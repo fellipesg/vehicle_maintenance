@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Support\AppStorage;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Gate;
 
 class Vehicle extends Model
 {
@@ -163,6 +165,24 @@ class Vehicle extends Model
             ->orderBy('id');
     }
 
+    /**
+     * Constrains a maintenance query to what the given user may read.
+     *
+     * A consigning garage without approved history access only sees what its own tenant
+     * registered during the consignment; the history the vehicle already had belongs to
+     * the owner.
+     *
+     * @param  Builder<Maintenance>|HasMany<Maintenance, Vehicle>  $query
+     */
+    public function restrictMaintenancesTo(Builder|HasMany $query, User $user): Builder|HasMany
+    {
+        if (Gate::forUser($user)->allows('viewFullHistory', $this)) {
+            return $query;
+        }
+
+        return $query->where('maintenances.tenant_id', $user->tenant_id);
+    }
+
     public function owners(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_vehicles')
@@ -185,6 +205,18 @@ class Vehicle extends Model
     public function accessGrants(): HasMany
     {
         return $this->hasMany(VehicleAccessGrant::class);
+    }
+
+    public function consignments(): HasMany
+    {
+        return $this->hasMany(VehicleConsignment::class);
+    }
+
+    public function activeConsignment(): HasOne
+    {
+        return $this->hasOne(VehicleConsignment::class)
+            ->where('status', VehicleConsignment::STATUS_ACTIVE)
+            ->latestOfMany();
     }
 
     public static function findByRenavam(string $renavam): ?self

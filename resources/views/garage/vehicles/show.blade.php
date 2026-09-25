@@ -15,6 +15,58 @@
         <a href="{{ route('garage.maintenances.create') }}?vehicle_id={{ $vehicle->id }}" class="btn-primary">+ Registrar revisão pré-venda</a>
     </div>
 
+    @if($vehicle->activeConsignment)
+        <div class="card mb-6 border-l-4 border-amber-400">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <span class="badge badge-orange">Consignação</span>
+                    <p class="mt-2 text-sm text-automotive-700">
+                        Proprietário: <strong>{{ $vehicle->activeConsignment->owner_name }}</strong>
+                    </p>
+                    @if($vehicle->activeConsignment->isDisputed())
+                        <p class="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+                            O proprietário contestou esta consignação. Novos registros de manutenção estão
+                            bloqueados até que nossa equipe analise o caso.
+                        </p>
+                    @endif
+                    @unless($seesFullHistory)
+                        <p class="mt-1 text-sm text-automotive-600">
+                            Você vê apenas as manutenções registradas pela sua garagem. O histórico anterior
+                            @if($vehicle->activeConsignment->isHistoryReviewPending())
+                                está aguardando a liberação do proprietário ou a análise da procuração.
+                            @else
+                                pertence ao proprietário e depende da liberação dele.
+                            @endif
+                        </p>
+                        @if(! $vehicle->activeConsignment->isHistoryReviewPending() && ! $vehicle->activeConsignment->isDisputed())
+                            <form method="POST" action="{{ route('garage.vehicles.consignment.request-history', $vehicle) }}" class="mt-2">
+                                @csrf
+                                <button type="submit" class="btn-secondary !py-1.5 !text-xs">
+                                    Pedir liberação do histórico ao proprietário
+                                </button>
+                            </form>
+                        @endif
+                    @endunless
+                </div>
+                <form
+                    method="POST"
+                    action="{{ route('garage.vehicles.consignment.end', $vehicle) }}"
+                    class="flex flex-wrap items-center gap-2"
+                    onsubmit="return confirm('Encerrar a consignação deste veículo? Você perde o acesso, mas as manutenções registradas permanecem no histórico.');"
+                >
+                    @csrf
+                    <select name="end_reason" class="form-input !py-1.5 !text-sm">
+                        <option value="sold">Veículo vendido</option>
+                        <option value="owner_withdrew">Devolvido ao proprietário</option>
+                    </select>
+                    <button type="submit" class="btn-secondary !py-1.5 !text-sm">Encerrar consignação</button>
+                </form>
+            </div>
+            @error('consignment')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+            @error('end_reason')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
+    @endif
+
     <x-provenance-strip
         :vehicle="$vehicle"
         maintenance-path-prefix="#"

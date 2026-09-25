@@ -13,6 +13,8 @@ use RuntimeException;
 
 trait RegistersVehicleWithOwnership
 {
+    use HandlesVehicleConsignment;
+
     /**
      * @return array<string, mixed>
      */
@@ -136,23 +138,26 @@ trait RegistersVehicleWithOwnership
 
         $crlv = $this->resolveCrlvFromSession($request);
         $ownership = app(VehicleOwnershipService::class);
+        $isConsignment = $this->isConsignmentFlow($request, $crlv);
+
+        if ($isConsignment && $crlv === null) {
+            return back()->withInput()->withErrors([
+                'crlv' => 'Importe o CRLV-e do veículo para cadastrá-lo em consignação.',
+            ]);
+        }
+
+        if ($isConsignment) {
+            $consignmentData = $request->validate(
+                $this->consignmentValidationRules(true),
+                $this->consignmentValidationMessages(),
+            );
+        }
 
         try {
-            if ($crlv !== null) {
-                $ownershipType = $ownership->resolveOwnershipType($request->user(), $crlv);
-
-                if ($ownershipType === 'consignment') {
-                    session([
-                        'consignment_pending' => [
-                            'vehicle_data' => $data,
-                            'crlv_verification' => session('crlv_verification'),
-                        ],
-                    ]);
-
-                    return redirect()->route($this->vehicleConsignmentRoute())
-                        ->with('warning', 'O CPF/CNPJ do CRLV-e não é o seu. Envie a procuração do proprietário para acessar o histórico em consignação.');
-                }
-
+            if ($isConsignment) {
+                $vehicle = $ownership->registerNew($request->user(), $data, $crlv, 'consignment');
+                $consignment = $this->startConsignment($request, $vehicle, $crlv, $consignmentData);
+            } elseif ($crlv !== null) {
                 $vehicle = $ownership->registerNew($request->user(), $data, $crlv);
             } else {
                 $vehicle = $ownership->registerNew($request->user(), $data, null);
@@ -163,9 +168,11 @@ trait RegistersVehicleWithOwnership
 
         $request->session()->forget(['crlv_verification', 'crlv_source']);
 
-        $successMessage = $crlv !== null
-            ? 'Veículo cadastrado com sucesso!'
-            : 'Veículo cadastrado com sucesso! Você pode importar o CRLV-e depois para validar a propriedade.';
+        $successMessage = match (true) {
+            $isConsignment => $this->consignmentSuccessMessage($consignment),
+            $crlv !== null => 'Veículo cadastrado com sucesso!',
+            default => 'Veículo cadastrado com sucesso! Você pode importar o CRLV-e depois para validar a propriedade.',
+        };
 
         return redirect()->route($this->vehicleShowRoute(), $vehicle)
             ->with('success', $successMessage);
@@ -189,40 +196,36 @@ trait RegistersVehicleWithOwnership
         }
 
         $ownership = app(VehicleOwnershipService::class);
+        $isConsignment = $this->isConsignmentFlow($request, $crlv);
+        $consignment = null;
+
+        if ($isConsignment) {
+            $consignmentData = $request->validate(
+                $this->consignmentValidationRules(true, $this->consignmentContactIsLocked($vehicle)),
+                $this->consignmentValidationMessages(),
+            );
+        }
 
         try {
-            $ownershipType = $ownership->resolveOwnershipType($request->user(), $crlv);
-
-            if ($ownershipType === 'consignment') {
-                session([
-                    'consignment_pending' => [
-                        'vehicle_id' => $vehicle->id,
-                        'crlv_verification' => session('crlv_verification'),
-                    ],
-                ]);
-
-                return redirect()->route($this->vehicleConsignmentRoute())
-                    ->with('warning', 'O veículo não está no seu CPF/CNPJ. Envie a procuração do proprietário para acessar o histórico em consignação.');
+            if ($isConsignment) {
+                $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
+                $consignment = $this->startConsignment($request, $vehicle, $crlv, $consignmentData);
+            } else {
+                $vehicle = $ownership->claimExisting($request->user(), $vehicle, $crlv);
             }
-
-            $vehicle = $ownership->claimExisting($request->user(), $vehicle, $crlv);
         } catch (RuntimeException $exception) {
-            if ($exception->getMessage() === 'consignment_required') {
-                return redirect()->route($this->vehicleConsignmentRoute());
-            }
-
             return back()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
         $request->session()->forget(['crlv_verification', 'crlv_source', 'claim_vehicle_id', 'crlv_mode']);
 
         return redirect()->route($this->vehicleShowRoute(), $vehicle)
-            ->with('success', 'Veículo vinculado à sua conta com sucesso!');
+            ->with('success', $consignment !== null
+                ? $this->consignmentSuccessMessage($consignment)
+                : 'Veículo vinculado à sua conta com sucesso!');
     }
 
     abstract protected function vehicleShowRoute(): string;
 
     abstract protected function vehicleClaimRoute(): string;
-
-    abstract protected function vehicleConsignmentRoute(): string;
 }
