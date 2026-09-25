@@ -132,6 +132,25 @@ class VehicleController extends Controller
             ->with('success', 'Consignação encerrada. As manutenções registradas seguem no histórico do veículo.');
     }
 
+    public function requestHistoryAccess(Request $request, Vehicle $vehicle, VehicleConsignmentService $consignments): RedirectResponse
+    {
+        Gate::authorize('endConsignment', $vehicle);
+
+        $consignment = $consignments->activeFor($request->user(), $vehicle);
+
+        if ($consignment === null) {
+            return back()->withErrors(['consignment' => 'Este veículo não está em consignação nesta garagem.']);
+        }
+
+        try {
+            $consignments->requestHistoryAccess($consignment);
+        } catch (RuntimeException $exception) {
+            return back()->withErrors(['consignment' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Pedido enviado ao proprietário. Ele pode liberar o histórico com um clique.');
+    }
+
     public function show(Request $request, Vehicle $vehicle): View
     {
         Gate::authorize('view', $vehicle);

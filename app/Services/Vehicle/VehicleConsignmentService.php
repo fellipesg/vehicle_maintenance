@@ -2,10 +2,15 @@
 
 namespace App\Services\Vehicle;
 
+use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleConsignment;
+use App\Notifications\ConsignmentHistoryAccessRequestedNotification;
+use App\Notifications\ConsignmentMaintenanceRegisteredNotification;
+use App\Notifications\VehicleConsignmentStartedNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -43,7 +48,7 @@ class VehicleConsignmentService
             throw new RuntimeException('Este veículo já está em consignação nesta garagem.');
         }
 
-        return DB::transaction(function () use ($garage, $vehicle, $data, $powerOfAttorneyPath) {
+        $consignment = DB::transaction(function () use ($garage, $vehicle, $data, $powerOfAttorneyPath) {
             return VehicleConsignment::create([
                 'vehicle_id' => $vehicle->id,
                 'garage_user_id' => $garage->id,
@@ -61,10 +66,125 @@ class VehicleConsignmentService
                     ? VehicleConsignment::HISTORY_PENDING
                     : VehicleConsignment::HISTORY_NONE,
                 'status' => VehicleConsignment::STATUS_ACTIVE,
+                'history_requested_at' => $powerOfAttorneyPath !== null ? now() : null,
                 'started_at' => now(),
-                'owner_dispute_token' => Str::random(48),
+                'owner_action_token' => Str::random(48),
             ]);
         });
+
+        $this->notifyOwner($consignment, new VehicleConsignmentStartedNotification($consignment));
+
+        return $consignment;
+    }
+
+    public function announceMaintenance(VehicleConsignment $consignment, Maintenance $maintenance): void
+    {
+        $this->notifyOwner(
+            $consignment,
+            new ConsignmentMaintenanceRegisteredNotification($consignment, $maintenance),
+        );
+    }
+
+    public function requestHistoryAccess(VehicleConsignment $consignment): VehicleConsignment
+    {
+        if ($consignment->grantsHistoryAccess()) {
+            throw new RuntimeException('O histórico deste veículo já está liberado.');
+        }
+
+        if (! $consignment->allowsMaintenance()) {
+            throw new RuntimeException('Esta consignação não está ativa.');
+        }
+
+        $consignment->update([
+            'history_access_status' => VehicleConsignment::HISTORY_PENDING,
+            'history_requested_at' => now(),
+        ]);
+
+        $this->notifyOwner($consignment, new ConsignmentHistoryAccessRequestedNotification($consignment));
+
+        return $consignment->fresh();
+    }
+
+    /**
+     * The owner approving from the e-mail beats a power of attorney a human has to read:
+     * it is faster and it is consent from the person the history belongs to.
+     */
+    public function approveHistoryAccess(VehicleConsignment $consignment, string $via, ?User $reviewer = null): VehicleConsignment
+    {
+        if (! in_array($via, ['owner', 'staff'], true)) {
+            throw new RuntimeException('Origem de aprovação inválida.');
+        }
+
+        $consignment->update([
+            'history_access_status' => VehicleConsignment::HISTORY_APPROVED,
+            'history_approved_via' => $via,
+            'reviewed_by' => $reviewer?->id,
+            'reviewed_at' => now(),
+        ]);
+
+        return $consignment->fresh();
+    }
+
+    public function rejectHistoryAccess(VehicleConsignment $consignment, ?User $reviewer = null, ?string $notes = null): VehicleConsignment
+    {
+        $consignment->update([
+            'history_access_status' => VehicleConsignment::HISTORY_REJECTED,
+            'history_approved_via' => null,
+            'reviewed_by' => $reviewer?->id,
+            'reviewed_at' => now(),
+            'review_notes' => $notes,
+        ]);
+
+        return $consignment->fresh();
+    }
+
+    /**
+     * The owner saying "I did not authorise this" freezes the garage immediately; staff
+     * decide afterwards whether to revoke the consignment for good.
+     */
+    public function dispute(VehicleConsignment $consignment, ?string $note = null): VehicleConsignment
+    {
+        $consignment->update([
+            'owner_disputed_at' => now(),
+            'owner_dispute_note' => $note,
+        ]);
+
+        return $consignment->fresh();
+    }
+
+    public function clearDispute(VehicleConsignment $consignment): VehicleConsignment
+    {
+        $consignment->update([
+            'owner_disputed_at' => null,
+            'owner_dispute_note' => null,
+        ]);
+
+        return $consignment->fresh();
+    }
+
+    /**
+     * Reaches the owner through their account when they have one, and by e-mail otherwise —
+     * a consigned vehicle very often belongs to someone who never heard of us.
+     */
+    private function notifyOwner(VehicleConsignment $consignment, object $notification): void
+    {
+        $consignment->loadMissing(['ownerUser', 'garageUser', 'vehicle']);
+
+        if ($consignment->ownerUser !== null) {
+            $consignment->ownerUser->notify($notification);
+            $consignment->forceFill(['owner_notified_at' => now()])->save();
+
+            return;
+        }
+
+        $email = $consignment->owner_email;
+
+        if ($email === null || $email === '') {
+            return;
+        }
+
+        Notification::route('mail', $email)->notify($notification);
+        $consignment->forceFill(['owner_notified_at' => now()])->save();
     }
 
     /**

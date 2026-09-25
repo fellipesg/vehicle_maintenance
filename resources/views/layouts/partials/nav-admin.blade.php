@@ -44,6 +44,11 @@
                     Oficinas
                 </a>
             </li>
+            <li>
+                <a href="{{ route('admin.consignments.index') }}" class="{{ $itemClass(request()->routeIs('admin.consignments.*')) }}">
+                    Consignações
+                </a>
+            </li>
         </ul>
     </div>
 

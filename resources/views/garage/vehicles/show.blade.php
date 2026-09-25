@@ -23,15 +23,29 @@
                     <p class="mt-2 text-sm text-automotive-700">
                         Proprietário: <strong>{{ $vehicle->activeConsignment->owner_name }}</strong>
                     </p>
+                    @if($vehicle->activeConsignment->isDisputed())
+                        <p class="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+                            O proprietário contestou esta consignação. Novos registros de manutenção estão
+                            bloqueados até que nossa equipe analise o caso.
+                        </p>
+                    @endif
                     @unless($seesFullHistory)
                         <p class="mt-1 text-sm text-automotive-600">
                             Você vê apenas as manutenções registradas pela sua garagem. O histórico anterior
                             @if($vehicle->activeConsignment->isHistoryReviewPending())
-                                será liberado após a análise da procuração enviada.
+                                está aguardando a liberação do proprietário ou a análise da procuração.
                             @else
                                 pertence ao proprietário e depende da liberação dele.
                             @endif
                         </p>
+                        @if(! $vehicle->activeConsignment->isHistoryReviewPending() && ! $vehicle->activeConsignment->isDisputed())
+                            <form method="POST" action="{{ route('garage.vehicles.consignment.request-history', $vehicle) }}" class="mt-2">
+                                @csrf
+                                <button type="submit" class="btn-secondary !py-1.5 !text-xs">
+                                    Pedir liberação do histórico ao proprietário
+                                </button>
+                            </form>
+                        @endif
                     @endunless
                 </div>
                 <form

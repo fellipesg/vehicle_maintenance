@@ -8,6 +8,7 @@ use App\Models\Maintenance;
 use App\Models\Vehicle;
 use App\Models\Workshop;
 use App\Rules\InvoiceFile;
+use App\Services\Vehicle\VehicleConsignmentService;
 use App\Services\Vehicle\VehicleMileageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -74,6 +75,8 @@ class MaintenanceController extends Controller
             $data['maintenance_date'],
         );
 
+        $consignment = app(VehicleConsignmentService::class)->activeFor($request->user(), $vehicle);
+
         $result = $this->storeMaintenanceWithInvoices(
             $request,
             function () use ($data, $request) {
@@ -87,6 +90,10 @@ class MaintenanceController extends Controller
                 return $maintenance;
             },
         );
+
+        if ($consignment !== null && $result['maintenance'] instanceof Maintenance) {
+            app(VehicleConsignmentService::class)->announceMaintenance($consignment, $result['maintenance']);
+        }
 
         return $this->redirectWithInvoiceFeedback(
             redirect()->route('garage.maintenances.index'),

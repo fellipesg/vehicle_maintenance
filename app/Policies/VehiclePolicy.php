@@ -65,12 +65,12 @@ class VehiclePolicy
     /**
      * Registering a maintenance moves the vehicle odometer, so it is limited to whoever
      * physically holds the car: the current owner, or the garage that declared it on
-     * consignment.
+     * consignment. A consignment the owner contested stops accepting new records.
      */
     public function addMaintenance(User $user, Vehicle $vehicle): bool
     {
         return $this->tenantOwnsVehicle($user, $vehicle)
-            || $this->hasActiveConsignment($user, $vehicle);
+            || $this->consignmentFor($user, $vehicle)?->allowsMaintenance() === true;
     }
 
     public function link(User $user, Vehicle $vehicle): bool

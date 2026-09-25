@@ -53,7 +53,11 @@ class VehicleConsignment extends Model
         'ended_at',
         'end_reason',
         'owner_notified_at',
-        'owner_dispute_token',
+        'owner_action_token',
+        'history_requested_at',
+        'history_approved_via',
+        'owner_disputed_at',
+        'owner_dispute_note',
     ];
 
     protected function casts(): array
@@ -64,6 +68,8 @@ class VehicleConsignment extends Model
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
             'owner_notified_at' => 'datetime',
+            'history_requested_at' => 'datetime',
+            'owner_disputed_at' => 'datetime',
         ];
     }
 
@@ -101,13 +107,34 @@ class VehicleConsignment extends Model
         return $this->status === self::STATUS_ACTIVE;
     }
 
-    public function grantsHistoryAccess(): bool
-    {
-        return $this->isActive() && $this->history_access_status === self::HISTORY_APPROVED;
-    }
-
     public function isHistoryReviewPending(): bool
     {
         return $this->history_access_status === self::HISTORY_PENDING;
+    }
+
+    public function isDisputed(): bool
+    {
+        return $this->owner_disputed_at !== null;
+    }
+
+    /**
+     * A disputed consignment keeps the vehicle visible to the garage — so it can see why it
+     * was blocked — but stops it from registering anything new until staff sort it out.
+     */
+    public function allowsMaintenance(): bool
+    {
+        return $this->isActive() && ! $this->isDisputed();
+    }
+
+    public function grantsHistoryAccess(): bool
+    {
+        return $this->isActive()
+            && ! $this->isDisputed()
+            && $this->history_access_status === self::HISTORY_APPROVED;
+    }
+
+    public function ownerNotificationRoute(): ?string
+    {
+        return $this->ownerUser?->email ?? $this->owner_email;
     }
 }
