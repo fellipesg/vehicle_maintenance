@@ -27,7 +27,7 @@ return new class extends Migration
                 'painting',
                 'finishing',
                 'interior',
-                'other'
+                'other',
             ])->default('other')->comment('Categoria do serviço');
             $table->boolean('is_manufacturer_required')->default(false)->comment('Se é manutenção requerida pelo manual');
             $table->timestamps();

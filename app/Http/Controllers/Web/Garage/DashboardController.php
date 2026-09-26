@@ -4,9 +4,6 @@ namespace App\Http\Controllers\Web\Garage;
 
 use App\Http\Controllers\Controller;
 use App\Models\Maintenance;
-use App\Models\Vehicle;
-use App\Models\Workshop;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
