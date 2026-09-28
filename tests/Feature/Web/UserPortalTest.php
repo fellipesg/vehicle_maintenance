@@ -7,6 +7,7 @@ use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Workshop;
+use App\Services\Vehicle\VehicleTimelineBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -189,7 +190,7 @@ class UserPortalTest extends TestCase
             ->post('/usuario/manutencoes', [
                 'vehicle_id' => $vehicle->id,
                 'maintenance_type' => 'Teste quilometragem antiga',
-                'maintenance_date' => '2026-09-23',
+                'maintenance_date' => now()->subYear()->toDateString(),
                 'kilometers' => 96_000,
                 'service_category' => 'other',
             ])
@@ -198,6 +199,17 @@ class UserPortalTest extends TestCase
 
         $this->assertTrue($vehicle->maintenances()->where('kilometers', 96_000)->exists());
         $this->assertSame(110_000, $vehicle->fresh()->current_kilometers);
+
+        $timeline = app(VehicleTimelineBuilder::class)->build($vehicle->fresh());
+
+        $this->assertSame(110_000, $timeline['vehicle']['current_kilometers']);
+        $this->assertSame(96_000, $timeline['summary']['first_kilometers']);
+        $this->assertSame(110_000, $timeline['summary']['last_kilometers']);
+        $this->assertSame(1, $timeline['summary']['maintenance_count']);
+        $this->assertNotNull($timeline['summary']['approximate_annual_kilometers']);
+        $this->assertTrue(collect($timeline['events'])->contains(
+            fn (array $event): bool => ($event['type'] ?? '') === 'maintenance' && (int) $event['kilometers'] === 96_000,
+        ));
     }
 
     public function test_maintenance_form_does_not_lock_kilometers_input_to_current_odometer(): void

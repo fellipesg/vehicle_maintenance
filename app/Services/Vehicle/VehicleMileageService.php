@@ -31,6 +31,7 @@ class VehicleMileageService
     {
         $vehicle->update([
             'current_kilometers' => max(
+                (int) ($vehicle->current_kilometers ?? 0),
                 (int) ($vehicle->odometer_at_registration ?? 0),
                 (int) $vehicle->maintenances()->max('kilometers'),
                 $kilometers,

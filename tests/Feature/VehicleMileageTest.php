@@ -70,6 +70,88 @@ class VehicleMileageTest extends TestCase
         $this->assertTrue($vehicle->maintenances()->where('kilometers', 79000)->exists());
     }
 
+    public function test_historical_maintenances_only_enrich_timeline_and_annual_average(): void
+    {
+        $user = $this->actingAsApiUser();
+
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 110_000,
+            'odometer_at_registration' => 110_000,
+            'created_at' => now(),
+        ]);
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $before = $this->getJson("/api/v1/vehicles/{$vehicle->id}/timeline")->assertOk();
+        $this->assertSame(110_000, $before->json('data.vehicle.current_kilometers'));
+        $this->assertSame(0, $before->json('data.summary.maintenance_count'));
+        $this->assertNull($before->json('data.summary.approximate_annual_kilometers'));
+
+        $revisionDate = now()->subYear()->toDateString();
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão antiga',
+            'maintenance_date' => $revisionDate,
+            'kilometers' => 96_000,
+            'service_category' => 'mechanical',
+        ])->assertCreated();
+
+        $this->assertSame(110_000, $vehicle->fresh()->current_kilometers);
+
+        $afterOne = $this->getJson("/api/v1/vehicles/{$vehicle->id}/timeline")
+            ->assertOk()
+            ->assertJsonPath('data.vehicle.current_kilometers', 110_000)
+            ->assertJsonPath('data.summary.last_kilometers', 110_000)
+            ->assertJsonPath('data.summary.first_kilometers', 96_000)
+            ->assertJsonPath('data.summary.maintenance_count', 1)
+            ->assertJsonPath('data.summary.usage_period_start_date', $revisionDate)
+            ->assertJsonPath('data.summary.usage_period_end_date', now()->toDateString());
+
+        $this->assertTrue(collect($afterOne->json('data.events'))->contains(
+            fn (array $event): bool => ($event['type'] ?? '') === 'maintenance'
+                && (int) $event['kilometers'] === 96_000
+                && ($event['date'] ?? '') === $revisionDate,
+        ));
+        $this->assertGreaterThan(10_000, $afterOne->json('data.summary.approximate_annual_kilometers'));
+
+        $olderDate = now()->subYears(2)->toDateString();
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão mais antiga',
+            'maintenance_date' => $olderDate,
+            'kilometers' => 80_000,
+            'service_category' => 'mechanical',
+        ])->assertCreated();
+
+        $this->assertSame(110_000, $vehicle->fresh()->current_kilometers);
+
+        $afterTwo = $this->getJson("/api/v1/vehicles/{$vehicle->id}/timeline")
+            ->assertOk()
+            ->assertJsonPath('data.vehicle.current_kilometers', 110_000)
+            ->assertJsonPath('data.summary.last_kilometers', 110_000)
+            ->assertJsonPath('data.summary.first_kilometers', 80_000)
+            ->assertJsonPath('data.summary.maintenance_count', 2)
+            ->assertJsonPath('data.summary.usage_period_start_date', $olderDate);
+
+        $this->assertTrue(collect($afterTwo->json('data.events'))->contains(
+            fn (array $event): bool => ($event['type'] ?? '') === 'maintenance' && (int) $event['kilometers'] === 80_000,
+        ));
+        $this->assertTrue(collect($afterTwo->json('data.events'))->contains(
+            fn (array $event): bool => ($event['type'] ?? '') === 'maintenance' && (int) $event['kilometers'] === 96_000,
+        ));
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão atual',
+            'maintenance_date' => now()->toDateString(),
+            'kilometers' => 115_000,
+            'service_category' => 'mechanical',
+        ])->assertCreated();
+
+        $this->assertSame(115_000, $vehicle->fresh()->current_kilometers);
+    }
+
     public function test_vehicle_timeline_endpoint_returns_events(): void
     {
         $user = $this->actingAsApiUser();

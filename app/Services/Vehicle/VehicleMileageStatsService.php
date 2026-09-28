@@ -69,6 +69,13 @@ class VehicleMileageStatsService
             ];
         }
 
+        if ($vehicle->current_kilometers !== null) {
+            $points[] = [
+                'kilometers' => (int) $vehicle->current_kilometers,
+                'date' => now()->startOfDay(),
+            ];
+        }
+
         foreach ($vehicle->maintenances as $maintenance) {
             if ($maintenance->kilometers === null || $maintenance->maintenance_date === null) {
                 continue;

@@ -17,4 +17,4 @@ coverPathForPdf() prefers cover_photo_path (landscape), then portrait. Center-cr
 Todo upload de capa (paisagem/retrato) deve gerar `cover_photo_thumb_path` 192×192 via `VehicleCoverCropper::cropToThumb`. Listagens e avatares devem preferir `cover_photo_thumb_url`.
 
 ## Allow historical maintenance km below odometer
-Maintenance km may be lower than vehicle current_kilometers so users can backfill history after registering the odometer. Do not set HTML min to current km and do not reject lower km in VehicleMileageService. current_kilometers stays the max of registration, existing maintenances, and the new reading.
+Maintenance km may be lower than vehicle current_kilometers so users can backfill history after registering the odometer. Do not set HTML min to current km and do not reject lower km in VehicleMileageService. A past reading only lands on the timeline and in approximateAnnualKilometers. applyMaintenanceKilometers uses max(current, registration, maintenances, incoming) so current_kilometers never decreases.
