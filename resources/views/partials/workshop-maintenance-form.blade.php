@@ -58,7 +58,7 @@
         <select name="general_warranty_template_id" id="general_warranty_template_id" class="form-select">
             <option value="">Sem garantia geral</option>
             @foreach($orderTemplates as $template)
-                <option value="{{ $template->id }}" @selected((string) old('general_warranty_template_id', $maintenance?->generalWarranty?->warranty_template_id) === (string) $template->id)>
+                <option value="{{ $template->id }}" @selected((string) old('general_warranty_template_id', ($maintenance ?? null)?->generalWarranty?->warranty_template_id) === (string) $template->id)>
                     {{ $template->name }} ({{ $template->duration_days }} dias)
                 </option>
             @endforeach
