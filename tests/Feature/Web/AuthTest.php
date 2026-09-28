@@ -48,7 +48,10 @@ class AuthTest extends TestCase
             ->assertOk()
             ->assertSee('Criar conta')
             ->assertSee('Mínimo de 8 caracteres')
-            ->assertSee('Confirmação igual à senha');
+            ->assertSee('Confirmação igual à senha')
+            ->assertSee('data-password-toggle', false)
+            ->assertSee('Mostrar senha', false)
+            ->assertSee('aria-controls="password"', false);
     }
 
     public function test_user_can_register_as_common_user(): void

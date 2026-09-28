@@ -5,8 +5,22 @@ function digitsOnly(value) {
     return String(value ?? '').replace(/\D/g, '');
 }
 
+function fieldHint(input) {
+    let node = input.parentElement;
+    while (node && node.tagName !== 'FORM') {
+        for (const child of node.children) {
+            if (child.matches('[data-field-hint]')) {
+                return child;
+            }
+        }
+        node = node.parentElement;
+    }
+
+    return null;
+}
+
 function setFieldState(input, ok, message) {
-    const hint = input.parentElement?.querySelector('[data-field-hint]');
+    const hint = fieldHint(input);
     input.classList.remove('border-red-500', 'border-green-500', 'ring-red-200', 'ring-green-200');
     if (input.value.length === 0) {
         if (hint) {
@@ -157,6 +171,23 @@ function bindDocumentMask(input) {
     apply();
 }
 
+function bindPasswordToggle(toggle) {
+    const inputId = toggle.getAttribute('aria-controls');
+    const input = inputId ? document.getElementById(inputId) : null;
+    if (!input) {
+        return;
+    }
+
+    toggle.addEventListener('click', () => {
+        const showing = input.type === 'text';
+        input.type = showing ? 'password' : 'text';
+        const nextLabel = showing ? 'Mostrar senha' : 'Ocultar senha';
+        toggle.setAttribute('aria-pressed', showing ? 'false' : 'true');
+        toggle.setAttribute('aria-label', nextLabel);
+        toggle.textContent = showing ? 'Mostrar' : 'Ocultar';
+    });
+}
+
 function bindPasswordCriteria(form) {
     const password = form.querySelector('[data-password-field]');
     const confirmation = form.querySelector('[data-password-confirmation]');
@@ -211,6 +242,7 @@ function initFormUx(root = document) {
     root.querySelectorAll('[data-mask="year"]').forEach(bindYearField);
     root.querySelectorAll('[data-mask="document"]').forEach(bindDocumentMask);
     root.querySelectorAll('form[data-password-form]').forEach(bindPasswordCriteria);
+    root.querySelectorAll('[data-password-toggle]').forEach(bindPasswordToggle);
 }
 
 export { initFormUx };

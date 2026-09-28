@@ -45,9 +45,19 @@
 
         <div>
             <label for="password" class="form-label !text-automotive-300">Senha</label>
-            <input type="password" name="password" id="password" required
-                   class="form-input !border-automotive-600 !bg-automotive-800 !text-white"
-                   data-password-field autocomplete="new-password" minlength="8">
+            <div class="relative">
+                <input type="password" name="password" id="password" required
+                       class="form-input !border-automotive-600 !bg-automotive-800 !text-white pr-24"
+                       data-password-field autocomplete="new-password" minlength="8">
+                <button type="button"
+                        data-password-toggle
+                        aria-controls="password"
+                        aria-pressed="false"
+                        aria-label="Mostrar senha"
+                        class="absolute inset-y-0 right-1 my-1 rounded-md px-2 text-sm font-medium text-automotive-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-wrench-500/40">
+                    Mostrar
+                </button>
+            </div>
             <ul class="mt-2 space-y-1 text-sm text-automotive-400" data-password-criteria>
                 <li data-rule="length" class="flex items-center gap-2">
                     <span data-rule-icon>○</span>
