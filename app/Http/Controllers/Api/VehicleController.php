@@ -326,28 +326,19 @@ class VehicleController extends Controller
         );
     }
 
+    /**
+     * Confirms that the vehicle is already linked to the caller as its current owner. It never
+     * grants ownership: a vehicle already on RevisaLog is claimed with the CRLV-e (web "Adicionar
+     * veículo" wizard, VehicleOwnershipService::claimExisting). Any other account gets 403.
+     */
+    #[Endpoint(
+        title: 'Confirm vehicle link',
+        description: 'Returns the vehicle when the caller is already its current owner; 403 otherwise. Claiming a vehicle that is already registered requires the CRLV-e.',
+    )]
     public function linkToUser(Request $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
         Gate::authorize('link', $vehicle);
-
-        $user = $request->user();
-
-        $existingLink = $user->vehicles()->where('vehicle_id', $vehicle->id)->first();
-
-        if ($existingLink) {
-            $user->vehicles()->updateExistingPivot($vehicle->id, [
-                'is_current_owner' => true,
-                'purchase_date' => $request->purchase_date ?? now(),
-                'tenant_id' => $user->tenant_id,
-            ]);
-        } else {
-            $user->vehicles()->attach($vehicle->id, [
-                'purchase_date' => $request->purchase_date ?? now(),
-                'is_current_owner' => true,
-                'tenant_id' => $user->tenant_id,
-            ]);
-        }
 
         return ApiResponse::success(new VehicleResource($vehicle->fresh()), 'Vehicle linked to user successfully');
     }

@@ -227,9 +227,11 @@ class VehicleControllerTest extends TestCase
     {
         $vehicle = Vehicle::factory()->create(['renavam' => '11122233344']);
 
+        // Visitante acha o veículo pelo RENAVAM, mas recebe o número parcial (public-lookup.md).
         $this->getJson('/api/v1/vehicles/search/11122233344')
             ->assertOk()
-            ->assertJsonPath('data.renavam', '11122233344');
+            ->assertJsonPath('data.id', $vehicle->id)
+            ->assertJsonPath('data.renavam', '•••••••3344');
     }
 
     public function test_search_returns_404_for_nonexistent_vehicle(): void
@@ -262,7 +264,7 @@ class VehicleControllerTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.license_plate', 'PII1234')
-            ->assertJsonPath('data.chassis', 'SECRETCHASSIS123')
+            ->assertJsonPath('data.chassis', '••••••••••••S123')
             ->assertJsonPath('data.matched_by', 'current_plate')
             ->assertJsonMissingPath('data.owners')
             ->assertJsonMissingPath('data.maintenances.0.user')
@@ -271,6 +273,7 @@ class VehicleControllerTest extends TestCase
         $payload = json_encode($response->json());
         $this->assertStringNotContainsString('owner-secret@example.com', $payload);
         $this->assertStringNotContainsString('11999998888', $payload);
+        $this->assertStringNotContainsString('SECRETCHASSIS123', $payload);
     }
 
     public function test_can_get_vehicle_maintenances(): void

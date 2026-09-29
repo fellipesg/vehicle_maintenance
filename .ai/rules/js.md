@@ -1,6 +1,9 @@
 ---
 paths:
   - resources/js/user-portal.js
+  - resources/js/owner-maintenance-form.js
+  - resources/js/maintenance-kilometer-range.js
+  - resources/js/utils/maintenance-kilometers.js
 ---
 
 # Js
@@ -25,3 +28,9 @@ The Cursor Simple Browser download UI (`--disable-blink-features=AutomationContr
 
 ## No download attribute on portal PDF links
 Never set the download attribute on the Baixar PDF link. Chromium implements it as a blob: fetch, so the shelf shows a UUID even when href already ends in historico_....pdf. Plain same-origin GET only. Cursor Simple Browser always lists downloads as UUIDs; verify in real Edge.
+
+## Owner portal is server-rendered
+The owner portal is rendered in Blade; user-portal.js only adds interactivity (PDF export) and owner-maintenance-form.js the maintenance form. Do not bring back screens built from the API with loading placeholders ("Carregando…"): DesignSystemGuardrailsTest fails on it. resources/js/api/client.js keeps only the PDF export calls.
+
+## Kilometer range mirrors VehicleMileageService
+resources/js/utils/maintenance-kilometers.js mirrors App\Services\Vehicle\VehicleMileageService::assertMaintenanceKilometers; change both together (OwnerPortalScriptsTest runs the JS against the server rule). resources/js/maintenance-kilometer-range.js binds it to the owner and garage forms (data-mileage from App\Support\Vehicle\MaintenanceMileageContext). It only warns: never prefill the field with today's odometer nor set min, because an old service has fewer km.

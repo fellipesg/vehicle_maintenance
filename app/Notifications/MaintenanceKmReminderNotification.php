@@ -67,7 +67,7 @@ class MaintenanceKmReminderNotification extends Notification implements ShouldQu
             ->line($intro)
             ->line("Próxima revisão estimada: **{$formattedNextDue} km**.")
             ->action('Ver veículo', $this->vehicleUrl($notifiable))
-            ->salutation('Revisalog');
+            ->salutation('RevisaLog');
     }
 
     /**

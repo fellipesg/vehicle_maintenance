@@ -23,7 +23,9 @@ class WorkshopPortalTest extends TestCase
         $this->actingAs($this->workshopUser)
             ->get('/oficina/dashboard')
             ->assertOk()
-            ->assertSee('Portal da Oficina');
+            ->assertSee('<title>Início · Oficina · RevisaLog</title>', false)
+            ->assertSee('Olá, '.$this->workshopUser->name)
+            ->assertDontSee('Portal da Oficina');
     }
 
     public function test_workshop_can_register_profile(): void

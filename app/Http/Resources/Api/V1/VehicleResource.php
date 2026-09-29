@@ -2,28 +2,55 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Models\User;
+use App\Support\Vehicle\VehicleIdentifierVisibility;
 use App\Support\VehicleProvenanceStrip;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin \App\Models\Vehicle */
+/**
+ * Veículo nas respostas da API. Chassi e RENAVAM saem inteiros só para o dono atual
+ * (VehiclePolicy::update); lojista em consignação, oficina, dono anterior e admin recebem os
+ * números parciais, com identifiers_masked = true (App\Support\Vehicle\VehicleIdentifierVisibility).
+ *
+ * @mixin \App\Models\Vehicle
+ */
 class VehicleResource extends JsonResource
 {
+    private ?User $viewer = null;
+
+    /**
+     * Quem vê o veículo, quando a requisição ainda não tem usuário (ex.: a resposta do login, que
+     * devolve os veículos da conta que acabou de entrar). Sem isso vale o usuário da requisição.
+     */
+    public function viewedBy(User $viewer): static
+    {
+        $this->viewer = $viewer;
+
+        return $this;
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
+        $identifiers = VehicleIdentifierVisibility::fields(
+            $this->viewer ?? VehicleIdentifierVisibility::viewerOf($request),
+            $this->resource,
+        );
+
         return [
             'id' => $this->id,
             'license_plate' => $this->license_plate,
             'current_plate' => $this->license_plate,
-            'renavam' => $this->renavam,
+            'renavam' => $identifiers['renavam'],
             'brand' => $this->brand,
             'model' => $this->model,
             'year' => $this->year,
             'color' => $this->color,
-            'chassis' => $this->chassis,
+            'chassis' => $identifiers['chassis'],
+            'identifiers_masked' => $identifiers['identifiers_masked'],
             'motorization' => $this->motorization,
             'engine' => $this->engine,
             'current_kilometers' => $this->current_kilometers,

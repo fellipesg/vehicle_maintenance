@@ -1,0 +1,15 @@
+---
+paths:
+  - 'app/Policies/**'
+---
+
+# Policies
+
+## Workshop changes only the order it sealed
+MaintenancePolicy::update/delete: a workshop account may change or delete only a maintenance with verified_at set and verified_workshop_id equal to its workshop. A record that an owner or dealer declared citing the workshop (workshop_id, no seal) stays with whoever declared it; the workshop can view it but not change it, in the API (Flutter) and on the web. Other accounts change only declared records of their own tenant; a sealed record is never changed by them. Web controllers call Gate view first and redirect with a friendly error before Gate update, so the declared-but-cited case does not become a bare 403.
+
+## Only the current owner changes a declared record
+Besides the tenant, MaintenancePolicy::update/delete require the account to be the vehicle's current owner (VehiclePolicy::addMaintenance, the user_vehicles pivot with is_current_owner in the account's tenant). A seller, or a dealer holding the car on consignment, keeps seeing what it declared but cannot edit or delete it (API and web). That denial carries the code MaintenancePolicy::DENIED_NOT_CURRENT_OWNER; the owner portal reads it with Gate::inspect to explain "O veículo não está mais na sua conta". The policies return Illuminate\Auth\Access\Response, so a policy that delegates calls ->allowed(). MaintenancePhotoPolicy and InvoicePolicy::update/delete delegate to MaintenancePolicy::update (changing a photo or an invoice changes the maintenance); InvoicePolicy::view still follows MaintenancePolicy::view.
+
+## /link never grants ownership; creating a record needs the current owner
+VehiclePolicy::link is tenantOwnsVehicle only: POST /api/v1/vehicles/{id}/link just confirms the caller's own current-owner link and never attaches or promotes a pivot (a consignment or former-owner pivot stays is_current_owner=false). Taking over a vehicle already on RevisaLog goes through the CRLV-e (VehicleOwnershipService::claimExisting). POST /api/v1/maintenances for any non-workshop account authorizes VehiclePolicy::addMaintenance, like the web stores; a consignment dealer or an admin gets 403 instead of moving the owner's odometer with a record nobody can undo.

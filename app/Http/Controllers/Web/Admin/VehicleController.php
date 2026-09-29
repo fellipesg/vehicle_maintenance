@@ -10,9 +10,30 @@ use Illuminate\View\View;
 
 class VehicleController extends Controller
 {
+    /**
+     * Colunas ordenáveis da frota (?ordenar=) => coluna ou contagem no SQL.
+     *
+     * @var array<string, string>
+     */
+    private const SORTS = [
+        'veiculo' => 'brand',
+        'cadastro' => 'created_at',
+        'manutencoes' => 'maintenances_count',
+    ];
+
+    /**
+     * Frota da plataforma inteira (sem escopo de tenant): busca por placa (atual ou antiga), chassi,
+     * RENAVAM, marca ou modelo; ordenação pelas colunas de SORTS (padrão: cadastro mais recente).
+     */
     public function index(Request $request): View
     {
-        $search = trim((string) $request->query('search', ''));
+        $search = is_string($request->query('search')) ? trim($request->query('search')) : '';
+        $sort = is_string($request->query('ordenar')) && array_key_exists($request->query('ordenar'), self::SORTS)
+            ? $request->query('ordenar')
+            : 'cadastro';
+        $direction = in_array($request->query('direcao'), ['asc', 'desc'], true)
+            ? $request->query('direcao')
+            : ($sort === 'veiculo' ? 'asc' : 'desc');
 
         $vehiclesQuery = Vehicle::query()
             ->withCount('maintenances')
@@ -24,7 +45,9 @@ class VehicleController extends Controller
                     ->limit(1)
                     ->with('workshop'),
             ])
-            ->orderByDesc('created_at');
+            ->orderBy(self::SORTS[$sort], $direction)
+            ->when($sort === 'veiculo', fn ($query) => $query->orderBy('model', $direction))
+            ->orderByDesc('id');
 
         if ($search !== '') {
             $lookup = VehiclePlateSearch::findByIdentifier($search);
@@ -47,28 +70,19 @@ class VehicleController extends Controller
         return view('admin.vehicles.index', [
             'vehicles' => $vehicles,
             'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
-    public function show(Request $request, Vehicle $vehicle): View
+    /**
+     * Ficha do veículo no admin: o mesmo <x-vehicle.detail> dos portais (linha do tempo, histórico
+     * na mesma ordem e documentos completos), só leitura, com o proprietário atual.
+     */
+    public function show(Vehicle $vehicle): View
     {
-        $verified = $request->query('verified');
-        $maintenanceCount = $vehicle->maintenances()->count();
+        $vehicle->load(['owners' => fn ($query) => $query->wherePivot('is_current_owner', true)]);
 
-        $vehicle->load([
-            'owners' => fn ($query) => $query->wherePivot('is_current_owner', true),
-            'maintenances' => fn ($query) => $query
-                ->orderByDesc('maintenance_date')
-                ->orderByDesc('id')
-                ->when($verified === '1', fn ($q) => $q->whereNotNull('verified_at'))
-                ->when($verified === '0', fn ($q) => $q->whereNull('verified_at'))
-                ->with(['workshop', 'verifiedWorkshop', 'user']),
-        ]);
-
-        return view('admin.vehicles.show', [
-            'vehicle' => $vehicle,
-            'verified' => $verified,
-            'showMaintenanceFilter' => $maintenanceCount > 5,
-        ]);
+        return view('admin.vehicles.show', ['vehicle' => $vehicle]);
     }
 }

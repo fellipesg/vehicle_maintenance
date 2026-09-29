@@ -52,7 +52,7 @@ class VehicleMaintenancePdfExporterTest extends TestCase
             $this->assertGreaterThanOrEqual(
                 2,
                 DemoWarrantyPdfValidator::embeddedImageCount($file['content']),
-                'Expected cover photo and Revisalog logo images in the PDF.'
+                'Expected cover photo and RevisaLog logo images in the PDF.'
             );
         } finally {
             $exporter->cleanupTemps($file['temps']);
@@ -111,10 +111,10 @@ class VehicleMaintenancePdfExporterTest extends TestCase
             $this->assertGreaterThanOrEqual(
                 1,
                 DemoWarrantyPdfValidator::embeddedImageCount($file['content']),
-                'Expected Revisalog logo image on cover page.'
+                'Expected RevisaLog logo image on cover page.'
             );
             $this->assertStringContainsString(
-                'Revisalog',
+                'RevisaLog',
                 DemoWarrantyPdfValidator::extractText($file['content'])
             );
         } finally {

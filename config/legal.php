@@ -15,9 +15,9 @@ return [
     'privacy_version' => '2026-09-22',
 
     'terms_of_use' => <<<'TEXT'
-Termos de Uso — Revisalog
+Termos de Uso — RevisaLog
 
-Estes termos regem o uso da plataforma Revisalog (revisalog.com.br), que registra o histórico de manutenções vinculado ao veículo (chassi/VIN), e não à conta do proprietário.
+Estes termos regem o uso da plataforma RevisaLog (revisalog.com.br), que registra o histórico de manutenções vinculado ao veículo (chassi/VIN), e não à conta do proprietário.
 
 1. Responsabilidade pelas informações
 Ao cadastrar veículos, quilometragens, datas de manutenção, notas fiscais e demais dados, você declara que as informações são verdadeiras e de sua responsabilidade como proprietário ou representante autorizado.
@@ -26,7 +26,7 @@ Ao cadastrar veículos, quilometragens, datas de manutenção, notas fiscais e d
 A quilometragem informada deve refletir o hodômetro do veículo no momento do registro. Manutenções devem ser registradas com a quilometragem e a data corretas. O sistema utiliza esses dados para compor o histórico do veículo.
 
 3. Isenção de responsabilidade
-A Revisalog atua como repositório do histórico informado pelos usuários. Não verificamos, em regra, a veracidade dos dados, não garantimos a completude do histórico e não nos responsabilizamos por informações falsas, incompletas ou desatualizadas fornecidas por terceiros. Selos de oficina identificam registros feitos pela oficina cadastrada; registros declarados pelo dono ou lojista não passam por essa verificação.
+A RevisaLog atua como repositório do histórico informado pelos usuários. Não verificamos, em regra, a veracidade dos dados, não garantimos a completude do histórico e não nos responsabilizamos por informações falsas, incompletas ou desatualizadas fornecidas por terceiros. Selos de oficina identificam registros feitos pela oficina cadastrada; registros declarados pelo dono ou lojista não passam por essa verificação.
 
 4. Uso do histórico
 O histórico exportado ou consultado reflete exclusivamente o que foi registrado na plataforma. Decisões de compra, venda, revisão ou garantia devem considerar fontes adicionais e inspeção presencial quando aplicável.
@@ -42,12 +42,12 @@ Ao marcar que leu e aceita estes termos, você confirma ciência das condições
 TEXT,
 
     'privacy_policy' => <<<'TEXT'
-Política de Privacidade — Revisalog
+Política de Privacidade — RevisaLog
 
-Esta política descreve como a Revisalog (revisalog.com.br) trata dados pessoais, para quê e quais são os seus direitos, em linha com a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018).
+Esta política descreve como a RevisaLog (revisalog.com.br) trata dados pessoais, para quê e quais são os seus direitos, em linha com a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018).
 
 1. Controlador e contato
-O tratamento é feito pela Revisalog, identificada no rodapé do site. Para exercer seus direitos ou tirar dúvidas sobre privacidade, escreva para suporte@revisalog.com.br ou use a página revisalog.com.br/contato com o assunto "Privacidade e dados pessoais (LGPD)".
+O tratamento é feito pela RevisaLog, identificada no rodapé do site. Para exercer seus direitos ou tirar dúvidas sobre privacidade, escreva para suporte@revisalog.com.br ou use a página revisalog.com.br/contato com o assunto "Privacidade e dados pessoais (LGPD)".
 
 2. Dados que coletamos
 - Conta: nome, e-mail, senha (armazenada de forma irreversível), telefone e CPF/CNPJ quando informados e, quando você entra com Google, Facebook ou X, o identificador fornecido por esse provedor.

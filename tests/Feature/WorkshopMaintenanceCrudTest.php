@@ -111,7 +111,7 @@ class WorkshopMaintenanceCrudTest extends TestCase
         $workshop = $workshopUser->workshop;
         $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
 
-        $maintenance = Maintenance::factory()->create([
+        $maintenance = Maintenance::factory()->sealedByWorkshop()->create([
             'vehicle_id' => $vehicle->id,
             'workshop_id' => $workshop->id,
             'maintenance_type' => 'Troca de óleo',
@@ -122,7 +122,7 @@ class WorkshopMaintenanceCrudTest extends TestCase
             ->assertOk()
             ->assertSee('Troca de óleo')
             ->assertSee('ABC1D23')
-            ->assertSee('Editar');
+            ->assertSee('Editar OS');
     }
 
     public function test_workshop_can_create_maintenance_with_warranty_items(): void

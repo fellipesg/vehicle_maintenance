@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\AccountController;
 use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryController;
 use App\Http\Controllers\Web\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Web\Admin\VehicleBrandController as AdminVehicleBrandCo
 use App\Http\Controllers\Web\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Web\Admin\VehicleModelController as AdminVehicleModelController;
 use App\Http\Controllers\Web\Admin\WorkshopController as AdminWorkshopController;
+use App\Http\Controllers\Web\Auth\PasswordResetController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BlogController;
 use App\Http\Controllers\Web\BlogFeedController;
@@ -45,6 +47,10 @@ Route::get('/contato', [ContactController::class, 'show'])->name('contact.show')
 Route::post('/contato', [ContactController::class, 'store'])
     ->middleware('throttle:contact')
     ->name('contact.store');
+// Conferência pública do Selo da oficina: o campo para digitar o código (/verificar) e a página do QR (/v/).
+Route::get('/verificar', [\App\Http\Controllers\Web\PublicVerificationController::class, 'lookup'])
+    ->middleware('throttle:search')
+    ->name('verification.lookup');
 Route::get('/v/{code}', [\App\Http\Controllers\Web\PublicVerificationController::class, 'show'])
     ->middleware('throttle:search')
     ->name('verification.show');
@@ -61,16 +67,35 @@ Route::middleware('guest')->group(function () {
         ->name('login.submit');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-web');
+
+    // Recuperação de senha (Password broker). O limite de tentativas fica no controller, com aviso em pt-BR.
+    Route::get('/esqueci-senha', [PasswordResetController::class, 'create'])->name('password.request');
+    Route::post('/esqueci-senha', [PasswordResetController::class, 'store'])->name('password.email');
+    Route::get('/redefinir-senha/{token}', [PasswordResetController::class, 'edit'])->name('password.reset');
+    Route::post('/redefinir-senha', [PasswordResetController::class, 'update'])->name('password.update');
 });
 
 Route::middleware(['auth', 'tenant'])->group(function () {
-    Route::get('/buscar-veiculo', [PublicVehicleController::class, 'search'])->name('vehicle.search');
+    Route::get('/buscar-veiculo', [PublicVehicleController::class, 'search'])
+        ->middleware('throttle:search')
+        ->name('vehicle.search');
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notificacoes/{notification}/lida', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notificacoes/lidas', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+
+    Route::get('/conta', [AccountController::class, 'edit'])->name('account.edit');
+    Route::put('/conta', [AccountController::class, 'update'])
+        ->middleware('throttle:6,1,account-update')
+        ->name('account.update');
+    Route::put('/conta/senha', [AccountController::class, 'updatePassword'])
+        ->middleware('throttle:6,1')
+        ->name('account.password');
+    Route::delete('/conta', [AccountController::class, 'destroy'])
+        ->middleware('throttle:6,1')
+        ->name('account.destroy');
 
     Route::prefix('usuario')->middleware('user.type:user')->name('user.')->group(function () {
         Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');
@@ -84,11 +109,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/veiculos/vincular', [UserVehicleController::class, 'claim'])->name('vehicles.claim.store');
         Route::get('/veiculos/consignacao', [UserVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
         Route::post('/veiculos/consignacao', [UserVehicleController::class, 'storeConsignment'])->name('vehicles.consignment.store');
+        Route::delete('/veiculos/consignacao', [UserVehicleController::class, 'cancelConsignment'])->name('vehicles.consignment.cancel');
         Route::post('/veiculos', [UserVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/veiculos/{vehicle}', [UserVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/veiculos/{vehicle}/editar', [UserVehicleController::class, 'edit'])->name('vehicles.edit');
         Route::post('/veiculos/{vehicle}/importar-crlv', [UserVehicleController::class, 'importCrlvForEdit'])->name('vehicles.import-crlv.edit');
         Route::put('/veiculos/{vehicle}', [UserVehicleController::class, 'update'])->name('vehicles.update');
+        Route::get('/veiculos/{vehicle}/capas', [UserVehicleController::class, 'editCovers'])->name('vehicles.covers');
+        Route::put('/veiculos/{vehicle}/capas', [UserVehicleController::class, 'updateCovers'])->name('vehicles.covers.update');
         Route::post('/veiculos/{vehicle}/pdf', [UserVehicleController::class, 'exportPdf'])->name('vehicles.export-pdf');
         Route::get('/exportacoes-pdf/{export}/baixar', [VehiclePdfExportDownloadController::class, 'redirectToNamedFile'])
             ->name('vehicle-pdf-exports.redirect');
@@ -101,6 +129,16 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/manutencoes/{maintenance}', [UserMaintenanceController::class, 'show'])
             ->whereNumber('maintenance')
             ->name('maintenances.show');
+        // Só manutenções declaradas: a MaintenancePolicy barra as que têm Selo da oficina.
+        Route::get('/manutencoes/{maintenance}/editar', [UserMaintenanceController::class, 'edit'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.edit');
+        Route::put('/manutencoes/{maintenance}', [UserMaintenanceController::class, 'update'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.update');
+        Route::delete('/manutencoes/{maintenance}', [UserMaintenanceController::class, 'destroy'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.destroy');
         Route::get('/oficinas', [WorkshopDirectoryController::class, 'index'])->name('workshops.index');
     });
 
@@ -116,11 +154,19 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/estoque/vincular', [GarageVehicleController::class, 'claim'])->name('vehicles.claim.store');
         Route::get('/estoque/consignacao', [GarageVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
         Route::post('/estoque/consignacao', [GarageVehicleController::class, 'storeConsignment'])->name('vehicles.consignment.store');
+        Route::delete('/estoque/consignacao', [GarageVehicleController::class, 'cancelConsignment'])->name('vehicles.consignment.cancel');
         Route::post('/estoque', [GarageVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/estoque/{vehicle}', [GarageVehicleController::class, 'show'])->name('vehicles.show');
+        Route::get('/estoque/{vehicle}/editar', [GarageVehicleController::class, 'edit'])->name('vehicles.edit');
+        Route::put('/estoque/{vehicle}', [GarageVehicleController::class, 'update'])->name('vehicles.update');
+        Route::get('/estoque/{vehicle}/capas', [GarageVehicleController::class, 'editCovers'])->name('vehicles.covers');
+        Route::put('/estoque/{vehicle}/capas', [GarageVehicleController::class, 'updateCovers'])->name('vehicles.covers.update');
         Route::get('/manutencoes', [GarageMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [GarageMaintenanceController::class, 'create'])->name('maintenances.create');
         Route::post('/manutencoes', [GarageMaintenanceController::class, 'store'])->name('maintenances.store');
+        Route::get('/manutencoes/{maintenance}', [GarageMaintenanceController::class, 'show'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.show');
     });
 
     Route::prefix('oficina')->middleware('user.type:workshop')->name('workshop.')->group(function () {
@@ -149,12 +195,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->whereNumber('maintenance')
             ->name('maintenances.destroy');
         Route::resource('garantias/templates', WorkshopWarrantyTemplateController::class)
+            ->except(['show'])
             ->names('warranty-templates')
             ->parameters(['templates' => 'warranty_template']);
     });
 
     Route::prefix('admin')->middleware('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/usuarios', [AdminUserController::class, 'index'])->name('users.index');
         Route::get('/usuarios/{user}', [AdminUserController::class, 'show'])->name('users.show');
         Route::get('/veiculos', [AdminVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
@@ -172,6 +220,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/blog', [AdminBlogPostController::class, 'index'])->name('blog.index');
         Route::get('/blog/novo', [AdminBlogPostController::class, 'create'])->name('blog.create');
         Route::post('/blog', [AdminBlogPostController::class, 'store'])->name('blog.store');
+        Route::post('/blog/pre-visualizacao', [AdminBlogPostController::class, 'preview'])->name('blog.preview');
         Route::get('/blog/categorias', [AdminBlogCategoryController::class, 'index'])->name('blog.categories.index');
         Route::post('/blog/categorias', [AdminBlogCategoryController::class, 'store'])->name('blog.categories.store');
         Route::put('/blog/categorias/{category}', [AdminBlogCategoryController::class, 'update'])->name('blog.categories.update');

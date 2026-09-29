@@ -6,6 +6,9 @@ use App\Models\Invoice;
 use App\Models\Vehicle;
 use App\Support\AppStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Dompdf\Adapter\CPDF;
+use Dompdf\Dompdf;
+use Dompdf\FontMetrics;
 use Illuminate\Support\Str;
 use setasign\Fpdi\Fpdi;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,7 +31,21 @@ class VehicleMaintenancePdfExporter
 
     public const LETTERHEAD_JPEG_QUALITY = 92;
 
+    /** Margem da página no Dompdf (1,2 cm, em pontos): o rodapé de página fica dentro dela. */
+    private const PAGE_MARGIN_PT = 34.0;
+
+    /** Rodapé de página em #5a7289 (automotive-500), o mesmo cinza dos rótulos do PDF. */
+    private const PAGE_FOOTER_COLOR = [90 / 255, 114 / 255, 137 / 255];
+
+    private const PAGE_FOOTER_FONT_SIZE = 7.5;
+
     /**
+     * $maskIdentifiers: quem pediu o PDF não é o dono atual (VehiclePolicy::update), como o lojista em
+     * consignação ou o admin. O PDF sai com chassi e RENAVAM parciais (VehicleIdentifierMask) e sem
+     * o código do motor, a mesma regra da API e da ficha na web. Quem decide é quem enfileira o PDF
+     * (App\Jobs\GenerateVehicleMaintenancePdfExport, App\Jobs\EmailVehicleMaintenancePdf), que
+     * sabe quem pediu.
+     *
      * @return array{
      *     content: string,
      *     filename: string,
@@ -36,7 +53,7 @@ class VehicleMaintenancePdfExporter
      *     temps: list<string>
      * }
      */
-    public function generate(Vehicle $vehicle): array
+    public function generate(Vehicle $vehicle, bool $maskIdentifiers = false): array
     {
         $vehicle->load([
             'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
@@ -89,6 +106,7 @@ class VehicleMaintenancePdfExporter
 
             $pdf = Pdf::loadView('pdfs.vehicle_maintenance_export', [
                 'vehicle' => $vehicle,
+                'identifiersMasked' => $maskIdentifiers,
                 'coverImageSrc' => $coverImageSrc,
                 'workshopLogos' => $workshopLogos,
                 'workshopLogoWidth' => self::WORKSHOP_LOGO_DISPLAY_WIDTH,
@@ -97,6 +115,8 @@ class VehicleMaintenancePdfExporter
                 'revisalogLogoSrc' => $this->revisalogLetterheadLogoSrc(),
             ]);
             $pdf->setPaper('a4', 'portrait');
+            $pdf->render();
+            $this->stampPageFooter($pdf->getDomPDF(), $vehicle);
 
             $mainPdfContent = $pdf->output();
             $invoiceCopies = $this->invoiceCopiesFromPrefetched($vehicle, $copies, $temps);
@@ -122,9 +142,42 @@ class VehicleMaintenancePdfExporter
         ];
     }
 
-    public function download(Vehicle $vehicle): Response
+    /**
+     * Rodapé de toda página do histórico: o veículo à esquerda (folha solta continua identificada) e
+     * "RevisaLog · Página X de Y" à direita, na margem inferior. Desenhado no canvas depois do
+     * render, fora do HTML, então não mexe no layout das tabelas (.ai/rules/pdfs.md). As notas
+     * fiscais em PDF anexadas depois pelo merge ficam sem esse rodapé: são documentos próprios.
+     */
+    private function stampPageFooter(Dompdf $dompdf, Vehicle $vehicle): void
     {
-        $file = $this->generate($vehicle);
+        $fontMetrics = $dompdf->getFontMetrics();
+        $font = $fontMetrics->getFont('DejaVu Sans', 'normal');
+
+        if ($font === null) {
+            return;
+        }
+
+        $vehicleLabel = collect([trim("{$vehicle->brand} {$vehicle->model}"), (string) $vehicle->license_plate])
+            ->filter(fn (string $part): bool => $part !== '')
+            ->implode(' · ');
+
+        $dompdf->getCanvas()->page_script(function (int $pageNumber, int $pageCount, CPDF $canvas, FontMetrics $metrics) use ($font, $vehicleLabel): void {
+            $size = self::PAGE_FOOTER_FONT_SIZE;
+            $y = $canvas->get_height() - 24;
+            $pageLabel = "RevisaLog · Página {$pageNumber} de {$pageCount}";
+            $pageLabelX = $canvas->get_width() - self::PAGE_MARGIN_PT - $metrics->getTextWidth($pageLabel, $font, $size);
+
+            if ($vehicleLabel !== '') {
+                $canvas->text(self::PAGE_MARGIN_PT, $y, $vehicleLabel, $font, $size, self::PAGE_FOOTER_COLOR);
+            }
+
+            $canvas->text($pageLabelX, $y, $pageLabel, $font, $size, self::PAGE_FOOTER_COLOR);
+        });
+    }
+
+    public function download(Vehicle $vehicle, bool $maskIdentifiers = false): Response
+    {
+        $file = $this->generate($vehicle, $maskIdentifiers);
 
         try {
             return response($file['content'], 200, [

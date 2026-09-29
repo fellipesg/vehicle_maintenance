@@ -100,7 +100,7 @@ class CrlvVehicleImportTest extends TestCase
             ->assertOk()
             ->assertSee($expected['license_plate'])
             ->assertSee($expected['brand'])
-            ->assertSee('Confirmar e salvar veículo');
+            ->assertSee('Conferir dados do veículo');
     }
 
     #[DataProvider('crlvFixtureProvider')]
@@ -176,7 +176,7 @@ class CrlvVehicleImportTest extends TestCase
             ->assertOk()
             ->assertSee('PHF9J95')
             ->assertSee('01050047521')
-            ->assertSee('Confirmar e salvar veículo');
+            ->assertSee('Conferir dados do veículo');
     }
 
     public function test_garage_claim_import_without_existing_vehicle_goes_to_preview(): void
@@ -432,7 +432,8 @@ class CrlvVehicleImportTest extends TestCase
 
         $this->assertStringContainsString('Estrutura do CRLV-e não reconhecida.', $html);
         $this->assertStringContainsString('CRLV-e.pdf', $html);
-        $this->assertStringContainsString('Usuario id', $html);
+        $this->assertStringContainsString('ID do usuário', $html);
+        $this->assertStringNotContainsString('Usuario id', $html);
     }
 
     public function test_preview_redirects_without_session(): void

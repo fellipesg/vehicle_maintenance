@@ -51,20 +51,15 @@ class VehiclePolicy
         return $this->tenantOwnsVehicle($user, $vehicle);
     }
 
+    /**
+     * POST /api/v1/vehicles/{id}/link só confirma o vínculo de quem já é o dono atual. Tomar posse de
+     * um veículo que já está na RevisaLog pede o CRLV-e (VehicleOwnershipService::claimExisting, no
+     * assistente "Adicionar veículo"): sem prova, qualquer conta viraria dona de um veículo sem dono
+     * atual (desvinculado, de conta excluída ou só em consignação) e leria chassi e RENAVAM inteiros.
+     */
     public function link(User $user, Vehicle $vehicle): bool
     {
-        if (! $user->tenant_id) {
-            return false;
-        }
-
-        if ($this->tenantOwnsVehicle($user, $vehicle)) {
-            return true;
-        }
-
-        return ! $vehicle->owners()
-            ->wherePivot('is_current_owner', true)
-            ->wherePivot('tenant_id', '!=', $user->tenant_id)
-            ->exists();
+        return $this->tenantOwnsVehicle($user, $vehicle);
     }
 
     /**

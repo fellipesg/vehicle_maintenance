@@ -1,33 +1,123 @@
 /**
  * Form UX: máscaras, critérios de senha e validação enquanto digita.
+ *
+ * Erro só depois de sair do campo: enquanto a pessoa digita pela primeira vez, o campo fica neutro
+ * (nada de vermelho na primeira tecla). Depois do primeiro blur, de uma tentativa de envio (submit
+ * ou o evento invalid da validação nativa) ou quando o servidor já marcou o campo com aria-invalid,
+ * a validação passa a acompanhar cada tecla (data-touched="true"). O estado válido aparece na hora.
+ * A lista de critérios da senha continua ao vivo.
  */
+
+/** Pedido para um campo validar já, mesmo sem blur (disparado no envio do formulário). */
+const TOUCH_EVENT = 'form-ux:touch';
+
 function digitsOnly(value) {
     return String(value ?? '').replace(/\D/g, '');
 }
 
+/**
+ * Classes de cor lidas do próprio elemento (data-ok-class, data-error-class, data-idle-class), para
+ * a mesma validação servir a fundo claro e escuro. Sem o atributo, vale o padrão de fundo claro.
+ */
+function stateClasses(element, state, fallback) {
+    const value = element.dataset[`${state}Class`];
+
+    return (value ?? fallback).split(/\s+/).filter(Boolean);
+}
+
+/** Bordas de estado pelos papéis semânticos (success 6,81:1 e danger 6,42:1 no branco). */
+const STATE_BORDER_CLASSES = { valid: 'border-success', invalid: 'border-danger' };
+
+/**
+ * Estado da validação enquanto a pessoa digita: data-state (idle | valid | invalid) no campo,
+ * aria-invalid="true" só enquanto o valor digitado é inválido e a borda pelos papéis semânticos.
+ *
+ * A mensagem só vai para a dica antiga, [data-field-hint] ao lado do campo. A dica de <x-ui.field>
+ * ({id}-hint) não tem esse atributo e fica como está: ela e o erro do servidor já estão no
+ * aria-describedby. aria-invalid vindo do servidor não é tirado aqui; só o que este script pôs.
+ */
 function setFieldState(input, ok, message) {
     const hint = input.parentElement?.querySelector('[data-field-hint]');
-    input.classList.remove('border-red-500', 'border-green-500', 'ring-red-200', 'ring-green-200');
-    if (input.value.length === 0) {
-        if (hint) {
-            hint.textContent = hint.dataset.defaultHint || '';
-            hint.className = hint.dataset.idleClass || 'mt-1 text-sm text-automotive-500';
-        }
+    let state = input.value.length === 0 ? 'idle' : (ok ? 'valid' : 'invalid');
+
+    // Antes do primeiro blur (ou envio), o valor ainda está sendo digitado: sem erro por enquanto.
+    if (state === 'invalid' && input.dataset.touched !== 'true') {
+        state = 'idle';
+    }
+
+    input.dataset.state = state;
+    input.classList.remove(...Object.values(STATE_BORDER_CLASSES));
+
+    if (state === 'invalid') {
+        input.setAttribute('aria-invalid', 'true');
+        input.dataset.liveInvalid = 'true';
+    } else if (input.dataset.liveInvalid) {
+        input.removeAttribute('aria-invalid');
+        delete input.dataset.liveInvalid;
+    }
+
+    if (state !== 'idle') {
+        input.classList.add(STATE_BORDER_CLASSES[state]);
+    }
+
+    if (!hint) {
         return;
     }
-    if (ok) {
-        input.classList.add('border-green-500');
-        if (hint) {
-            hint.textContent = message || hint.dataset.okHint || 'OK';
-            hint.className = 'mt-1 text-sm text-green-600';
-        }
+
+    if (state === 'idle') {
+        hint.textContent = hint.dataset.defaultHint || '';
+        hint.className = stateClasses(hint, 'idle', 'mt-1 text-sm text-muted-foreground').join(' ');
+    } else if (state === 'valid') {
+        hint.textContent = message || hint.dataset.okHint || 'OK';
+        hint.className = stateClasses(hint, 'ok', 'mt-1 text-sm text-success').join(' ');
     } else {
-        input.classList.add('border-red-500');
-        if (hint) {
-            hint.textContent = message || hint.dataset.errorHint || 'Valor inválido';
-            hint.className = 'mt-1 text-sm text-red-600';
-        }
+        hint.textContent = message || hint.dataset.errorHint || 'Valor inválido';
+        hint.className = stateClasses(hint, 'error', 'mt-1 text-sm text-danger').join(' ');
     }
+}
+
+/**
+ * No envio, marca os campos do formulário como tocados para o erro aparecer mesmo sem blur. Uma vez
+ * por formulário.
+ *
+ * @param {HTMLFormElement|null|undefined} form
+ */
+function touchFieldsOnSubmit(form) {
+    if (!form || form.dataset.formUxSubmitReady === 'true') {
+        return;
+    }
+
+    form.dataset.formUxSubmitReady = 'true';
+    form.addEventListener('submit', () => {
+        form.querySelectorAll('[data-form-ux-field]').forEach((field) => {
+            field.dispatchEvent(new CustomEvent(TOUCH_EVENT));
+        });
+    });
+}
+
+/**
+ * Liga a validação de um campo: apply() a cada tecla; o blur, o invalid nativo e o envio marcam o
+ * campo como tocado antes de validar. Erro que veio do servidor (aria-invalid) já conta como tocado.
+ *
+ * @param {HTMLInputElement} input
+ * @param {() => void} apply
+ */
+function watchField(input, apply) {
+    const touch = () => {
+        input.dataset.touched = 'true';
+        apply();
+    };
+
+    if (input.getAttribute('aria-invalid') === 'true') {
+        input.dataset.touched = 'true';
+    }
+
+    input.dataset.formUxField = '';
+    input.addEventListener('input', apply);
+    input.addEventListener('blur', touch);
+    input.addEventListener('invalid', touch);
+    input.addEventListener(TOUCH_EVENT, touch);
+    touchFieldsOnSubmit(input.form);
 }
 
 function bindDigitMask(input) {
@@ -51,9 +141,11 @@ function bindDigitMask(input) {
     };
 
     input.setAttribute('inputmode', 'numeric');
-    input.setAttribute('autocomplete', 'off');
-    input.addEventListener('input', apply);
-    input.addEventListener('blur', apply);
+    // Não passa por cima de um autocomplete da view (tel-national, postal-code...).
+    if (input.getAttribute('autocomplete') === null) {
+        input.setAttribute('autocomplete', 'off');
+    }
+    watchField(input, apply);
     apply();
 }
 
@@ -82,8 +174,7 @@ function bindChassisMask(input) {
         );
     };
 
-    input.addEventListener('input', apply);
-    input.addEventListener('blur', apply);
+    watchField(input, apply);
     apply();
 }
 
@@ -101,8 +192,7 @@ function bindPlateMask(input) {
         const ok = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(value);
         setFieldState(input, ok, ok ? 'Placa válida' : 'Use o padrão ABC1D23 ou ABC1234');
     };
-    input.addEventListener('input', apply);
-    input.addEventListener('blur', apply);
+    watchField(input, apply);
     apply();
 }
 
@@ -122,8 +212,7 @@ function bindYearField(input) {
             ok ? '' : `Ano entre ${min} e ${max}`,
         );
     };
-    input.addEventListener('input', apply);
-    input.addEventListener('blur', apply);
+    watchField(input, apply);
     apply();
 }
 
@@ -152,8 +241,7 @@ function bindDocumentMask(input) {
         setFieldState(input, ok, ok ? 'Documento OK' : 'CPF (11) ou CNPJ (14) dígitos');
     };
     input.setAttribute('inputmode', 'numeric');
-    input.addEventListener('input', apply);
-    input.addEventListener('blur', apply);
+    watchField(input, apply);
     apply();
 }
 
@@ -170,14 +258,29 @@ function bindPasswordCriteria(form) {
         match: criteria.querySelector('[data-rule="match"]'),
     };
 
-    const mark = (el, ok) => {
+    const okClasses = stateClasses(criteria, 'ok', 'text-success');
+    const idleClasses = stateClasses(criteria, 'idle', 'text-muted-foreground');
+    const errorClasses = stateClasses(criteria, 'error', 'text-danger');
+
+    /**
+     * @param {Element|null} el item da lista ([data-rule])
+     * @param {boolean} ok critério atendido
+     * @param {boolean} typed já há o que conferir (sem isso o item fica neutro, não vermelho)
+     */
+    const mark = (el, ok, typed) => {
         if (!el) return;
-        el.classList.toggle('text-green-500', ok);
-        el.classList.toggle('text-automotive-400', !ok);
-        el.classList.toggle('text-red-400', !ok && (password.value.length > 0 || (confirmation?.value.length ?? 0) > 0));
+        const state = ok ? 'ok' : (typed ? 'error' : 'idle');
+        el.classList.remove(...okClasses, ...idleClasses, ...errorClasses);
+        el.classList.add(...({ ok: okClasses, error: errorClasses, idle: idleClasses })[state]);
         const icon = el.querySelector('[data-rule-icon]');
         if (icon) {
             icon.textContent = ok ? '✓' : '○';
+        }
+        // O glifo é aria-hidden: o leitor de tela ouve "atendido" ou "pendente" (a lista é aria-live).
+        const status = el.querySelector('[data-rule-status]');
+        const statusText = ok ? ', atendido' : ', pendente';
+        if (status && status.textContent !== statusText) {
+            status.textContent = statusText;
         }
     };
 
@@ -186,8 +289,9 @@ function bindPasswordCriteria(form) {
         const matchOk = confirmation
             ? confirmation.value.length > 0 && confirmation.value === password.value
             : true;
-        mark(items.length, lengthOk);
-        mark(items.match, matchOk);
+        mark(items.length, lengthOk, password.value.length > 0);
+        // "Confirmação igual à senha" só é conferida quando a confirmação começa a ser digitada.
+        mark(items.match, matchOk, (confirmation?.value.length ?? 0) > 0);
         setFieldState(password, password.value.length === 0 || lengthOk, lengthOk ? '' : 'Mínimo de 8 caracteres');
         if (confirmation) {
             setFieldState(
@@ -198,8 +302,10 @@ function bindPasswordCriteria(form) {
         }
     };
 
-    password.addEventListener('input', apply);
-    confirmation?.addEventListener('input', apply);
+    watchField(password, apply);
+    if (confirmation) {
+        watchField(confirmation, apply);
+    }
     criteria.classList.remove('hidden');
     apply();
 }

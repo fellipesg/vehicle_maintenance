@@ -1,60 +1,61 @@
+{{--
+    Ficha do veículo no Lojista: a mesma <x-vehicle.detail> dos outros portais (capa inteira, Km
+    atual, Próxima revisão, Procedência, linha do tempo com os pontos e o filtro abaixo, histórico
+    e documentos). Ações: "Editar veículo e capas" (só o dono atual) e "Registrar manutenção" (o
+    primário, por último). Em consignação o aviso explica por que as ações não aparecem.
+--}}
 @extends('layouts.app')
 
-@section('title', $vehicle->brand . ' ' . $vehicle->model)
+@php
+    $vehicleName = trim($vehicle->brand.' '.$vehicle->model);
+    $registerMaintenanceUrl = route('garage.maintenances.create', ['vehicle_id' => $vehicle->id]);
+@endphp
+
+@section('title', $vehicleName)
 
 @section('content')
-<div class="mx-auto max-w-7xl px-4 py-8">
-    <span class="badge badge-green mb-2">🏪 Garagem</span>
-    <x-vehicle-cover :vehicle="$vehicle" variant="hero" class="mb-6" />
-    <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div class="space-y-3">
-            <h1 class="text-3xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h1>
-            <p class="text-automotive-600">{{ $vehicle->year }} · {{ $vehicle->color ?? '—' }}</p>
-            <x-vehicle-identity :vehicle="$vehicle" size="hero" :edit-route="null" />
-        </div>
-        <a href="{{ route('garage.maintenances.create') }}?vehicle_id={{ $vehicle->id }}" class="btn-primary">+ Registrar revisão pré-venda</a>
-    </div>
+    <x-ui.container size="lg" padded>
+        <x-vehicle.detail
+            :vehicle="$vehicle"
+            :portal="\App\Enums\Portal::Dealer"
+            :breadcrumbs="[['Estoque', route('garage.vehicles.index')], [$vehicleName]]"
+            :edit-url="$canEdit ? route('garage.vehicles.edit', $vehicle) : null"
+            :masked="$identifiersMasked"
+        >
+            @if ($canEdit || $canAddMaintenance)
+                <x-slot:actions>
+                    @if ($canEdit)
+                        <x-ui.button variant="secondary" icon="pencil-square" :href="route('garage.vehicles.edit', $vehicle)">Editar veículo e capas</x-ui.button>
+                    @endif
+                    @if ($canAddMaintenance)
+                        <x-ui.button icon="plus" :href="$registerMaintenanceUrl">Registrar manutenção</x-ui.button>
+                    @endif
+                </x-slot:actions>
+            @endif
 
-    <x-provenance-strip
-        :vehicle="$vehicle"
-        maintenance-path-prefix="#"
-        :filter-base-url="route('garage.vehicles.show', $vehicle)"
-        class="mb-6"
-    />
+            @unless ($canAddMaintenance)
+                <x-slot:notice>
+                    <x-ui.alert variant="info" :title="$consignmentGrant !== null ? 'Veículo em consignação' : 'Somente consulta'" data-add-maintenance-denied>
+                        <p>
+                            {{ $consignmentGrant !== null
+                                ? 'Veículo em consignação: só o proprietário registra manutenções.'
+                                : 'Só o dono atual registra manutenções neste veículo.' }}
+                            O histórico abaixo é o que o proprietário e as oficinas registraram.
+                        </p>
+                        @if ($consignmentGrant !== null)
+                            <div class="mt-3">
+                                @include('garage.vehicles._consignment-status', ['grant' => $consignmentGrant, 'compact' => false])
+                            </div>
+                        @endif
+                    </x-ui.alert>
+                </x-slot:notice>
+            @endunless
 
-    @if ($vehicle->relationLoaded('plates') && $vehicle->plates->isNotEmpty())
-        <details class="card mb-6">
-            <summary class="cursor-pointer font-semibold text-automotive-900">Histórico de placas</summary>
-            <table class="mt-4 w-full text-sm">
-                <thead>
-                    <tr class="text-left text-automotive-500">
-                        <th class="pb-2">Placa</th>
-                        <th class="pb-2">De</th>
-                        <th class="pb-2">Até</th>
-                        <th class="pb-2">Origem</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($vehicle->plates as $plateRow)
-                        <tr class="border-t border-automotive-100">
-                            <td class="py-2 font-mono">{{ $plateRow->plate }}</td>
-                            <td class="py-2">{{ $plateRow->started_at?->format('d/m/Y') ?? '—' }}</td>
-                            <td class="py-2">{{ $plateRow->ended_at?->format('d/m/Y') ?? 'Vigente' }}</td>
-                            <td class="py-2">{{ \App\Models\VehiclePlate::sourceLabel($plateRow->source) }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </details>
-    @endif
-
-    <x-provenance-legend class="mb-4" />
-
-    <h2 class="mb-4 text-xl font-semibold">Revisões documentadas</h2>
-    @forelse($vehicle->maintenances->sortByDesc('maintenance_date') as $maintenance)
-        <x-provenance-card :maintenance="$maintenance" />
-    @empty
-        <div class="card text-center text-automotive-500">Nenhuma revisão documentada.</div>
-    @endforelse
-</div>
+            @if ($canAddMaintenance)
+                <x-slot:empty-actions>
+                    <x-ui.button icon="plus" :href="$registerMaintenanceUrl">Registrar manutenção</x-ui.button>
+                </x-slot:empty-actions>
+            @endif
+        </x-vehicle.detail>
+    </x-ui.container>
 @endsection

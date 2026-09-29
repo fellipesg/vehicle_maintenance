@@ -14,6 +14,13 @@ class ContactMessageMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
+    /**
+     * Tema de resources/views/vendor/mail/html/themes/revisalog.css.
+     *
+     * @var string
+     */
+    public $theme = 'revisalog';
+
     // Falha do provedor vira nova tentativa, não mensagem perdida.
     public int $tries = 5;
 

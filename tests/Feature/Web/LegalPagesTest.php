@@ -11,7 +11,7 @@ class LegalPagesTest extends TestCase
         $this->get(route('legal.terms'))
             ->assertOk()
             ->assertSee('Termos de uso')
-            ->assertSee('Estes termos regem o uso da plataforma Revisalog')
+            ->assertSee('Estes termos regem o uso da plataforma RevisaLog')
             ->assertSee((string) config('legal.terms_version'))
             ->assertDontSee('Vehicle Maintenance');
     }
@@ -39,10 +39,11 @@ class LegalPagesTest extends TestCase
         $this->get(route('legal.privacy'))
             ->assertOk()
             ->assertSee('<h2', false)
+            ->assertSee('<h2 id="seus-direitos"', false)
             ->assertSee('7. Seus direitos')
-            ->assertSee('<ul class="list-disc', false)
+            ->assertSee('list-disc', false)
             ->assertSee('href="mailto:suporte@revisalog.com.br"', false)
-            ->assertSee('em vigor desde 22 de setembro de 2026');
+            ->assertSee('Em vigor desde <time datetime="2026-09-22">22 de setembro de 2026</time>', false);
     }
 
     public function test_api_privacy_policy_matches_web_policy(): void
@@ -55,10 +56,10 @@ class LegalPagesTest extends TestCase
 
     public function test_footer_shows_company_identification_when_configured(): void
     {
-        config(['legal.company.legal_name' => 'Revisalog Tecnologia Ltda', 'legal.company.cnpj' => '00.000.000/0001-00']);
+        config(['legal.company.legal_name' => 'RevisaLog Tecnologia Ltda', 'legal.company.cnpj' => '00.000.000/0001-00']);
 
         $this->get(route('legal.terms'))
-            ->assertSee('Revisalog Tecnologia Ltda')
+            ->assertSee('RevisaLog Tecnologia Ltda')
             ->assertSee('CNPJ 00.000.000/0001-00');
     }
 }

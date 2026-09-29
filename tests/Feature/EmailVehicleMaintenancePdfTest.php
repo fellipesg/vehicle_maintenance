@@ -74,7 +74,7 @@ class EmailVehicleMaintenancePdfTest extends TestCase
         $mailable->assertHasReplyTo((string) config('mail.reply_to.address'));
         $mailable->assertSeeInHtml('Honda Civic');
         $mailable->assertSeeInHtml('ABC1D23');
-        $mailable->assertSeeInHtml('Revisalog');
+        $mailable->assertSeeInHtml('RevisaLog');
         $mailable->assertDontSeeInHtml('Vehicle Maintenance');
     }
 }

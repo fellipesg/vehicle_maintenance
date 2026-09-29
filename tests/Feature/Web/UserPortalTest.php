@@ -30,7 +30,8 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get('/usuario/dashboard')
             ->assertOk()
-            ->assertSee('Meus Veículos');
+            ->assertSee('Primeiros passos')
+            ->assertDontSee('Carregando');
     }
 
     public function test_user_can_view_vehicles_page(): void
@@ -38,7 +39,8 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get('/usuario/veiculos')
             ->assertOk()
-            ->assertSee('Meus Veículos');
+            ->assertSee('>Meus veículos</h1>', false)
+            ->assertSee('Nenhum veículo ainda');
     }
 
     public function test_user_can_create_vehicle(): void
@@ -80,9 +82,9 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get('/usuario/veiculos/novo')
             ->assertOk()
-            ->assertSee('Importar do CRLV-e')
-            ->assertSee('Preencher dados manualmente')
-            ->assertSee('Cadastrar veículo');
+            ->assertSee('Ler o CRLV-e')
+            ->assertSee('Não tenho o CRLV-e agora: preencher manualmente')
+            ->assertSee('>Adicionar veículo</h1>', false);
     }
 
     public function test_user_can_create_vehicle_manually_without_crlv(): void
@@ -280,8 +282,9 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get('/usuario/manutencoes')
             ->assertOk()
-            ->assertSee('data-api-page="maintenances-index"', false)
-            ->assertSee('Carregando manutenções');
+            ->assertSee('Troca Válvula')
+            ->assertSee('Brothers Londrina')
+            ->assertDontSee('Carregando');
     }
 
     public function test_user_can_view_workshops_directory(): void
@@ -291,8 +294,9 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get('/usuario/oficinas')
             ->assertOk()
-            ->assertSee('data-api-page="workshops-index"', false)
-            ->assertSee('Carregando oficinas');
+            ->assertSee('>Oficinas da rede</h1>', false)
+            ->assertSee('Oficina Teste')
+            ->assertDontSee('Carregando');
     }
 
     public function test_vehicle_listing_and_detail_show_cover_photo(): void
@@ -312,21 +316,23 @@ class UserPortalTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('user.vehicles.index'))
             ->assertOk()
-            ->assertSee('data-api-page="vehicles-index"', false)
-            ->assertSee('Carregando veículos');
+            ->assertSee('data-vehicle-cover="card"', false)
+            ->assertSee('Capa do Mercedes-Benz C 180', false)
+            ->assertDontSee('Carregando');
 
         $this->actingAs($this->user)
             ->get(route('user.vehicles.show', $vehicle))
             ->assertOk()
-            ->assertSee('data-api-page="vehicle-show"', false)
-            ->assertSee('data-vehicle-id="'.$vehicle->id.'"', false)
-            ->assertSee('Carregando veículo');
+            ->assertSee('data-vehicle-cover="hero"', false)
+            ->assertSee('Capa do Mercedes-Benz C 180', false)
+            ->assertDontSee('Carregando');
 
         $this->actingAs($this->user)
             ->get('/usuario/dashboard')
             ->assertOk()
-            ->assertSee('data-api-page="dashboard"', false)
-            ->assertSee('Carregando veículos');
+            ->assertSee('data-vehicle-cover="thumb"', false)
+            ->assertSee('Capa do Mercedes-Benz C 180', false)
+            ->assertDontSee('Carregando');
     }
 
     public function test_vehicle_edit_shows_and_updates_cover_photo(): void
@@ -354,7 +360,7 @@ class UserPortalTest extends TestCase
             ->assertOk()
             ->assertSee('Capa paisagem (celular deitado)')
             ->assertSee('Capa retrato (celular em pé)')
-            ->assertSee('Capa do Honda Civic', false);
+            ->assertSee('Capa paisagem atual do Honda Civic', false);
 
         $file = UploadedFile::fake()->image('nova-capa.jpg', 800, 450);
 

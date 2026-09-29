@@ -20,19 +20,26 @@ class AdminUsersTest extends TestCase
         $this->seed(VehicleCatalogSeeder::class);
     }
 
-    public function test_admin_dashboard_lists_users(): void
+    public function test_admin_users_page_lists_users(): void
     {
         $admin = User::factory()->asUser()->asAdmin()->create();
         $owner = User::factory()->asUser()->create(['name' => 'João Proprietário']);
         $garage = User::factory()->asGarage()->create(['name' => 'Loja ABC']);
 
         $this->actingAs($admin)
-            ->get('/admin/dashboard')
+            ->get('/admin/usuarios')
             ->assertOk()
-            ->assertSee('Todos os usuários')
+            ->assertSee('Usuários cadastrados')
             ->assertSee('João Proprietário')
             ->assertSee('Loja ABC')
             ->assertSee('Lojista');
+
+        $this->actingAs($admin)
+            ->get('/admin/dashboard')
+            ->assertOk()
+            ->assertSee('Cadastros recentes')
+            ->assertSee('Loja ABC')
+            ->assertDontSee('Todos os usuários');
     }
 
     public function test_admin_can_view_user_vehicles_and_maintenances(): void

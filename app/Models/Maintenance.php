@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\WarrantyScope;
+use App\Support\DisplayTime;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -41,6 +42,17 @@ class Maintenance extends Model
         return $this->verified_at !== null;
     }
 
+    /**
+     * A OS mudou depois da emissão do Selo da oficina (mais de um minuto depois, para não contar a
+     * gravação da própria emissão). As telas mostram "Atualizada em dd/mm/aaaa" (WRK-X04).
+     */
+    public function wasUpdatedAfterSeal(): bool
+    {
+        return $this->verified_at !== null
+            && $this->updated_at !== null
+            && $this->updated_at->greaterThan($this->verified_at->copy()->addMinute());
+    }
+
     public function getProvenanceLabelAttribute(): string
     {
         return match ($this->registered_by_type) {
@@ -72,7 +84,7 @@ class Maintenance extends Model
     public function getProvenanceMetaAttribute(): string
     {
         if ($this->isVerified()) {
-            $date = $this->verified_at?->format('d/m/Y') ?? '';
+            $date = DisplayTime::local($this->verified_at)?->format('d/m/Y') ?? '';
             $code = $this->verification_code ?? '';
 
             return trim("verificada em {$date} · {$code}");
