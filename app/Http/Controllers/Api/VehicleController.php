@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\LinkVehicleRequest;
 use App\Http\Requests\Api\V1\StoreVehicleRequest;
 use App\Http\Requests\Api\V1\UpdateVehicleRequest;
 use App\Http\Requests\Api\V1\UploadVehicleCoverRequest;
@@ -16,6 +17,7 @@ use App\Http\Resources\Api\V1\VehicleResource;
 use App\Models\Vehicle;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Vehicle\VehicleOwnershipService;
 use App\Services\Vehicle\VehiclePdfExportService;
 use App\Services\Vehicle\VehiclePlateHistoryService;
 use App\Services\Vehicle\VehicleTimelineBuilder;
@@ -29,6 +31,7 @@ use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 #[Group('Vehicles', weight: 10)]
 class VehicleController extends Controller
@@ -326,19 +329,46 @@ class VehicleController extends Controller
         );
     }
 
-    /**
-     * Confirms that the vehicle is already linked to the caller as its current owner. It never
-     * grants ownership: a vehicle already on RevisaLog is claimed with the CRLV-e (web "Adicionar
-     * veículo" wizard, VehicleOwnershipService::claimExisting). Any other account gets 403.
-     */
     #[Endpoint(
-        title: 'Confirm vehicle link',
-        description: 'Returns the vehicle when the caller is already its current owner; 403 otherwise. Claiming a vehicle that is already registered requires the CRLV-e.',
+        title: 'Link vehicle to the authenticated user',
+        description: 'Claims a vehicle that has no current owner. Requires the plate and RENAVAM '.
+            'printed on the vehicle document as proof; they must match the stored vehicle. '.
+            'Ownership claimed this way is not marked as verified — only a CRLV-e import verifies it.',
     )]
-    public function linkToUser(Request $request, string $id): JsonResponse
+    public function linkToUser(LinkVehicleRequest $request, string $id, VehicleOwnershipService $ownership): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
         Gate::authorize('link', $vehicle);
+
+        if (! $request->alreadyCurrentOwner() && ! $ownership->documentMatchesVehicle(
+            $vehicle,
+            (string) $request->input('license_plate'),
+            (string) $request->input('renavam'),
+        )) {
+            // One generic message: telling which field failed would let a caller
+            // brute-force the plate and the RENAVAM independently.
+            throw ValidationException::withMessages([
+                'license_plate' => 'A placa e o RENAVAM informados não conferem com o veículo.',
+            ]);
+        }
+
+        $user = $request->user();
+
+        $existingLink = $user->vehicles()->where('vehicle_id', $vehicle->id)->first();
+
+        if ($existingLink) {
+            $user->vehicles()->updateExistingPivot($vehicle->id, [
+                'is_current_owner' => true,
+                'purchase_date' => $request->purchase_date ?? now(),
+                'tenant_id' => $user->tenant_id,
+            ]);
+        } else {
+            $user->vehicles()->attach($vehicle->id, [
+                'purchase_date' => $request->purchase_date ?? now(),
+                'is_current_owner' => true,
+                'tenant_id' => $user->tenant_id,
+            ]);
+        }
 
         return ApiResponse::success(new VehicleResource($vehicle->fresh()), 'Vehicle linked to user successfully');
     }

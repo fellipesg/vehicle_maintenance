@@ -8,14 +8,13 @@ use App\Models\Vehicle;
 use App\Models\VehicleAccessGrant;
 use App\Services\User\DeleteUserAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * POST /api/v1/vehicles/{id}/link não dá a posse de nada: só confirma o vínculo de quem já é o dono
- * atual (VehiclePolicy::link). Sem essa trava, qualquer conta virava dona de um veículo sem dono atual
- * (desvinculado pelo dono, de conta excluída ou só em consignação), lia chassi e RENAVAM inteiros
- * (identifiers_masked = false) e, como "dono atual", voltava a editar o que declarou
- * (MaintenancePolicy). Tomar posse de um veículo que já está na RevisaLog pede o CRLV-e.
+ * POST /api/v1/vehicles/{id}/link confirma quem já é o dono atual. Um carro sem dono atual só muda de
+ * mãos com a placa e o RENAVAM do documento; sem esses campos a resposta é 422 e o pivot não vira
+ * dono. Carro de outra conta continua 403, mesmo com o documento certo.
  */
 class VehicleLinkRequiresOwnershipTest extends TestCase
 {
@@ -56,7 +55,11 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
             ->assertJsonPath('data.identifiers_masked', true)
             ->json('data.id');
 
-        $this->assertLinkRefused($stranger, $vehicleId);
+        $this->assertDocumentRequired($stranger, $vehicleId);
+        $this->claimWithDocument($vehicleId)
+            ->assertOk()
+            ->assertJsonPath('data.identifiers_masked', false)
+            ->assertJsonPath('data.chassis', self::CHASSIS);
     }
 
     public function test_stranger_cannot_link_a_vehicle_left_by_a_deleted_account(): void
@@ -66,17 +69,24 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
 
         $stranger = $this->actingAsApiUser();
 
-        $this->assertLinkRefused($stranger, $vehicle->id);
+        $this->assertDocumentRequired($stranger, $vehicle->id);
+        $this->claimWithDocument($vehicle->id)->assertOk();
+        $this->assertDatabaseHas('user_vehicles', [
+            'user_id' => $stranger->id,
+            'vehicle_id' => $vehicle->id,
+            'is_current_owner' => true,
+        ]);
     }
 
-    public function test_stranger_cannot_link_a_vehicle_held_only_on_consignment(): void
+    public function test_stranger_needs_the_document_to_link_a_vehicle_held_only_on_consignment(): void
     {
         $vehicle = $this->vehicle();
         $this->consignmentDealer($vehicle, 'pending');
 
         $stranger = $this->actingAsApiUser();
 
-        $this->assertLinkRefused($stranger, $vehicle->id);
+        $this->assertDocumentRequired($stranger, $vehicle->id);
+        $this->claimWithDocument($vehicle->id)->assertOk();
     }
 
     public function test_dealer_with_a_pending_power_of_attorney_cannot_link_and_skip_the_review(): void
@@ -87,7 +97,7 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
         $this->actingAsApiUser($dealer);
         $this->getJson("/api/v1/vehicles/{$vehicle->id}")->assertForbidden();
 
-        $this->assertLinkRefused($dealer, $vehicle->id);
+        $this->assertDocumentRequired($dealer, $vehicle->id);
         $this->assertDatabaseHas('user_vehicles', [
             'user_id' => $dealer->id,
             'vehicle_id' => $vehicle->id,
@@ -105,7 +115,7 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
         $this->actingAsApiUser($dealer);
 
         $this->putJson("/api/v1/maintenances/{$maintenance->id}", ['description' => 'Alterada'])->assertForbidden();
-        $this->assertLinkRefused($dealer, $vehicle->id);
+        $this->assertDocumentRequired($dealer, $vehicle->id);
         $this->putJson("/api/v1/maintenances/{$maintenance->id}", ['description' => 'Alterada'])->assertForbidden();
         $this->deleteJson("/api/v1/maintenances/{$maintenance->id}")->assertForbidden();
         $this->assertModelExists($maintenance);
@@ -123,7 +133,7 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
         $this->deleteJson("/api/v1/vehicles/{$vehicle->id}")->assertOk();
 
         $this->actingAsApiUser($seller);
-        $this->assertLinkRefused($seller, $vehicle->id);
+        $this->assertDocumentRequired($seller, $vehicle->id);
         $this->putJson("/api/v1/maintenances/{$maintenance->id}", ['description' => 'Alterada depois da venda'])->assertForbidden();
         $this->deleteJson("/api/v1/maintenances/{$maintenance->id}")->assertForbidden();
         $this->assertModelExists($maintenance);
@@ -135,14 +145,23 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
 
         $stranger = $this->actingAsApiUser();
 
-        $this->assertLinkRefused($stranger, $vehicle->id);
+        $this->postJson("/api/v1/vehicles/{$vehicle->id}/link", [
+            'license_plate' => 'ABC1D23',
+            'renavam' => self::RENAVAM,
+        ])->assertForbidden();
+
+        $this->assertDatabaseMissing('user_vehicles', [
+            'user_id' => $stranger->id,
+            'vehicle_id' => $vehicle->id,
+            'is_current_owner' => true,
+        ]);
     }
 
-    private function assertLinkRefused(User $account, int $vehicleId): void
+    private function assertDocumentRequired(User $account, int $vehicleId): void
     {
         $this->actingAsApiUser($account);
 
-        $response = $this->postJson("/api/v1/vehicles/{$vehicleId}/link")->assertForbidden();
+        $response = $this->postJson("/api/v1/vehicles/{$vehicleId}/link")->assertStatus(422);
 
         $this->assertStringNotContainsString(self::CHASSIS, (string) $response->getContent());
         $this->assertStringNotContainsString(self::RENAVAM, (string) $response->getContent());
@@ -151,14 +170,14 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
             'vehicle_id' => $vehicleId,
             'is_current_owner' => true,
         ]);
+    }
 
-        $detail = $this->getJson("/api/v1/vehicles/{$vehicleId}");
-
-        if ($detail->isOk()) {
-            $detail->assertJsonPath('data.identifiers_masked', true);
-        } else {
-            $detail->assertForbidden();
-        }
+    private function claimWithDocument(int $vehicleId): TestResponse
+    {
+        return $this->postJson("/api/v1/vehicles/{$vehicleId}/link", [
+            'license_plate' => 'ABC1D23',
+            'renavam' => self::RENAVAM,
+        ]);
     }
 
     /**

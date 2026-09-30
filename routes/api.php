@@ -67,7 +67,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/vehicles/{id}/timeline', [VehicleController::class, 'timeline'])->middleware('ability:vehicles:read');
 
         // Link vehicle to user
-        Route::post('/vehicles/{id}/link', [VehicleController::class, 'linkToUser'])->middleware('ability:vehicles:write');
+        Route::post('/vehicles/{id}/link', [VehicleController::class, 'linkToUser'])
+            ->middleware(['ability:vehicles:write', 'throttle:vehicle-link']);
 
         // Maintenance routes
         Route::get('/maintenances', [MaintenanceController::class, 'index'])->middleware('ability:maintenances:read');
