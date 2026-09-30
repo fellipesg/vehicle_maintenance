@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Workshop;
 
+use App\Enums\ServiceCategory;
 use App\Enums\WarrantyScope;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Web\Concerns\StoresMaintenanceInvoices;
@@ -9,15 +10,23 @@ use App\Http\Controllers\Web\Concerns\SyncsMaintenanceItems;
 use App\Http\Controllers\Web\Concerns\SyncsMaintenanceWarranties;
 use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
+use App\Models\User;
+use App\Models\Workshop;
 use App\Rules\InvoiceFile;
 use App\Services\Maintenance\MaintenancePhotoService;
+use App\Services\Maintenance\MaintenanceVerificationStamper;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Support\AppStorage;
+use App\Support\Maintenance\WorkshopMaintenanceFilters;
 use App\Support\VehiclePlateSearch;
 use App\Support\VehicleTenantResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class MaintenanceController extends Controller
@@ -26,6 +35,18 @@ class MaintenanceController extends Controller
     use SyncsMaintenanceItems;
     use SyncsMaintenanceWarranties;
 
+    /**
+     * Grupos de fotos da OS: campo do formulário => [assunto, etapa].
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    public const PHOTO_GROUPS = [
+        'vehicle_before' => [MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_BEFORE],
+        'vehicle_after' => [MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_AFTER],
+        'part_before' => [MaintenancePhoto::SUBJECT_PART, MaintenancePhoto::STAGE_BEFORE],
+        'part_after' => [MaintenancePhoto::SUBJECT_PART, MaintenancePhoto::STAGE_AFTER],
+    ];
+
     public function __construct(
         private MaintenancePhotoService $photos,
     ) {}
@@ -33,30 +54,56 @@ class MaintenanceController extends Controller
     public function index(Request $request): View
     {
         $workshop = $request->user()->workshop;
-        $maintenances = collect();
+        $filters = WorkshopMaintenanceFilters::fromRequest($request);
+        $maintenances = null;
+        $counts = ['' => 0, '1' => 0, '0' => 0];
 
         if ($workshop) {
-            $maintenances = Maintenance::where('workshop_id', $workshop->id)
+            $maintenances = $filters->apply($workshop->maintenances())
                 ->with(['vehicle', 'user', 'verifiedWorkshop', 'workshop'])
-                ->orderByDesc('maintenance_date')
-                ->paginate(15);
+                ->withCount(['invoices', 'photos', 'items'])
+                ->withSum('items as items_total', 'total_price')
+                ->paginate(15)
+                ->withQueryString();
+
+            $totals = $filters->applyWithoutProvenance($workshop->maintenances())
+                ->toBase()
+                ->selectRaw('count(*) as total')
+                ->selectRaw('sum(case when verified_at is not null then 1 else 0 end) as sealed')
+                ->first();
+
+            $counts = [
+                '' => (int) ($totals->total ?? 0),
+                '1' => (int) ($totals->sealed ?? 0),
+                '0' => (int) ($totals->total ?? 0) - (int) ($totals->sealed ?? 0),
+            ];
         }
 
-        return view('workshop.maintenances.index', compact('workshop', 'maintenances'));
+        return view('workshop.maintenances.index', compact('workshop', 'maintenances', 'filters', 'counts'));
     }
 
+    /**
+     * Nova OS em duas etapas na mesma página: a placa (GET ?license_plate=) confirma o veículo e
+     * só então o resto do formulário aparece. Depois de um erro de validação, a placa enviada
+     * (old input) vale quando a URL não traz a placa.
+     */
     public function create(Request $request): View
     {
         $workshop = $request->user()->workshop;
-        $vehicle = null;
-        $licensePlate = VehiclePlateSearch::normalize((string) $request->query('license_plate', ''));
-
-        if ($licensePlate !== '') {
-            $vehicle = VehiclePlateSearch::findByPlate($licensePlate)?->vehicle;
-        }
+        $plateInput = $request->query('license_plate');
+        $plateInput = is_scalar($plateInput) && (string) $plateInput !== '' ? (string) $plateInput : (string) $request->old('license_plate', '');
+        $licensePlate = substr(VehiclePlateSearch::normalize($plateInput), 0, 10);
+        $lookup = $licensePlate !== '' ? VehiclePlateSearch::findByPlate($licensePlate) : null;
+        $vehicle = $lookup?->vehicle;
 
         return view('workshop.maintenances.create', array_merge(
-            compact('workshop', 'vehicle', 'licensePlate'),
+            [
+                'workshop' => $workshop,
+                'vehicle' => $vehicle,
+                'licensePlate' => $licensePlate,
+                'lookup' => $lookup,
+                'vehicleHasOwner' => $vehicle !== null && VehicleTenantResolver::resolveTenantId($vehicle) !== null,
+            ],
             $this->warrantyTemplateOptions($workshop),
         ));
     }
@@ -67,7 +114,7 @@ class MaintenanceController extends Controller
 
         if ($workshop === null) {
             return redirect()->route('workshop.profile.create')
-                ->with('error', 'Cadastre sua oficina antes de registrar serviços.');
+                ->with('error', 'Cadastre sua oficina antes de registrar OS.');
         }
 
         if ($redirect = $this->prepareInvoiceUploads($request)) {
@@ -80,27 +127,25 @@ class MaintenanceController extends Controller
             'description' => ['nullable', 'string'],
             'maintenance_date' => ['required', 'date'],
             'kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
-            'service_category' => ['required', 'in:mechanical,electrical,suspension,painting,finishing,interior,other'],
+            'service_category' => ['required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => ['nullable', 'boolean'],
             'invoices' => ['nullable', 'array'],
             'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
             'photos' => ['nullable', 'array'],
             'photos.*' => ['nullable', 'array', 'max:'.MaintenancePhoto::MAX_PER_GROUP],
-            'photos.*.*' => [
-                File::image(allowSvg: false)
-                    ->types(['jpg', 'jpeg', 'png', 'webp'])
-                    ->max(5 * 1024),
-            ],
+            'photos.*.*' => $this->photoFileRules(),
         ], $this->maintenanceItemValidationRules(), $this->maintenanceWarrantyValidationRules()), [
             'license_plate.required' => 'Informe a placa do veículo.',
+            'photos.*.max' => 'Cada grupo aceita até '.MaintenancePhoto::MAX_PER_GROUP.' fotos.',
         ]);
 
-        $vehicle = VehiclePlateSearch::findByPlate($data['license_plate'])?->vehicle;
+        $licensePlate = VehiclePlateSearch::normalize($data['license_plate']);
+        $vehicle = VehiclePlateSearch::findByPlate($licensePlate)?->vehicle;
 
         if ($vehicle === null) {
             return redirect()->back()
                 ->withInput()
-                ->withErrors(['license_plate' => 'Veículo não encontrado para a placa informada. Verifique e tente novamente.']);
+                ->withErrors(['license_plate' => self::vehicleNotFoundMessage($licensePlate)]);
         }
 
         $tenantId = VehicleTenantResolver::resolveTenantId($vehicle);
@@ -108,7 +153,7 @@ class MaintenanceController extends Controller
         if ($tenantId === null) {
             return redirect()->back()
                 ->withInput()
-                ->withErrors(['license_plate' => 'Não foi possível identificar o proprietário deste veículo.']);
+                ->withErrors(['license_plate' => self::vehicleWithoutOwnerMessage()]);
         }
 
         app(VehicleMileageService::class)->assertMaintenanceKilometers(
@@ -135,7 +180,7 @@ class MaintenanceController extends Controller
             $request,
             function () use ($maintenanceData, $vehicle, $data, $request, $workshop) {
                 $maintenance = Maintenance::create($maintenanceData);
-                app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
+                app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
                 app(VehicleMileageService::class)->applyMaintenanceKilometers(
                     $vehicle,
                     (int) $data['kilometers'],
@@ -147,12 +192,16 @@ class MaintenanceController extends Controller
             },
         );
 
-        $this->storePhotosFromRequest($request, $result['maintenance'], $request->user());
+        $maintenance = $result['maintenance']->fresh();
+
+        $this->storePhotosFromRequest($request, $maintenance, $request->user());
 
         return $this->redirectWithInvoiceFeedback(
-            redirect()->route('workshop.maintenances.show', $result['maintenance']),
+            redirect()->route('workshop.maintenances.show', $maintenance),
             $result['items_created'],
             $result['warnings'],
+            $result['items_skipped'],
+            self::createdMessage($maintenance),
         );
     }
 
@@ -162,25 +211,49 @@ class MaintenanceController extends Controller
 
         $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'photos', 'workshop', 'verifiedWorkshop', 'user']);
 
-        return view('workshop.maintenances.show', compact('maintenance'));
+        return view('workshop.maintenances.show', [
+            'maintenance' => $maintenance,
+            'canManage' => self::isAuthoredBy($maintenance, $request->user()->workshop),
+            'updatedAfterSeal' => self::wasUpdatedAfterSeal($maintenance),
+        ]);
     }
 
-    public function edit(Request $request, Maintenance $maintenance): View
+    public function edit(Request $request, Maintenance $maintenance): View|RedirectResponse
     {
+        Gate::authorize('view', $maintenance);
+
+        if ($redirect = $this->redirectUnlessAuthored($request, $maintenance)) {
+            return $redirect;
+        }
+
         Gate::authorize('update', $maintenance);
 
-        $maintenance->load(['vehicle', 'items', 'photos', 'generalWarranty', 'warranties']);
+        $maintenance->load([
+            'vehicle',
+            'items' => fn ($query) => $query->orderBy('id'),
+            'items.warranty',
+            'invoices',
+            'photos',
+            'generalWarranty',
+            'warranties',
+        ]);
 
         $workshop = $request->user()->workshop;
 
         return view('workshop.maintenances.edit', array_merge(
             compact('maintenance', 'workshop'),
-            $this->warrantyTemplateOptions($workshop),
+            $this->warrantyTemplateOptions($workshop, $maintenance),
         ));
     }
 
     public function update(Request $request, Maintenance $maintenance): RedirectResponse
     {
+        Gate::authorize('view', $maintenance);
+
+        if ($redirect = $this->redirectUnlessAuthored($request, $maintenance)) {
+            return $redirect;
+        }
+
         Gate::authorize('update', $maintenance);
 
         if ($redirect = $this->prepareInvoiceUploads($request)) {
@@ -194,20 +267,21 @@ class MaintenanceController extends Controller
             'description' => ['nullable', 'string'],
             'maintenance_date' => ['required', 'date'],
             'kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
-            'service_category' => ['required', 'in:mechanical,electrical,suspension,painting,finishing,interior,other'],
+            'service_category' => ['required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => ['nullable', 'boolean'],
             'invoices' => ['nullable', 'array'],
             'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
             'photos' => ['nullable', 'array'],
             'photos.*' => ['nullable', 'array', 'max:'.MaintenancePhoto::MAX_PER_GROUP],
-            'photos.*.*' => [
-                File::image(allowSvg: false)
-                    ->types(['jpg', 'jpeg', 'png', 'webp'])
-                    ->max(5 * 1024),
-            ],
+            'photos.*.*' => $this->photoFileRules(),
             'delete_photos' => ['nullable', 'array'],
             'delete_photos.*' => ['integer', 'exists:maintenance_photos,id'],
-        ], $this->maintenanceItemValidationRules(), $this->maintenanceWarrantyValidationRules()));
+        ], $this->maintenanceItemValidationRules(), $this->maintenanceWarrantyValidationRules()), [
+            'photos.*.max' => 'Cada grupo aceita até '.MaintenancePhoto::MAX_PER_GROUP.' fotos.',
+        ]);
+
+        // Antes de gravar qualquer coisa: fotos que ficam + novas não passam do limite do grupo.
+        $this->assertPhotoCapacity($request, $maintenance);
 
         app(VehicleMileageService::class)->assertMaintenanceKilometers(
             $maintenance->vehicle,
@@ -231,8 +305,6 @@ class MaintenanceController extends Controller
 
         app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
 
-        $warnings = $this->storeMaintenanceInvoices($request, $maintenance);
-
         $this->syncMaintenanceItems($maintenance, $request);
         $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
 
@@ -240,7 +312,10 @@ class MaintenanceController extends Controller
             $this->recomputeMaintenanceWarrantyDates($maintenance->fresh(['warranties']));
         }
 
-        foreach ($request->input('delete_photos', []) as $photoId) {
+        // Depois dos itens: com a lista vazia, os itens da NF-e preenchem a OS.
+        $invoiceResult = $this->processMaintenanceInvoices($request, $maintenance);
+
+        foreach ($this->photoIdsToDelete($request) as $photoId) {
             $photo = $maintenance->photos()->whereKey($photoId)->first();
             if ($photo !== null) {
                 Gate::authorize('delete', $photo);
@@ -252,13 +327,21 @@ class MaintenanceController extends Controller
 
         return $this->redirectWithInvoiceFeedback(
             redirect()->route('workshop.maintenances.show', $maintenance),
-            0,
-            $warnings,
-        )->with('success', 'Serviço atualizado com sucesso!');
+            $invoiceResult['items_created'],
+            $invoiceResult['warnings'],
+            $invoiceResult['items_skipped'],
+            'OS atualizada.',
+        );
     }
 
     public function destroy(Request $request, Maintenance $maintenance): RedirectResponse
     {
+        Gate::authorize('view', $maintenance);
+
+        if ($redirect = $this->redirectUnlessAuthored($request, $maintenance)) {
+            return $redirect;
+        }
+
         Gate::authorize('delete', $maintenance);
 
         foreach ($maintenance->photos as $photo) {
@@ -266,8 +349,8 @@ class MaintenanceController extends Controller
         }
 
         foreach ($maintenance->invoices as $invoice) {
-            if (\App\Support\AppStorage::disk()->exists($invoice->file_path)) {
-                \App\Support\AppStorage::disk()->delete($invoice->file_path);
+            if (AppStorage::disk()->exists($invoice->file_path)) {
+                AppStorage::disk()->delete($invoice->file_path);
             }
         }
 
@@ -279,42 +362,153 @@ class MaintenanceController extends Controller
         }
 
         return redirect()->route('workshop.maintenances.index')
-            ->with('success', 'Serviço removido com sucesso!');
+            ->with('success', 'OS excluída.');
     }
 
     /**
-     * @return array{orderTemplates: \Illuminate\Support\Collection, itemTemplates: \Illuminate\Support\Collection}
+     * A OS é da oficina: ela aplicou o Selo da oficina. Registros que um proprietário ou lojista
+     * declarou citando a oficina (workshop_id) aparecem para ela, mas só quem declarou pode
+     * alterar ou excluir (a oficina não é autora e o registro continua "Declarada").
      */
-    private function warrantyTemplateOptions(?\App\Models\Workshop $workshop): array
+    public static function isAuthoredBy(Maintenance $maintenance, ?Workshop $workshop): bool
+    {
+        return $workshop !== null
+            && $maintenance->isVerified()
+            && (int) $maintenance->verified_workshop_id === (int) $workshop->id;
+    }
+
+    /**
+     * A OS mudou depois da emissão do selo (Maintenance::wasUpdatedAfterSeal).
+     */
+    public static function wasUpdatedAfterSeal(Maintenance $maintenance): bool
+    {
+        return $maintenance->wasUpdatedAfterSeal();
+    }
+
+    public static function vehicleNotFoundMessage(string $licensePlate): string
+    {
+        return 'Veículo '.$licensePlate.' ainda não está no RevisaLog. Peça ao proprietário para cadastrar o veículo no app; depois registre a OS aqui.';
+    }
+
+    public static function vehicleWithoutOwnerMessage(): string
+    {
+        return 'Este veículo está no RevisaLog, mas ainda não tem um proprietário vinculado. Peça ao proprietário para adicionar o veículo à conta dele; depois registre a OS aqui.';
+    }
+
+    private static function createdMessage(Maintenance $maintenance): string
+    {
+        return $maintenance->verification_code
+            ? 'OS registrada. Selo da oficina emitido: '.$maintenance->verification_code.'.'
+            : 'OS registrada.';
+    }
+
+    private function redirectUnlessAuthored(Request $request, Maintenance $maintenance): ?RedirectResponse
+    {
+        if (self::isAuthoredBy($maintenance, $request->user()->workshop)) {
+            return null;
+        }
+
+        return redirect()->route('workshop.maintenances.show', $maintenance)
+            ->with('error', 'Este registro foi declarado por quem cuida do veículo e não tem o Selo da sua oficina. Só quem declarou pode alterar ou excluir.');
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function photoFileRules(): array
+    {
+        return [
+            File::image(allowSvg: false)
+                ->types(['jpg', 'jpeg', 'png', 'webp'])
+                ->max(5 * 1024),
+        ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function photoIdsToDelete(Request $request): array
+    {
+        $ids = $request->input('delete_photos', []);
+
+        return is_array($ids) ? array_values(array_unique(array_map('intval', $ids))) : [];
+    }
+
+    /**
+     * Fotos que ficam (as existentes menos as marcadas para remover) + as novas de cada grupo não
+     * podem passar de MaintenancePhoto::MAX_PER_GROUP. Roda antes de qualquer gravação, com o erro
+     * na chave photos.{grupo}, mostrada ao lado do campo.
+     */
+    private function assertPhotoCapacity(Request $request, Maintenance $maintenance): void
+    {
+        $toDelete = $this->photoIdsToDelete($request);
+        $existing = $maintenance->photos()->get(['id', 'subject', 'stage']);
+        $messages = [];
+
+        foreach (self::PHOTO_GROUPS as $field => [$subject, $stage]) {
+            $kept = $existing
+                ->where('subject', $subject)
+                ->where('stage', $stage)
+                ->reject(fn (MaintenancePhoto $photo): bool => in_array($photo->id, $toDelete, true))
+                ->count();
+            $files = $request->file("photos.{$field}", []);
+            $incoming = is_array($files) ? count(array_filter($files)) : 0;
+
+            if ($incoming > 0 && $kept + $incoming > MaintenancePhoto::MAX_PER_GROUP) {
+                $room = max(0, MaintenancePhoto::MAX_PER_GROUP - $kept);
+                $messages["photos.{$field}"] = $room === 0
+                    ? 'Este grupo já tem '.MaintenancePhoto::MAX_PER_GROUP.' fotos. Remova alguma antes de adicionar outra.'
+                    : 'Este grupo aceita até '.MaintenancePhoto::MAX_PER_GROUP.' fotos e já tem '.$kept.'. Envie no máximo '.$room.' ou remova alguma.';
+            }
+        }
+
+        if ($messages !== []) {
+            throw ValidationException::withMessages($messages);
+        }
+    }
+
+    /**
+     * Active templates for the form. On edit, the order template behind the
+     * issued general warranty stays listed even when deactivated, so saving the
+     * OS keeps that warranty. Item rows handle their own issued template.
+     *
+     * @return array{orderTemplates: Collection, itemTemplates: Collection, hasActiveTemplates: bool}
+     */
+    private function warrantyTemplateOptions(?Workshop $workshop, ?Maintenance $maintenance = null): array
     {
         if ($workshop === null) {
             return [
                 'orderTemplates' => collect(),
                 'itemTemplates' => collect(),
+                'hasActiveTemplates' => false,
             ];
         }
 
+        $issuedOrderTemplateIds = $maintenance?->warranties
+            ->where('scope', WarrantyScope::Order)
+            ->pluck('warranty_template_id')
+            ->filter()
+            ->values()
+            ->all() ?? [];
+
         $templates = $workshop->warrantyTemplates()
-            ->where('is_active', true)
+            ->where(function ($query) use ($issuedOrderTemplateIds) {
+                $query->where('is_active', true)
+                    ->orWhereIn('id', $issuedOrderTemplateIds);
+            })
             ->orderBy('name')
             ->get();
 
         return [
             'orderTemplates' => $templates->where('scope', WarrantyScope::Order)->values(),
-            'itemTemplates' => $templates->where('scope', WarrantyScope::Item)->values(),
+            'itemTemplates' => $templates->where('scope', WarrantyScope::Item)->where('is_active', true)->values(),
+            'hasActiveTemplates' => $templates->where('is_active', true)->isNotEmpty(),
         ];
     }
 
-    private function storePhotosFromRequest(Request $request, Maintenance $maintenance, \App\Models\User $user): void
+    private function storePhotosFromRequest(Request $request, Maintenance $maintenance, User $user): void
     {
-        $groups = [
-            'vehicle_before' => [MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_BEFORE],
-            'vehicle_after' => [MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_AFTER],
-            'part_before' => [MaintenancePhoto::SUBJECT_PART, MaintenancePhoto::STAGE_BEFORE],
-            'part_after' => [MaintenancePhoto::SUBJECT_PART, MaintenancePhoto::STAGE_AFTER],
-        ];
-
-        foreach ($groups as $field => [$subject, $stage]) {
+        foreach (self::PHOTO_GROUPS as $field => [$subject, $stage]) {
             $files = $request->file("photos.{$field}", []);
             if (! is_array($files)) {
                 continue;

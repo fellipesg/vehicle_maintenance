@@ -2,11 +2,20 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\Vehicle\VehicleIdentifierVisibility;
 use App\Support\VehicleProvenanceStrip;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin \App\Models\Vehicle */
+/**
+ * Resultado da busca pública de veículo (GET /api/v1/vehicles/search/{identifier}), aberta sem
+ * login. Chassi e RENAVAM saem parciais (App\Support\Vehicle\VehicleIdentifierVisibility) para
+ * quem não passa no VehiclePolicy::update, como na busca da web (.ai/rules/public-lookup.md): a
+ * busca não pode virar fonte de dados para clonagem de documento. identifiers_masked diz ao app se
+ * os números vieram parciais.
+ *
+ * @mixin \App\Models\Vehicle
+ */
 class PublicVehicleSearchResource extends JsonResource
 {
     /**
@@ -14,12 +23,18 @@ class PublicVehicleSearchResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $identifiers = VehicleIdentifierVisibility::fields(
+            VehicleIdentifierVisibility::viewerOf($request),
+            $this->resource,
+        );
+
         return [
             'id' => $this->id,
             'license_plate' => $this->license_plate,
             'current_plate' => $this->license_plate,
-            'chassis' => $this->chassis,
-            'renavam' => $this->renavam,
+            'chassis' => $identifiers['chassis'],
+            'renavam' => $identifiers['renavam'],
+            'identifiers_masked' => $identifiers['identifiers_masked'],
             'brand' => $this->brand,
             'model' => $this->model,
             'year' => $this->year,

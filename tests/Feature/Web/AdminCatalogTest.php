@@ -23,7 +23,7 @@ class AdminCatalogTest extends TestCase
 
     public function test_guest_cannot_access_admin_panel(): void
     {
-        $this->get('/admin/dashboard')->assertRedirect('/login');
+        $this->get('/admin/dashboard')->assertRedirect(route('login.admin'));
     }
 
     public function test_non_admin_cannot_access_admin_panel(): void
@@ -32,7 +32,8 @@ class AdminCatalogTest extends TestCase
 
         $this->actingAs($user)
             ->get('/admin/dashboard')
-            ->assertForbidden();
+            ->assertRedirect(route('user.dashboard'))
+            ->assertSessionHas('info');
     }
 
     public function test_admin_can_view_dashboard(): void
@@ -42,7 +43,8 @@ class AdminCatalogTest extends TestCase
         $this->actingAs($admin)
             ->get('/admin/dashboard')
             ->assertOk()
-            ->assertSee('Painel Administrador');
+            ->assertSee('Visão geral')
+            ->assertDontSee('Painel Administrador');
     }
 
     public function test_admin_can_create_brand_and_model(): void

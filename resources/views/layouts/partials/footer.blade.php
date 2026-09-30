@@ -1,49 +1,79 @@
-<footer class="border-t border-automotive-200 bg-automotive-50 py-12 text-sm text-automotive-600">
-    <div class="mx-auto max-w-7xl px-4">
-        <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
+{{--
+    Rodapé institucional, só para visitantes (logados recebem layouts.partials.footer-compact).
+    Colunas: Produto (seções da landing, na ordem da página, "Conferir selo da oficina" e Blog) ·
+    Conta · Lojas e oficinas · Legal. "Consultar um veículo" leva à busca, que pede login e oferece
+    o cadastro grátis (o texto avisa); a conferência do selo (/verificar) é a única consulta aberta a
+    qualquer visitante. Títulos de coluna em text-xs caixa-alta (ritmo do rodapé do ObsidianUI) e
+    links em text-sm com 40px de alvo.
+--}}
+@php
+    $footerColumns = [
+        'Produto' => [
+            ['label' => 'Como funciona', 'href' => route('home').'#como-funciona'],
+            ['label' => 'Procedência', 'href' => route('home').'#procedencia'],
+            ['label' => 'Linha do tempo, busca e PDF', 'href' => route('home').'#produto'],
+            ['label' => 'Conferir selo da oficina', 'href' => route('verification.lookup')],
+            ['label' => 'App', 'href' => route('home').'#app'],
+            ['label' => 'Preço', 'href' => route('home').'#preco'],
+            ['label' => 'Perguntas frequentes', 'href' => route('home').'#faq'],
+            ['label' => 'Blog', 'href' => route('blog.index')],
+        ],
+        'Conta' => [
+            ['label' => 'Entrar', 'href' => route('login')],
+            ['label' => 'Começar grátis', 'href' => route('register')],
+            ['label' => 'Consultar um veículo', 'href' => route('vehicle.search'), 'note' => 'grátis, com conta'],
+        ],
+        'Lojas e oficinas' => [
+            ['label' => 'Quero ser parceiro', 'href' => route('contact.show', ['assunto' => 'partnership'])],
+            ['label' => 'Entrar como lojista', 'href' => route('login.lojista')],
+            ['label' => 'Entrar como oficina', 'href' => route('login.oficina')],
+        ],
+        'Legal' => [
+            ['label' => 'Termos de uso', 'href' => route('legal.terms')],
+            ['label' => 'Privacidade', 'href' => route('legal.privacy')],
+            ['label' => 'Contato', 'href' => route('contact.show')],
+            ['label' => config('legal.support_email'), 'href' => 'mailto:'.config('legal.support_email')],
+        ],
+    ];
+@endphp
+<footer class="border-t border-border bg-background py-12 text-sm text-muted-foreground sm:py-16">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6">
+        <div class="grid gap-10 lg:grid-cols-5">
             <div>
-                <a href="{{ route('home') }}" class="inline-flex items-center">
+                {{-- Os lockups PNG não têm canal alfa (fundo automotive-950 embutido): o contêiner escuro
+                     arredondado torna o fundo intencional até existir uma versão transparente. --}}
+                <a href="{{ route('home') }}" class="inline-flex items-center rounded-control bg-automotive-950 px-3 py-2">
                     <img
                         src="{{ \App\Support\AppStorage::brandUrl('lockup-horizontal.png') }}"
                         alt="RevisaLog"
-                        class="h-8 w-auto"
+                        class="h-7 w-auto"
                     >
                 </a>
-                <p class="mt-3 text-xs leading-relaxed text-automotive-500">Histórico permanente de manutenções veiculares. O registro fica no carro, não na conta.</p>
+                <p class="mt-4 max-w-xs text-sm leading-relaxed">Histórico permanente de manutenções. O registro fica no carro, não na conta.</p>
             </div>
-            <nav class="flex flex-col gap-2 text-xs" aria-label="Produto">
-                <p class="font-semibold uppercase tracking-wide text-automotive-800">Produto</p>
-                <a href="{{ route('home') }}" class="hover:text-wrench-700">Início</a>
-                <a href="{{ route('home') }}#como-funciona" class="hover:text-wrench-700">Como funciona</a>
-                <a href="{{ route('home') }}#recursos" class="hover:text-wrench-700">Recursos</a>
-                <a href="{{ route('home') }}#telas" class="hover:text-wrench-700">Telas</a>
-                <a href="{{ route('home') }}#preco" class="hover:text-wrench-700">Preço</a>
-                <a href="{{ route('blog.index') }}" class="hover:text-wrench-700">Blog</a>
-            </nav>
-            <nav class="flex flex-col gap-2 text-xs" aria-label="Conta">
-                <p class="font-semibold uppercase tracking-wide text-automotive-800">Conta</p>
-                <a href="{{ route('login') }}" class="hover:text-wrench-700">Entrar</a>
-                <a href="{{ route('register') }}" class="hover:text-wrench-700">Cadastrar</a>
-                <a href="{{ route('login.lojista') }}" class="hover:text-wrench-700">Lojista</a>
-                <a href="{{ route('login.oficina') }}" class="hover:text-wrench-700">Oficina</a>
-            </nav>
-            <nav class="flex flex-col gap-2 text-xs" aria-label="Plataforma">
-                <p class="font-semibold uppercase tracking-wide text-automotive-800">Plataforma</p>
-                <a href="{{ route('vehicle.search') }}" class="hover:text-wrench-700">Buscar veículo</a>
-                <a href="{{ route('home') }}#app" class="hover:text-wrench-700">App</a>
-                <a href="{{ route('home') }}#faq" class="hover:text-wrench-700">Perguntas</a>
-            </nav>
-            <nav class="flex flex-col gap-2 text-xs" aria-label="Legal">
-                <p class="font-semibold uppercase tracking-wide text-automotive-800">Legal</p>
-                <a href="{{ route('legal.terms') }}" class="hover:text-wrench-700">Termos de uso</a>
-                <a href="{{ route('legal.privacy') }}" class="hover:text-wrench-700">Privacidade</a>
-                <a href="{{ route('contact.show') }}" class="hover:text-wrench-700">Contato</a>
-                <a href="mailto:{{ config('legal.support_email') }}" class="hover:text-wrench-700">{{ config('legal.support_email') }}</a>
+            <nav aria-label="Rodapé" class="grid gap-8 sm:grid-cols-2 lg:col-span-4 lg:grid-cols-4">
+                @foreach($footerColumns as $footerHeading => $footerLinks)
+                    <div>
+                        <h2 class="text-xs font-semibold tracking-wider text-foreground uppercase">{{ $footerHeading }}</h2>
+                        <ul role="list" class="mt-3">
+                            @foreach($footerLinks as $footerLink)
+                                <li>
+                                    <a href="{{ $footerLink['href'] }}" class="inline-flex min-h-10 flex-wrap items-center gap-x-1 wrap-anywhere transition-colors duration-fast hover:text-link-hover hover:underline motion-reduce:transition-none">
+                                        {{ $footerLink['label'] }}
+                                        @isset($footerLink['note'])
+                                            <span class="text-xs text-subtle-foreground">({{ $footerLink['note'] }})</span>
+                                        @endisset
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
             </nav>
         </div>
-        <div class="mt-10 flex flex-col gap-2 border-t border-automotive-200 pt-6 text-xs text-automotive-400 sm:flex-row sm:items-center sm:justify-between">
+        <div class="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs sm:flex-row sm:items-center sm:justify-between">
             <p>
-                © {{ now()->year }} {{ config('legal.company.legal_name') ?: 'Revisalog' }}
+                © {{ now()->year }} {{ config('legal.company.legal_name') ?: 'RevisaLog' }}
                 @if(config('legal.company.cnpj'))
                     · CNPJ {{ config('legal.company.cnpj') }}
                 @endif

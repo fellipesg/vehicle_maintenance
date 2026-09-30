@@ -1,85 +1,135 @@
 @extends('layouts.admin')
 
-@section('title', 'Veículos — Admin')
+@section('title', 'Veículos')
+
+@php
+    $adminBreadcrumbs = [['Frota'], ['Veículos']];
+    $hasSearch = $search !== '';
+    $formatCount = fn (int $count): string => number_format($count, 0, ',', '.');
+@endphp
 
 @section('content')
-<div class="mx-auto max-w-7xl px-4 py-6">
-    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-automotive-900">Todos os veículos</h1>
-            <p class="mt-1 text-sm text-automotive-600">Frota completa da plataforma</p>
-        </div>
-        <form method="GET" action="{{ route('admin.vehicles.index') }}" class="flex gap-2">
-            <input
-                type="search"
-                name="search"
-                value="{{ $search }}"
-                placeholder="Chassi, placa, RENAVAM…"
-                class="input-field min-w-[220px]"
-            >
-            <button type="submit" class="btn-secondary">Buscar</button>
-        </form>
-    </div>
+    <x-ui.page-header title="Veículos" description="Frota completa da plataforma, com o proprietário atual e a última oficina de cada veículo.">
+        <x-slot:actions>
+            <form method="GET" action="{{ route('admin.vehicles.index') }}" class="flex w-full gap-2 sm:w-auto" role="search" aria-label="Buscar veículo" data-submit-busy="off">
+                @if(request()->query('ordenar'))
+                    <input type="hidden" name="ordenar" value="{{ $sort }}">
+                    <input type="hidden" name="direcao" value="{{ $direction }}">
+                @endif
+                <label for="admin-vehicle-search" class="sr-only">Buscar veículo por chassi, placa ou RENAVAM</label>
+                <x-ui.input
+                    type="search"
+                    id="admin-vehicle-search"
+                    name="search"
+                    :value="$search"
+                    placeholder="Placa, chassi ou RENAVAM"
+                    leading-icon="magnifying-glass"
+                    autocomplete="off"
+                    class="min-w-0 flex-1 sm:w-72"
+                />
+                <x-ui.button type="submit" variant="secondary">Buscar</x-ui.button>
+            </form>
+        </x-slot:actions>
+    </x-ui.page-header>
 
-    <div class="card overflow-hidden !p-0">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-                <thead class="border-b border-automotive-200 bg-automotive-50">
-                    <tr>
-                        <th class="px-4 py-3 font-semibold text-automotive-800">Capa</th>
-                        <th class="px-4 py-3 font-semibold text-automotive-800">Veículo</th>
-                        <th class="px-4 py-3 font-semibold text-automotive-800">Chassi</th>
-                        <th class="px-4 py-3 font-semibold text-automotive-800">Placa</th>
-                        <th class="px-4 py-3 font-semibold text-automotive-800">Dono atual</th>
-                        <th class="px-4 py-3 font-semibold text-automotive-800">Última oficina</th>
-                        <th class="px-4 py-3 font-semibold text-automotive-800">Manut.</th>
-                        <th class="px-4 py-3 text-right font-semibold text-automotive-800"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($vehicles as $vehicle)
-                        @php
-                            $owner = $vehicle->owners->first();
-                            $latest = $vehicle->maintenances->first();
-                            $workshopLabel = $latest?->workshop?->name ?? $latest?->workshop_name;
-                        @endphp
-                        <tr class="border-b border-automotive-100 last:border-0">
-                            <td class="px-4 py-3">
-                                <x-vehicle-cover :vehicle="$vehicle" class="h-12 w-20 rounded object-cover" />
-                            </td>
-                            <td class="px-4 py-3 font-medium text-automotive-900">
-                                {{ $vehicle->brand }} {{ $vehicle->model }}
-                                @if($vehicle->year)
-                                    <span class="text-automotive-500">· {{ $vehicle->year }}</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 font-mono text-xs text-automotive-700">{{ $vehicle->chassis ?? '—' }}</td>
-                            <td class="px-4 py-3">{{ $vehicle->license_plate ?? '—' }}</td>
-                            <td class="px-4 py-3">
-                                @if($owner)
-                                    <a href="{{ route('admin.users.show', $owner) }}" class="text-wrench-600 hover:underline">{{ $owner->name }}</a>
-                                @else
-                                    <span class="text-automotive-400">—</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 text-automotive-600">{{ $workshopLabel ?? '—' }}</td>
-                            <td class="px-4 py-3">{{ $vehicle->maintenances_count }}</td>
-                            <td class="px-4 py-3 text-right">
-                                <a href="{{ route('admin.vehicles.show', $vehicle) }}" class="text-wrench-600 hover:underline">Ver</a>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="px-4 py-10 text-center text-automotive-600">Nenhum veículo encontrado.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <p class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground" @if($hasSearch) data-admin-vehicle-search-summary @endif>
+        @if($hasSearch)
+            <span>
+                {{ $formatCount($vehicles->total()) }} {{ $vehicles->total() === 1 ? 'resultado' : 'resultados' }} para
+                <span class="font-medium text-foreground">“{{ $search }}”</span>
+            </span>
+            <x-ui.link :href="route('admin.vehicles.index')" icon="x-mark">Limpar busca</x-ui.link>
+        @else
+            <span>{{ $formatCount($vehicles->total()) }} {{ $vehicles->total() === 1 ? 'veículo' : 'veículos' }}</span>
+        @endif
+    </p>
+
+    <x-ui.table caption="Veículos da plataforma" stack :sort="$sort" :direction="$direction">
+        <x-slot:head>
+            <tr>
+                <th class="w-20"><span class="sr-only">Capa</span></th>
+                <th class="min-w-40" data-sort="veiculo">Veículo</th>
+                <th>Placa</th>
+                <th>Chassi</th>
+                <th class="min-w-44">Proprietário atual</th>
+                <th class="min-w-44">Última oficina</th>
+                <th class="text-right" data-sort="manutencoes" data-sort-default="desc">Manutenções</th>
+                <th data-sort="cadastro" data-sort-default="desc">Cadastro</th>
+                <th class="text-right"><span class="sr-only">Ações</span></th>
+            </tr>
+        </x-slot:head>
+
+        @foreach($vehicles as $vehicle)
+            @php
+                $owner = $vehicle->owners->first();
+                $latest = $vehicle->maintenances->first();
+                $workshopLabel = $latest?->workshop?->name ?? $latest?->workshop_name;
+                $vehicleName = trim($vehicle->brand.' '.$vehicle->model);
+            @endphp
+            <tr>
+                <td class="py-2 max-md:hidden">
+                    <x-vehicle-cover :vehicle="$vehicle" />
+                </td>
+                <th scope="row" class="font-medium">
+                    <x-ui.link :href="route('admin.vehicles.show', $vehicle)">{{ $vehicleName }}</x-ui.link>
+                    @if($vehicle->year)
+                        <span class="block text-xs font-normal text-muted-foreground">{{ $vehicle->year }}</span>
+                    @endif
+                </th>
+                <td class="font-mono whitespace-nowrap tracking-wider">{{ $vehicle->license_plate ?? '—' }}</td>
+                <td class="font-mono text-xs break-all text-muted-foreground">{{ $vehicle->chassis ?? '—' }}</td>
+                <td>
+                    @if($owner)
+                        <x-ui.link :href="route('admin.users.show', $owner)">{{ $owner->name }}</x-ui.link>
+                    @else
+                        <span class="text-muted-foreground">Sem proprietário atual</span>
+                    @endif
+                </td>
+                <td class="text-muted-foreground">{{ $workshopLabel ?? '—' }}</td>
+                <td class="text-right">{{ $formatCount((int) $vehicle->maintenances_count) }}</td>
+                <td class="whitespace-nowrap">{{ $vehicle->created_at?->format('d/m/Y') ?? '—' }}</td>
+                <td class="py-2 text-right">
+                    <x-admin.row-actions :label="'Ações para o veículo '.$vehicleName.($vehicle->license_plate ? ' '.$vehicle->license_plate : '')" :id="'veiculo-'.$vehicle->id.'-acoes'">
+                        <x-ui.dropdown-item :href="route('admin.vehicles.show', $vehicle)" icon="eye">Abrir veículo</x-ui.dropdown-item>
+                        @if($vehicle->maintenances_count > 0)
+                            <x-ui.dropdown-item :href="route('admin.maintenances.index', ['veiculo' => $vehicle->id])" icon="wrench-screwdriver">Ver manutenções</x-ui.dropdown-item>
+                        @endif
+                        @if($owner)
+                            <x-ui.dropdown-item :href="route('admin.users.show', $owner)" icon="user-circle">Abrir proprietário atual</x-ui.dropdown-item>
+                        @endif
+                    </x-admin.row-actions>
+                </td>
+            </tr>
+        @endforeach
+
+        <x-slot:empty>
+            @if($hasSearch)
+                <x-ui.empty-state
+                    icon="magnifying-glass"
+                    title="Nenhum veículo encontrado"
+                    description="Confira a placa, o chassi ou o RENAVAM e busque de novo."
+                    variant="plain"
+                    size="sm"
+                    heading-level="p"
+                >
+                    <x-slot:actions>
+                        <x-ui.button variant="secondary" :href="route('admin.vehicles.index')">Limpar busca</x-ui.button>
+                    </x-slot:actions>
+                </x-ui.empty-state>
+            @else
+                <x-ui.empty-state
+                    icon="truck"
+                    title="Nenhum veículo cadastrado"
+                    description="Os veículos aparecem aqui quando proprietários, lojistas ou oficinas os cadastram."
+                    variant="plain"
+                    size="sm"
+                    heading-level="p"
+                />
+            @endif
+        </x-slot:empty>
+    </x-ui.table>
 
     <div class="mt-4">
         {{ $vehicles->links() }}
     </div>
-</div>
 @endsection

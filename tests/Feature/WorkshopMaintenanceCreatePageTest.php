@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Maintenance;
 use App\Models\MaintenanceWarranty;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Models\WarrantyTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -23,7 +24,7 @@ class WorkshopMaintenanceCreatePageTest extends TestCase
 
         $this->withoutVite()
             ->actingAs($workshopUser)
-            ->get(route('workshop.maintenances.create'))
+            ->get(route('workshop.maintenances.create', ['license_plate' => $this->ownedVehiclePlate()]))
             ->assertOk()
             ->assertSee('Garantia geral da OS')
             ->assertSee('name="general_warranty_template_id"', false)
@@ -39,8 +40,9 @@ class WorkshopMaintenanceCreatePageTest extends TestCase
 
         $this->withoutVite()
             ->actingAs($workshopUser)
-            ->get(route('workshop.maintenances.create'))
+            ->get(route('workshop.maintenances.create', ['license_plate' => $this->ownedVehiclePlate()]))
             ->assertOk()
+            ->assertSee('data-warranty-section', false)
             ->assertDontSee('Garantia geral da OS');
     }
 
@@ -49,7 +51,7 @@ class WorkshopMaintenanceCreatePageTest extends TestCase
         $workshopUser = User::factory()->asWorkshop()->create();
         $workshop = $workshopUser->workshop;
         $template = WarrantyTemplate::factory()->forWorkshop($workshop)->orderScope()->create();
-        $maintenance = Maintenance::factory()->create(['workshop_id' => $workshop->id]);
+        $maintenance = Maintenance::factory()->sealedByWorkshop()->create(['workshop_id' => $workshop->id]);
         MaintenanceWarranty::factory()->fromTemplate($template, $maintenance)->create();
 
         $this->withoutVite()
@@ -58,5 +60,16 @@ class WorkshopMaintenanceCreatePageTest extends TestCase
             ->assertOk()
             ->assertSee('Garantia geral da OS')
             ->assertSee('<option value="'.$template->id.'" selected', false);
+    }
+
+    /**
+     * O formulário da OS aparece depois de a placa achar um veículo com proprietário.
+     */
+    private function ownedVehiclePlate(): string
+    {
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'CPG1A23']);
+        $this->attachVehicleToUser(User::factory()->asUser()->create(), $vehicle);
+
+        return 'CPG1A23';
     }
 }

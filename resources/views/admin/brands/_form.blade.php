@@ -1,17 +1,13 @@
-<div class="grid gap-4">
-    <div>
-        <label for="name" class="form-label">Nome da marca *</label>
-        <input type="text" name="name" id="name"
-               value="{{ old('name', $brand->name ?? '') }}" required
-               class="form-input" placeholder="Ex: Mercedes-Benz">
-        @error('name')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-    </div>
+{{-- Campos da marca (nova e edição). $brand é opcional: sem ele, a marca nasce ativa. --}}
+<div class="grid gap-5">
+    <x-ui.field name="name" label="Nome da marca" hint="Como aparece nos formulários de veículo. Ex.: Mercedes-Benz" required>
+        <x-ui.input :value="$brand->name ?? ''" required maxlength="100" autocomplete="off" />
+    </x-ui.field>
 
-    <div class="flex items-center gap-2">
-        <input type="hidden" name="is_active" value="0">
-        <input type="checkbox" name="is_active" id="is_active" value="1"
-               class="rounded border-automotive-300 text-wrench-600 focus:ring-wrench-500"
-               @checked(old('is_active', $brand->is_active ?? true))>
-        <label for="is_active" class="text-sm text-automotive-700">Marca ativa (visível nos formulários)</label>
-    </div>
+    <x-ui.switch
+        name="is_active"
+        label="Marca ativa"
+        description="Marca inativa some dos formulários de veículo, mas continua nos cadastros antigos."
+        :checked="(bool) ($brand->is_active ?? true)"
+    />
 </div>

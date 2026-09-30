@@ -51,6 +51,11 @@ class VehiclePolicy
         return $this->tenantOwnsVehicle($user, $vehicle);
     }
 
+    /**
+     * Quem já é o dono atual confirma o vínculo. Quem não é só entra se nenhum outro tenant for o
+     * dono atual; a placa e o RENAVAM do documento é que provam a posse
+     * (VehicleOwnershipService::documentMatchesVehicle). Veículo de outra conta continua 403.
+     */
     public function link(User $user, Vehicle $vehicle): bool
     {
         if (! $user->tenant_id) {

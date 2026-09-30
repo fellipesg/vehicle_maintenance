@@ -4,6 +4,11 @@
     $pageTitle = $category ? $category->name.' — Blog' : 'Blog';
     $pageDescription = $category?->description
         ?: 'Guias, dicas e novidades sobre manutenção, documentação e cuidados com o seu carro.';
+
+    // Chips de categoria: estado pelo atributo aria-current (não só pela cor) e alvo de 40px.
+    $chipClass = 'inline-flex min-h-10 shrink-0 snap-start items-center gap-1.5 rounded-full border px-4 text-sm whitespace-nowrap transition-colors duration-fast ease-smooth-out motion-reduce:transition-none';
+    $chipIdleClass = 'border-border bg-surface font-medium text-muted-foreground hover:border-border-strong hover:text-foreground';
+    $chipCurrentClass = 'border-accent-border bg-accent font-semibold text-accent-foreground';
 @endphp
 
 @section('title', $pageTitle)
@@ -18,57 +23,70 @@
 @endpush
 
 @section('content')
-<div class="mx-auto max-w-7xl px-4 py-10">
-    <header class="mb-8">
-        @if($category)
-            <a href="{{ route('blog.index') }}" class="text-sm text-wrench-600 hover:underline">← Todos os artigos</a>
-        @endif
-        <h1 class="mt-2 text-4xl font-bold text-automotive-900">{{ $category?->name ?? 'Blog' }}</h1>
-        <p class="mt-2 max-w-2xl text-automotive-600">{{ $pageDescription }}</p>
-    </header>
+<x-ui.container padded>
+    <x-ui.page-header
+        :title="$category?->name ?? 'Blog'"
+        :description="$pageDescription"
+        :breadcrumbs="$category ? [['Blog', route('blog.index')], [$category->name]] : []"
+    />
 
     @if($categories->isNotEmpty())
-        <nav class="mb-8 flex flex-wrap gap-2" aria-label="Categorias do blog">
-            <a
-                href="{{ route('blog.index') }}"
-                @class([
-                    'rounded-full border px-3 py-1.5 text-sm transition',
-                    'border-wrench-500 bg-wrench-500/15 font-semibold text-wrench-700' => ! $category,
-                    'border-automotive-200 bg-white text-automotive-600 hover:border-wrench-400 hover:text-wrench-700' => (bool) $category,
-                ])
-            >
-                Todos
-            </a>
-            @foreach($categories as $item)
-                <a
-                    href="{{ route('blog.category', $item) }}"
-                    @class([
-                        'rounded-full border px-3 py-1.5 text-sm transition',
-                        'border-wrench-500 bg-wrench-500/15 font-semibold text-wrench-700' => $category?->is($item),
-                        'border-automotive-200 bg-white text-automotive-600 hover:border-wrench-400 hover:text-wrench-700' => ! $category?->is($item),
-                    ])
-                >
-                    {{ $item->name }}
-                    <span class="text-xs text-automotive-400">{{ $item->posts_count }}</span>
-                </a>
-            @endforeach
+        {{-- No celular os chips rolam na horizontal em vez de ocupar várias linhas antes dos posts. --}}
+        <nav aria-label="Categorias do blog" class="mb-8" data-slot="blog-categories">
+            <ul role="list" class="landing-scroller -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+                <li class="shrink-0">
+                    <a
+                        href="{{ route('blog.index') }}"
+                        @if(! $category) aria-current="page" @endif
+                        class="{{ $chipClass }} {{ $category ? $chipIdleClass : $chipCurrentClass }}"
+                    >Todos</a>
+                </li>
+                @foreach($categories as $item)
+                    @php($isCurrentCategory = (bool) $category?->is($item))
+                    <li class="shrink-0">
+                        <a
+                            href="{{ route('blog.category', $item) }}"
+                            @if($isCurrentCategory) aria-current="page" @endif
+                            class="{{ $chipClass }} {{ $isCurrentCategory ? $chipCurrentClass : $chipIdleClass }}"
+                        >
+                            {{ $item->name }}
+                            <span class="text-xs font-normal tabular-nums text-subtle-foreground" aria-hidden="true">{{ $item->posts_count }}</span>
+                            <span class="sr-only">({{ $item->posts_count === 1 ? '1 artigo' : $item->posts_count.' artigos' }})</span>
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
         </nav>
     @endif
 
     @if($posts->isEmpty())
-        <div class="card text-center text-automotive-500">
-            Nenhum artigo publicado {{ $category ? 'nesta categoria' : 'por enquanto' }}.
-        </div>
+        <x-ui.empty-state
+            icon="newspaper"
+            heading-level="h2"
+            :title="$category ? 'Ainda não há artigos nesta categoria' : 'Ainda não há artigos aqui'"
+            description="Os próximos guias sobre manutenção, documentação e venda do carro aparecem nesta página."
+        >
+            <x-slot:actions>
+                @if($category)
+                    <x-ui.button :href="route('blog.index')">Ver todos os artigos</x-ui.button>
+                @endif
+                <x-ui.button variant="secondary" :href="route('home')">Conhecer a plataforma</x-ui.button>
+            </x-slot:actions>
+        </x-ui.empty-state>
     @else
-        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <ul role="list" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" data-slot="blog-posts">
             @foreach($posts as $post)
-                <x-blog.card :post="$post" />
+                <li class="min-w-0">
+                    <x-blog.card :post="$post" />
+                </li>
             @endforeach
-        </div>
+        </ul>
 
-        <div class="mt-10">
-            {{ $posts->links() }}
-        </div>
+        @if($posts->hasPages())
+            <div class="mt-10">
+                {{ $posts->onEachSide(1)->links() }}
+            </div>
+        @endif
     @endif
-</div>
+</x-ui.container>
 @endsection

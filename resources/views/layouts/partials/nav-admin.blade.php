@@ -1,98 +1,20 @@
-@php
-    $itemClass = function (bool $active): string {
-        return $active
-            ? 'flex items-center gap-2 rounded-lg bg-wrench-500/15 px-3 py-2 text-sm font-medium text-wrench-400 ring-1 ring-inset ring-wrench-500/25'
-            : 'flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-automotive-300 hover:bg-automotive-900 hover:text-wrench-400';
-    };
-@endphp
+{{--
+    Menu lateral do admin. Os destinos vêm da fonte única (App\Enums\Portal::Admin->navigationItems():
+    Visão geral sem grupo; Cadastros, Frota, Conteúdo e Catálogo agrupando o resto, cada item com
+    ícone de 20px e aria-current="page" na área aberta) e são desenhados por <x-ui.nav> vertical.
 
-<nav class="space-y-6" aria-label="Menu admin">
-    <div>
-        <p class="mb-2 px-3 text-[0.65rem] font-semibold uppercase tracking-wider text-automotive-500">Visão</p>
-        <ul class="space-y-0.5">
-            <li>
-                <a href="{{ route('admin.dashboard') }}" class="{{ $itemClass(request()->routeIs('admin.dashboard')) }}">
-                    Dashboard
-                </a>
-            </li>
-        </ul>
-    </div>
+    Mapas não são itens do menu: são outra forma de ver um cadastro (a troca Lista | Mapa fica na
+    própria página), e o Portal já faz cada mapa ativar o item da lista dele. "Usuários" abre a
+    lista própria (/admin/usuarios, admin.users.index), com busca, perfis e paginação.
 
-    <div>
-        <p class="mb-2 px-3 text-[0.65rem] font-semibold uppercase tracking-wider text-automotive-500">Plataforma</p>
-        <ul class="space-y-0.5">
-            <li>
-                <a
-                    href="{{ route('admin.dashboard') }}#usuarios"
-                    class="{{ $itemClass(request()->routeIs('admin.users.*')) }}"
-                >
-                    Usuários
-                </a>
-            </li>
-            <li>
-                <a href="{{ route('admin.vehicles.index') }}" class="{{ $itemClass(request()->routeIs('admin.vehicles.*')) }}">
-                    Veículos
-                </a>
-            </li>
-            <li>
-                <a href="{{ route('admin.maintenances.index') }}" class="{{ $itemClass(request()->routeIs('admin.maintenances.*')) }}">
-                    Manutenções
-                </a>
-            </li>
-            <li>
-                <a href="{{ route('admin.workshops.index') }}" class="{{ $itemClass(request()->routeIs('admin.workshops.*')) }}">
-                    Oficinas
-                </a>
-            </li>
-        </ul>
-    </div>
-
-    <div>
-        <p class="mb-2 px-3 text-[0.65rem] font-semibold uppercase tracking-wider text-automotive-500">Mapas</p>
-        <ul class="space-y-0.5">
-            <li>
-                <a href="{{ route('admin.maps.workshops') }}" class="{{ $itemClass(request()->routeIs('admin.maps.workshops')) }}">
-                    Oficinas
-                </a>
-            </li>
-            <li>
-                <a href="{{ route('admin.maps.users') }}" class="{{ $itemClass(request()->routeIs('admin.maps.users')) }}">
-                    Usuários
-                </a>
-            </li>
-        </ul>
-    </div>
-
-    <div>
-        <p class="mb-2 px-3 text-[0.65rem] font-semibold uppercase tracking-wider text-automotive-500">Conteúdo</p>
-        <ul class="space-y-0.5">
-            <li>
-                <a
-                    href="{{ route('admin.blog.index') }}"
-                    class="{{ $itemClass(request()->routeIs('admin.blog.index') || request()->routeIs('admin.blog.create') || request()->routeIs('admin.blog.edit')) }}"
-                >
-                    Blog
-                </a>
-            </li>
-            <li>
-                <a
-                    href="{{ route('admin.blog.categories.index') }}"
-                    class="{{ $itemClass(request()->routeIs('admin.blog.categories.*')) }}"
-                >
-                    Categorias
-                </a>
-            </li>
-        </ul>
-    </div>
-
-    <div>
-        <p class="mb-2 px-3 text-[0.65rem] font-semibold uppercase tracking-wider text-automotive-500">Catálogo</p>
-        <ul class="space-y-0.5">
-            <li>
-                <a href="{{ route('admin.brands.index') }}" class="{{ $itemClass(request()->routeIs('admin.brands.*')) }}">
-                    Marcas
-                </a>
-            </li>
-        </ul>
-    </div>
-</nav>
+    Sidebar recolhida (data-sidebar="collapsed" no <html>, a partir de md; ver layouts.admin): os
+    rótulos dos itens e dos grupos ficam só para leitor de tela e os ícones se centralizam. O nome de
+    cada item aparece na dica de resources/js/ui/sidebar.js.
+--}}
+<x-ui.nav
+    label="Administração"
+    variant="vertical"
+    :items="\App\Enums\Portal::Admin->navigationItems()"
+    class="md:in-data-[sidebar=collapsed]:[&_a]:justify-center md:in-data-[sidebar=collapsed]:[&_a]:px-0 md:in-data-[sidebar=collapsed]:[&_a>span]:sr-only md:in-data-[sidebar=collapsed]:[&_li>p]:sr-only"
+    data-sidebar-nav
+/>

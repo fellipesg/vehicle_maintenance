@@ -13,9 +13,24 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 
+/**
+ * Boas-vindas de toda conta nova. O botão depende de por onde a pessoa entrou:
+ *
+ * - web: já tem senha e está logada, então o botão leva ao primeiro passo (adicionar o veículo);
+ * - app com e-mail e senha: entrar pelo navegador com os mesmos dados;
+ * - app com Google ou Facebook (OAuth): a conta tem uma senha aleatória que a pessoa não conhece,
+ *   então o botão leva a "Esqueci minha senha" para ela definir uma e poder usar o navegador.
+ */
 class WelcomeUserMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
+
+    /**
+     * Tema de resources/views/vendor/mail/html/themes/revisalog.css.
+     *
+     * @var string
+     */
+    public $theme = 'revisalog';
 
     public function __construct(
         public User $user,
@@ -27,14 +42,14 @@ class WelcomeUserMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: new Address('noreply@revisalog.com.br', 'Revisalog'),
+            from: new Address('noreply@revisalog.com.br', 'RevisaLog'),
             replyTo: [
                 new Address(
                     (string) config('mail.reply_to.address'),
-                    'Revisalog',
+                    'RevisaLog',
                 ),
             ],
-            subject: 'Bem-vindo à Revisalog',
+            subject: 'Bem-vindo à RevisaLog',
         );
     }
 
@@ -45,6 +60,10 @@ class WelcomeUserMail extends Mailable implements ShouldQueue
             with: [
                 'firstName' => $this->firstName(),
                 'actionUrl' => $this->actionUrl(),
+                'actionLabel' => $this->actionLabel(),
+                'needsPassword' => $this->needsPassword(),
+                'createdInApp' => $this->source !== RegistrationSource::Web,
+                'email' => $this->user->email,
             ],
         );
     }
@@ -56,11 +75,29 @@ class WelcomeUserMail extends Mailable implements ShouldQueue
         return $firstName !== '' ? $firstName : 'motorista';
     }
 
+    /**
+     * Conta criada com Google ou Facebook: sem senha conhecida, o login do navegador não serve.
+     */
+    public function needsPassword(): bool
+    {
+        return $this->source === RegistrationSource::Oauth;
+    }
+
     public function actionUrl(): string
     {
         return match ($this->source) {
-            RegistrationSource::Web => route('user.dashboard'),
-            RegistrationSource::Api, RegistrationSource::Oauth => route('login.usuario'),
+            RegistrationSource::Web => route('user.vehicles.create'),
+            RegistrationSource::Api => route('login.usuario'),
+            RegistrationSource::Oauth => route('password.request', ['portal' => 'usuario']),
+        };
+    }
+
+    public function actionLabel(): string
+    {
+        return match ($this->source) {
+            RegistrationSource::Web => 'Adicionar meu veículo',
+            RegistrationSource::Api => 'Entrar pelo navegador',
+            RegistrationSource::Oauth => 'Definir senha para o navegador',
         };
     }
 }

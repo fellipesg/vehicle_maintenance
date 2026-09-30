@@ -101,6 +101,23 @@ class MaintenanceControllerTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_category_must_be_one_of_the_service_categories(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão',
+            'maintenance_date' => now()->toDateString(),
+            'kilometers' => ($vehicle->current_kilometers ?? 0) + 1000,
+            'service_category' => 'tuning',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('service_category', 'errors');
+    }
+
     public function test_cannot_create_maintenance_for_unowned_vehicle(): void
     {
         $this->actingAsApiUser();
@@ -180,6 +197,7 @@ class MaintenanceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -196,6 +214,7 @@ class MaintenanceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,

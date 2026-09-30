@@ -15,6 +15,7 @@ trait SyncsMaintenanceItems
     {
         return [
             'items' => ['nullable', 'array'],
+            'items.*.id' => ['nullable', 'integer'],
             'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -24,39 +25,70 @@ trait SyncsMaintenanceItems
         ];
     }
 
+    /**
+     * Make the OS items match the submitted list. Rows that carry the id of an
+     * item of this OS update it in place, so its issued warranty and invoice
+     * links survive; rows without a known id become new items, created in the
+     * submitted order; items missing from the list are deleted. An empty or
+     * absent list removes every item, which lets the NF-e import fill it.
+     */
     protected function syncMaintenanceItems(Maintenance $maintenance, Request $request): void
     {
-        $items = $request->input('items', []);
+        $rows = $request->input('items', []);
 
-        if (! is_array($items)) {
+        if (! is_array($rows)) {
             return;
         }
 
-        $maintenance->items()->delete();
+        $existingItems = $maintenance->items()->get()->keyBy('id');
+        $keptItemIds = [];
 
-        foreach ($items as $item) {
-            if (! is_array($item) || empty($item['name'])) {
+        foreach ($rows as $row) {
+            if (! is_array($row) || empty($row['name'])) {
                 continue;
             }
 
-            $quantity = (int) ($item['quantity'] ?? 1);
-            $unitPrice = isset($item['unit_price']) ? (float) $item['unit_price'] : null;
-            $totalPrice = isset($item['total_price'])
-                ? (float) $item['total_price']
-                : ($unitPrice !== null ? $unitPrice * $quantity : null);
+            $attributes = $this->maintenanceItemAttributes($row);
+            $existingItem = isset($row['id']) ? $existingItems->get((int) $row['id']) : null;
 
-            MaintenanceItem::create([
+            if ($existingItem !== null && ! in_array($existingItem->id, $keptItemIds, true)) {
+                $existingItem->update($attributes);
+                $keptItemIds[] = $existingItem->id;
+
+                continue;
+            }
+
+            $keptItemIds[] = MaintenanceItem::create([
                 'maintenance_id' => $maintenance->id,
-                'name' => $item['name'],
-                'description' => $item['description'] ?? null,
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'total_price' => $totalPrice,
-                'part_number' => $item['part_number'] ?? null,
-                'has_warranty' => false,
-                'warranty_starts_at' => null,
-                'warranty_ends_at' => null,
-            ]);
+                ...$attributes,
+            ])->id;
         }
+
+        $maintenance->items()->whereNotIn('id', $keptItemIds)->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array{name: string, description: ?string, quantity: int, unit_price: ?float, total_price: ?float, part_number: ?string, has_warranty: bool, warranty_starts_at: null, warranty_ends_at: null}
+     */
+    private function maintenanceItemAttributes(array $row): array
+    {
+        $quantity = (int) ($row['quantity'] ?? 1);
+        $unitPrice = isset($row['unit_price']) ? (float) $row['unit_price'] : null;
+        $totalPrice = isset($row['total_price'])
+            ? (float) $row['total_price']
+            : ($unitPrice !== null ? $unitPrice * $quantity : null);
+
+        return [
+            'name' => $row['name'],
+            'description' => $row['description'] ?? null,
+            'quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'total_price' => $totalPrice,
+            'part_number' => $row['part_number'] ?? null,
+            'has_warranty' => false,
+            'warranty_starts_at' => null,
+            'warranty_ends_at' => null,
+        ];
     }
 }

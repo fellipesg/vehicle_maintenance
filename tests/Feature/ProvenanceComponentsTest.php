@@ -65,33 +65,43 @@ class ProvenanceComponentsTest extends TestCase
             'maintenance_type' => 'Revisão declarada',
         ]);
 
-        $this->actingAs($user)
+        // Sem JS o filtro é do servidor: o card que não casa sai com hidden (o JS mostra de novo no lugar).
+        $sealedOnly = $this->actingAs($user)
             ->get('/buscar-veiculo?identifier=ABC1D23&verified=1')
             ->assertOk()
             ->assertSee('Selo da oficina', false)
-            ->assertDontSee('Revisão declarada', false);
+            ->assertSee('Mostrando 1 de 2 manutenções', false)
+            ->getContent();
+        $this->assertMatchesRegularExpression('#<li[^>]*data-verified="0"[^>]*hidden#', $sealedOnly);
+        $this->assertDoesNotMatchRegularExpression('#<li[^>]*data-verified="1"[^>]*hidden#', $sealedOnly);
 
-        $this->actingAs($user)
+        $declaredOnly = $this->actingAs($user)
             ->get('/buscar-veiculo?identifier=ABC1D23&verified=0')
             ->assertOk()
             ->assertSee('Revisão declarada', false)
-            ->assertDontSee('prov-card prov-verified', false);
+            ->getContent();
+        $this->assertMatchesRegularExpression('#<li[^>]*data-verified="1"[^>]*hidden#', $declaredOnly);
+        $this->assertDoesNotMatchRegularExpression('#<li[^>]*data-verified="0"[^>]*hidden#', $declaredOnly);
     }
 
     public function test_public_vehicle_search_uses_client_side_provenance_filters(): void
     {
         $user = User::factory()->create();
-        Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        Maintenance::factory()->sealedByWorkshop()->create(['vehicle_id' => $vehicle->id]);
 
         $html = $this->actingAs($user)
             ->get('/buscar-veiculo?identifier=ABC1D23')
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('data-provenance-filter=""', $html);
-        $this->assertStringContainsString('data-provenance-filter="1"', $html);
-        $this->assertStringContainsString('data-vehicle-search-results', $html);
-        $this->assertStringContainsString('id="vehicle-search-maintenances-json"', $html);
+        // A busca usa a ficha <x-vehicle.detail>: formulário GET com botões name="verified" que o
+        // initProvenanceFilters (resources/js/provenance-ui.js) filtra no lugar.
+        $this->assertStringContainsString('data-provenance-filter-root', $html);
+        $this->assertStringContainsString('data-provenance-filter-form', $html);
+        $this->assertMatchesRegularExpression('#<button[^>]*name="verified"[^>]*value="1"#', $html);
+        $this->assertMatchesRegularExpression('#<input type="hidden" name="identifier" value="ABC1D23">#', $html);
+        $this->assertStringNotContainsString('id="vehicle-search-maintenances-json"', $html);
         $this->assertStringNotContainsString('href="?verified=1"', $html);
     }
 
@@ -139,18 +149,20 @@ class ProvenanceComponentsTest extends TestCase
         $this->assertStringContainsString('+1</span>', $html);
     }
 
-    public function test_workshop_maintenances_index_includes_provenance_legend_and_cards(): void
+    public function test_workshop_maintenances_index_shows_the_provenance_of_each_order(): void
     {
         $workshopUser = User::factory()->asWorkshop()->create();
         $maintenance = Maintenance::factory()->sealedByWorkshop()->create([
             'workshop_id' => $workshopUser->workshop->id,
-        ]);
+        ])->fresh();
 
+        // A lista da oficina é uma tabela: a procedência vem no filtro, em data-verified e no código do selo.
         $this->actingAs($workshopUser)
             ->get(route('workshop.maintenances.index'))
             ->assertOk()
             ->assertSee('Selo da oficina', false)
-            ->assertSee('prov-card', false)
+            ->assertSee('data-maintenance-row="'.$maintenance->id.'" data-verified="1"', false)
+            ->assertSee($maintenance->verification_code, false)
             ->assertSee($maintenance->maintenance_type, false);
     }
 
@@ -180,12 +192,12 @@ class ProvenanceComponentsTest extends TestCase
 
         $this->assertStringContainsString('Selo da oficina', $html);
         $this->assertStringContainsString('Declarada', $html);
-        $this->assertStringContainsString('manutenções com selo de oficina', $html);
+        $this->assertStringContainsString('Um ponto por manutenção, da mais antiga à mais recente', $html);
         $this->assertStringContainsString('revisalog.com.br/v/{código}', $html);
 
-        // Capa: contadores + linha de pontos (um por manutenção), sem a barra segmentada.
-        $this->assertStringContainsString('prov-count--verified', $html);
-        $this->assertStringContainsString('prov-count--declared', $html);
+        // Capa: contador compacto ("1 com selo · 1 declarada") + linha de pontos (um por manutenção).
+        $this->assertStringContainsString('<span class="prov-counter--sealed">1 com selo</span>', $html);
+        $this->assertStringContainsString('<span class="prov-counter--declared">1 declarada</span>', $html);
         $this->assertSame(
             $vehicle->maintenances->count(),
             preg_match_all('/class="prov-dot prov-dot--(verified|declared)"/', $html)
@@ -197,5 +209,29 @@ class ProvenanceComponentsTest extends TestCase
         $this->assertStringContainsString('Registro feito pela própria oficina em', $html);
         $this->assertStringContainsString('não verificado por oficina cadastrada', $html);
         $this->assertMatchesRegularExpression('#revisalog\.com\.br/v/RVL-[A-Z0-9]{4}-[A-Z0-9]{2}#', $html);
+    }
+
+    /**
+     * O marcador da declarada usa as letras da legenda (PR, LJ), nunca as iniciais de quem declarou:
+     * a busca por placa e o /v/ são vistos por quem não é dono.
+     */
+    public function test_declared_marker_uses_generic_letters_instead_of_the_owner_initials(): void
+    {
+        $owner = User::factory()->create(['name' => 'Zélia Quintana']);
+        $ownerRecord = Maintenance::factory()->declaredByOwner()->create(['user_id' => $owner->id, 'workshop_name' => 'Mecânica Xavier']);
+        $garageRecord = Maintenance::factory()->declaredByGarage()->create(['user_id' => $owner->id]);
+
+        $ownerHtml = Blade::render('<x-provenance-marker :maintenance="$maintenance" />', ['maintenance' => $ownerRecord->fresh()->load('user')]);
+        $garageHtml = Blade::render('<x-provenance-marker :maintenance="$maintenance" />', ['maintenance' => $garageRecord->fresh()->load('user')]);
+        $eventHtml = Blade::render('<x-provenance-marker :event="$event" />', ['event' => ['is_verified' => false, 'registered_by_type' => 'garage', 'provenance_label' => 'Declarada pelo lojista']]);
+
+        $this->assertMatchesRegularExpression('#prov-marker--declared[^>]*>\s*PR\s*</div>#', $ownerHtml);
+        $this->assertStringNotContainsString('ZQ', $ownerHtml);
+        $this->assertStringNotContainsString('MX', $ownerHtml);
+        $this->assertMatchesRegularExpression('#prov-marker--declared[^>]*>\s*LJ\s*</div>#', $garageHtml);
+        $this->assertMatchesRegularExpression('#prov-marker--declared[^>]*>\s*LJ\s*</div>#', $eventHtml);
+
+        $sealed = Maintenance::factory()->sealedByWorkshop()->create(['workshop_id' => Workshop::factory()->create(['name' => 'Silva Auto'])->id]);
+        $this->assertMatchesRegularExpression('#prov-marker--verified[^>]*>\s*SA\s*</div>#', Blade::render('<x-provenance-marker :maintenance="$maintenance" />', ['maintenance' => $sealed->fresh()->load('verifiedWorkshop')]));
     }
 }

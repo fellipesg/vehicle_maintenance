@@ -28,7 +28,8 @@ class AuthTest extends TestCase
     {
         $this->get('/login')
             ->assertOk()
-            ->assertSee('Como você deseja entrar?')
+            ->assertSee('>Entrar</h1>', false)
+            ->assertSee('Escolha o tipo da sua conta.')
             ->assertSee('Oficina')
             ->assertSee('lockup-horizontal-tagline.png', false)
             ->assertSee('alt="RevisaLog"', false);
@@ -210,7 +211,7 @@ class AuthTest extends TestCase
 
     public function test_guest_cannot_access_user_dashboard(): void
     {
-        $this->get('/usuario/dashboard')->assertRedirect('/login');
+        $this->get('/usuario/dashboard')->assertRedirect(route('login.usuario'));
     }
 
     public function test_wrong_user_type_cannot_access_portal(): void
@@ -219,7 +220,8 @@ class AuthTest extends TestCase
 
         $this->actingAs($garage)
             ->get('/usuario/dashboard')
-            ->assertForbidden();
+            ->assertRedirect(route('garage.dashboard'))
+            ->assertSessionHas('info');
     }
 
     public function test_web_login_rate_limit_returns_redirect_not_json(): void
