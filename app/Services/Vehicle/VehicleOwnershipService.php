@@ -193,6 +193,30 @@ class VehicleOwnershipService
     /**
      * @param  array<string, mixed>  $vehicleData
      */
+    /**
+     * The API claim has no CRLV file, so the plate and RENAVAM printed on the document
+     * stand in as proof. It is weaker than a parsed CRLV, so the caller must not mark
+     * the ownership as verified.
+     */
+    public function documentMatchesVehicle(Vehicle $vehicle, string $licensePlate, string $renavam): bool
+    {
+        $vehicleRenavam = $this->normalizeDigits((string) $vehicle->renavam);
+        $givenRenavam = $this->normalizeDigits($renavam);
+
+        if ($vehicleRenavam === '' || $givenRenavam === '') {
+            return false;
+        }
+
+        $vehiclePlate = VehiclePlateSearch::normalize((string) $vehicle->license_plate);
+        $givenPlate = VehiclePlateSearch::normalize($licensePlate);
+
+        if ($vehiclePlate === '' || $givenPlate === '') {
+            return false;
+        }
+
+        return $givenRenavam === $vehicleRenavam && $givenPlate === $vehiclePlate;
+    }
+
     private function assertCrlvMatchesRegistration(
         CrlvParseResult $crlv,
         string $renavam,

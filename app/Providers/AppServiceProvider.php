@@ -69,6 +69,11 @@ class AppServiceProvider extends ServiceProvider
             'search|'.$request->ip(),
         ));
 
+        // Claiming a vehicle is guarded by plate + RENAVAM, so cap the guesses per account.
+        RateLimiter::for('vehicle-link', fn (Request $request) => Limit::perMinute(10)->by(
+            'vehicle-link|'.($request->user()?->id ?: $request->ip()),
+        ));
+
         RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(10)->by(
             'uploads|'.($request->user()?->id ?: $request->ip()),
         ));
