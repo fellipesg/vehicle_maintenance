@@ -4,17 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\RegistrationSource;
 use App\Events\UserRegistered;
+use App\Exceptions\InvalidAppleIdentityTokenException;
 use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\AppleLoginRequest;
 use App\Http\Requests\Api\V1\LoginRequest;
 use App\Http\Requests\Api\V1\RegisterRequest;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\User;
+use App\Services\Auth\AppleIdentityTokenVerifier;
 use App\Services\TenantService;
 use App\Support\ApiResponse;
 use App\Support\SanctumMobileToken;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -185,40 +189,13 @@ class AuthController extends Controller
                 ->redirectUrl($redirectUri)
                 ->user();
 
-            $user = User::where('provider', $provider)
-                ->where('provider_id', $socialUser->getId())
-                ->first();
-
-            $isNewUser = false;
-
-            if (! $user) {
-                $user = User::where('email', $socialUser->getEmail())->first();
-
-                if ($user) {
-                    $user->update([
-                        'provider' => $provider,
-                        'provider_id' => $socialUser->getId(),
-                        'avatar' => $socialUser->getAvatar(),
-                    ]);
-                } else {
-                    $user = DB::transaction(function () use ($socialUser, $provider): User {
-                        $user = User::create([
-                            'name' => $socialUser->getName(),
-                            'email' => $socialUser->getEmail(),
-                            'provider' => $provider,
-                            'provider_id' => $socialUser->getId(),
-                            'avatar' => $socialUser->getAvatar(),
-                            'password' => Hash::make(uniqid()),
-                        ]);
-                        (new TenantService)->createForUser($user);
-
-                        return $user->refresh();
-                    });
-                    $isNewUser = true;
-                }
-            } elseif ($socialUser->getAvatar() && $user->avatar !== $socialUser->getAvatar()) {
-                $user->update(['avatar' => $socialUser->getAvatar()]);
-            }
+            ['user' => $user, 'is_new' => $isNewUser] = $this->findOrCreateSocialUser(
+                provider: $provider,
+                providerId: (string) $socialUser->getId(),
+                email: $socialUser->getEmail(),
+                name: $socialUser->getName(),
+                avatar: $socialUser->getAvatar(),
+            );
 
             if ($isNewUser) {
                 UserRegistered::dispatch($user, RegistrationSource::Oauth);
@@ -242,6 +219,145 @@ class AuthController extends Controller
                 500,
             );
         }
+    }
+
+    /**
+     * Sign in with Apple (native iOS identity token).
+     *
+     * Accepts the relay address Apple issues when the user hides their email.
+     */
+    #[Group('OAuth (Advanced)', 'Optional browser-based OAuth for mobile/web clients. Email/password login is the primary method.', weight: 90)]
+    #[Endpoint(
+        title: 'Sign in with Apple',
+        description: 'Verifies a native Sign in with Apple identity token and returns a Bearer token or a 2FA challenge. The token audience is the iOS bundle id.',
+    )]
+    public function loginWithApple(AppleLoginRequest $request, AppleIdentityTokenVerifier $tokens): JsonResponse
+    {
+        try {
+            $identity = $tokens->verify(
+                $request->string('identity_token')->toString(),
+                $request->string('nonce')->toString(),
+            );
+        } catch (InvalidAppleIdentityTokenException $exception) {
+            Log::warning('Apple sign-in rejected', ['reason' => $exception->getMessage()]);
+
+            return ApiResponse::error('Unable to authenticate with Apple.', 401);
+        }
+
+        $portal = $request->filled('portal') ? $request->string('portal')->toString() : null;
+        $existing = User::query()
+            ->where('provider', 'apple')
+            ->where('provider_id', $identity->subject)
+            ->first();
+
+        if (! $existing && $identity->email) {
+            $existing = User::query()->where('email', $identity->email)->first();
+        }
+
+        if ($existing && $portal && ! $this->userMatchesPortal($existing, $portal)) {
+            return ApiResponse::error('This account does not have access to this portal.', 403);
+        }
+
+        if (! $existing && in_array($portal, ['admin', 'oficina'], true)) {
+            return ApiResponse::error('This account does not have access to this portal.', 403);
+        }
+
+        if (! $existing && ! $identity->email) {
+            return ApiResponse::error('Apple did not share an email address.', 422);
+        }
+
+        try {
+            ['user' => $user, 'is_new' => $isNewUser] = $this->findOrCreateSocialUser(
+                provider: 'apple',
+                providerId: $identity->subject,
+                email: $identity->email,
+                name: $request->filled('name') ? $request->string('name')->toString() : null,
+                avatar: null,
+                userType: $portal === 'lojista' ? 'garage' : null,
+            );
+        } catch (UniqueConstraintViolationException) {
+            return ApiResponse::error('Unable to authenticate with Apple.', 409);
+        }
+
+        if ($identity->emailVerified && $user->email_verified_at === null) {
+            $user->email_verified_at = now();
+            $user->save();
+        }
+
+        if ($isNewUser) {
+            UserRegistered::dispatch($user, RegistrationSource::Oauth);
+        }
+
+        if ($twoFactorResponse = $this->maybeIssueTwoFactorChallenge($user)) {
+            return $twoFactorResponse;
+        }
+
+        return SanctumMobileToken::loginResponse($user);
+    }
+
+    /**
+     * @return array{user: User, is_new: bool}
+     */
+    private function findOrCreateSocialUser(
+        string $provider,
+        string $providerId,
+        ?string $email,
+        ?string $name,
+        ?string $avatar,
+        ?string $userType = null,
+    ): array {
+        $user = User::query()
+            ->where('provider', $provider)
+            ->where('provider_id', $providerId)
+            ->first();
+
+        if ($user) {
+            if ($avatar && $user->avatar !== $avatar) {
+                $user->update(['avatar' => $avatar]);
+            }
+
+            return ['user' => $user, 'is_new' => false];
+        }
+
+        if (filled($email)) {
+            $user = User::query()->where('email', $email)->first();
+        }
+
+        if ($user) {
+            $user->update([
+                'provider' => $provider,
+                'provider_id' => $providerId,
+                'avatar' => $avatar,
+            ]);
+
+            return ['user' => $user, 'is_new' => false];
+        }
+
+        if (! filled($email)) {
+            throw new \InvalidArgumentException('OAuth provider did not return an email.');
+        }
+
+        $user = DB::transaction(function () use ($email, $name, $provider, $providerId, $avatar, $userType): User {
+            $attributes = [
+                'name' => filled($name) ? $name : 'Usuário',
+                'email' => $email,
+                'provider' => $provider,
+                'provider_id' => $providerId,
+                'avatar' => $avatar,
+                'password' => Hash::make(uniqid()),
+            ];
+
+            if ($userType !== null) {
+                $attributes['user_type'] = $userType;
+            }
+
+            $user = User::create($attributes);
+            (new TenantService)->createForUser($user);
+
+            return $user->refresh();
+        });
+
+        return ['user' => $user, 'is_new' => true];
     }
 
     private function maybeIssueTwoFactorChallenge(User $user): ?JsonResponse

@@ -152,13 +152,17 @@ class AppServiceProvider extends ServiceProvider
 
     private function isLoginRequest(Request $request): bool
     {
-        return ! $request->is('api/v1/register', 'register', 'api/v1/auth/*/callback');
+        return ! $request->is('api/v1/register', 'register', 'api/v1/auth/*/callback', 'api/v1/auth/apple');
     }
 
     private function authRateLimitKey(Request $request): string
     {
         if ($request->is('api/v1/register', 'register')) {
             return 'register|'.$request->ip();
+        }
+
+        if ($request->is('api/v1/auth/apple')) {
+            return 'oauth:apple|'.$request->ip();
         }
 
         if ($request->is('api/v1/auth/*/callback')) {

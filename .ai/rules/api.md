@@ -2,6 +2,7 @@
 paths:
   - 'app/Http/Controllers/Api/**'
   - app/Http/Controllers/Api/VehicleController.php
+  - app/Http/Controllers/Api/AuthController.php
 ---
 
 # Api
@@ -11,3 +12,6 @@ Use ApiResponse for all JSON responses with success/data/message/errors/meta/lin
 
 ## Listagens de veículos com ?include=
 Endpoints de listagem (`myVehicles`, `index`) não devem carregar `plates` nem `provenanceStripMaintenances` por padrão. Use `VehicleListIncludes` e `?include=plates,provenance_strip` quando o cliente precisar desses campos.
+
+## iOS Sign in with Apple is required
+The iOS app offers Google, Facebook, and X login, so Guideline 4.8 requires native Sign in with Apple on the same owner and lojista screens, above those buttons. POST /api/v1/auth/apple verifies the identity token (audience br.com.revisalog.app) against Apple JWKS and stores the Apple subject plus the email Apple returns, including @privaterelay.appleid.com. Do not remove the button or accept an unverified token. The App ID needs the Sign in with Apple capability.
