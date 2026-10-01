@@ -81,6 +81,18 @@ class VehicleEntryWizardTest extends TestCase
         $this->assertSame('Lendo CRLV-e…', $read->getAttribute('data-loading-label'));
         $this->assertSame('primary', $read->getAttribute('data-variant'));
 
+        if (! $flow->allowsManualEntry()) {
+            // No Lojista o CRLV-e é obrigatório: sem ele a loja se cadastraria como dona de um
+            // carro de terceiro, e é o documento que separa estoque próprio de consignação.
+            $this->assertNull($page->querySelector('details[data-vehicle-entry-manual]'));
+            $this->assertNotNull($page->querySelector('[data-manual-entry-blocked]'));
+
+            $this->assertStringNotContainsString('Vincular com CRLV-e', $page->body->textContent);
+            $this->assertNull($page->querySelector('a[href="'.route($prefix.'.vehicles.claim').'"]'), 'O vínculo não tem mais tela própria.');
+
+            return;
+        }
+
         $manual = $page->querySelector('details[data-vehicle-entry-manual]');
         $this->assertFalse($manual->hasAttribute('open'), 'O formulário manual começa recolhido.');
         $this->assertStringContainsString('preencher manualmente', $manual->querySelector('summary')->textContent);
@@ -126,7 +138,9 @@ class VehicleEntryWizardTest extends TestCase
         $this->assertSame('true', $file->getAttribute('aria-invalid'));
         $this->assertContains('crlv-error', explode(' ', (string) $file->getAttribute('aria-describedby')));
         $this->assertNotSame('', trim($page->querySelector('#crlv-error')->textContent));
-        $this->assertFalse($page->querySelector('details[data-vehicle-entry-manual]')->hasAttribute('open'), 'Erro do CRLV-e não abre o manual.');
+        if ($flow->allowsManualEntry()) {
+            $this->assertFalse($page->querySelector('details[data-vehicle-entry-manual]')->hasAttribute('open'), 'Erro do CRLV-e não abre o manual.');
+        }
     }
 
     public function test_missing_crlv_file_has_a_portuguese_message(): void

@@ -134,12 +134,25 @@ class TermsScrollAcceptTest extends TestCase
         $this->assertStringContainsString('aria-invalid="true"', $checkbox);
     }
 
-    public function test_garage_create_page_uses_the_same_accessible_terms(): void
+    public function test_garage_review_page_uses_the_same_accessible_terms(): void
     {
         $garage = User::factory()->asGarage()->create();
 
+        // No Lojista o cadastro manual não existe (CRLV-e obrigatório), então o aceite fica no passo
+        // Conferir, que é onde o veículo é gravado.
+        $this->seed(\Database\Seeders\VehicleCatalogSeeder::class);
+        $this->actingAs($garage)->post('/garagem/estoque/importar-crlv', [
+            'crlv' => new \Illuminate\Http\UploadedFile(
+                base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
+                'CRLV-e.pdf',
+                'application/pdf',
+                null,
+                true,
+            ),
+        ]);
+
         $this->actingAs($garage)
-            ->get('/garagem/estoque/novo')
+            ->get('/garagem/estoque/importar-crlv/preview')
             ->assertOk()
             ->assertSee('role="region"', false)
             ->assertSee('aria-labelledby="terms-accepted-title"', false)
@@ -178,7 +191,6 @@ class TermsScrollAcceptTest extends TestCase
 
         $pages = [
             [$owner, '/usuario/veiculos/novo'],
-            [$garage, '/garagem/estoque/novo'],
         ];
 
         foreach ($pages as [$user, $path]) {

@@ -37,34 +37,40 @@
         'description' => 'Exporte o PDF no app Carteira Digital de Trânsito (CDT). Lemos placa, RENAVAM, número do CRV e chassi; se o veículo já estiver na RevisaLog, você confirma o vínculo e fica com o histórico.',
     ])
 
-    <details class="group rounded-card border border-border bg-surface shadow-sm" data-vehicle-entry-manual @if($manualOpen) open @endif>
-        <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-card px-4 py-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:px-6 [&::-webkit-details-marker]:hidden">
-            <span class="min-w-0">
-                <span class="block text-base font-semibold text-foreground">Não tenho o CRLV-e agora: preencher manualmente</span>
-                <span class="mt-1 block text-sm text-muted-foreground">Digite os dados como estão no documento. Sem o CRLV-e, a propriedade fica sem confirmação.</span>
-            </span>
-            <x-ui.icon name="chevron-down" class="size-5 shrink-0 text-muted-foreground transition-transform duration-fast ease-smooth-out group-open:rotate-180 motion-reduce:transition-none" />
-        </summary>
+    @if($flow->allowsManualEntry())
+        <details class="group rounded-card border border-border bg-surface shadow-sm" data-vehicle-entry-manual @if($manualOpen) open @endif>
+            <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-card px-4 py-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span class="min-w-0">
+                    <span class="block text-base font-semibold text-foreground">Não tenho o CRLV-e agora: preencher manualmente</span>
+                    <span class="mt-1 block text-sm text-muted-foreground">Digite os dados como estão no documento. Sem o CRLV-e, a propriedade fica sem confirmação.</span>
+                </span>
+                <x-ui.icon name="chevron-down" class="size-5 shrink-0 text-muted-foreground transition-transform duration-fast ease-smooth-out group-open:rotate-180 motion-reduce:transition-none" />
+            </summary>
 
-        <div class="border-t border-border px-4 py-4 sm:px-6 sm:py-6">
-            <form method="POST" action="{{ $flow->url('store') }}" class="space-y-6" data-vehicle-entry-form="manual">
-                @csrf
+            <div class="border-t border-border px-4 py-4 sm:px-6 sm:py-6">
+                <form method="POST" action="{{ $flow->url('store') }}" class="space-y-6" data-vehicle-entry-form="manual">
+                    @csrf
 
-                <x-ui.form-errors
-                    id="manual-erros"
-                    :threshold="$errors->has('vehicle') ? 1 : 2"
-                    :ids="['vehicle' => null, 'crlv' => null, 'terms_accepted' => 'terms-accepted-checkbox']"
-                />
+                    <x-ui.form-errors
+                        id="manual-erros"
+                        :threshold="$errors->has('vehicle') ? 1 : 2"
+                        :ids="['vehicle' => null, 'crlv' => null, 'terms_accepted' => 'terms-accepted-checkbox']"
+                    />
 
-                @include('user.vehicles._form', ['catalog' => $catalog, 'vehicle' => new \App\Models\Vehicle])
+                    @include('user.vehicles._form', ['catalog' => $catalog, 'vehicle' => new \App\Models\Vehicle])
 
-                <x-terms-scroll-accept />
+                    <x-terms-scroll-accept />
 
-                <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-sm max-sm:*:grow sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none" data-slot="form-actions">
-                    <x-ui.button variant="secondary" :href="$flow->listUrl()">Cancelar</x-ui.button>
-                    <x-ui.button type="submit" icon="plus" loading-label="Adicionando…" data-terms-submit>{{ $flow->addLabel() }}</x-ui.button>
-                </div>
-            </form>
-        </div>
-    </details>
+                    <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-sm max-sm:*:grow sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none" data-slot="form-actions">
+                        <x-ui.button variant="secondary" :href="$flow->listUrl()">Cancelar</x-ui.button>
+                        <x-ui.button type="submit" icon="plus" loading-label="Adicionando…" data-terms-submit>{{ $flow->addLabel() }}</x-ui.button>
+                    </div>
+                </form>
+            </div>
+        </details>
+    @else
+        <x-ui.alert variant="info" title="O CRLV-e é obrigatório no estoque" data-manual-entry-blocked>
+            É o documento que identifica o proprietário do veículo e separa o que é da loja do que está em consignação. Exporte o PDF no app Carteira Digital de Trânsito (CDT) e envie acima.
+        </x-ui.alert>
+    @endif
 @endsection

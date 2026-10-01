@@ -145,6 +145,12 @@ trait RegistersVehicleWithOwnership
             'chassis' => $chassisInput,
         ]);
 
+        if (! $flow->allowsManualEntry() && $crlv === null) {
+            return back()->withInput()->withErrors([
+                'crlv' => 'Envie o CRLV-e do veículo. No estoque o documento é obrigatório: é ele que identifica o proprietário e separa o veículo da loja do que está em consignação.',
+            ]);
+        }
+
         $existingVehicleRedirect = $this->redirectWhenVehicleExists($request);
 
         if ($existingVehicleRedirect !== null) {

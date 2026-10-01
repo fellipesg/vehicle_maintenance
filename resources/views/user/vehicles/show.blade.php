@@ -53,6 +53,21 @@
                 @endif
             </x-slot:actions>
 
+            @unless ($vehicle->hasVerifiedOwnership())
+                <x-slot:notice>
+                    <x-ui.alert variant="warning" title="Propriedade não confirmada" data-ownership-unverified>
+                        <p>
+                            Este veículo foi cadastrado sem o CRLV-e, então ninguém confirmou que ele é seu. Enquanto
+                            isso, ele não aparece na consulta de procedência e o PDF do histórico sai marcado como
+                            não confirmado.
+                        </p>
+                        <x-ui.link :href="route('user.vehicles.create')" class="mt-2 text-sm" arrow data-ownership-verify>
+                            Enviar o CRLV-e e confirmar a propriedade
+                        </x-ui.link>
+                    </x-ui.alert>
+                </x-slot:notice>
+            @endunless
+
             @if ($canAddMaintenance)
                 <x-slot:empty-actions>
                     <x-ui.button icon="plus" :href="$vehicleCreateMaintenanceUrl">Registrar manutenção</x-ui.button>

@@ -189,6 +189,22 @@ class Vehicle extends Model
      * Não dá para fazer isso dentro de maintenances(): o eager loading do Eloquent resolve a relação
      * num newInstance() do model, onde qualquer estado guardado na instância se perde.
      */
+    /**
+     * A propriedade do dono atual foi confirmada pelo CRLV-e?
+     *
+     * O cadastro manual grava ownership_verified_at nulo: os dados batem com o documento que a pessoa
+     * tem na mão, mas ninguém conferiu que o veículo é dela. A diferença precisa aparecer nas telas —
+     * manutenção declarada sobre uma posse não confirmada é o que corrói a confiança no histórico.
+     */
+    public function hasVerifiedOwnership(): bool
+    {
+        $owner = $this->owners()
+            ->whereRaw('user_vehicles.is_current_owner = true')
+            ->first();
+
+        return $owner?->pivot?->ownership_verified_at !== null;
+    }
+
     public function restrictHistoryTo(User $viewer): static
     {
         $this->setRelation('maintenances', $this->maintenancesVisibleTo($viewer)->get());
