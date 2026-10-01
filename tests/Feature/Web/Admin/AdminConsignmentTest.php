@@ -30,9 +30,10 @@ class AdminConsignmentTest extends TestCase
 
     public function test_non_admin_cannot_reach_the_queue(): void
     {
+        // O middleware admin tira quem não é da equipe da área inteira, com redirecionamento.
         $this->actingAs($this->garage)
             ->get(route('admin.consignments.index'))
-            ->assertForbidden();
+            ->assertRedirect();
     }
 
     public function test_queue_highlights_pending_and_disputed(): void

@@ -70,6 +70,11 @@ class MaintenanceController extends Controller
         return ApiResponse::paginated($maintenances, MaintenanceResource::class);
     }
 
+    /**
+     * A workshop registers the order it performed on any vehicle. Every other account registers
+     * only on a vehicle it currently owns (VehiclePolicy::addMaintenance, as in the web portals):
+     * the record moves the odometer, so a dealer holding the car on consignment or an admin gets 403.
+     */
     public function store(StoreMaintenanceRequest $request): JsonResponse
     {
         $user = $request->user();
@@ -82,7 +87,7 @@ class MaintenanceController extends Controller
                 return ApiResponse::error('Workshop profile is required.', 403);
             }
         } else {
-            Gate::authorize('view', $vehicle);
+            Gate::authorize('addMaintenance', $vehicle);
         }
 
         try {

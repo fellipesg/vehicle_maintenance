@@ -19,6 +19,7 @@ Route::prefix('v1')->group(function () {
     // Public routes (authentication)
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
+    Route::post('/auth/apple', [AuthController::class, 'loginWithApple'])->middleware('throttle:auth');
     Route::get('/auth/{provider}/redirect', [AuthController::class, 'redirectToProvider']);
     Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderCallback'])
         ->middleware('throttle:auth');
@@ -67,7 +68,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/vehicles/{id}/timeline', [VehicleController::class, 'timeline'])->middleware('ability:vehicles:read');
 
         // Link vehicle to user
-        Route::post('/vehicles/{id}/link', [VehicleController::class, 'linkToUser'])->middleware('ability:vehicles:write');
+        Route::post('/vehicles/{id}/link', [VehicleController::class, 'linkToUser'])
+            ->middleware(['ability:vehicles:write', 'throttle:vehicle-link']);
 
         // Maintenance routes
         Route::get('/maintenances', [MaintenanceController::class, 'index'])->middleware('ability:maintenances:read');

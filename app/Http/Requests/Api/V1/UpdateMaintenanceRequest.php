@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\ServiceCategory;
 use App\Models\Maintenance;
 use App\Rules\InvoiceFile;
 use App\Rules\RequiresInvoiceWhenWorkshopAssigned;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class UpdateMaintenanceRequest extends ApiFormRequest
 {
@@ -33,7 +35,7 @@ class UpdateMaintenanceRequest extends ApiFormRequest
             'workshop_name' => 'nullable|string|max:255',
             'maintenance_date' => 'sometimes|required|date',
             'kilometers' => 'sometimes|required|integer|min:0|max:9999999',
-            'service_category' => 'sometimes|required|in:mechanical,electrical,suspension,painting,finishing,interior,other',
+            'service_category' => ['sometimes', 'required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => 'boolean',
             'invoices' => [
                 'nullable',

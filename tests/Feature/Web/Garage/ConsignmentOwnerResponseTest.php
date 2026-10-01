@@ -94,7 +94,7 @@ class ConsignmentOwnerResponseTest extends TestCase
         $this->get(route('consignments.owner.show', $consignment->owner_action_token))
             ->assertOk()
             ->assertSee($this->garage->name)
-            ->assertSee('Liberar histórico para a garagem');
+            ->assertSee('Liberar histórico para a loja');
 
         $this->get(route('consignments.owner.show', 'token-invalido'))->assertNotFound();
     }
@@ -175,11 +175,17 @@ class ConsignmentOwnerResponseTest extends TestCase
         $consignment = $this->consign();
         app(VehicleConsignmentService::class)->approveHistoryAccess($consignment, 'owner');
 
+        $ownerMaintenance = Maintenance::factory()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'user_id' => $this->owner->id,
+            'tenant_id' => $this->owner->tenant_id,
+        ]);
+
         $this->post(route('consignments.owner.dispute', $consignment->owner_action_token))->assertRedirect();
 
         $response = $this->actingAs($this->garage)->get(route('garage.vehicles.show', $this->vehicle));
 
-        $this->assertFalse($response->viewData('seesFullHistory'));
+        $this->assertFalse($response->viewData('vehicle')->maintenances->contains('id', $ownerMaintenance->id));
     }
 
     public function test_garage_can_ask_the_owner_to_release_the_history(): void

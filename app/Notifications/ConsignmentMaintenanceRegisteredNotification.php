@@ -47,7 +47,7 @@ class ConsignmentMaintenanceRegisteredNotification extends Notification implemen
             ->line('Esse registro entra no histórico do veículo e valoriza o carro na hora da venda.')
             ->action('Ver registro', $this->actionUrl())
             ->line('Se esse serviço não foi feito, use o mesmo link para contestar.')
-            ->salutation('Revisalog');
+            ->salutation('RevisaLog');
     }
 
     /**

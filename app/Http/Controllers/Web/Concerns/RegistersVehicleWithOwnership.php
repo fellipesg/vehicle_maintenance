@@ -6,14 +6,21 @@ use App\Models\Vehicle;
 use App\Rules\Chassis;
 use App\Services\Crlv\CrlvParseResult;
 use App\Services\Vehicle\VehicleOwnershipService;
+use App\Support\Vehicle\VehicleEntryFlow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use RuntimeException;
 
+/**
+ * Gravação do assistente de entrada de veículo (App\Support\Vehicle\VehicleEntryFlow): o veículo
+ * novo (manual ou com o CRLV-e), o vínculo a um veículo existente e o desvio para a procuração
+ * quando o lojista não é o proprietário do CRLV-e. Depois de gravar, o assistente segue para as capas.
+ */
 trait RegistersVehicleWithOwnership
 {
-    use HandlesVehicleConsignment;
+    abstract protected function vehicleEntryFlow(): VehicleEntryFlow;
 
     /**
      * @return array<string, mixed>
@@ -51,6 +58,27 @@ trait RegistersVehicleWithOwnership
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    protected function vehicleValidationMessages(): array
+    {
+        $flow = $this->vehicleEntryFlow();
+        $termsMessage = 'Role os termos de uso até o final e marque o aceite para continuar.';
+
+        return [
+            'license_plate.regex' => 'Informe a placa no formato ABC1D23 ou ABC1234.',
+            'license_plate.unique' => $flow->vehicleExistsMessage('esta placa'),
+            'renavam.digits' => 'O RENAVAM deve ter exatamente 11 dígitos.',
+            'renavam.unique' => $flow->vehicleExistsMessage('este RENAVAM'),
+            'crv_number.digits_between' => 'O número do CRV deve ter entre 10 e 12 dígitos.',
+            'year.min' => 'O ano do modelo deve ser no mínimo 1900.',
+            'terms_accepted.required' => $termsMessage,
+            'terms_accepted.accepted' => $termsMessage,
+            'chassis.unique' => $flow->vehicleExistsMessage('este chassi'),
+        ];
+    }
+
     protected function resolveCrlvFromSession(Request $request): ?CrlvParseResult
     {
         $verification = session('crlv_verification');
@@ -67,22 +95,28 @@ trait RegistersVehicleWithOwnership
 
         $preview = $verification['parsed'] ?? null;
 
-        if (! is_array($preview)) {
-            return null;
-        }
+        return is_array($preview) ? $this->crlvFromPreview($preview) : null;
+    }
 
+    /**
+     * Refaz o CRLV-e lido a partir da cópia guardada na sessão (CrlvParseResult::toPreview()).
+     *
+     * @param  array<string, mixed>  $preview
+     */
+    protected function crlvFromPreview(array $preview): CrlvParseResult
+    {
         return new CrlvParseResult(
-            licensePlate: $preview['license_plate'],
-            renavam: $preview['renavam'],
-            brand: $preview['brand'],
-            model: $preview['model'],
+            licensePlate: (string) $preview['license_plate'],
+            renavam: (string) $preview['renavam'],
+            brand: (string) $preview['brand'],
+            model: (string) $preview['model'],
             year: (int) $preview['year'],
             color: $preview['color'] ?? null,
             chassis: $preview['chassis'] ?? null,
             engine: $preview['engine'] ?? null,
             motorization: $preview['motorization'] ?? null,
-            brandRaw: $preview['brand_raw'] ?? '',
-            modelRaw: $preview['model_raw'] ?? '',
+            brandRaw: (string) ($preview['brand_raw'] ?? ''),
+            modelRaw: (string) ($preview['model_raw'] ?? ''),
             brandMatched: (bool) ($preview['brand_matched'] ?? false),
             modelMatched: (bool) ($preview['model_matched'] ?? false),
             detranState: $preview['detran_state'] ?? null,
@@ -97,10 +131,11 @@ trait RegistersVehicleWithOwnership
 
     protected function registerVehicle(Request $request): RedirectResponse
     {
-        $crlvPreview = $this->resolveCrlvFromSession($request);
+        $flow = $this->vehicleEntryFlow();
+        $crlv = $this->resolveCrlvFromSession($request);
         $chassisInput = Vehicle::normalizeChassis((string) $request->input('chassis', ''));
-        if ($chassisInput === '' && $crlvPreview?->chassis) {
-            $chassisInput = Vehicle::normalizeChassis($crlvPreview->chassis);
+        if ($chassisInput === '' && $crlv?->chassis) {
+            $chassisInput = Vehicle::normalizeChassis($crlv->chassis);
         }
 
         $request->merge([
@@ -110,78 +145,42 @@ trait RegistersVehicleWithOwnership
             'chassis' => $chassisInput,
         ]);
 
-        $data = $request->validate($this->vehicleValidationRules(), [
-            'license_plate.regex' => 'Informe a placa no formato ABC1D23 ou ABC1234.',
-            'renavam.digits' => 'O RENAVAM deve ter exatamente 11 dígitos.',
-            'crv_number.digits_between' => 'O número do CRV deve ter entre 10 e 12 dígitos.',
-            'year.min' => 'O ano do modelo deve ser no mínimo 1900.',
-            'terms_accepted.required' => 'Role os termos de uso até o final e marque o aceite para continuar.',
-            'terms_accepted.accepted' => 'Role os termos de uso até o final e marque o aceite para continuar.',
-            'chassis.unique' => 'Já existe um veículo com este chassi. Você pode vinculá-lo em Vincular veículo.',
-        ]);
+        $existingVehicleRedirect = $this->redirectWhenVehicleExists($request);
 
-        if (Vehicle::findByChassis($data['chassis'])) {
-            return redirect()->route($this->vehicleClaimRoute())
-                ->withInput(['chassis' => $data['chassis']])
-                ->withErrors([
-                    'chassis' => 'Já existe um veículo com este chassi. Você pode vinculá-lo em Vincular veículo.',
-                ]);
+        if ($existingVehicleRedirect !== null) {
+            return $existingVehicleRedirect;
         }
 
-        if (Vehicle::findByRenavam($data['renavam'])) {
-            return redirect()->route($this->vehicleClaimRoute())
-                ->withInput(['renavam' => $data['renavam']])
-                ->withErrors([
-                    'renavam' => 'Este veículo já está cadastrado. Envie o CRLV-e para vincular à sua conta.',
-                ]);
-        }
-
-        $crlv = $this->resolveCrlvFromSession($request);
+        $data = $request->validate($this->vehicleValidationRules(), $this->vehicleValidationMessages());
         $ownership = app(VehicleOwnershipService::class);
-        $isConsignment = $this->isConsignmentFlow($request, $crlv);
-
-        if ($isConsignment && $crlv === null) {
-            return back()->withInput()->withErrors([
-                'crlv' => 'Importe o CRLV-e do veículo para cadastrá-lo em consignação.',
-            ]);
-        }
-
-        if ($isConsignment) {
-            $consignmentData = $request->validate(
-                $this->consignmentValidationRules(true),
-                $this->consignmentValidationMessages(),
-            );
-        }
 
         try {
-            if ($isConsignment) {
-                $vehicle = $ownership->registerNew($request->user(), $data, $crlv, 'consignment');
-                $consignment = $this->startConsignment($request, $vehicle, $crlv, $consignmentData);
-            } elseif ($crlv !== null) {
-                $vehicle = $ownership->registerNew($request->user(), $data, $crlv);
-            } else {
-                $vehicle = $ownership->registerNew($request->user(), $data, null);
+            if ($crlv !== null && $ownership->resolveOwnershipType($request->user(), $crlv) === 'consignment') {
+                return $this->startConsignment($request, [
+                    'vehicle_data' => Arr::except($data, ['terms_accepted', 'crlv_verification_token']),
+                ]);
             }
+
+            $vehicle = $ownership->registerNew($request->user(), $data, $crlv);
         } catch (RuntimeException $exception) {
             return back()->withInput()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
         $request->session()->forget(['crlv_verification', 'crlv_source']);
 
-        $successMessage = match (true) {
-            $isConsignment => $this->consignmentSuccessMessage($consignment),
-            $crlv !== null => 'Veículo cadastrado com sucesso!',
-            default => 'Veículo cadastrado com sucesso! Você pode importar o CRLV-e depois para validar a propriedade.',
-        };
-
-        return redirect()->route($this->vehicleShowRoute(), $vehicle)
-            ->with('success', $successMessage);
+        return redirect()->route($flow->routeName('covers'), $vehicle)
+            ->with('success', $flow->addedMessage($crlv !== null));
     }
 
     protected function claimVehicle(Request $request): RedirectResponse
     {
-        $data = $request->validate([
+        $flow = $this->vehicleEntryFlow();
+        $expiredMessage = 'A leitura do CRLV-e expirou. Envie o documento de novo para vincular o veículo.';
+
+        $request->validate([
             'crlv_verification_token' => ['required', 'string'],
+        ], [
+            'crlv_verification_token.required' => $expiredMessage,
         ]);
 
         $vehicle = session('claim_vehicle_id')
@@ -191,41 +190,71 @@ trait RegistersVehicleWithOwnership
         $crlv = $this->resolveCrlvFromSession($request);
 
         if ($vehicle === null || $crlv === null) {
-            return redirect()->route($this->vehicleClaimRoute())
-                ->withErrors(['crlv' => 'Sessão de vinculação expirada. Envie o CRLV-e novamente.']);
+            return redirect()->route($flow->routeName('create'))
+                ->withErrors(['crlv' => $expiredMessage]);
         }
 
         $ownership = app(VehicleOwnershipService::class);
-        $isConsignment = $this->isConsignmentFlow($request, $crlv);
-        $consignment = null;
-
-        if ($isConsignment) {
-            $consignmentData = $request->validate(
-                $this->consignmentValidationRules(true, $this->consignmentContactIsLocked($vehicle)),
-                $this->consignmentValidationMessages(),
-            );
-        }
 
         try {
-            if ($isConsignment) {
-                $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
-                $consignment = $this->startConsignment($request, $vehicle, $crlv, $consignmentData);
-            } else {
-                $vehicle = $ownership->claimExisting($request->user(), $vehicle, $crlv);
+            if ($ownership->resolveClaimOwnershipType($request->user(), $vehicle, $crlv) === 'consignment') {
+                return $this->startConsignment($request, ['vehicle_id' => $vehicle->id]);
             }
+
+            $vehicle = $ownership->claimExisting($request->user(), $vehicle, $crlv);
         } catch (RuntimeException $exception) {
+            if ($exception->getMessage() === 'consignment_required') {
+                return $this->startConsignment($request, ['vehicle_id' => $vehicle->id]);
+            }
+
             return back()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
         $request->session()->forget(['crlv_verification', 'crlv_source', 'claim_vehicle_id', 'crlv_mode']);
 
-        return redirect()->route($this->vehicleShowRoute(), $vehicle)
-            ->with('success', $consignment !== null
-                ? $this->consignmentSuccessMessage($consignment)
-                : 'Veículo vinculado à sua conta com sucesso!');
+        return redirect()->route($flow->routeName('covers'), $vehicle)
+            ->with('success', $flow->claimedMessage());
     }
 
-    abstract protected function vehicleShowRoute(): string;
+    /**
+     * Chassi ou RENAVAM que já está na RevisaLog não vira um segundo cadastro: volta ao passo
+     * Documento, que pede o CRLV-e para o vínculo (a leitura encontra o cadastro sozinha).
+     */
+    private function redirectWhenVehicleExists(Request $request): ?RedirectResponse
+    {
+        $chassis = (string) $request->input('chassis');
+        $renavam = (string) $request->input('renavam');
 
-    abstract protected function vehicleClaimRoute(): string;
+        $field = match (true) {
+            $chassis !== '' && Vehicle::findByChassis($chassis) !== null => 'chassis',
+            $renavam !== '' && Vehicle::findByRenavam($renavam) !== null => 'renavam',
+            default => null,
+        };
+
+        if ($field === null) {
+            return null;
+        }
+
+        $flow = $this->vehicleEntryFlow();
+
+        return redirect()->route($flow->routeName('create'))
+            ->withInput($request->except(['terms_accepted', 'crlv_verification_token']))
+            ->withErrors([$field => $flow->vehicleExistsMessage($field === 'chassis' ? 'este chassi' : 'este RENAVAM')])
+            ->with('vehicle_exists', true);
+    }
+
+    /**
+     * Desvio para a procuração (consignação). O CRLV-e lido continua só em crlv_verification: a
+     * sessão viaja num cookie de 4 KB e não comporta uma segunda cópia.
+     *
+     * @param  array{vehicle_id?: int, vehicle_data?: array<string, mixed>}  $pending
+     */
+    private function startConsignment(Request $request, array $pending): RedirectResponse
+    {
+        $request->session()->put('consignment_pending', $pending + [
+            'reason' => VehicleEntryFlow::consignmentReasonFor($request->user()),
+        ]);
+
+        return redirect()->route($this->vehicleEntryFlow()->routeName('consignment'));
+    }
 }

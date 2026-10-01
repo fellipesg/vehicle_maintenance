@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Support\AppStorage;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -147,6 +146,23 @@ class Vehicle extends Model
         return $this->hasMany(Maintenance::class);
     }
 
+    /**
+     * Consulta do histórico limitada ao que o usuário pode ler: tudo para o dono atual, e só o que a
+     * própria loja registrou para o lojista em consignação sem liberação do proprietário.
+     *
+     * @return HasMany<Maintenance, Vehicle>
+     */
+    public function maintenancesVisibleTo(User $viewer): HasMany
+    {
+        $relation = $this->maintenances();
+
+        if (! Gate::forUser($viewer)->allows('viewFullHistory', $this)) {
+            $relation->where('maintenances.tenant_id', $viewer->tenant_id);
+        }
+
+        return $relation;
+    }
+
     public function plates(): HasMany
     {
         return $this->hasMany(VehiclePlate::class);
@@ -166,21 +182,18 @@ class Vehicle extends Model
     }
 
     /**
-     * Constrains a maintenance query to what the given user may read.
+     * Deixa o histórico deste veículo pré-carregado com o que o usuário pode ler, para que ninguém
+     * rio abaixo precise repetir a regra: VehicleTimelineBuilder e <x-vehicle.detail> usam a relação
+     * já carregada (loadMissing / relationLoaded) em vez de consultar de novo.
      *
-     * A consigning garage without approved history access only sees what its own tenant
-     * registered during the consignment; the history the vehicle already had belongs to
-     * the owner.
-     *
-     * @param  Builder<Maintenance>|HasMany<Maintenance, Vehicle>  $query
+     * Não dá para fazer isso dentro de maintenances(): o eager loading do Eloquent resolve a relação
+     * num newInstance() do model, onde qualquer estado guardado na instância se perde.
      */
-    public function restrictMaintenancesTo(Builder|HasMany $query, User $user): Builder|HasMany
+    public function restrictHistoryTo(User $viewer): static
     {
-        if (Gate::forUser($user)->allows('viewFullHistory', $this)) {
-            return $query;
-        }
+        $this->setRelation('maintenances', $this->maintenancesVisibleTo($viewer)->get());
 
-        return $query->where('maintenances.tenant_id', $user->tenant_id);
+        return $this;
     }
 
     public function owners(): BelongsToMany

@@ -1,18 +1,25 @@
 @extends('layouts.admin')
 
 @section('title', 'Nova marca')
+@section('admin_content_width', 'max-w-3xl')
+
+@php
+    $adminBreadcrumbs = [['Catálogo'], ['Marcas e modelos', route('admin.brands.index')], ['Nova marca']];
+@endphp
 
 @section('content')
-<div class="mx-auto max-w-2xl px-4 py-8">
-    <div class="mb-6">
-        <a href="{{ route('admin.brands.index') }}" class="text-sm text-wrench-600 hover:underline">← Voltar para marcas</a>
-        <h1 class="mt-2 text-3xl font-bold">Nova marca</h1>
-    </div>
+    <x-ui.page-header title="Nova marca" description="Depois de salvar, cadastre os modelos na página da marca." />
 
-    <form method="POST" action="{{ route('admin.brands.store') }}" class="card space-y-4">
+    <form method="POST" action="{{ route('admin.brands.store') }}">
         @csrf
-        @include('admin.brands._form')
-        <button type="submit" class="btn-primary">Salvar marca</button>
+
+        <x-ui.card>
+            @include('admin.brands._form', ['brand' => null])
+
+            <x-slot:footer class="justify-end border-t border-border pt-4">
+                <x-ui.button variant="secondary" :href="route('admin.brands.index')">Cancelar</x-ui.button>
+                <x-ui.button type="submit" icon="check" loading-label="Salvando…">Salvar marca</x-ui.button>
+            </x-slot:footer>
+        </x-ui.card>
     </form>
-</div>
 @endsection

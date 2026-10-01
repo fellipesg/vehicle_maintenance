@@ -26,7 +26,8 @@ class AdminBlogTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('admin.blog.index'))
-            ->assertForbidden();
+            ->assertRedirect(route('user.dashboard'))
+            ->assertSessionHas('info');
     }
 
     public function test_admin_creates_post_with_generated_slug(): void

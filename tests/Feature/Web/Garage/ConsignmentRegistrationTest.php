@@ -11,11 +11,13 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
+/**
+ * Entrada de um veículo em consignação pelo assistente do Lojista, nas duas situações: veículo novo
+ * na RevisaLog e veículo que já está cadastrado em outra conta.
+ */
 class ConsignmentRegistrationTest extends TestCase
 {
     use RefreshDatabase;
-
-    private const FIXTURE = 'honda_civic_ms.pdf';
 
     private const OWNER_DOCUMENT = '37452845854';
 
@@ -28,66 +30,48 @@ class ConsignmentRegistrationTest extends TestCase
         $this->garage = User::factory()->asGarage()->create(['document' => '11222333000181']);
     }
 
-    public function test_preview_locks_the_switch_when_crlv_belongs_to_someone_else(): void
+    public function test_crlv_of_a_third_party_sends_the_garage_to_the_consignment_step(): void
     {
         $this->importCrlv();
 
         $this->actingAs($this->garage)
-            ->get(route('garage.vehicles.import.preview'))
+            ->post(route('garage.vehicles.store'), $this->vehiclePayload())
+            ->assertRedirect(route('garage.vehicles.consignment'));
+
+        $this->actingAs($this->garage)
+            ->get(route('garage.vehicles.consignment'))
             ->assertOk()
             ->assertSee('Veículo em consignação')
-            ->assertSee('entra obrigatoriamente como consignação')
             ->assertSee('RODRIGO SANCHES DEVIGO');
+
+        $this->assertSame(0, Vehicle::count(), 'Nada é gravado antes da declaração.');
     }
 
-    public function test_garage_that_owns_the_crlv_does_not_get_the_locked_switch(): void
+    public function test_garage_that_owns_the_crlv_is_registered_as_owner(): void
     {
         $this->garage->update(['document' => self::OWNER_DOCUMENT]);
         $this->importCrlv();
 
         $this->actingAs($this->garage)
-            ->get(route('garage.vehicles.import.preview'))
-            ->assertOk()
-            ->assertDontSee('entra obrigatoriamente como consignação');
-    }
-
-    public function test_registration_requires_the_authorization_declaration(): void
-    {
-        $token = $this->importCrlv();
-
-        $this->actingAs($this->garage)
-            ->from(route('garage.vehicles.import.preview'))
-            ->post(route('garage.vehicles.store'), $this->payload($token, [
-                'consignment_declaration' => null,
-            ]))
-            ->assertSessionHasErrors('consignment_declaration');
+            ->post(route('garage.vehicles.store'), $this->vehiclePayload())
+            ->assertSessionDoesntHaveErrors();
 
         $this->assertDatabaseCount('vehicle_consignments', 0);
-        $this->assertDatabaseCount('vehicles', 0);
+        $this->assertDatabaseHas('user_vehicles', [
+            'user_id' => $this->garage->id,
+            'ownership_type' => 'owner',
+            'is_current_owner' => true,
+        ]);
     }
 
-    public function test_registration_requires_a_contact_for_the_owner(): void
+    public function test_declaration_creates_the_consignment_for_a_new_vehicle(): void
     {
-        $token = $this->importCrlv();
+        $this->importCrlv();
+        $this->actingAs($this->garage)->post(route('garage.vehicles.store'), $this->vehiclePayload());
 
         $this->actingAs($this->garage)
-            ->from(route('garage.vehicles.import.preview'))
-            ->post(route('garage.vehicles.store'), $this->payload($token, [
-                'consignment_owner_email' => null,
-                'consignment_owner_phone' => null,
-            ]))
-            ->assertSessionHasErrors('consignment_owner_email');
-
-        $this->assertDatabaseCount('vehicle_consignments', 0);
-    }
-
-    public function test_garage_registers_a_consigned_vehicle(): void
-    {
-        $token = $this->importCrlv();
-
-        $this->actingAs($this->garage)
-            ->post(route('garage.vehicles.store'), $this->payload($token))
-            ->assertRedirect();
+            ->post(route('garage.vehicles.consignment.store'), $this->declaration())
+            ->assertRedirect(route('garage.vehicles.index'));
 
         $vehicle = Vehicle::where('renavam', '01050047521')->firstOrFail();
 
@@ -100,25 +84,21 @@ class ConsignmentRegistrationTest extends TestCase
             'history_access_status' => VehicleConsignment::HISTORY_NONE,
         ]);
 
-        $this->assertDatabaseHas('user_vehicles', [
-            'user_id' => $this->garage->id,
-            'vehicle_id' => $vehicle->id,
-            'ownership_type' => 'consignment',
-            'is_current_owner' => false,
-        ]);
-
         $consignment = VehicleConsignment::firstOrFail();
         $this->assertNotNull($consignment->declaration_accepted_at);
         $this->assertNotNull($consignment->declaration_ip);
+        $this->assertSame(self::OWNER_DOCUMENT, $consignment->owner_document);
     }
 
-    public function test_power_of_attorney_upload_queues_history_review(): void
+    public function test_power_of_attorney_upload_queues_the_history_review(): void
     {
         Storage::fake(config('filesystems.default'));
-        $token = $this->importCrlv();
+
+        $this->importCrlv();
+        $this->actingAs($this->garage)->post(route('garage.vehicles.store'), $this->vehiclePayload());
 
         $this->actingAs($this->garage)
-            ->post(route('garage.vehicles.store'), $this->payload($token, [
+            ->post(route('garage.vehicles.consignment.store'), $this->declaration([
                 'power_of_attorney' => UploadedFile::fake()->create('procuracao.pdf', 120, 'application/pdf'),
             ]))
             ->assertRedirect();
@@ -127,41 +107,45 @@ class ConsignmentRegistrationTest extends TestCase
 
         $this->assertSame(VehicleConsignment::HISTORY_PENDING, $consignment->history_access_status);
         $this->assertNotNull($consignment->power_of_attorney_path);
+        $this->assertNotNull($consignment->history_requested_at);
     }
 
-    public function test_claim_preview_masks_the_contact_of_a_registered_owner(): void
+    public function test_consignment_step_masks_the_contact_of_a_registered_owner(): void
     {
         $owner = $this->registeredOwner();
 
         $this->importCrlvForClaim();
+        $this->actingAs($this->garage)
+            ->post(route('garage.vehicles.claim.store'), ['crlv_verification_token' => session('crlv_verification.token')])
+            ->assertRedirect(route('garage.vehicles.consignment'));
 
         $this->actingAs($this->garage)
-            ->get(route('garage.vehicles.claim.preview'))
+            ->get(route('garage.vehicles.consignment'))
             ->assertOk()
-            ->assertSee('já tem conta no Revisalog')
+            ->assertSee('já tem conta na RevisaLog')
             ->assertSee('r******@example.com')
-            ->assertDontSee($owner->email)
-            ->assertDontSee('manutenção(ões) já registrada(s)');
+            ->assertDontSee($owner->email);
     }
 
-    public function test_claiming_an_existing_vehicle_creates_the_consignment(): void
+    public function test_claiming_an_existing_vehicle_links_the_owner_account(): void
     {
         $owner = $this->registeredOwner();
-        $token = $this->importCrlvForClaim();
+
+        $this->importCrlvForClaim();
+        $this->actingAs($this->garage)
+            ->post(route('garage.vehicles.claim.store'), ['crlv_verification_token' => session('crlv_verification.token')]);
 
         $this->actingAs($this->garage)
-            ->post(route('garage.vehicles.claim.store'), [
-                'crlv_verification_token' => $token,
-                'is_consignment' => '1',
+            ->post(route('garage.vehicles.consignment.store'), [
                 'consignment_owner_name' => $owner->name,
                 'consignment_declaration' => '1',
             ])
-            ->assertRedirect();
+            ->assertRedirect(route('garage.vehicles.index'));
 
         $consignment = VehicleConsignment::firstOrFail();
 
         $this->assertSame($owner->id, $consignment->owner_user_id);
-        $this->assertNull($consignment->owner_email);
+        $this->assertNull($consignment->owner_email, 'O contato de quem já tem conta não passa pelo formulário.');
         $this->assertTrue($consignment->isActive());
     }
 
@@ -191,7 +175,7 @@ class ConsignmentRegistrationTest extends TestCase
     private function crlvUpload(): UploadedFile
     {
         return new UploadedFile(
-            base_path('tests/fixtures/crlv/'.self::FIXTURE),
+            base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
             'CRLV-e.pdf',
             'application/pdf',
             null,
@@ -199,43 +183,43 @@ class ConsignmentRegistrationTest extends TestCase
         );
     }
 
-    private function importCrlv(): string
+    private function importCrlv(): void
     {
         $this->actingAs($this->garage)
             ->post(route('garage.vehicles.import-crlv'), ['crlv' => $this->crlvUpload()]);
-
-        return session('crlv_verification.token');
     }
 
-    private function importCrlvForClaim(): string
+    private function importCrlvForClaim(): void
     {
         $this->actingAs($this->garage)
             ->post(route('garage.vehicles.claim.import-crlv'), ['crlv' => $this->crlvUpload()]);
-
-        return session('crlv_verification.token');
     }
 
     /**
-     * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
-    private function payload(string $token, array $overrides = []): array
+    private function vehiclePayload(): array
     {
-        return array_merge([
+        return [
             'license_plate' => 'PHF9J95',
             'renavam' => '01050047521',
             'crv_number' => '264600365712',
             'brand' => 'Honda',
             'model' => 'Civic',
             'year' => 2016,
-            'color' => 'PRETA',
-            'chassis' => '93HFB9640GZ202125',
-            'engine' => 'R20Z5-6401964',
-            'motorization' => '155CV 2L',
-            'current_kilometers' => 50_000,
+            'current_kilometers' => 85_000,
             'terms_accepted' => '1',
-            'crlv_verification_token' => $token,
-            'is_consignment' => '1',
+            'crlv_verification_token' => session('crlv_verification.token'),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function declaration(array $overrides = []): array
+    {
+        return array_merge([
             'consignment_owner_name' => 'Rodrigo Sanches Devigo',
             'consignment_owner_email' => 'rodrigo@example.com',
             'consignment_declaration' => '1',

@@ -86,10 +86,9 @@ class VehicleConsignmentTest extends TestCase
 
         $vehicle = $response->viewData('vehicle');
 
-        $this->assertFalse($response->viewData('seesFullHistory'));
-        $this->assertSame(0, $vehicle->maintenances_count);
         $this->assertFalse($vehicle->maintenances->contains('id', $ownerMaintenance->id));
         $this->assertFalse($vehicle->provenanceStripMaintenances->contains('id', $ownerMaintenance->id));
+        $response->assertDontSee($ownerMaintenance->maintenance_type);
     }
 
     public function test_approved_history_access_reveals_owner_history(): void
@@ -101,7 +100,6 @@ class VehicleConsignmentTest extends TestCase
             ->get(route('garage.vehicles.show', $this->vehicle))
             ->assertOk();
 
-        $this->assertTrue($response->viewData('seesFullHistory'));
         $this->assertTrue($response->viewData('vehicle')->maintenances->contains('id', $ownerMaintenance->id));
     }
 

@@ -26,7 +26,9 @@ class GaragePortalTest extends TestCase
         $this->actingAs($this->garage)
             ->get('/garagem/dashboard')
             ->assertOk()
-            ->assertSee('Portal da Garagem');
+            ->assertSee('<title>Início · Lojista · RevisaLog</title>', false)
+            ->assertSee('Olá, '.$this->garage->name)
+            ->assertDontSee('Portal da Garagem');
     }
 
     public function test_garage_can_add_vehicle_to_stock(): void
@@ -96,18 +98,25 @@ class GaragePortalTest extends TestCase
             ->get(route('garage.vehicles.index'))
             ->assertOk()
             ->assertSee($alt, false)
-            ->assertSee($path, false);
+            ->assertSee($path, false)
+            ->assertSee('h-48 sm:h-52', false)
+            ->assertSee('object-contain', false)
+            ->assertDontSee('aspect-[', false);
 
         $this->actingAs($this->garage)
             ->get(route('garage.vehicles.show', $vehicle))
             ->assertOk()
             ->assertSee($alt, false)
-            ->assertSee($path, false);
+            ->assertSee($path, false)
+            ->assertSee('h-64 sm:h-80 lg:h-96', false)
+            ->assertSee('object-contain', false);
 
         $this->actingAs($this->garage)
             ->get('/garagem/dashboard')
             ->assertOk()
             ->assertSee($alt, false)
-            ->assertSee($path, false);
+            ->assertSee($path, false)
+            ->assertSee('h-14 w-14', false)
+            ->assertSee('object-cover', false);
     }
 }

@@ -22,3 +22,9 @@ Workshop logo in letterhead: portrait 2:3, CSS max-width 72px / max-height 108px
 
 ## Letterhead workshop logo size
 Crop workshop logos to 200×300 portrait in VehicleMaintenancePdfExporter before embed. Display with explicit width/height attrs (120×180) — Dompdf ignores max-width/max-height. Demo seeder resolves workshop by official name so Brothers Auto Service gets the logo file.
+
+## Footer, cover counter and dates
+The page footer ("RevisaLog · Página X de Y" plus the vehicle) is drawn by VehicleMaintenancePdfExporter::stampPageFooter through Dompdf page_script after render(), never in the HTML. The cover summary uses .prov-counter (N com selo · M declarada(s)) plus the .prov-dot row; .cover-document--only applies when the vehicle has no maintenances (the empty state lives on the cover itself). Dates and times use America/Sao_Paulo. Seals are checked at revisalog.com.br/verificar (the code typed from the PDF) or revisalog.com.br/v/{código}.
+
+## Identifiers follow the requester
+The template receives $identifiersMasked (VehicleMaintenancePdfExporter::generate(..., maskIdentifiers:)). When true, chassis and RENAVAM go through VehicleIdentifierMask and the engine code is left out. GenerateVehicleMaintenancePdfExport and EmailVehicleMaintenancePdf compute it from the requester with VehicleIdentifierVisibility::showsFullIdentifiers (full numbers only for Gate update), so a consignment holder or an admin gets the masked PDF.

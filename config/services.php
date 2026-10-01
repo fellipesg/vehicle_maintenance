@@ -58,4 +58,8 @@ return [
         'redirect' => env('TWITTER_REDIRECT_URI'),
     ],
 
+    'apple' => [
+        'client_id' => env('APPLE_CLIENT_ID', 'br.com.revisalog.app'),
+    ],
+
 ];

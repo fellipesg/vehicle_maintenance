@@ -43,7 +43,7 @@ class ConsignmentHistoryAccessRequestedNotification extends Notification impleme
             ->line('Esse histórico é seu e hoje ela não vê nada dele. Liberar costuma ajudar na venda, porque mostra ao comprador o cuidado que o carro teve.')
             ->action('Ver e decidir', route('consignments.owner.show', $this->consignment->owner_action_token))
             ->line('Você pode recusar simplesmente ignorando este e-mail.')
-            ->salutation('Revisalog');
+            ->salutation('RevisaLog');
     }
 
     /**

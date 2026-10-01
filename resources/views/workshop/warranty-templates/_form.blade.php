@@ -1,52 +1,73 @@
+{{--
+    Campos do modelo de garantia (Novo modelo e Editar modelo).
+
+    Bloqueio: enquanto a oficina tem garantias vigentes, termo, prazo e escopo de um modelo que já
+    existe não mudam (ValidatesWarrantyTemplateImmutability). Os campos ficam readonly (dá para
+    selecionar e copiar o texto) e só o status continua editável; "Duplicar" cria um modelo novo
+    com o mesmo conteúdo.
+
+    Variáveis: $workshop, $template (na edição), $templatesLocked e $source (modelo duplicado, no
+    Novo modelo).
+--}}
 @php
-    $locked = $templatesLocked ?? false;
-    $readonly = $locked && isset($template);
+    use App\Enums\WarrantyScope;
+
+    $template = $template ?? null;
+    $source = $source ?? null;
+    $readonly = ($templatesLocked ?? false) && $template !== null;
+    $scopeOptions = [
+        WarrantyScope::Order->value => 'Garantia geral da OS',
+        WarrantyScope::Item->value => 'Garantia de cada peça (item da OS)',
+    ];
+    $base = $template ?? $source;
+    $nameValue = $template?->name ?? ($source ? 'Cópia de '.$source->name : null);
+    $scopeValue = $base?->scope?->value ?? WarrantyScope::Order->value;
+    $readonlyClass = 'read-only:bg-surface-muted read-only:text-foreground';
 @endphp
 
-@if($workshop->logoUrl())
-    <div class="mb-4 flex items-center gap-3 rounded border border-automotive-100 bg-automotive-50 p-3">
-        <img src="{{ $workshop->logoUrl() }}" alt="Logo da oficina" class="h-12 w-auto object-contain">
-        <p class="text-sm text-automotive-600">Logo da oficina usada nos termos de garantia e PDFs.</p>
-    </div>
-@endif
+<div class="space-y-6">
+    @if($readonly)
+        <x-ui.alert variant="warning" role="status" title="Termo, prazo e escopo bloqueados" data-template-locked>
+            A oficina tem garantias vigentes emitidas com os modelos atuais, então o conteúdo deste modelo não muda. Você pode ativar ou desativar o modelo, ou duplicá-lo para escrever um termo novo.
+            <x-slot:actions>
+                <x-ui.button variant="secondary" size="sm" icon="document-duplicate" :href="route('workshop.warranty-templates.create', ['duplicar' => $template->id])">Duplicar como novo modelo</x-ui.button>
+            </x-slot:actions>
+        </x-ui.alert>
+    @endif
 
-@if($readonly)
-    <div class="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-        Não é possível editar templates enquanto houver garantias vigentes desta oficina. Você pode visualizar os dados, alterar apenas o status ativo ou criar um novo template.
-    </div>
-@endif
+    <x-ui.form-section id="secao-termo" title="Termo de garantia" description="O cliente vê o nome e o texto do termo na OS e no PDF do histórico.">
+        <x-ui.field name="name" label="Nome do modelo" hint="Ex.: Garantia de 90 dias em serviços de freio." required>
+            <x-ui.input :value="$nameValue" required maxlength="255" autocomplete="off" :readonly="$readonly" class="{{ $readonlyClass }}" />
+        </x-ui.field>
 
-<div>
-    <label for="name" class="form-label">Nome do template *</label>
-    <input type="text" name="name" id="name" value="{{ old('name', $template->name ?? '') }}" required @disabled($readonly) class="form-input @if($readonly) bg-automotive-100 @endif">
-    @error('name')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+        <x-ui.field name="body" label="Texto do termo" hint="O que a garantia cobre, o que não cobre e como o cliente aciona." required>
+            <x-ui.textarea :value="$base?->body" rows="8" required autosize :readonly="$readonly" class="{{ $readonlyClass }}" />
+        </x-ui.field>
+    </x-ui.form-section>
+
+    <x-ui.form-section id="secao-prazo" title="Prazo e escopo" description="A validade é contada a partir da data do serviço na OS.">
+        <div class="grid gap-4 sm:grid-cols-2 sm:items-start">
+            <x-ui.field name="duration_days" label="Duração" required>
+                <x-ui.input-group :class="$readonly ? 'bg-surface-muted' : null">
+                    <x-ui.input type="number" :value="$base?->duration_days ?? 90" min="1" max="3650" step="1" inputmode="numeric" required :readonly="$readonly" class="tabular-nums" />
+                    <x-slot:trailing>dias</x-slot:trailing>
+                </x-ui.input-group>
+            </x-ui.field>
+
+            @if($readonly)
+                <x-ui.field label="Escopo" hint="Não muda enquanto houver garantias vigentes.">
+                    <x-ui.input id="scope" :value="$scopeOptions[$scopeValue] ?? $scopeValue" readonly class="{{ $readonlyClass }}" />
+                </x-ui.field>
+            @else
+                <x-ui.field name="scope" label="Escopo" hint="Geral: uma garantia para a OS inteira. Por peça: escolhida em cada item." required>
+                    <x-ui.select :options="$scopeOptions" :value="$scopeValue" required />
+                </x-ui.field>
+            @endif
+        </div>
+    </x-ui.form-section>
+
+    <x-ui.form-section id="secao-status" title="Status">
+        <x-ui.switch name="is_active" label="Modelo ativo" :checked="(bool) ($template?->is_active ?? true)"
+                     description="Ativo: aparece ao registrar uma OS. Inativo: sai das próximas OS, sem mudar as garantias já emitidas." />
+    </x-ui.form-section>
 </div>
-
-<div>
-    <label for="body" class="form-label">Termo de garantia *</label>
-    <textarea name="body" id="body" rows="8" required @disabled($readonly) class="form-input @if($readonly) bg-automotive-100 @endif">{{ old('body', $template->body ?? '') }}</textarea>
-    @error('body')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-</div>
-
-<div class="grid gap-4 sm:grid-cols-2">
-    <div>
-        <label for="duration_days" class="form-label">Duração (dias) *</label>
-        <input type="number" name="duration_days" id="duration_days" min="1" max="3650" value="{{ old('duration_days', $template->duration_days ?? 90) }}" required @disabled($readonly) class="form-input @if($readonly) bg-automotive-100 @endif">
-        @error('duration_days')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-    </div>
-    <div>
-        <label for="scope" class="form-label">Escopo *</label>
-        <select name="scope" id="scope" required @disabled($readonly) class="form-input @if($readonly) bg-automotive-100 @endif">
-            <option value="order" @selected(old('scope', $template?->scope?->value ?? 'order') === 'order')>Ordem de serviço (geral)</option>
-            <option value="item" @selected(old('scope', $template?->scope?->value ?? '') === 'item')>Item da OS</option>
-        </select>
-        @error('scope')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-    </div>
-</div>
-
-<div class="flex items-center gap-2">
-    <input type="hidden" name="is_active" value="0">
-    <input type="checkbox" name="is_active" id="is_active" value="1" @checked(old('is_active', $template->is_active ?? true)) class="rounded border-automotive-300">
-    <label for="is_active" class="text-sm">Template ativo (disponível para novas OS)</label>
-</div>
-@error('is_active')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror

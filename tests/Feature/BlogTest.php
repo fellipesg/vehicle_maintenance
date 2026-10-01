@@ -99,6 +99,7 @@ class BlogTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
             ->assertSee(route('blog.show', $post), false)
+            ->assertSee('<loc>'.route('verification.lookup').'</loc>', false)
             ->assertDontSee('rascunho-sitemap');
     }
 
@@ -150,9 +151,11 @@ class BlogTest extends TestCase
         $category = BlogCategory::factory()->create(['name' => 'Documentação', 'slug' => 'documentacao']);
         BlogPost::factory()->for($category, 'category')->create(['cover_photo_path' => null]);
 
+        // No card a cena é decorativa: o título ao lado é o nome do link, e o chip já diz a categoria.
         $this->get(route('blog.index'))
             ->assertOk()
-            ->assertSee('aria-label="Ilustração de Documentação"', false)
+            ->assertSee('data-scene="documento"', false)
+            ->assertDontSee('aria-label="Ilustração de Documentação"', false)
             ->assertDontSee('>DOCUMENTAÇÃO</text>', false);
     }
 }

@@ -138,7 +138,8 @@ class MaintenanceProvenanceTest extends TestCase
 
         $this->get('/v/RVL-TEST-12')
             ->assertOk()
-            ->assertSee('Registro verificado')
-            ->assertSee('*********VT004251', false);
+            ->assertSee('Selo da oficina confirmado')
+            ->assertDontSee('Registro verificado')
+            ->assertSee('9BW••••••••••4251', false);
     }
 }

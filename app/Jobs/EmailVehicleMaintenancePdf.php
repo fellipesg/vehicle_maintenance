@@ -6,6 +6,7 @@ use App\Mail\VehicleMaintenancePdfMail;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\Vehicle\VehicleMaintenancePdfExporter;
+use App\Support\Vehicle\VehicleIdentifierVisibility;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Mail;
@@ -29,7 +30,10 @@ class EmailVehicleMaintenancePdf implements ShouldQueue
             set_time_limit($this->timeout);
         }
 
-        $file = $exporter->generate($this->vehicle);
+        $file = $exporter->generate(
+            $this->vehicle,
+            maskIdentifiers: ! VehicleIdentifierVisibility::showsFullIdentifiers($this->user, $this->vehicle),
+        );
 
         try {
             Mail::to($this->user)->send(new VehicleMaintenancePdfMail(

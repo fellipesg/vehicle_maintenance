@@ -1,4 +1,13 @@
-@props(['post', 'label' => true])
+{{--
+    Capa ilustrada do post sem foto (SVG 1200x630). Regras em .ai/rules/blog.md.
+
+    Props:
+    - post: o BlogPost (categoria e cover_art escolhem a cena).
+    - label: desenha o nome da categoria no canto (false no card, onde o chip já aparece).
+    - decorative: true quando o título ao lado já diz tudo (card): sai com aria-hidden, sem nome
+      para leitor de tela. No artigo fica false e a capa é anunciada como "Ilustração de ...".
+--}}
+@props(['post', 'label' => true, 'decorative' => false])
 
 @php
     $art = \App\Support\BlogCoverArt::for($post->category, $post->cover_art);
@@ -9,8 +18,13 @@
     {{ $attributes->merge(['class' => 'block w-full']) }}
     viewBox="0 0 1200 630"
     preserveAspectRatio="xMidYMid slice"
-    role="img"
-    aria-label="Ilustração de {{ $art['label'] }}"
+    @if($decorative)
+        aria-hidden="true"
+        focusable="false"
+    @else
+        role="img"
+        aria-label="Ilustração de {{ $art['label'] }}"
+    @endif
     data-scene="{{ $art['scene'] }}"
     xmlns="http://www.w3.org/2000/svg"
 >

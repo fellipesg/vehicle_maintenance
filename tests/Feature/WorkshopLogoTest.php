@@ -98,6 +98,6 @@ class WorkshopLogoTest extends TestCase
         $this->actingAs($user)
             ->get(route('workshop.profile.show'))
             ->assertOk()
-            ->assertSee('<p class="mb-2 font-semibold">Logo</p>', false);
+            ->assertSee('src="'.e($workshop->fresh()->logoUrl()).'" alt="Logo da '.e($workshop->name).'"', false);
     }
 }

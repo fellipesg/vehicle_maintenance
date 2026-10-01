@@ -1,292 +1,234 @@
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+/**
+ * Procedência (contrato de .ai/rules/theme.md): Selo da oficina × Declarada.
+ *
+ * As telas são renderizadas no servidor (x-vehicle.detail, x-provenance-card, x-provenance-strip,
+ * x-maintenance.list). Este módulo só acrescenta interatividade, sem montar HTML:
+ * initProvenanceFilters() faz o filtro Todas / Selo da oficina / Declaradas da ficha filtrar no
+ * lugar (atributo hidden, aria-pressed e contadores). Sem JS, o mesmo filtro é um GET (?verified=).
+ */
+
+const FILTER_ALL = '';
+const FILTER_SEALED = '1';
+const FILTER_DECLARED = '0';
+
+/**
+ * '1' (Selo da oficina), '0' (Declaradas) ou '' (Todas).
+ *
+ * @param {unknown} value
+ * @returns {''|'1'|'0'}
+ */
+export function normalizeProvenanceFilter(value) {
+    const text = value === null || value === undefined ? '' : String(value);
+
+    return text === FILTER_SEALED || text === FILTER_DECLARED ? text : FILTER_ALL;
 }
 
-function formatDate(value) {
-    if (!value) {
-        return '—';
+/**
+ * @param {boolean|string} verified true/'1' para Selo da oficina
+ * @param {unknown} filter
+ */
+export function matchesProvenanceFilter(verified, filter) {
+    const isVerified = verified === true || verified === '1';
+    const normalized = normalizeProvenanceFilter(filter);
+
+    if (normalized === FILTER_SEALED) {
+        return isVerified;
     }
 
-    const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+    if (normalized === FILTER_DECLARED) {
+        return !isVerified;
+    }
 
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR');
+    return true;
 }
 
-function isVerifiedMaintenance(maintenance) {
-    return maintenance.is_verified === true || maintenance.verified_at != null;
+/**
+ * Texto do contador da lista ("4 manutenções" ou "Mostrando 2 de 4 manutenções").
+ *
+ * @param {{ shown: number, filter: string, templateAll: string, templateFiltered: string }} options
+ */
+export function provenanceCountText({ shown, filter, templateAll, templateFiltered }) {
+    return normalizeProvenanceFilter(filter) === FILTER_ALL
+        ? templateAll
+        : templateFiltered.replace('{shown}', String(shown));
 }
 
-/** @param {Array<{ is_verified?: boolean, verified_at?: string|null }>} maintenances */
-export function filterMaintenancesByVerifiedQuery(maintenances, searchOrVerified = '') {
-    let verified = null;
+/**
+ * Índice visível mais próximo de fromIndex (primeiro à esquerda, depois à direita), ou -1.
+ *
+ * @param {boolean[]} visibility
+ * @param {number} fromIndex
+ */
+export function nearestVisibleIndex(visibility, fromIndex) {
+    if (visibility[fromIndex]) {
+        return fromIndex;
+    }
 
-    if (searchOrVerified === '1' || searchOrVerified === '0') {
-        verified = searchOrVerified;
+    for (let distance = 1; distance < visibility.length; distance += 1) {
+        if (visibility[fromIndex - distance]) {
+            return fromIndex - distance;
+        }
+
+        if (visibility[fromIndex + distance]) {
+            return fromIndex + distance;
+        }
+    }
+
+    return -1;
+}
+
+/**
+ * @param {ParentNode} root
+ * @param {string} selector
+ * @returns {Element[]}
+ */
+function within(root, selector) {
+    const found = typeof root?.querySelectorAll === 'function' ? Array.from(root.querySelectorAll(selector)) : [];
+
+    if (typeof root?.matches === 'function' && root.matches(selector)) {
+        found.unshift(root);
+    }
+
+    return found;
+}
+
+function replaceFilterInUrl(filter) {
+    const url = new URL(window.location.href);
+
+    if (filter === FILTER_ALL) {
+        url.searchParams.delete('verified');
     } else {
-        verified = new URLSearchParams(searchOrVerified || window.location.search).get('verified');
+        url.searchParams.set('verified', filter);
     }
 
-    if (verified === '1') {
-        return maintenances.filter((maintenance) => isVerifiedMaintenance(maintenance));
-    }
-
-    if (verified === '0') {
-        return maintenances.filter((maintenance) => ! isVerifiedMaintenance(maintenance));
-    }
-
-    return maintenances;
+    url.searchParams.delete('page');
+    window.history.replaceState(window.history.state, '', url);
 }
 
-export function renderMaintenanceHistoryList(
-    maintenances,
-    { basePath = '/usuario', linkMaintenances = true } = {},
-) {
-    if (maintenances.length === 0) {
-        return '<div class="card text-center text-automotive-500">Nenhuma manutenção neste filtro.</div>';
-    }
+/**
+ * Aplica o filtro na ficha: cards do histórico, colunas da linha do tempo, contadores, estado
+ * vazio, botões (aria-pressed) e a URL.
+ *
+ * @param {HTMLElement} root [data-provenance-filter-root]
+ * @param {unknown} value
+ */
+export function applyProvenanceFilter(root, value) {
+    const filter = normalizeProvenanceFilter(value);
+    const items = within(root, '[data-provenance-list] > [data-verified]');
+    let shown = 0;
 
-    return maintenances
-        .map((maintenance) => renderProvenanceCard(maintenance, {
-            href: linkMaintenances ? `${basePath}/manutencoes/${maintenance.id}` : null,
-        }))
-        .join('');
-}
+    // Liga o fade de 150ms dos cards que voltam à lista (app.css), só depois do primeiro filtro.
+    root.setAttribute('data-provenance-filtered', '');
 
-function provenanceFilterChipClass(isActive) {
-    return `underline ${isActive ? 'font-semibold text-automotive-900' : ''}`;
-}
+    items.forEach((item) => {
+        const visible = matchesProvenanceFilter(item.getAttribute('data-verified'), filter);
+        item.hidden = !visible;
+        shown += visible ? 1 : 0;
+    });
 
-export function initProvenanceStripFilters(
-    root,
-    allMaintenances,
-    { basePath = '/usuario', linkMaintenances = true } = {},
-) {
-    const listHost = root.querySelector('[data-maintenance-list]');
-    const titleEl = root.querySelector('[data-maintenance-list-title]');
+    within(root, '[data-timeline-grid]').forEach((grid) => {
+        const columns = Array.from(grid.querySelectorAll('[data-timeline-column]'));
+        const selectedIndex = columns.findIndex((column) => column.getAttribute('aria-selected') === 'true');
+        const visibility = columns.map((column) => !column.hasAttribute('data-verified')
+            || matchesProvenanceFilter(column.getAttribute('data-verified'), filter));
 
-    if (!listHost) {
-        return;
-    }
-
-    const titleTemplate = titleEl?.dataset.titleTemplate
-        ?? '🔧 Histórico de Manutenções ({count})';
-
-    const applyFilter = (verifiedValue) => {
-        const filtered = filterMaintenancesByVerifiedQuery(
-            allMaintenances,
-            verifiedValue === null ? '' : verifiedValue,
-        );
-
-        const url = new URL(window.location.href);
-        if (verifiedValue === null || verifiedValue === '') {
-            url.searchParams.delete('verified');
-        } else {
-            url.searchParams.set('verified', verifiedValue);
-        }
-        history.replaceState(null, '', url);
-
-        root.querySelectorAll('[data-provenance-filter]').forEach((button) => {
-            const value = button.dataset.provenanceFilter ?? '';
-            const active =
-                (value === '' && !url.searchParams.get('verified'))
-                || url.searchParams.get('verified') === value;
-            button.className = provenanceFilterChipClass(active);
+        columns.forEach((column, index) => {
+            column.hidden = !visibility[index];
+            column.disabled = !visibility[index];
         });
 
-        listHost.innerHTML = renderMaintenanceHistoryList(filtered, {
-            basePath,
-            linkMaintenances,
+        const visibleCount = Math.max(1, visibility.filter(Boolean).length);
+        grid.setAttribute('data-visible-count', String(visibleCount));
+
+        grid.querySelectorAll('[data-timeline-rail], [data-timeline-progress]').forEach((line) => {
+            line.style.left = `calc(100% / (2 * ${visibleCount}))`;
+            if (line.hasAttribute('data-timeline-rail')) {
+                line.style.right = `calc(100% / (2 * ${visibleCount}))`;
+            }
+        });
+        grid.querySelectorAll('[data-timeline-progress]').forEach((progress) => {
+            progress.hidden = filter !== FILTER_ALL;
         });
 
-        if (titleEl) {
-            titleEl.textContent = titleTemplate.replace('{count}', String(filtered.length));
-        }
-    };
+        // A coluna aberta saiu do filtro: abre a visível mais próxima (o clique passa por ui/tabs.js).
+        if (selectedIndex !== -1 && !visibility[selectedIndex]) {
+            const nextIndex = nearestVisibleIndex(visibility, selectedIndex);
 
-    root.querySelectorAll('[data-provenance-filter]').forEach((button) => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            const value = button.dataset.provenanceFilter ?? '';
-            applyFilter(value === '' ? null : value);
+            if (nextIndex !== -1) {
+                columns[nextIndex].click();
+            }
+        }
+    });
+
+    within(root, 'form[data-provenance-filter-form] button[name="verified"]').forEach((button) => {
+        button.setAttribute('aria-pressed', normalizeProvenanceFilter(button.value) === filter ? 'true' : 'false');
+    });
+
+    within(root, '[data-provenance-count]').forEach((counter) => {
+        counter.textContent = provenanceCountText({
+            shown,
+            filter,
+            templateAll: counter.getAttribute('data-template-all') ?? '',
+            templateFiltered: counter.getAttribute('data-template-filtered') ?? '{shown}',
         });
     });
 
-    const initialVerified = new URLSearchParams(window.location.search).get('verified');
-    applyFilter(initialVerified === '1' || initialVerified === '0' ? initialVerified : null);
+    within(root, '[data-provenance-empty]').forEach((empty) => {
+        empty.hidden = !(filter !== FILTER_ALL && shown === 0 && items.length > 0);
+        const title = empty.querySelector('[data-slot="empty-state-title"]');
+        const text = filter === FILTER_DECLARED ? empty.getAttribute('data-title-declared') : empty.getAttribute('data-title-sealed');
+
+        if (title && text) {
+            title.textContent = text;
+        }
+    });
+
+    replaceFilterInUrl(filter);
+    root.dispatchEvent(new CustomEvent('provenance:filter-change', { bubbles: true, detail: { filter, shown, total: items.length } }));
+
+    return shown;
 }
 
-function provenanceRootClass(maintenance) {
-    return isVerifiedMaintenance(maintenance) ? 'prov-verified' : 'prov-declared';
-}
+/**
+ * Liga o filtro de procedência da ficha (x-vehicle.detail). Idempotente.
+ *
+ * @param {ParentNode} [root]
+ */
+export function initProvenanceFilters(root = document) {
+    within(root, '[data-provenance-filter-root]').forEach((filterRoot) => {
+        if (filterRoot.dataset.provenanceFilterReady === 'true') {
+            return;
+        }
 
-export function renderProvenanceMarker(maintenance, size = 'md') {
-    const verified = isVerifiedMaintenance(maintenance);
-    const sizeClass = size === 'sm' ? 'prov-marker--sm' : size === 'lg' ? 'prov-marker--lg' : '';
-    const logo = maintenance.verified_workshop?.logo_url ?? maintenance.workshop?.logo_url;
-    const initials = (maintenance.verified_workshop?.name ?? maintenance.workshop_name ?? maintenance.user?.name ?? '?')
-        .split(' ')
-        .map((p) => p[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
+        filterRoot.dataset.provenanceFilterReady = 'true';
 
-    if (verified) {
-        const inner = logo
-            ? `<img src="${escapeHtml(logo)}" alt="" class="h-full w-full object-cover">`
-            : escapeHtml(initials);
+        filterRoot.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const button = target?.closest('form[data-provenance-filter-form] button[name="verified"]');
+            const clear = target?.closest('[data-provenance-clear]');
 
-        return `<div class="prov-marker prov-marker--verified ${sizeClass} ${provenanceRootClass(maintenance)}">${inner}</div>`;
-    }
+            if (button && filterRoot.contains(button)) {
+                event.preventDefault();
+                applyProvenanceFilter(filterRoot, button.value);
 
-    return `<div class="prov-marker prov-marker--declared ${sizeClass} ${provenanceRootClass(maintenance)}">${escapeHtml(initials)}</div>`;
-}
+                return;
+            }
 
-export function renderProvenanceCard(maintenance, { href = null, titleWeight = true } = {}) {
-    const verified = isVerifiedMaintenance(maintenance);
-    const railClass = verified ? 'prov-rail' : 'prov-rail prov-rail--declared';
-    const cardClass = verified ? 'prov-card' : 'prov-card prov-card--declared';
-    const titleClass = verified ? 'font-semibold text-automotive-900' : 'font-medium text-automotive-700';
-    const label = maintenance.provenance_card_label ?? maintenance.provenance_label ?? '';
-    const meta = maintenance.provenance_meta ?? maintenance.provenance_sublabel ?? '';
-    const type = escapeHtml(maintenance.maintenance_type ?? '');
-    const inner = `
-        <div class="${railClass} ${provenanceRootClass(maintenance)}"></div>
-        ${renderProvenanceMarker(maintenance)}
-        <div class="min-w-0 flex-1">
-            <p class="${titleClass}">${type}</p>
-            <p class="text-sm text-automotive-600">${escapeHtml(label)}</p>
-            <p class="text-xs text-automotive-500">${escapeHtml(meta)}</p>
-        </div>
-    `;
+            if (clear && filterRoot.contains(clear)) {
+                event.preventDefault();
+                applyProvenanceFilter(filterRoot, FILTER_ALL);
+                filterRoot.querySelector('form[data-provenance-filter-form] button[name="verified"][value=""]')?.focus();
+            }
+        });
 
-    if (href) {
-        return `<a href="${escapeHtml(href)}" class="${cardClass} ${provenanceRootClass(maintenance)} mb-3 block hover:border-wrench-300">${inner}</a>`;
-    }
+        // Envio sem clique no botão (Enter): mantém o filtro no lugar.
+        filterRoot.addEventListener('submit', (event) => {
+            const form = event.target instanceof HTMLFormElement ? event.target : null;
 
-    return `<div class="${cardClass} ${provenanceRootClass(maintenance)} mb-3">${inner}</div>`;
-}
-
-export function renderVehicleIdentity(vehicle, { size = 'card', editUrl = null } = {}) {
-    const isHero = size === 'hero';
-    const chassisClass = isHero
-        ? 'font-mono tracking-wider font-semibold text-automotive-900 text-lg sm:text-xl'
-        : 'font-mono tracking-wider font-semibold text-automotive-900 text-sm';
-    const chassis = vehicle.chassis;
-    const plate = vehicle.current_plate ?? vehicle.license_plate;
-
-    let chassisBlock = '';
-    if (chassis) {
-        const copyBtn = isHero
-            ? `<button type="button" class="btn-secondary text-xs py-1 px-2" data-copy-chassis data-chassis="${escapeHtml(chassis)}">Copiar</button>`
-            : '';
-        chassisBlock = `<div class="flex flex-wrap items-center gap-2"><p class="${chassisClass}">${escapeHtml(chassis)}</p>${copyBtn}</div>`;
-    } else if (editUrl) {
-        chassisBlock = `<a href="${escapeHtml(editUrl)}" class="inline-flex rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">Chassi não informado</a>`;
-    } else {
-        chassisBlock = `<span class="inline-flex rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">Chassi não informado</span>`;
-    }
-
-    const plateChip = plate
-        ? `<span class="inline-flex rounded-md border border-automotive-200 px-2 py-0.5 text-xs text-automotive-700">Placa atual ${escapeHtml(plate)}</span>`
-        : '';
-
-    return `
-        <div class="space-y-1">
-            <p class="text-xs uppercase tracking-wide text-automotive-500">Chassi</p>
-            ${chassisBlock}
-            ${plateChip}
-        </div>
-    `;
-}
-
-const PROVENANCE_DOTS_MAX = 16;
-
-export function renderProvenanceStrip(vehicle, { basePath = '', interactiveFilters = false } = {}) {
-    const strip = vehicle.provenance_strip ?? [];
-    const total = vehicle.maintenances_count ?? strip.length;
-    const verified = vehicle.verified_maintenances_count ?? strip.filter((s) => s.is_verified).length;
-    const declared = Math.max(0, total - verified);
-    const declaredLabel = declared === 1 ? 'declarada' : 'declaradas';
-    const visibleDots = strip.slice(0, PROVENANCE_DOTS_MAX);
-    const overflowDots = Math.max(0, strip.length - visibleDots.length);
-
-    const dots = visibleDots
-        .map((segment) => {
-            const cls = segment.is_verified ? 'prov-dot--verified' : 'prov-dot--declared';
-            const kind = segment.is_verified ? 'Selo da oficina' : 'Declarada';
-            const title = `${kind} · ${formatDate(segment.date)}`;
-            const href = segment.maintenance_id ? `${basePath}/manutencoes/${segment.maintenance_id}` : '#';
-
-            return `<a href="${escapeHtml(href)}" class="prov-dot-link" title="${escapeHtml(title)}"><span class="prov-dot ${cls}"></span></a>`;
-        })
-        .join('');
-    const overflow = overflowDots > 0
-        ? `<span class="prov-dots-more" title="${overflowDots} manutenções a mais">+${overflowDots}</span>`
-        : '';
-    const dotsRow = visibleDots.length > 0
-        ? `<div class="prov-dots-row" role="img" aria-label="Linha de procedência das manutenções, da mais antiga à mais recente">${dots}${overflow}</div>`
-        : '';
-
-    const current = new URLSearchParams(window.location.search).get('verified');
-
-    let filterControls = '';
-
-    if (interactiveFilters) {
-        const chip = (value, label) => {
-            const active = (value === '' && current === null) || current === value;
-
-            return `<button type="button" data-provenance-filter="${value}" class="${provenanceFilterChipClass(active)}">${label}</button>`;
-        };
-        filterControls = `
-            ${chip('', 'Todas')}
-            ${chip('1', 'Selo da oficina')}
-            ${chip('0', 'Declaradas')}
-        `;
-    } else {
-        const params = new URLSearchParams(window.location.search);
-        params.delete('verified');
-        params.delete('page');
-        const suffix = params.toString();
-        const prefix = suffix ? `?${suffix}&` : '?';
-        const allHref = suffix ? `?${suffix}` : window.location.pathname;
-        const verifiedHref = `${prefix}verified=1`;
-        const declaredHref = `${prefix}verified=0`;
-        filterControls = `
-            <a href="${escapeHtml(allHref)}" class="${provenanceFilterChipClass(current === null)}">Todas</a>
-            <a href="${escapeHtml(verifiedHref)}" class="${provenanceFilterChipClass(current === '1')}">Selo da oficina</a>
-            <a href="${escapeHtml(declaredHref)}" class="${provenanceFilterChipClass(current === '0')}">Declaradas</a>
-        `;
-    }
-
-    return `
-        <div class="mb-4" data-provenance-strip>
-            <p class="prov-strip-summary text-sm text-automotive-700">
-                <span class="font-medium text-[#0f766e]">${verified}</span> com selo ·
-                <span class="font-medium text-[#92400e]">${declared}</span> ${declaredLabel}
-            </p>
-            ${dotsRow}
-            <div class="mt-2 flex flex-wrap gap-3 text-sm">
-                ${filterControls}
-            </div>
-        </div>
-    `;
-}
-
-export function renderProvenanceLegend() {
-    return `
-        <div class="flex flex-wrap items-center gap-6 text-sm text-automotive-700">
-            <div class="flex items-center gap-2">
-                <div class="prov-marker prov-marker--verified prov-marker--sm prov-verified">OF</div>
-                <span>Selo da oficina <span class="text-automotive-500">(verificada)</span></span>
-            </div>
-            <div class="flex items-center gap-2">
-                <div class="prov-marker prov-marker--declared prov-marker--sm prov-declared">PR</div>
-                <span>Declarada <span class="text-automotive-500">(não verificada)</span></span>
-            </div>
-        </div>
-    `;
+            if (form?.matches('[data-provenance-filter-form]')) {
+                event.preventDefault();
+                applyProvenanceFilter(filterRoot, event.submitter?.value ?? FILTER_ALL);
+            }
+        });
+    });
 }

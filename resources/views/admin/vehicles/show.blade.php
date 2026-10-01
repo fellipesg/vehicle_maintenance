@@ -1,52 +1,48 @@
 @extends('layouts.admin')
 
-@section('title', 'Veículo — Admin')
-@section('page_heading', $vehicle->brand.' '.$vehicle->model)
+@section('title', trim($vehicle->brand.' '.$vehicle->model))
+
+@php
+    $vehicleName = trim($vehicle->brand.' '.$vehicle->model);
+    $adminBreadcrumbs = [['Frota'], ['Veículos', route('admin.vehicles.index')], [$vehicleName]];
+    $owner = $vehicle->owners->first();
+@endphp
 
 @section('content')
-    <a href="{{ route('admin.vehicles.index') }}" class="text-sm text-wrench-600 hover:underline">← Todos os veículos</a>
-
-    <div class="mt-4 flex flex-wrap gap-6">
-        <x-vehicle-cover :vehicle="$vehicle" class="h-40 w-64 rounded-lg object-cover shadow" />
-        <div>
-            <h2 class="text-2xl font-bold">{{ $vehicle->brand }} {{ $vehicle->model }}</h2>
-            <p class="text-automotive-600">
-                {{ $vehicle->year ?? '—' }} · Placa {{ $vehicle->license_plate ?? '—' }} · Chassi {{ $vehicle->chassis ?? '—' }}
-            </p>
-            @if($vehicle->renavam)
-                <p class="text-sm text-automotive-500">RENAVAM {{ $vehicle->renavam }}</p>
+    {{--
+        A mesma ficha dos portais (<x-vehicle.detail>), só leitura: o admin vê os documentos completos
+        e o histórico com a procedência; a trilha fica na topbar do admin.
+    --}}
+    <x-vehicle.detail :vehicle="$vehicle" :portal="\App\Enums\Portal::Admin">
+        <x-slot:actions>
+            @if($vehicle->maintenances()->exists())
+                <x-ui.button variant="secondary" icon="wrench-screwdriver" :href="route('admin.maintenances.index', ['veiculo' => $vehicle->id])">Ver na lista de manutenções</x-ui.button>
             @endif
-            @php $owner = $vehicle->owners->first(); @endphp
             @if($owner)
-                <p class="mt-2 text-sm">
-                    Dono atual:
-                    <a href="{{ route('admin.users.show', $owner) }}" class="font-medium text-wrench-600 hover:underline">{{ $owner->name }}</a>
-                </p>
+                <x-ui.button variant="secondary" icon="user-circle" :href="route('admin.users.show', $owner)">Abrir proprietário atual</x-ui.button>
             @endif
-        </div>
-    </div>
+        </x-slot:actions>
 
-    <div class="mb-4 mt-8 flex flex-wrap items-end justify-between gap-4">
-        <h3 class="text-xl font-semibold">Manutenções</h3>
-        @if($showMaintenanceFilter)
-            <div class="flex flex-wrap gap-2 text-sm">
-                <a href="{{ route('admin.vehicles.show', $vehicle) }}" class="btn-secondary {{ ($verified ?? null) === null ? '!bg-wrench-100' : '' }}">Todas</a>
-                <a href="{{ route('admin.vehicles.show', [$vehicle, 'verified' => '1']) }}" class="btn-secondary {{ ($verified ?? null) === '1' ? '!bg-wrench-100' : '' }}">Selo da oficina</a>
-                <a href="{{ route('admin.vehicles.show', [$vehicle, 'verified' => '0']) }}" class="btn-secondary {{ ($verified ?? null) === '0' ? '!bg-wrench-100' : '' }}">Declaradas</a>
-            </div>
-        @endif
-    </div>
-
-    <x-provenance-legend class="mb-4" />
-
-    @forelse($vehicle->maintenances as $maintenance)
-        <div class="mb-3">
-            <x-provenance-card :maintenance="$maintenance" />
-            @if($maintenance->description)
-                <p class="mt-2 text-sm text-automotive-600">{{ Str::limit($maintenance->description, 300) }}</p>
-            @endif
-        </div>
-    @empty
-        <p class="text-automotive-600">Nenhuma manutenção registrada.</p>
-    @endforelse
+        <x-slot:notice>
+            <dl class="flex flex-wrap gap-x-6 gap-y-2 rounded-card border border-border bg-surface px-4 py-3 text-sm" data-slot="admin-vehicle-ownership">
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <dt class="text-muted-foreground">Proprietário atual</dt>
+                    <dd class="flex flex-wrap items-center gap-1.5">
+                        @if($owner)
+                            <x-ui.link :href="route('admin.users.show', $owner)">{{ $owner->name }}</x-ui.link>
+                            <x-admin.user-type-badge :user="$owner" size="sm" />
+                        @else
+                            <span class="text-foreground">Sem proprietário atual</span>
+                        @endif
+                    </dd>
+                </div>
+                @if($vehicle->created_at)
+                    <div class="flex gap-1.5">
+                        <dt class="text-muted-foreground">Cadastro na plataforma</dt>
+                        <dd class="text-foreground tabular-nums">{{ $vehicle->created_at->format('d/m/Y') }}</dd>
+                    </div>
+                @endif
+            </dl>
+        </x-slot:notice>
+    </x-vehicle.detail>
 @endsection

@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\CheckApiAbility;
 use App\Support\ApiResponse;
+use App\Support\FriendlyHttpErrors;
+use App\Support\PortalAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -41,6 +43,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => \App\Http\Middleware\SetTenantContext::class,
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
             'etag.vehicle_list' => \App\Http\Middleware\EtagForVehicleList::class,
+        ]);
+
+        // Visitante que abre um link protegido vai ao login do portal da URL (/garagem → lojista),
+        // e quem já entrou e abre /login vai ao próprio Início (e não à landing).
+        $middleware->redirectGuestsTo(fn (Request $request): string => PortalAccess::loginUrlFor($request));
+        $middleware->redirectUsersTo(fn (Request $request): string => PortalAccess::homeUrl($request->user()));
+
+        // A sessão guarda o hash da senha: trocar ou redefinir a senha (e excluir a conta, que também
+        // a troca) desconecta os outros aparelhos. Ver App\Http\Middleware\AuthenticateWebSession.
+        $middleware->web(append: [
+            \App\Http\Middleware\AuthenticateWebSession::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -110,4 +123,18 @@ return Application::configure(basePath: dirname(__DIR__))
         };
 
         $exceptions->render($apiRenderer);
+
+        // Páginas web: sessão expirada (419) nos formulários de entrada e perfil errado (403)
+        // voltam com aviso, em vez da página de erro. Ver App\Support\FriendlyHttpErrors.
+        $exceptions->render(function (HttpExceptionInterface $e, Request $request): ?\Illuminate\Http\RedirectResponse {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return null;
+            }
+
+            return match ($e->getStatusCode()) {
+                419 => FriendlyHttpErrors::sessionExpired($request),
+                403 => FriendlyHttpErrors::wrongArea($request),
+                default => null,
+            };
+        });
     })->create();

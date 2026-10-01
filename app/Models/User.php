@@ -3,12 +3,15 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\Portal;
+use App\Notifications\ResetPasswordNotification;
 use App\Support\AppStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -123,33 +126,136 @@ class User extends Authenticatable
     }
 
     /**
-     * Consignments this user holds as a garage.
+     * Estoque do lojista: veículos de que ele é dono atual mais os que recebeu em consignação,
+     * no tenant dele. A consignação é anexada com is_current_owner=false (o dono é outra pessoa),
+     * então currentVehicles() não a enxerga. Aqui ela entra em qualquer estado do acesso ao
+     * histórico (sem pedido, em análise, aprovado ou recusado), com a consignação deste usuário
+     * já carregada em activeConsignment, para o estoque mostrar o status.
+     */
+    public function stockVehicles(): BelongsToMany
+    {
+        $query = $this->vehicles()
+            ->where(function (Builder $query): void {
+                // Postgres rejects "boolean = 1"; use a SQL boolean literal.
+                $query->whereRaw('user_vehicles.is_current_owner = true')
+                    ->orWhere('user_vehicles.ownership_type', 'consignment');
+            })
+            ->with([
+                'activeConsignment' => fn (HasOne $query) => $query->where('garage_user_id', $this->id),
+            ]);
+
+        if ($this->tenant_id) {
+            $query->wherePivot('tenant_id', $this->tenant_id);
+        }
+
+        return $query;
+    }
+
+    /**
+     * O veículo está no estoque em consignação: o lojista o vende, mas o dono é outra pessoa.
+     */
+    public function holdsOnConsignment(Vehicle $vehicle): bool
+    {
+        $pivot = $this->stockPivotFor($vehicle);
+
+        return $pivot !== null
+            && $pivot->ownership_type === 'consignment'
+            && ! $pivot->is_current_owner;
+    }
+
+    /**
+     * Procuração de consignação que este usuário enviou para o veículo, se houver.
+     */
+    public function consignmentFor(Vehicle $vehicle): ?VehicleConsignment
+    {
+        if ($vehicle->relationLoaded('activeConsignment')) {
+            $consignment = $vehicle->activeConsignment;
+
+            return $consignment !== null && (int) $consignment->garage_user_id === (int) $this->id
+                ? $consignment
+                : null;
+        }
+
+        return VehicleConsignment::query()
+            ->active()
+            ->where('garage_user_id', $this->id)
+            ->where('vehicle_id', $vehicle->id)
+            ->first();
+    }
+
+    /**
+     * A loja abre a ficha de qualquer veículo do estoque, inclusive a consignação sem liberação do
+     * histórico: é nela que ela registra as manutenções e acompanha o que já registrou.
+     */
+    public function canOpenStockVehicle(Vehicle $vehicle): bool
+    {
+        return $this->stockPivotFor($vehicle) !== null;
+    }
+
+    /**
+     * Espelha VehiclePolicy::viewFullHistory nas listas do estoque, sem uma consulta por veículo: o
+     * histórico anterior abre para o dono atual e para a consignação que o proprietário liberou (ou
+     * cuja procuração a equipe aprovou). Em consignação sem essa liberação o lojista continua
+     * entrando no veículo e vendo o que ele mesmo registrou.
+     */
+    public function canViewStockVehicleHistory(Vehicle $vehicle): bool
+    {
+        $pivot = $this->stockPivotFor($vehicle);
+
+        if ($pivot === null) {
+            return false;
+        }
+
+        if ($pivot->is_current_owner) {
+            return true;
+        }
+
+        return $this->consignmentFor($vehicle)?->grantsHistoryAccess() ?? false;
+    }
+
+    /**
+     * IDs dos veículos do estoque cujo histórico o lojista pode ver.
+     *
+     * @return list<int>
+     */
+    public function stockVehicleIdsWithVisibleHistory(): array
+    {
+        return $this->stockVehicles()
+            ->get()
+            ->filter(fn (Vehicle $vehicle): bool => $this->canViewStockVehicleHistory($vehicle))
+            ->values()
+            ->modelKeys();
+    }
+
+    /**
+     * Vínculo do veículo com o estoque deste usuário: o pivot já carregado quando o veículo veio de
+     * stockVehicles(), ou uma consulta quando veio de outro lugar (ex.: route model binding).
+     */
+    private function stockPivotFor(Vehicle $vehicle): ?UserVehicle
+    {
+        if ($vehicle->relationLoaded('pivot')) {
+            $pivot = $vehicle->getRelation('pivot');
+
+            $isOwnStockPivot = $pivot instanceof UserVehicle
+                && (int) $pivot->user_id === (int) $this->id
+                && ($this->tenant_id === null || (int) $pivot->tenant_id === (int) $this->tenant_id);
+
+            if ($isOwnStockPivot) {
+                return $pivot;
+            }
+        }
+
+        $stockVehicle = $this->stockVehicles()->where('vehicles.id', $vehicle->id)->first();
+
+        return $stockVehicle?->getRelation('pivot');
+    }
+
+    /**
+     * Consignações que este usuário mantém como lojista.
      */
     public function consignments(): HasMany
     {
         return $this->hasMany(VehicleConsignment::class, 'garage_user_id');
-    }
-
-    /**
-     * Vehicles a garage can work on: the ones it owns plus the ones it holds on consignment.
-     *
-     * @return Builder<Vehicle>
-     */
-    public function stockVehicles(): Builder
-    {
-        return Vehicle::query()->where(function (Builder $query): void {
-            $query->whereHas('owners', function ($owners): void {
-                $owners->where('users.id', $this->id)
-                    ->whereRaw('user_vehicles.is_current_owner = true');
-
-                if ($this->tenant_id) {
-                    $owners->where('user_vehicles.tenant_id', $this->tenant_id);
-                }
-            })->orWhereHas('consignments', function ($consignments): void {
-                $consignments->where('garage_user_id', $this->id)
-                    ->where('status', VehicleConsignment::STATUS_ACTIVE);
-            });
-        });
     }
 
     public function tenant()
@@ -226,22 +332,18 @@ class User extends Authenticatable
         return $this->hasMany(Maintenance::class);
     }
 
-    public function typeLabel(): string
+    /**
+     * Portal (área) da conta pelo user_type. O Painel admin é uma área extra de quem tem is_admin:
+     * ver Portal::current() e Portal::accessibleBy().
+     */
+    public function portal(): Portal
     {
-        return match ($this->user_type) {
-            'garage' => 'Lojista',
-            'workshop' => 'Oficina',
-            default => 'Usuário',
-        };
+        return Portal::forUserType($this->user_type);
     }
 
-    public function typeBadgeClass(): string
+    public function typeLabel(): string
     {
-        return match ($this->user_type) {
-            'garage' => 'badge-green',
-            'workshop' => 'badge-orange',
-            default => 'badge-blue',
-        };
+        return $this->portal()->label();
     }
 
     /**
@@ -268,6 +370,16 @@ class User extends Authenticatable
         }
 
         return AppStorage::url($this->avatar);
+    }
+
+    /**
+     * Link de redefinição de senha em pt-BR, no chrome de e-mail do projeto.
+     *
+     * @param  string  $token
+     */
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 
     public function hasTwoFactorEnabled(): bool

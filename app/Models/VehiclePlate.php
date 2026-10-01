@@ -43,14 +43,19 @@ class VehiclePlate extends Model
         return $this->ended_at === null;
     }
 
-    public static function sourceLabel(string $source): string
+    /**
+     * Coluna "Origem" do histórico de placas (ficha do veículo em todos os portais e PDF), com o
+     * glossário: nunca o valor interno. "manual" vale tanto para a placa digitada no cadastro quanto
+     * para a trocada em "Editar veículo", e a tabela é vista por outras contas (admin, próximo dono),
+     * então o texto não diz quem digitou.
+     */
+    public static function sourceLabel(?string $source): string
     {
         return match ($source) {
-            'manual' => 'Manual',
-            'crlv_import' => 'Importação CRLV',
-            'backfill' => 'Migração',
-            'api' => 'API',
-            default => $source,
+            'crlv_import' => 'CRLV-e',
+            'manual' => 'Informada manualmente',
+            'api' => 'Cadastro pelo app',
+            default => 'Cadastro',
         };
     }
 }

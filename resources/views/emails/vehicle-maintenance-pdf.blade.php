@@ -1,15 +1,25 @@
-<p>Olá,</p>
+<x-mail::message>
+# Histórico do {{ $vehicleName }}
 
-<p>
-    Segue o relatório de manutenções do veículo
-    <strong>{{ $vehicle->brand }} {{ $vehicle->model }}</strong>
-    (placa {{ $vehicle->license_plate }}).
-    O histórico consolidado está no PDF principal
-    @if(count($invoiceAttachments) > 0)
-        e cada nota fiscal segue como arquivo anexo neste e-mail.
-    @else
-        .
-    @endif
-</p>
+Segue o histórico de manutenções do **{{ $vehicleName }}** (placa {{ $plate }}), gerado em {{ $generatedAt }}.
 
-<p>Este e-mail foi gerado automaticamente pela Revisalog.</p>
+@if($maintenanceCount > 0)
+**{{ $provenanceSummary }}.** Com selo são as manutenções registradas pela própria oficina; declaradas são as informadas pelo proprietário ou pelo lojista.
+@else
+O veículo ainda não tem manutenções registradas. O PDF traz os dados do veículo.
+@endif
+
+## Anexos
+
+@foreach($attachmentLines as $attachmentLine)
+- {{ $attachmentLine }}
+@endforeach
+
+<x-mail::button :url="$vehicleUrl">
+Ver veículo na RevisaLog
+</x-mail::button>
+
+Quem receber o relatório pode conferir qualquer Selo da oficina em [{{ preg_replace('#^https?://#', '', $verificationUrl) }}]({{ $verificationUrl }}).
+
+RevisaLog
+</x-mail::message>

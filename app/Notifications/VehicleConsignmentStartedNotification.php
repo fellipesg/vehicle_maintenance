@@ -40,7 +40,7 @@ class VehicleConsignmentStartedNotification extends Notification implements Shou
             ->subject("{$garageName} registrou seu {$label} em consignação")
             ->greeting('Olá, '.$this->firstName().'!')
             ->line("A garagem **{$garageName}** informou que está com o seu **{$label}** (placa {$vehicle->license_plate}) para venda em consignação.")
-            ->line('A partir de agora ela pode registrar no Revisalog as manutenções que fizer no veículo, e você recebe um aviso a cada registro.')
+            ->line('A partir de agora ela pode registrar no RevisaLog as manutenções que fizer no veículo, e você recebe um aviso a cada registro.')
             ->line('O histórico de manutenções que o veículo já tinha continua privado. A garagem só vê esse histórico se você liberar.')
             ->action('Ver e responder', $this->actionUrl());
 
@@ -50,7 +50,7 @@ class VehicleConsignmentStartedNotification extends Notification implements Shou
 
         return $message
             ->line('Se você não autorizou essa garagem, use o mesmo link para contestar.')
-            ->salutation('Revisalog');
+            ->salutation('RevisaLog');
     }
 
     /**

@@ -26,6 +26,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -60,6 +61,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -97,6 +99,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -136,6 +139,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -169,6 +173,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -214,6 +219,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -247,6 +253,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -270,6 +277,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
@@ -295,6 +303,7 @@ class InvoiceControllerTest extends TestCase
     {
         $user = $this->actingAsApiUser();
         $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
         $maintenance = Maintenance::factory()->create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,

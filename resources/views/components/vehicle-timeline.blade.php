@@ -1,412 +1,334 @@
-@props(['timeline'])
+{{--
+    Linha do tempo do veículo, renderizada no servidor a partir de
+    App\Services\Vehicle\VehicleTimelineBuilder::build(): um evento por coluna, da mais antiga para a
+    mais recente (km crescente), e a próxima revisão estimada no fim.
+
+    As colunas são abas (WAI-ARIA Tabs) e cada evento tem o próprio painel de detalhes, já no HTML:
+    resources/js/ui/tabs.js (iniciado pelo app.js) troca a seleção no clique e nas setas, Home e End,
+    sem montar HTML no navegador. resources/js/vehicle-timeline-portal.js (initVehicleTimelines) só
+    acrescenta o ajuste fino do trilho, o esmaecido nas bordas quando há rolagem e a coluna
+    selecionada centralizada.
+
+    Props:
+    - timeline (obrigatório): o array do VehicleTimelineBuilder.
+    - maintenance-url: link "Ver manutenção completa" no painel de cada manutenção. Closure(int $id)
+      ou padrão com "{id}" ("/usuario/manutencoes/{id}"); null não mostra o link.
+    - filter: procedência filtrada agora ('1' Selo da oficina, '0' Declaradas, '' todas). As colunas
+      de manutenção que não entram no filtro saem (hidden + disabled) e o trilho de progresso some.
+    - summary: cabeçalho com "N manutenções · R$ em itens" e a barra até a próxima revisão (padrão:
+      sim). A ficha (x-vehicle.detail) já mostra isso em x-ui.stat e passa :summary="false".
+    - title / heading-level: título do card ("Linha do tempo") e o nível, h2 (o padrão) ou h3; o
+      título do painel usa o nível seguinte.
+    - id-prefix: prefixo dos ids das abas e painéis (padrão "linha-do-tempo").
+
+    Slot footer: abaixo da linha do tempo, no mesmo card (os pontos de procedência e o filtro
+    Todas / Selo da oficina / Declaradas, como no app: .ai/rules/provenance.md).
+
+    Ex.: <x-vehicle-timeline :timeline="$timeline" maintenance-url="/usuario/manutencoes/{id}" />
+--}}
+@props([
+    'timeline',
+    'maintenanceUrl' => null,
+    'filter' => '',
+    'summary' => true,
+    'title' => 'Linha do tempo',
+    'headingLevel' => 'h2',
+    'idPrefix' => 'linha-do-tempo',
+])
 
 @php
+    $timelineHeadingTag = \App\Support\UiProps::oneOf('x-vehicle-timeline', 'heading-level', $headingLevel, ['h2', 'h3'], 'h2');
+    $timelinePanelHeadingTag = $timelineHeadingTag === 'h2' ? 'h3' : 'h4';
+    $timelineFilter = \App\Support\Vehicle\VehicleMaintenanceHistory::normalizeFilter($filter);
+    $timelineIsFiltered = $timelineFilter !== '';
+
     $events = $timeline['events'] ?? [];
-    $vehicle = $timeline['vehicle'] ?? [];
-    $summary = $timeline['summary'] ?? [];
-    $reminder = $timeline['reminder'] ?? [];
-    $nextDue = $summary['next_due_kilometers'] ?? null;
-    $remaining = $summary['kilometers_remaining'] ?? null;
-    $progress = $summary['progress_percent'] ?? null;
-    $odometerProgress = $summary['odometer_progress_percent'] ?? $progress;
-    $isOverdue = (bool) ($summary['is_overdue'] ?? false);
-    $approxAnnualKm = $summary['approximate_annual_kilometers'] ?? null;
+    $timelineVehicle = $timeline['vehicle'] ?? [];
+    $timelineSummary = $timeline['summary'] ?? [];
+    $nextDue = $timelineSummary['next_due_kilometers'] ?? null;
+    $remaining = $timelineSummary['kilometers_remaining'] ?? null;
+    $progress = $timelineSummary['progress_percent'] ?? null;
+    $odometerProgress = $timelineSummary['odometer_progress_percent'] ?? $progress;
+    $isOverdue = (bool) ($timelineSummary['is_overdue'] ?? false);
+    $approxAnnualKm = $timelineSummary['approximate_annual_kilometers'] ?? null;
+    $maintenanceCount = (int) ($timelineSummary['maintenance_count'] ?? 0);
 
-    $timelineEvents = array_values(array_filter(
-        $events,
-        fn (array $event) => ($event['type'] ?? '') !== 'upcoming',
-    ));
+    $pastEvents = array_values(array_filter($events, fn (array $event) => ($event['type'] ?? '') !== 'upcoming'));
     $upcomingEvent = collect($events)->first(fn (array $event) => ($event['type'] ?? '') === 'upcoming');
-    $displayEvents = $upcomingEvent ? [...$timelineEvents, $upcomingEvent] : $timelineEvents;
-    $eventCount = max(count($displayEvents), 1);
+    $displayEvents = $upcomingEvent ? [...$pastEvents, $upcomingEvent] : $pastEvents;
 
-    $defaultIndex = 0;
+    $eventIsVisible = fn (array $event): bool => ($event['type'] ?? '') !== 'maintenance'
+        || \App\Support\Vehicle\VehicleMaintenanceHistory::matchesFilter((bool) ($event['is_verified'] ?? false), $timelineFilter);
+    $visibleIndexes = array_keys(array_filter($displayEvents, $eventIsVisible));
+    $visibleCount = max(count($visibleIndexes), 1);
 
-    foreach ($displayEvents as $index => $event) {
-        if (($event['is_current'] ?? false) && ($event['type'] ?? '') !== 'upcoming') {
-            $defaultIndex = $index;
+    $selectedIndex = null;
+    foreach ($displayEvents as $eventIndex => $event) {
+        if (($event['is_current'] ?? false) && ($event['type'] ?? '') !== 'upcoming' && in_array($eventIndex, $visibleIndexes, true)) {
+            $selectedIndex = $eventIndex;
         }
     }
+    if ($selectedIndex === null) {
+        $visiblePast = array_values(array_filter($visibleIndexes, fn (int $eventIndex): bool => ($displayEvents[$eventIndex]['type'] ?? '') !== 'upcoming'));
+        $selectedIndex = $visiblePast !== [] ? end($visiblePast) : ($visibleIndexes[0] ?? 0);
+    }
 
-    $defaultEvent = $displayEvents[$defaultIndex] ?? null;
-    $trackCurrentIndex = (int) ($summary['track_current_index'] ?? $defaultIndex);
-    $timelineProgressPercent = (float) ($summary['track_progress_percent'] ?? 0);
+    $trackCurrentIndex = (int) ($timelineSummary['track_current_index'] ?? $selectedIndex);
+    $trackPercent = (float) ($timelineSummary['track_progress_percent'] ?? 0);
+
+    $formatKm = fn (mixed $value): string => $value === null ? '—' : number_format((int) $value, 0, ',', '.').' km';
+    $formatMoney = fn (mixed $value): string => 'R$ '.number_format((float) ($value ?? 0), 2, ',', '.');
+    $formatDate = fn (?string $value): ?string => filled($value) ? \Carbon\Carbon::parse($value)->format('d/m/Y') : null;
+    $eventUrl = function (array $event) use ($maintenanceUrl): ?string {
+        if (($event['type'] ?? '') !== 'maintenance' || ! isset($event['id'])) {
+            return null;
+        }
+
+        $url = match (true) {
+            $maintenanceUrl instanceof \Closure => $maintenanceUrl((int) $event['id']),
+            is_string($maintenanceUrl) && $maintenanceUrl !== '' => str_replace('{id}', (string) $event['id'], $maintenanceUrl),
+            default => null,
+        };
+
+        return is_string($url) && $url !== '' ? $url : null;
+    };
+
+    $headerParts = ['Da mais antiga para a mais recente'];
+    if ($summary) {
+        $headerParts[] = \App\Support\Vehicle\VehicleMaintenanceHistory::countLabel($maintenanceCount);
+        $headerParts[] = $formatMoney($timelineSummary['total_spent'] ?? 0).' em itens';
+        if ($approxAnnualKm) {
+            $headerParts[] = '~'.$formatKm($approxAnnualKm).'/ano (aprox.)';
+        }
+    }
+    $odometerValue = (int) min(100, max(0, (float) ($odometerProgress ?? 0)));
+    $odometerText = $isOverdue
+        ? 'Revisão estimada em '.$formatKm($nextDue).', em atraso'
+        : 'Faltam '.$formatKm($remaining).' para '.$formatKm($nextDue);
 @endphp
 
-@if(count($displayEvents) > 0)
-    <section {{ $attributes->merge(['class' => 'card !p-0 overflow-hidden']) }} data-vehicle-timeline>
-        <div class="border-b border-automotive-200 px-6 py-5">
-            <h2 class="text-lg font-medium text-automotive-900">Linha do tempo</h2>
-            <p class="mt-0.5 text-sm text-automotive-600">
-                {{ $vehicle['brand'] ?? '' }} {{ $vehicle['model'] ?? '' }} ·
-                {{ $summary['maintenance_count'] ?? 0 }} manutenção(ões) ·
-                R$ {{ number_format((float) ($summary['total_spent'] ?? 0), 2, ',', '.') }} em itens
-                @if($approxAnnualKm)
-                    · ~{{ number_format((int) $approxAnnualKm, 0, ',', '.') }} km/ano (aprox.)
-                @endif
-            </p>
+@if (count($displayEvents) > 0)
+    <section {{ $attributes->class(['overflow-hidden rounded-card border border-border bg-surface shadow-sm'])->merge(['aria-labelledby' => $idPrefix.'-titulo', 'data-vehicle-timeline' => '']) }}>
+        <div class="border-b border-border px-4 py-5 sm:px-6">
+            <{{ $timelineHeadingTag }} id="{{ $idPrefix }}-titulo" class="text-lg font-semibold text-foreground">{{ $title }}</{{ $timelineHeadingTag }}>
+            <p class="mt-0.5 text-sm text-muted-foreground">{{ implode(' · ', $headerParts) }}</p>
 
-            @if($nextDue)
-                <div class="mt-5 rounded-xl border border-automotive-200 bg-white px-4 py-3">
+            @if ($summary && $nextDue)
+                <div class="mt-5 rounded-control border border-border bg-surface px-4 py-3">
                     <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <p class="font-medium text-automotive-900">
-                            Odômetro atual: {{ number_format((int) ($summary['last_kilometers'] ?? 0), 0, ',', '.') }} km
-                        </p>
-                        <p class="text-automotive-500">
-                            Meta: {{ number_format((int) $nextDue, 0, ',', '.') }} km
-                        </p>
+                        <p class="font-medium text-foreground">Odômetro atual: <span class="tabular-nums">{{ $formatKm($timelineSummary['last_kilometers'] ?? 0) }}</span></p>
+                        <p class="text-muted-foreground">Meta: <span class="tabular-nums">{{ $formatKm($nextDue) }}</span></p>
                     </div>
-                    <div class="mt-3 h-2.5 overflow-hidden rounded-full border border-automotive-200 bg-automotive-100">
-                        <div
-                            class="h-full rounded-full transition-all duration-300 {{ $isOverdue ? 'bg-red-500' : 'bg-wrench-500' }}"
-                            style="width: {{ min(100, max(0, (float) ($odometerProgress ?? 0))) }}%"
-                            role="progressbar"
-                            aria-valuenow="{{ (int) ($odometerProgress ?? 0) }}"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                        ></div>
+                    <div
+                        class="mt-3 h-2.5 overflow-hidden rounded-full border border-border bg-surface-muted"
+                        role="progressbar"
+                        aria-label="Quilometragem até a próxima revisão"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="{{ $odometerValue }}"
+                        aria-valuetext="{{ $odometerText }}"
+                    >
+                        <div @class(['h-full rounded-full', 'bg-danger' => $isOverdue, 'bg-primary' => ! $isOverdue]) style="width: {{ $odometerValue }}%"></div>
                     </div>
-                    <p class="mt-2 text-sm {{ $isOverdue ? 'font-medium text-red-600' : 'text-automotive-600' }}">
-                        @if($isOverdue)
-                            Revisão estimada em {{ number_format((int) $nextDue, 0, ',', '.') }} km — em atraso
-                        @else
-                            Faltam {{ number_format((int) $remaining, 0, ',', '.') }} km para {{ number_format((int) $nextDue, 0, ',', '.') }} km
-                            @if($progress !== null)
-                                <span class="text-automotive-400">({{ number_format((float) $progress, 0, ',', '.') }}% do intervalo)</span>
-                            @endif
+                    <p @class(['mt-2 text-sm', 'font-medium text-danger' => $isOverdue, 'text-muted-foreground' => ! $isOverdue])>
+                        {{ $odometerText }}
+                        @if (! $isOverdue && $progress !== null)
+                            <span class="text-muted-foreground">({{ number_format((float) $progress, 0, ',', '.') }}% do intervalo)</span>
                         @endif
                     </p>
                 </div>
             @endif
         </div>
 
-        <div class="overflow-x-auto px-6 py-6">
-            <div
-                class="relative grid min-w-full gap-2"
-                style="grid-template-columns: repeat({{ $eventCount }}, minmax(148px, 1fr));"
-                data-timeline-grid
-            >
+        <div data-ui-tabs data-timeline-tabs>
+            <div class="relative overflow-x-auto px-4 py-4 sm:px-6 data-[overflow=true]:[mask-image:linear-gradient(to_right,transparent,black_1.5rem,black_calc(100%-1.5rem),transparent)]" data-timeline-scroller>
                 <div
-                    class="pointer-events-none absolute left-[calc(100%/(2*{{ $eventCount }}))] right-[calc(100%/(2*{{ $eventCount }}))] top-8 z-0 h-0.5 bg-automotive-300"
-                    aria-hidden="true"
-                ></div>
-                <div
-                    class="pointer-events-none absolute top-8 z-[1] h-0.5 bg-wrench-500 transition-all duration-300"
-                    style="left: calc(100% / (2 * {{ $eventCount }})); width: calc((100% - (100% / {{ $eventCount }})) * {{ $timelineProgressPercent / 100 }});"
-                    data-timeline-progress
-                    data-track-index="{{ $trackCurrentIndex }}"
-                    data-track-percent="{{ $timelineProgressPercent }}"
-                    aria-hidden="true"
-                ></div>
+                    id="{{ $idPrefix }}-colunas"
+                    role="tablist"
+                    aria-label="Eventos da linha do tempo, do mais antigo ao mais recente"
+                    aria-orientation="horizontal"
+                    class="--prevent-on-load-init relative grid min-w-full auto-cols-[minmax(9.5rem,1fr)] grid-flow-col gap-2"
+                    data-timeline-grid
+                    data-visible-count="{{ $visibleCount }}"
+                >
+                    <div
+                        class="pointer-events-none absolute top-[3.375rem] z-0 h-0.5 bg-border-strong"
+                        style="left: calc(100% / (2 * {{ $visibleCount }})); right: calc(100% / (2 * {{ $visibleCount }}));"
+                        aria-hidden="true"
+                        data-timeline-rail
+                    ></div>
+                    <div
+                        class="pointer-events-none absolute top-[3.375rem] z-[1] h-0.5 bg-primary"
+                        style="left: calc(100% / (2 * {{ $visibleCount }})); width: calc((100% - (100% / {{ $visibleCount }})) * {{ $trackPercent / 100 }});"
+                        aria-hidden="true"
+                        data-timeline-progress
+                        data-track-index="{{ $trackCurrentIndex }}"
+                        data-track-percent="{{ $trackPercent }}"
+                        @if ($timelineIsFiltered) hidden @endif
+                    ></div>
 
-                @foreach($displayEvents as $index => $event)
-                    @php
-                        $isUpcoming = ($event['type'] ?? '') === 'upcoming';
-                        $isSelected = $index === $defaultIndex;
-                        $itemsCount = (int) ($event['items_count'] ?? count($event['items'] ?? []));
-                    @endphp
-
-                    <button
-                        type="button"
-                        class="group relative z-[2] flex cursor-pointer flex-col items-center gap-1.5 px-2 text-center transition {{ $isUpcoming ? 'opacity-60' : '' }}"
-                        data-timeline-column
-                        data-index="{{ $index }}"
-                        aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
-                    >
-                        <span @class([
-                            'text-xs',
-                            'text-automotive-500' => ! $isUpcoming,
-                            'text-automotive-400' => $isUpcoming,
-                        ])>
-                            {{ isset($event['kilometers']) ? number_format((int) $event['kilometers'], 0, ',', '.') . ' km' : '—' }}
-                        </span>
-
-                        @if($isUpcoming)
-                            <span class="box-border h-4 w-4 rounded-full border-2 border-dashed border-automotive-400 bg-white"></span>
-                        @elseif(($event['type'] ?? '') === 'maintenance')
-                            <x-provenance-marker :event="$event" size="lg" />
-                        @elseif($isSelected)
-                            <span class="box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500"></span>
-                        @elseif($index <= $trackCurrentIndex)
-                            <span class="box-border h-4 w-4 rounded-full border-2 border-wrench-500 bg-wrench-500"></span>
-                        @else
-                            <span class="box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white"></span>
-                        @endif
-
-                        @if(! empty($event['date']))
-                            <span @class([
-                                'text-[11px]',
-                                'font-medium text-wrench-600' => $isSelected && ! $isUpcoming,
-                                'text-automotive-500' => ! $isSelected || $isUpcoming,
-                            ]) data-column-date>
-                                {{ \Carbon\Carbon::parse($event['date'])->format('d/m/Y') }}
-                            </span>
-                        @elseif($isUpcoming)
-                            <span class="text-[11px] text-automotive-400">Agendado</span>
-                        @endif
-
-                        <span @class([
-                            'text-sm leading-snug',
-                            'font-medium text-automotive-900' => ! $isUpcoming,
-                            'font-medium text-automotive-500' => $isUpcoming,
-                            'font-semibold' => $isSelected && ! $isUpcoming,
-                        ]) data-column-title>
-                            {{ $event['label'] ?? 'Evento' }}
-                        </span>
-
-                        @if($isUpcoming)
-                            <span class="text-xs text-automotive-400">
-                                ~{{ number_format((int) ($event['kilometers_remaining'] ?? $remaining ?? 0), 0, ',', '.') }} km restantes
-                            </span>
-                        @else
-                            <span class="text-xs text-automotive-600" data-column-total>
-                                R$ {{ number_format((float) ($event['total_amount'] ?? 0), 2, ',', '.') }}
-                            </span>
-                            <span class="text-[11px] text-automotive-500" data-column-meta>
-                                {{ $itemsCount }} {{ $itemsCount === 1 ? 'item' : 'itens' }}
-                                @if($event['has_invoice'] ?? false)
-                                    · NF
+                    @foreach ($displayEvents as $eventIndex => $event)
+                        @php
+                            $eventType = (string) ($event['type'] ?? '');
+                            $isUpcoming = $eventType === 'upcoming';
+                            $isMaintenance = $eventType === 'maintenance';
+                            $isSelected = $eventIndex === $selectedIndex;
+                            $isVisible = in_array($eventIndex, $visibleIndexes, true);
+                            $isReached = ! $isUpcoming && $eventIndex <= $trackCurrentIndex;
+                            $eventVerified = (bool) ($event['is_verified'] ?? false);
+                            $itemsCount = (int) ($event['items_count'] ?? count($event['items'] ?? []));
+                            $panelId = $idPrefix.'-evento-'.$eventIndex;
+                            $eventDate = $formatDate($event['date'] ?? null);
+                        @endphp
+                        <button
+                            type="button"
+                            role="tab"
+                            id="{{ $panelId }}-aba"
+                            aria-controls="{{ $panelId }}"
+                            aria-selected="{{ $isSelected ? 'true' : 'false' }}"
+                            tabindex="{{ $isSelected ? '0' : '-1' }}"
+                            data-ui-tab="{{ $panelId }}"
+                            data-timeline-column
+                            data-index="{{ $eventIndex }}"
+                            data-event-type="{{ $eventType }}"
+                            @if ($isMaintenance) data-verified="{{ $eventVerified ? '1' : '0' }}" @endif
+                            @unless ($isVisible) hidden disabled @endunless
+                            class="group relative z-[2] flex min-w-0 cursor-pointer flex-col items-center gap-1.5 rounded-control px-2 pt-2 pb-3 text-center transition-colors duration-fast ease-smooth-out hover:bg-surface-muted/60 aria-selected:bg-accent/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+                        >
+                            <span class="h-4 text-xs leading-4 text-muted-foreground tabular-nums">{{ isset($event['kilometers']) ? $formatKm($event['kilometers']) : '—' }}</span>
+                            <span class="flex h-12 items-center justify-center" data-timeline-marker>
+                                @if ($isMaintenance)
+                                    <span class="inline-flex rounded-full ring-offset-2 ring-offset-surface group-aria-selected:ring-2 group-aria-selected:ring-ring">
+                                        <x-provenance-marker :event="$event" size="lg" />
+                                    </span>
+                                    <span class="sr-only">{{ $eventVerified ? 'Selo da oficina' : 'Declarada' }}</span>
+                                @elseif ($isUpcoming)
+                                    <span class="box-border size-4 rounded-full border-2 border-dashed border-input bg-surface" aria-hidden="true"></span>
+                                @else
+                                    <span @class([
+                                        'box-border size-4 rounded-full border-2 group-aria-selected:size-5 group-aria-selected:ring-2 group-aria-selected:ring-ring group-aria-selected:ring-offset-2',
+                                        'border-primary bg-primary' => $isReached,
+                                        'border-input bg-surface' => ! $isReached,
+                                    ]) aria-hidden="true"></span>
                                 @endif
                             </span>
-                        @endif
-                    </button>
-                @endforeach
+                            <span class="text-xs text-muted-foreground tabular-nums group-aria-selected:font-medium group-aria-selected:text-link" data-column-date>{{ $eventDate ?? ($isUpcoming ? 'Estimada' : '—') }}</span>
+                            <span @class([
+                                'text-sm leading-snug group-aria-selected:font-semibold',
+                                'font-medium text-foreground' => ! $isUpcoming,
+                                'font-medium text-muted-foreground' => $isUpcoming,
+                            ]) data-column-title>{{ $event['label'] ?? 'Evento' }}</span>
+                            @if ($isUpcoming)
+                                <span class="text-xs text-muted-foreground tabular-nums">~{{ $formatKm($event['kilometers_remaining'] ?? $remaining ?? 0) }} restantes</span>
+                            @elseif ($isMaintenance)
+                                <span class="text-xs text-muted-foreground tabular-nums" data-column-total>{{ $formatMoney($event['total_amount'] ?? 0) }}</span>
+                                <span class="text-xs text-muted-foreground" data-column-meta>{{ $itemsCount }} {{ $itemsCount === 1 ? 'item' : 'itens' }}@if ($event['has_invoice'] ?? false) · NF-e @endif</span>
+                            @endif
+                        </button>
+                    @endforeach
+                </div>
             </div>
-        </div>
+            @if (count($visibleIndexes) > 2)
+                <p class="px-4 pb-3 text-xs text-muted-foreground sm:hidden">Deslize para o lado para ver todos os eventos.</p>
+            @endif
 
-        @if($defaultEvent)
-            <div class="border-t border-automotive-200 px-6 py-5" data-timeline-detail>
-                <p class="text-[11px] font-medium uppercase tracking-wider text-automotive-500">Detalhes</p>
-                <h3 class="mt-3 text-lg font-medium text-automotive-900" data-detail-title>
-                    {{ $defaultEvent['label'] ?? 'Evento' }}
-                </h3>
+            @foreach ($displayEvents as $eventIndex => $event)
+                @php
+                    $eventType = (string) ($event['type'] ?? '');
+                    $isUpcoming = $eventType === 'upcoming';
+                    $isMaintenance = $eventType === 'maintenance';
+                    $eventVerified = (bool) ($event['is_verified'] ?? false);
+                    $panelId = $idPrefix.'-evento-'.$eventIndex;
+                    $eventDate = $formatDate($event['date'] ?? null);
+                    $eventItems = $event['items'] ?? [];
+                    $generalWarranty = $event['general_warranty'] ?? null;
+                    $detailUrl = $eventUrl($event);
+                @endphp
+                <div
+                    id="{{ $panelId }}"
+                    role="tabpanel"
+                    aria-labelledby="{{ $panelId }}-aba"
+                    tabindex="0"
+                    data-ui-tab-panel
+                    data-timeline-panel
+                    @unless ($eventIndex === $selectedIndex) hidden @endunless
+                    class="border-t border-border px-4 py-5 sm:px-6 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+                >
+                    <p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">Detalhes</p>
+                    <{{ $timelinePanelHeadingTag }} class="mt-2 text-lg font-semibold text-foreground" data-detail-title>{{ $event['label'] ?? 'Evento' }}</{{ $timelinePanelHeadingTag }}>
 
-                <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-lg bg-automotive-50 px-3 py-3">
-                        <p class="text-[11px] text-automotive-500">Data</p>
-                        <p class="mt-1 text-sm font-medium text-automotive-900" data-detail-date>
-                            {{ ! empty($defaultEvent['date']) ? \Carbon\Carbon::parse($defaultEvent['date'])->format('d/m/Y') : '—' }}
-                        </p>
-                    </div>
-                    <div class="rounded-lg bg-automotive-50 px-3 py-3">
-                        <p class="text-[11px] text-automotive-500">Quilometragem</p>
-                        <p class="mt-1 text-sm font-medium text-automotive-900" data-detail-km>
-                            {{ isset($defaultEvent['kilometers']) ? number_format((int) $defaultEvent['kilometers'], 0, ',', '.') . ' km' : '—' }}
-                        </p>
-                    </div>
-                    <div class="rounded-lg bg-automotive-50 px-3 py-3">
-                        <p class="text-[11px] text-automotive-500">Total em itens</p>
-                        <p class="mt-1 text-sm font-medium text-wrench-600" data-detail-total>
-                            @if(($defaultEvent['type'] ?? '') === 'upcoming')
-                                —
-                            @else
-                                R$ {{ number_format((float) ($defaultEvent['total_amount'] ?? 0), 2, ',', '.') }}
+                    @if ($isMaintenance)
+                        <p class="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <x-ui.badge :variant="$eventVerified ? 'seal' : 'declared'">{{ $eventVerified ? 'Selo da oficina' : ($event['provenance_label'] ?? 'Declarada') }}</x-ui.badge>
+                            @if (filled($event['workshop_name'] ?? null))
+                                <span data-detail-workshop>{{ $event['workshop_name'] }}</span>
                             @endif
                         </p>
-                    </div>
-                </div>
+                    @endif
 
-                @if(! empty($defaultEvent['workshop_name']))
-                    <p class="mt-3 text-sm text-automotive-600" data-detail-workshop>{{ $defaultEvent['workshop_name'] }}</p>
-                @else
-                    <p class="mt-3 hidden text-sm text-automotive-600" data-detail-workshop></p>
-                @endif
-
-                <div class="mt-4 overflow-hidden rounded-lg" data-detail-items>
-                    @forelse($defaultEvent['items'] ?? [] as $itemIndex => $item)
-                        @if($itemIndex > 0)
-                            <div class="h-px bg-automotive-200" aria-hidden="true"></div>
-                        @endif
-                        <div class="flex items-start justify-between gap-4 bg-automotive-50 px-3 py-2.5">
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium text-automotive-900">{{ $item['name'] }}</p>
-                                <p class="text-xs text-automotive-500">{{ $item['quantity'] }}x</p>
-                                @if(($item['has_warranty'] ?? false) && ! empty($item['warranty_starts_at']) && ! empty($item['warranty_ends_at']))
-                                    <div class="mt-1 flex flex-wrap items-center gap-2">
-                                        <span @class([
-                                            'badge',
-                                            'badge-green' => $item['is_under_warranty'] ?? false,
-                                            'badge-orange' => ! ($item['is_under_warranty'] ?? false),
-                                        ])>
-                                            {{ ($item['is_under_warranty'] ?? false) ? 'Em garantia' : 'Garantia encerrada' }}
-                                        </span>
-                                        <span class="text-xs text-automotive-600">
-                                            {{ \Carbon\Carbon::parse($item['warranty_starts_at'])->format('d/m/Y') }}
-                                            —
-                                            {{ \Carbon\Carbon::parse($item['warranty_ends_at'])->format('d/m/Y') }}
-                                        </span>
-                                    </div>
-                                @endif
-                            </div>
-                            <p class="shrink-0 text-sm text-automotive-900">
-                                R$ {{ number_format((float) ($item['total_price'] ?? 0), 2, ',', '.') }}
-                            </p>
+                    <dl class="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div class="rounded-control bg-surface-muted px-3 py-3">
+                            <dt class="text-xs text-muted-foreground">Data</dt>
+                            <dd class="mt-1 text-sm font-medium text-foreground tabular-nums" data-detail-date>{{ $eventDate ?? ($isUpcoming ? 'Estimada' : '—') }}</dd>
                         </div>
-                    @empty
-                        <div class="bg-automotive-50 px-3 py-4 text-center text-sm text-automotive-500">
-                            {{ ($defaultEvent['type'] ?? '') === 'upcoming'
-                                ? 'Marco estimado para a próxima revisão preventiva.'
-                                : 'Sem itens registrados.' }}
+                        <div class="rounded-control bg-surface-muted px-3 py-3">
+                            <dt class="text-xs text-muted-foreground">Quilometragem</dt>
+                            <dd class="mt-1 text-sm font-medium text-foreground tabular-nums" data-detail-km>{{ isset($event['kilometers']) ? $formatKm($event['kilometers']) : '—' }}</dd>
                         </div>
-                    @endforelse
-                </div>
-            </div>
-        @endif
-    </section>
+                        <div class="rounded-control bg-surface-muted px-3 py-3">
+                            <dt class="text-xs text-muted-foreground">Total em itens</dt>
+                            <dd class="mt-1 text-sm font-medium text-foreground tabular-nums" data-detail-total>{{ $isUpcoming ? '—' : $formatMoney($event['total_amount'] ?? 0) }}</dd>
+                        </div>
+                    </dl>
 
-    @push('scripts')
-        <script>
-            (() => {
-                const timeline = @json($displayEvents);
-                const eventCount = timeline.length;
-                const root = document.querySelector('[data-vehicle-timeline]');
-                if (!root) return;
+                    @if ($isUpcoming && filled($event['description'] ?? null))
+                        <p class="mt-4 text-sm text-muted-foreground">{{ $event['description'] }}</p>
+                    @endif
 
-                const title = root.querySelector('[data-detail-title]');
-                const date = root.querySelector('[data-detail-date]');
-                const km = root.querySelector('[data-detail-km]');
-                const total = root.querySelector('[data-detail-total]');
-                const workshop = root.querySelector('[data-detail-workshop]');
-                const items = root.querySelector('[data-detail-items]');
-                const formatMoney = (value) => new Intl.NumberFormat('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                }).format(value || 0);
+                    @if (is_array($generalWarranty))
+                        <p class="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <span class="font-medium text-foreground">Garantia do serviço</span>
+                            <x-ui.badge :variant="($generalWarranty['is_vigente'] ?? false) ? 'success' : 'neutral'" dot>{{ $generalWarranty['label'] ?? '' }}</x-ui.badge>
+                        </p>
+                    @endif
 
-                const formatKm = (value) => value == null
-                    ? '—'
-                    : `${new Intl.NumberFormat('pt-BR').format(value)} km`;
-
-                const formatDate = (value) => {
-                    if (!value) return '—';
-                    const [year, month, day] = value.split('-');
-                    return `${day}/${month}/${year}`;
-                };
-
-                const positionTimelineProgress = () => {
-                    const grid = root.querySelector('[data-timeline-grid]');
-                    const progress = root.querySelector('[data-timeline-progress]');
-                    const columns = root.querySelectorAll('[data-timeline-column]');
-
-                    if (!grid || !progress || columns.length < 2) {
-                        return;
-                    }
-
-                    const percent = Number(progress.dataset.trackPercent ?? 0);
-                    const first = columns[0];
-                    const last = columns[columns.length - 1];
-                    const firstCenter = first.offsetLeft + (first.offsetWidth / 2);
-                    const lastCenter = last.offsetLeft + (last.offsetWidth / 2);
-                    const ratio = Math.min(1, Math.max(0, percent / 100));
-
-                    progress.style.left = `${firstCenter}px`;
-                    progress.style.width = `${Math.max(0, lastCenter - firstCenter) * ratio}px`;
-                    progress.style.right = 'auto';
-                };
-
-                requestAnimationFrame(positionTimelineProgress);
-                window.addEventListener('resize', positionTimelineProgress);
-
-                const setSelectedStyles = (selectedIndex) => {
-                    root.querySelectorAll('[data-timeline-column]').forEach((column) => {
-                        const index = Number(column.dataset.index);
-                        const isSelected = index === selectedIndex;
-                        const isUpcoming = (timeline[index]?.type ?? '') === 'upcoming';
-                        const columnDate = column.querySelector('[data-column-date]');
-                        const columnTitle = column.querySelector('[data-column-title]');
-
-                        column.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
-
-                        const dot = column.querySelector('span.rounded-full');
-                        if (dot && ! isUpcoming) {
-                            if (isSelected) {
-                                dot.className = 'box-border h-5 w-5 rounded-full border-[3px] border-white bg-wrench-500 outline outline-[3px] outline-wrench-500';
-                            } else if (index <= {{ $trackCurrentIndex }}) {
-                                dot.className = 'box-border h-4 w-4 rounded-full border-2 border-wrench-500 bg-wrench-500';
-                            } else {
-                                dot.className = 'box-border h-4 w-4 rounded-full border-2 border-automotive-400 bg-white';
-                            }
-                        }
-
-                        if (columnDate && ! isUpcoming) {
-                            columnDate.classList.toggle('font-medium', isSelected);
-                            columnDate.classList.toggle('text-wrench-600', isSelected);
-                            columnDate.classList.toggle('text-automotive-500', ! isSelected);
-                        }
-
-                        if (columnTitle && ! isUpcoming) {
-                            columnTitle.classList.toggle('font-semibold', isSelected);
-                            columnTitle.classList.toggle('font-medium', ! isSelected);
-                        }
-                    });
-                };
-
-                const warrantyItemHtml = (item) => {
-                    if (! item?.has_warranty || ! item.warranty_starts_at || ! item.warranty_ends_at) {
-                        return '';
-                    }
-
-                    const badgeClass = item.is_under_warranty ? 'badge-green' : 'badge-orange';
-                    const label = item.is_under_warranty ? 'Em garantia' : 'Garantia encerrada';
-
-                    return `<div class="mt-1 flex flex-wrap items-center gap-2">
-                        <span class="badge ${badgeClass}">${label}</span>
-                        <span class="text-xs text-automotive-600">
-                            ${formatDate(item.warranty_starts_at)} — ${formatDate(item.warranty_ends_at)}
-                        </span>
-                    </div>`;
-                };
-
-                const renderItems = (event) => {
-                    if ((event.items || []).length) {
-                        items.innerHTML = event.items.map((item, itemIndex) => {
-                            const divider = itemIndex > 0
-                                ? '<div class="h-px bg-automotive-200" aria-hidden="true"></div>'
-                                : '';
-
-                            return `${divider}
-                                <div class="flex items-start justify-between gap-4 bg-automotive-50 px-3 py-2.5">
+                    @if ($eventItems !== [])
+                        <ul role="list" class="mt-4 divide-y divide-border overflow-hidden rounded-control border border-border" aria-label="Itens de {{ $event['label'] ?? 'evento' }}" data-detail-items>
+                            @foreach ($eventItems as $item)
+                                <li class="flex items-start justify-between gap-4 bg-surface px-3 py-2.5">
                                     <div class="min-w-0">
-                                        <p class="text-sm font-medium text-automotive-900">${item.name}</p>
-                                        <p class="text-xs text-automotive-500">${item.quantity}x</p>
-                                        ${warrantyItemHtml(item)}
+                                        <p class="text-sm font-medium text-foreground">{{ $item['name'] ?? '' }}</p>
+                                        <p class="text-xs text-muted-foreground tabular-nums">{{ $item['quantity'] ?? 1 }}x</p>
+                                        @if (($item['has_warranty'] ?? false) && ! empty($item['warranty_starts_at']) && ! empty($item['warranty_ends_at']))
+                                            <p class="mt-1 flex flex-wrap items-center gap-2">
+                                                <x-ui.badge size="sm" :variant="($item['is_under_warranty'] ?? false) ? 'success' : 'neutral'" dot>{{ ($item['is_under_warranty'] ?? false) ? 'Em garantia' : 'Garantia encerrada' }}</x-ui.badge>
+                                                <span class="text-xs text-muted-foreground tabular-nums">{{ $formatDate($item['warranty_starts_at']) }} a {{ $formatDate($item['warranty_ends_at']) }}</span>
+                                            </p>
+                                        @endif
                                     </div>
-                                    <p class="shrink-0 text-sm text-automotive-900">${formatMoney(item.total_price)}</p>
-                                </div>`;
-                        }).join('');
+                                    <p class="shrink-0 text-sm text-foreground tabular-nums">{{ $formatMoney($item['total_price'] ?? 0) }}</p>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="mt-4 rounded-control bg-surface-muted px-3 py-4 text-center text-sm text-muted-foreground" data-detail-items>
+                            {{ $isUpcoming ? 'Marco estimado para a próxima revisão preventiva.' : ($isMaintenance ? 'Sem itens registrados.' : 'Quilometragem informada no cadastro do veículo.') }}
+                        </p>
+                    @endif
 
-                        return;
-                    }
+                    @if ($detailUrl)
+                        <p class="mt-4">
+                            <x-ui.link :href="$detailUrl" arrow>Ver manutenção completa</x-ui.link>
+                        </p>
+                    @endif
+                </div>
+            @endforeach
+        </div>
 
-                    items.innerHTML = event.type === 'upcoming'
-                        ? '<div class="bg-automotive-50 px-3 py-4 text-center text-sm text-automotive-500">Marco estimado para a próxima revisão preventiva.</div>'
-                        : '<div class="bg-automotive-50 px-3 py-4 text-center text-sm text-automotive-500">Sem itens registrados.</div>';
-                };
-
-                root.querySelectorAll('[data-timeline-column]').forEach((column) => {
-                    column.addEventListener('click', () => {
-                        const event = timeline[Number(column.dataset.index)];
-                        if (! event) return;
-
-                        setSelectedStyles(Number(column.dataset.index));
-
-                        title.textContent = event.label || 'Evento';
-                        date.textContent = formatDate(event.date);
-                        km.textContent = formatKm(event.kilometers);
-                        total.textContent = event.type === 'upcoming' ? '—' : formatMoney(event.total_amount);
-
-                        if (event.workshop_name) {
-                            workshop.textContent = event.workshop_name;
-                            workshop.classList.remove('hidden');
-                        } else {
-                            workshop.textContent = '';
-                            workshop.classList.add('hidden');
-                        }
-
-                        renderItems(event);
-                    });
-                });
-            })();
-        </script>
-    @endpush
+        @isset($footer)
+            @if ($footer->hasActualContent())
+                <div {{ $footer->attributes->class(['border-t border-border px-4 py-4 sm:px-6'])->merge(['data-timeline-footer' => '']) }}>{{ $footer }}</div>
+            @endif
+        @endisset
+    </section>
 @endif

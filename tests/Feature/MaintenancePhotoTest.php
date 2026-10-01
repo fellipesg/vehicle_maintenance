@@ -22,7 +22,7 @@ class MaintenancePhotoTest extends TestCase
 
         $workshopUser = User::factory()->asWorkshop()->create();
         $workshop = $workshopUser->workshop;
-        $maintenance = Maintenance::factory()->create(['workshop_id' => $workshop->id]);
+        $maintenance = Maintenance::factory()->sealedByWorkshop()->create(['workshop_id' => $workshop->id]);
 
         $this->actingAsApiUser($workshopUser);
 
@@ -48,7 +48,7 @@ class MaintenancePhotoTest extends TestCase
 
         $workshopUser = User::factory()->asWorkshop()->create();
         $workshop = $workshopUser->workshop;
-        $maintenance = Maintenance::factory()->create(['workshop_id' => $workshop->id]);
+        $maintenance = Maintenance::factory()->sealedByWorkshop()->create(['workshop_id' => $workshop->id]);
 
         $this->actingAsApiUser($workshopUser);
 
@@ -81,6 +81,28 @@ class MaintenancePhotoTest extends TestCase
             'subject' => 'vehicle',
             'stage' => 'after',
         ])->assertForbidden();
+    }
+
+    /**
+     * Registro que o proprietário declarou citando a oficina (workshop_id, sem Selo da oficina)
+     * continua de quem declarou: a oficina não envia fotos para ele.
+     */
+    public function test_workshop_cannot_upload_photos_to_a_declared_record_that_cites_it(): void
+    {
+        Storage::fake('public');
+
+        $workshopUser = User::factory()->asWorkshop()->create();
+        $maintenance = Maintenance::factory()->declaredByOwner()->create(['workshop_id' => $workshopUser->workshop->id]);
+
+        $this->actingAsApiUser($workshopUser);
+
+        $this->postJson("/api/v1/maintenances/{$maintenance->id}/photos", [
+            'photo' => UploadedFile::fake()->image('declared.jpg'),
+            'subject' => 'vehicle',
+            'stage' => 'after',
+        ])->assertForbidden();
+
+        $this->assertSame(0, MaintenancePhoto::where('maintenance_id', $maintenance->id)->count());
     }
 
     public function test_public_vehicle_search_hides_before_photos(): void

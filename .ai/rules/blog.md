@@ -30,7 +30,16 @@ Quando `cover_photo_path` é nulo, card e hero renderizam `<x-blog.cover>`: SVG 
 Para acrescentar uma ilustração: registre a chave em `BlogCoverArt::SCENES` (rótulo em PT-BR, é o que aparece no select do admin), crie `resources/views/components/blog/art/<chave>.blade.php` recebendo `:art` e desenhe no viewBox 1200x630 — o `<svg>`, o fundo e o rótulo já vêm do cover. A cena é recuada (`translate(36,34) scale(0.94)`) para não colidir com o rótulo da categoria no canto superior esquerdo; deixe o topo-esquerdo livre. `BlogCoverArtTest` falha se a chave não tiver componente, e o admin só aceita chaves de `SCENES`.
 
 ## Mídia do card é 1200x630
-Foto e cena ocupam `aspect-[1200/630]` no card, para a grade não ficar com alturas diferentes quando só alguns posts têm foto. Não voltar para altura fixa (`h-52`) em um dos dois ramos.
+Foto e cena ocupam `aspect-[1200/630]` no card, para a grade não ficar com alturas diferentes quando só alguns posts têm foto. Não voltar para altura fixa (`h-52`) em um dos dois ramos. A foto aparece inteira (`object-contain` sobre `bg-surface-muted`) no card, no artigo e na prévia do admin: na proporção pedida (1200 × 630) ela preenche a moldura; fora dela nada é cortado. Não voltar para `object-cover` (a catraca DesignSystemGuardrailsTest está em zero).
+
+## Card do blog tem um link só
+`x-blog.card` tem um único link esticado (o título, `after:absolute after:inset-0`); a capa é decorativa (`alt=""` na foto, `decorative` no `x-blog.cover`) e a categoria fica clicável por cima com `relative z-10`. `heading-level` acompanha a página: `h3` dentro de uma seção com `h2` ("Leia também"), `h2` na listagem.
+
+## Leitura em coluna de 56ch
+O artigo e os documentos legais usam a coluna de leitura de `.blog-content`/`.doc-content` (app.css): `max-w-[56ch]` (~72 caracteres por linha na Inter; 68ch dava ~89), 17px no celular e 18px a partir de sm, entrelinha 1,8. O H1 vem sempre do `x-ui.page-header` (no artigo, o tamanho maior vai no slot title).
+
+## Imagem de compartilhamento vai pelo layout
+A capa do post vira og:image e twitter:image por `@section('og_image')` e `@section('og_image_alt')`; `layouts.app` repassa ao `<x-brand-head-icons include-og-image>`, que imprime uma vez só (sem a capa, a arte og-preview.png da marca). Nunca um segundo og:image em `@push('head')`: WhatsApp e Facebook usam o primeiro.
 
 ## SEO acompanha o post
 Alterações em blog.show devem manter canonical, og:*, JSON-LD BlogPosting e o link do feed. O sitemap (/sitemap.xml) e o feed (/blog/feed) listam só posts publicados.

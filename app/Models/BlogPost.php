@@ -19,6 +19,11 @@ class BlogPost extends Model
 
     public const STATUS_PUBLISHED = 'published';
 
+    /**
+     * Situação só de filtro (não é gravada): publicado com published_at no futuro.
+     */
+    public const FILTER_SCHEDULED = 'scheduled';
+
     protected $fillable = [
         'blog_category_id',
         'author_id',
@@ -67,6 +72,17 @@ class BlogPost extends Model
         $query->where('status', self::STATUS_PUBLISHED)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
+    }
+
+    /**
+     * Published posts whose publication date is still in the future (agendados).
+     *
+     * @param  Builder<BlogPost>  $query
+     */
+    public function scopeScheduled(Builder $query): void
+    {
+        $query->where('status', self::STATUS_PUBLISHED)
+            ->where('published_at', '>', now());
     }
 
     public function isPublished(): bool

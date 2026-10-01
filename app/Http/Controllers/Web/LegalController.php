@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Support\LegalDocument;
 use Illuminate\View\View;
 
 class LegalController extends Controller
@@ -12,7 +13,9 @@ class LegalController extends Controller
         return view('legal.document', [
             'title' => 'Termos de uso',
             'version' => config('legal.terms_version'),
-            'content' => config('legal.terms_of_use'),
+            'document' => LegalDocument::fromText(config('legal.terms_of_use')),
+            'relatedDocument' => ['label' => 'Política de privacidade', 'url' => route('legal.privacy')],
+            'contactUrl' => route('contact.show'),
         ]);
     }
 
@@ -21,7 +24,9 @@ class LegalController extends Controller
         return view('legal.document', [
             'title' => 'Política de privacidade',
             'version' => config('legal.privacy_version'),
-            'content' => config('legal.privacy_policy'),
+            'document' => LegalDocument::fromText(config('legal.privacy_policy')),
+            'relatedDocument' => ['label' => 'Termos de uso', 'url' => route('legal.terms')],
+            'contactUrl' => route('contact.show', ['assunto' => 'privacy']),
         ]);
     }
 }

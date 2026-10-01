@@ -3,82 +3,85 @@
 @section('title', 'Notificações')
 
 @section('content')
-<div class="mx-auto max-w-3xl px-4 py-6">
-    <div class="mb-6 flex items-center justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-automotive-900">Notificações</h1>
-            <p class="mt-1 text-sm text-automotive-600">Lembretes de revisão e avisos do sistema</p>
-        </div>
-
-        @if(auth()->user()->unreadNotifications()->exists())
-            <form method="POST" action="{{ route('notifications.read-all') }}">
-                @csrf
-                <button type="submit" class="btn-secondary !py-2 !text-sm">Marcar todas como lidas</button>
-            </form>
-        @endif
-    </div>
-
-    <div class="card divide-y divide-automotive-100 !p-0">
-        @forelse($notifications as $notification)
-            @php
-                $data = $notification->data;
-                $title = $data['title'] ?? 'Notificação';
-                $body = $data['body'] ?? '';
-                $isUnread = $notification->read_at === null;
-                $vehicleUrl = is_string($data['vehicle_url'] ?? null) ? $data['vehicle_url'] : null;
-                $vehicleId = $data['vehicle_id'] ?? null;
-                $vehicleLink = is_numeric($vehicleId)
-                    ? route(auth()->user()->isGarage() ? 'garage.vehicles.show' : 'user.vehicles.show', (int) $vehicleId, absolute: false)
-                    : $vehicleUrl;
-            @endphp
-            @if($isUnread)
-                <form method="POST" action="{{ route('notifications.read', $notification->id) }}" class="block">
+<x-ui.container size="md" padded>
+    <x-ui.page-header title="Notificações" description="Lembretes de revisão e avisos da sua conta.">
+        @if($unreadCount > 0)
+            <x-slot:actions>
+                <form method="POST" action="{{ route('notifications.read-all') }}">
                     @csrf
-                    <button type="submit" class="flex w-full items-start gap-3 px-4 py-4 text-left transition hover:bg-automotive-50 {{ $isUnread ? 'bg-wrench-50/40' : '' }}">
-                        <div class="mt-1 h-2 w-2 shrink-0 rounded-full bg-wrench-500"></div>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm font-medium text-automotive-900">{{ $title }}</p>
-                            @if($body !== '')
-                                <p class="mt-1 text-sm text-automotive-600">{{ $body }}</p>
-                            @endif
-                            <p class="mt-2 text-xs text-automotive-400">{{ $notification->created_at->format('d/m/Y H:i') }}</p>
-                            <p class="mt-1 text-xs font-medium text-wrench-600">Ver veículo →</p>
-                        </div>
-                    </button>
+                    <x-ui.button type="submit" variant="secondary" icon="check" class="max-sm:w-full">Marcar todas como lidas</x-ui.button>
                 </form>
-            @elseif($vehicleLink)
-                <a href="{{ $vehicleLink }}" class="flex items-start gap-3 px-4 py-4 transition hover:bg-automotive-50">
-                    <div class="mt-1 h-2 w-2 shrink-0 rounded-full bg-transparent"></div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-medium text-automotive-900">{{ $title }}</p>
-                        @if($body !== '')
-                            <p class="mt-1 text-sm text-automotive-600">{{ $body }}</p>
-                        @endif
-                        <p class="mt-2 text-xs text-automotive-400">{{ $notification->created_at->format('d/m/Y H:i') }}</p>
-                        <p class="mt-1 text-xs font-medium text-wrench-600">Ver veículo →</p>
-                    </div>
-                </a>
-            @else
-                <div class="flex items-start gap-3 px-4 py-4">
-                    <div class="mt-1 h-2 w-2 shrink-0 rounded-full bg-transparent"></div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-medium text-automotive-900">{{ $title }}</p>
-                        @if($body !== '')
-                            <p class="mt-1 text-sm text-automotive-600">{{ $body }}</p>
-                        @endif
-                        <p class="mt-2 text-xs text-automotive-400">{{ $notification->created_at->format('d/m/Y H:i') }}</p>
-                    </div>
-                </div>
-            @endif
-        @empty
-            <p class="px-4 py-10 text-center text-sm text-automotive-500">Nenhuma notificação ainda.</p>
-        @endforelse
-    </div>
+            </x-slot:actions>
+        @endif
+    </x-ui.page-header>
 
-    @if($notifications->hasPages())
-        <div class="mt-4">
-            {{ $notifications->links() }}
-        </div>
+    @if($notifications->isEmpty())
+        <x-ui.empty-state
+            icon="bell"
+            heading-level="h2"
+            title="Nenhuma notificação ainda"
+            description="Lembretes de revisão e avisos da sua conta aparecem aqui."
+        />
+    @else
+        <ul role="list" class="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface shadow-xs" data-notification-list>
+            @foreach($notifications as $notification)
+                @php
+                    $notificationData = (array) $notification->data;
+                    $notificationTitle = is_string($notificationData['title'] ?? null) && $notificationData['title'] !== '' ? $notificationData['title'] : 'Notificação';
+                    $notificationBody = is_string($notificationData['body'] ?? null) ? $notificationData['body'] : '';
+                    $notificationIsUnread = $notification->read_at === null;
+                    $notificationVehicleUrl = \App\Support\NotificationLink::vehicleUrl($notificationData, auth()->user());
+                    // Não lida: botão que marca como lida (e abre o veículo, se houver). Lida: link
+                    // para o veículo, ou só o texto.
+                    $notificationTag = $notificationIsUnread ? 'button' : ($notificationVehicleUrl !== null ? 'a' : 'div');
+                @endphp
+                <li @if($notificationIsUnread) data-unread @endif>
+                    @if($notificationIsUnread)
+                        <form method="POST" action="{{ route('notifications.read', $notification->id) }}">
+                            @csrf
+                    @endif
+                    <{{ $notificationTag }}
+                        @if($notificationTag === 'button') type="submit" @endif
+                        @if($notificationTag === 'a') href="{{ $notificationVehicleUrl }}" @endif
+                        @class([
+                            'flex w-full items-start gap-3 px-4 py-4 text-left',
+                            'transition-colors duration-fast hover:bg-surface-muted motion-reduce:transition-none' => $notificationTag !== 'div',
+                            'bg-accent' => $notificationIsUnread,
+                        ])
+                    >
+                        <span aria-hidden="true" @class(['mt-1.5 size-2 shrink-0 rounded-full', 'bg-primary' => $notificationIsUnread])></span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block text-sm font-medium text-foreground">
+                                @if($notificationIsUnread)<span class="sr-only">Não lida: </span>@endif{{ $notificationTitle }}
+                            </span>
+                            @if($notificationBody !== '')
+                                <span class="mt-1 block text-sm text-muted-foreground">{{ $notificationBody }}</span>
+                            @endif
+                            <span class="mt-2 block text-xs text-muted-foreground">
+                                <time datetime="{{ $notification->created_at->toIso8601String() }}">{{ \App\Support\DisplayTime::local($notification->created_at)->format('d/m/Y H:i') }}</time>
+                            </span>
+                            @if($notificationVehicleUrl !== null)
+                                <span class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-link">
+                                    Ver veículo
+                                    <x-ui.icon name="arrow-right" class="size-3.5" />
+                                </span>
+                            @elseif($notificationIsUnread)
+                                <span class="mt-1 block text-xs font-medium text-link">Marcar como lida</span>
+                            @endif
+                        </span>
+                    </{{ $notificationTag }}>
+                    @if($notificationIsUnread)
+                        </form>
+                    @endif
+                </li>
+            @endforeach
+        </ul>
+
+        @if($notifications->hasPages())
+            <div class="mt-4">
+                {{ $notifications->links() }}
+            </div>
+        @endif
     @endif
-</div>
+</x-ui.container>
 @endsection
