@@ -11,6 +11,7 @@ use App\Models\Vehicle;
 use App\Models\Workshop;
 use App\Rules\InvoiceFile;
 use App\Services\Maintenance\MaintenanceVerificationStamper;
+use App\Services\Vehicle\VehicleConsignmentService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Support\Maintenance\MaintenanceListFilters;
 use App\Support\Vehicle\MaintenanceMileageContext;
@@ -44,7 +45,7 @@ class MaintenanceController extends Controller
 
     /**
      * Lista o histórico dos veículos do estoque (Selo da oficina, declaradas por donos anteriores e as do
-     * lojista), só onde ele pode ver o histórico: dono atual ou consignação com procuração aprovada.
+     * lojista), só onde ele pode ver o histórico: dono atual ou consignação com o histórico liberado.
      * "Registradas por mim" filtra pelo autor do registro, inclusive em veículos que já saíram do estoque.
      * O filtro "veiculo" (x-maintenance.list) recorta um veículo do estoque.
      */
@@ -90,8 +91,9 @@ class MaintenanceController extends Controller
     {
         $user = $request->user();
 
-        // Registrar manutenção move o hodômetro, então só o dono atual pode (VehiclePolicy::addMaintenance).
-        // Consignação fica fora do select e a tela explica o motivo.
+        // Registrar manutenção move o hodômetro, então fica com quem está com o carro na mão: o dono
+        // atual e a loja que declarou a consignação (VehiclePolicy::addMaintenance). Só a consignação
+        // que o proprietário contestou sai do select, e a tela explica o motivo.
         [$vehicles, $consignmentVehicles] = $user->stockVehicles()
             ->with(['maintenances' => fn ($query) => $query->select(MaintenanceMileageContext::COLUMNS)])
             ->orderBy('vehicles.brand')
@@ -160,6 +162,8 @@ class MaintenanceController extends Controller
             $data['maintenance_date'],
         );
 
+        $consignment = app(VehicleConsignmentService::class)->activeFor($request->user(), $vehicle);
+
         $result = $this->storeMaintenanceWithInvoices(
             $request,
             function () use ($data, $request) {
@@ -173,6 +177,12 @@ class MaintenanceController extends Controller
                 return $maintenance;
             },
         );
+
+        // O proprietário de um veículo em consignação é avisado de cada manutenção: é isso que
+        // sustenta a declaração do lojista, no lugar da procuração.
+        if ($consignment !== null) {
+            app(VehicleConsignmentService::class)->announceMaintenance($consignment, $result['maintenance']);
+        }
 
         // Quem começou pela ficha volta a ela, com a manutenção nova em destaque (:target do card).
         $redirect = $returnsToVehicle

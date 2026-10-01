@@ -4,7 +4,7 @@ namespace Tests\Feature\Web;
 
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessGrant;
+use App\Models\VehicleConsignment;
 use App\Support\AppStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -28,7 +28,7 @@ class GarageStockConsignmentTest extends TestCase
         $this->garage = User::factory()->asGarage()->create();
     }
 
-    public function test_pending_consignment_appears_in_stock_with_status_and_without_detail_link(): void
+    public function test_pending_consignment_appears_in_stock_with_status_and_detail_link(): void
     {
         $vehicle = $this->consignedVehicle('pending', ['brand' => 'Fiat', 'model' => 'Toro']);
 
@@ -37,10 +37,11 @@ class GarageStockConsignmentTest extends TestCase
             ->assertOk()
             ->assertSee('Fiat Toro')
             ->assertSee('Consignação')
-            ->assertSee('Procuração em análise')
+            ->assertSee('Histórico aguardando liberação')
             ->assertSee('data-consignment-status="pending"', false)
-            ->assertSee('O histórico do veículo abre aqui quando a análise for concluída.')
-            ->assertDontSee('href="'.route('garage.vehicles.show', $vehicle).'"', false);
+            ->assertSee('O histórico abre aqui quando o proprietário liberar ou a equipe aprovar a procuração.')
+            // A consignação declarada abre o veículo: é nele que a loja registra as manutenções.
+            ->assertSee('href="'.route('garage.vehicles.show', $vehicle).'"', false);
     }
 
     public function test_rejected_consignment_shows_review_notes_and_resend_action(): void
@@ -50,36 +51,34 @@ class GarageStockConsignmentTest extends TestCase
         $this->actingAs($this->garage)
             ->get(route('garage.vehicles.index'))
             ->assertOk()
-            ->assertSee('Procuração recusada')
+            ->assertSee('Pedido de histórico recusado')
             ->assertSee('data-consignment-status="rejected"', false)
             ->assertSee('Procuração sem firma reconhecida.')
-            ->assertSee('Reenviar procuração')
-            ->assertSee('href="'.route('garage.vehicles.create').'"', false);
+            ->assertSee('Pedir liberação ao proprietário');
 
-        // O link vai direto ao assistente "Adicionar ao estoque" (/vincular só redireciona para ele).
+        // A nova tentativa é pedir ao proprietário, na ficha do veículo, não reenviar documento.
         $html = $this->actingAs($this->garage)->get(route('garage.vehicles.index'))->getContent();
-        $this->assertMatchesRegularExpression('#<a[^>]*href="'.preg_quote(route('garage.vehicles.create'), '#').'"[^>]*data-consignment-resend#', $html);
-        $this->assertStringNotContainsString('href="'.route('garage.vehicles.claim').'"', $html);
+        $this->assertMatchesRegularExpression('#<a[^>]*data-consignment-request#', $html);
     }
 
-    public function test_approved_consignment_opens_detail_without_register_revision_action(): void
+    public function test_approved_consignment_opens_detail_with_register_revision_action(): void
     {
         $vehicle = $this->consignedVehicle('approved');
 
         $this->actingAs($this->garage)
             ->get(route('garage.vehicles.index'))
             ->assertOk()
-            ->assertSee('Procuração aprovada')
+            ->assertSee('Histórico liberado')
             ->assertSee('href="'.route('garage.vehicles.show', $vehicle).'"', false)
-            ->assertDontSee('Reenviar procuração');
+            ->assertDontSee('Pedir liberação ao proprietário');
 
         $this->actingAs($this->garage)
             ->get(route('garage.vehicles.show', $vehicle))
             ->assertOk()
-            ->assertSee('Procuração aprovada')
-            ->assertSee('Veículo em consignação: só o proprietário registra manutenções.')
-            ->assertDontSee(route('garage.maintenances.create', ['vehicle_id' => $vehicle->id]), false)
-            ->assertDontSee('Registrar manutenção');
+            ->assertSee('Histórico liberado')
+            ->assertSee('Veículo em consignação')
+            ->assertSee('href="'.e(route('garage.maintenances.create', ['vehicle_id' => $vehicle->id])).'"', false)
+            ->assertSee('Registrar manutenção');
     }
 
     public function test_owned_stock_vehicle_detail_keeps_register_revision_action(): void
@@ -105,28 +104,42 @@ class GarageStockConsignmentTest extends TestCase
             ->assertOk()
             ->assertSee('Honda Civic')
             ->assertSee('Fiat Toro')
-            ->assertSee('Procuração em análise')
+            ->assertSee('Histórico aguardando liberação')
             ->assertSee('1 em consignação')
             ->assertSee('data-attention="consignment_pending"', false)
-            ->assertDontSee('href="'.route('garage.vehicles.show', $consigned).'"', false)
+            ->assertSee('href="'.route('garage.vehicles.show', $consigned).'"', false)
             ->getContent();
 
         $this->assertMatchesRegularExpression('/data-stat="vehicles".*?data-slot="stat-value"[^>]*>\s*2\s*</s', $html);
     }
 
-    public function test_revision_form_lists_owned_stock_and_explains_why_consignment_is_missing(): void
+    public function test_revision_form_lists_owned_stock_and_consignments(): void
     {
         $owned = $this->ownedVehicle(['license_plate' => 'OWN1A23']);
-        $this->consignedVehicle('approved', ['license_plate' => 'CSG2B34']);
+        $consigned = $this->consignedVehicle('approved', ['license_plate' => 'CSG2B34']);
 
         $this->actingAs($this->garage)
             ->get(route('garage.maintenances.create'))
             ->assertOk()
             ->assertSee('value="'.$owned->id.'"', false)
             ->assertSee('OWN1A23')
+            ->assertSee('value="'.$consigned->id.'"', false)
+            ->assertSee('CSG2B34')
+            ->assertDontSee('data-consignment-note', false);
+    }
+
+    public function test_revision_form_hides_a_consignment_the_owner_disputed(): void
+    {
+        $this->ownedVehicle(['license_plate' => 'OWN1A23']);
+        $disputed = $this->consignedVehicle('approved', ['license_plate' => 'CSG2B34']);
+        $disputed->activeConsignment->update(['owner_disputed_at' => now()]);
+
+        $this->actingAs($this->garage)
+            ->get(route('garage.maintenances.create'))
+            ->assertOk()
             ->assertDontSee('CSG2B34')
             ->assertSee('data-consignment-note', false)
-            ->assertSee('O veículo em consignação não aparece na lista: só o proprietário registra manutenções nele.');
+            ->assertSee('o proprietário contestou a consignação');
     }
 
     public function test_revision_form_without_consignment_has_no_consignment_note(): void
@@ -192,24 +205,24 @@ class GarageStockConsignmentTest extends TestCase
                     'crlv_verification' => ['parsed' => $this->crlvPreview()],
                 ],
             ])
-            ->post(route('garage.vehicles.consignment.store'), [
+            ->post(route('garage.vehicles.consignment.store'), $this->declaration([
                 'power_of_attorney' => UploadedFile::fake()->create('procuracao.pdf', 120, 'application/pdf'),
-            ])
+            ]))
             ->assertRedirect(route('garage.vehicles.index'))
-            ->assertSessionHas('success', 'Procuração enviada para análise. O veículo aparece no estoque como "Procuração em análise" até a aprovação.');
+            ->assertSessionHas('success', 'Veículo em consignação adicionado. Você já pode registrar manutenções; a procuração foi enviada para análise e o histórico anterior abre depois dela.');
 
-        $this->assertDatabaseHas('vehicle_access_grants', [
-            'user_id' => $this->garage->id,
+        $this->assertDatabaseHas('vehicle_consignments', [
+            'garage_user_id' => $this->garage->id,
             'vehicle_id' => $vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => 'pending',
+            'status' => 'active',
+            'history_access_status' => 'pending',
         ]);
 
         $this->actingAs($this->garage)
             ->get(route('garage.vehicles.index'))
             ->assertOk()
             ->assertSee('Honda Civic')
-            ->assertSee('Procuração em análise');
+            ->assertSee('Histórico aguardando liberação');
     }
 
     public function test_power_of_attorney_form_explains_the_review_steps(): void
@@ -219,8 +232,7 @@ class GarageStockConsignmentTest extends TestCase
             ->get(route('garage.vehicles.consignment'))
             ->assertOk()
             ->assertSee('data-consignment-steps', false)
-            ->assertSeeInOrder(['Envio:', 'Análise:', 'Histórico liberado:'])
-            ->assertSee('o veículo aparece no estoque como "Procuração em análise"', false);
+            ->assertSeeInOrder(['Agora:', 'Aviso ao proprietário:', 'Histórico anterior:']);
     }
 
     public function test_new_vehicle_registered_on_consignment_lands_on_stock_under_review(): void
@@ -242,11 +254,11 @@ class GarageStockConsignmentTest extends TestCase
                     'crlv_verification' => ['parsed' => $this->crlvPreview()],
                 ],
             ])
-            ->post(route('garage.vehicles.consignment.store'), [
+            ->post(route('garage.vehicles.consignment.store'), $this->declaration([
                 'power_of_attorney' => UploadedFile::fake()->create('procuracao.pdf', 120, 'application/pdf'),
-            ])
+            ]))
             ->assertRedirect(route('garage.vehicles.index'))
-            ->assertSessionHas('success', 'Veículo adicionado em consignação. Ele aparece no estoque como "Procuração em análise" até a aprovação.');
+            ->assertSessionHas('success', 'Veículo em consignação adicionado. Você já pode registrar manutenções; a procuração foi enviada para análise e o histórico anterior abre depois dela.');
 
         $vehicle = Vehicle::where('license_plate', 'PHF9J95')->firstOrFail();
 
@@ -261,7 +273,7 @@ class GarageStockConsignmentTest extends TestCase
             ->get(route('garage.vehicles.index'))
             ->assertOk()
             ->assertSee('Honda Civic')
-            ->assertSee('Procuração em análise');
+            ->assertSee('Histórico aguardando liberação');
     }
 
     /**
@@ -298,6 +310,19 @@ class GarageStockConsignmentTest extends TestCase
     }
 
     /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function declaration(array $overrides = []): array
+    {
+        return array_merge([
+            'consignment_owner_name' => 'Rodrigo Sanches Devigo',
+            'consignment_owner_email' => 'rodrigo@example.com',
+            'consignment_declaration' => '1',
+        ], $overrides);
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     private function consignedVehicle(string $status, array $attributes = [], ?string $reviewNotes = null): Vehicle
@@ -316,11 +341,11 @@ class GarageStockConsignmentTest extends TestCase
             'ownership_type' => 'consignment',
         ]);
 
-        VehicleAccessGrant::create([
-            'user_id' => $this->garage->id,
+        VehicleConsignment::factory()->create([
             'vehicle_id' => $vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => $status,
+            'garage_user_id' => $this->garage->id,
+            'tenant_id' => $this->garage->tenant_id,
+            'history_access_status' => $status,
             'power_of_attorney_path' => 'procuracoes/teste.pdf',
             'review_notes' => $reviewNotes,
         ]);

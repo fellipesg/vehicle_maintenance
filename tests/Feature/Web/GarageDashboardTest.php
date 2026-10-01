@@ -92,13 +92,19 @@ class GarageDashboardTest extends TestCase
         );
 
         $rejectedItem = $this->garageElement($xpath, './li[@data-stock-vehicle="'.$rejected->id.'"]', $attention);
-        $this->assertStringContainsString('Procuração recusada', $this->garageText($rejectedItem));
-        $this->assertSame(route('garage.vehicles.create'), $this->garageElement($xpath, './/a[contains(., "Reenviar procuração")]', $rejectedItem)->getAttribute('href'));
-        $this->assertSame(0, $xpath->query('.//a[@href="'.route('garage.vehicles.show', $rejected).'"]', $rejectedItem)->length);
+        $this->assertStringContainsString('Pedido de histórico recusado', $this->garageText($rejectedItem));
+        $this->assertSame(
+            route('garage.vehicles.show', $rejected),
+            $this->garageElement($xpath, './/a[contains(., "Pedir liberação ao proprietário")]', $rejectedItem)->getAttribute('href'),
+        );
 
         $pendingItem = $this->garageElement($xpath, './li[@data-stock-vehicle="'.$pending->id.'"]', $attention);
-        $this->assertStringContainsString('Procuração em análise', $this->garageText($pendingItem));
-        $this->assertSame(0, $xpath->query('.//a', $pendingItem)->length);
+        $this->assertStringContainsString('Histórico aguardando liberação', $this->garageText($pendingItem));
+        // Pedido já enviado: o veículo abre, mas não há ação pendente para a loja.
+        $this->assertSame(
+            [route('garage.vehicles.show', $pending)],
+            array_map(fn ($link): string => $link->getAttribute('href'), iterator_to_array($xpath->query('.//a', $pendingItem))),
+        );
 
         $emptyItem = $this->garageElement($xpath, './li[@data-stock-vehicle="'.$withoutHistory->id.'"]', $attention);
         $this->assertSame(

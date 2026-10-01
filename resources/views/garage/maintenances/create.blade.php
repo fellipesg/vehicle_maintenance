@@ -34,8 +34,8 @@
         ? $workshop->name.MaintenanceController::WORKSHOP_LABEL_SEPARATOR.$workshop->city
         : $workshop->name;
     $consignmentNote = $consignmentVehicles->isEmpty() ? null : ($consignmentVehicles->count() === 1
-        ? 'O veículo em consignação não aparece na lista: só o proprietário registra manutenções nele.'
-        : 'Os '.$consignmentVehicles->count().' veículos em consignação não aparecem na lista: só o proprietário registra manutenções neles.');
+        ? 'Um veículo em consignação não aparece na lista: o proprietário contestou a consignação.'
+        : $consignmentVehicles->count().' veículos em consignação não aparecem na lista: o proprietário contestou a consignação deles.');
 @endphp
 
 @section('content')
@@ -48,7 +48,7 @@
 
         @if ($consignmentNote !== null)
             <x-ui.alert variant="info" class="mb-6" data-consignment-note>
-                {{ $consignmentNote }} O histórico fica na ficha do veículo quando a procuração é aprovada.
+                {{ $consignmentNote }} A equipe RevisaLog está analisando o caso.
             </x-ui.alert>
         @endif
 

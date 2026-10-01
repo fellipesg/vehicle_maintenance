@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessGrant;
+use App\Models\VehicleConsignment;
 use App\Services\User\DeleteUserAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -95,7 +95,9 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
         $dealer = $this->consignmentDealer($vehicle, 'pending');
 
         $this->actingAsApiUser($dealer);
-        $this->getJson("/api/v1/vehicles/{$vehicle->id}")->assertForbidden();
+        // A consignação declarada abre o veículo, mas não vale como posse: o vínculo continua
+        // exigindo placa e RENAVAM do documento.
+        $this->getJson("/api/v1/vehicles/{$vehicle->id}")->assertOk();
 
         $this->assertDocumentRequired($dealer, $vehicle->id);
         $this->assertDatabaseHas('user_vehicles', [
@@ -106,7 +108,7 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
         ]);
     }
 
-    public function test_consignment_dealer_cannot_link_to_edit_or_delete_what_it_declared(): void
+    public function test_consignment_dealer_cannot_link_but_still_corrects_what_it_declared(): void
     {
         $vehicle = $this->vehicle();
         $dealer = $this->consignmentDealer($vehicle, 'approved');
@@ -114,8 +116,28 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
 
         $this->actingAsApiUser($dealer);
 
-        $this->putJson("/api/v1/maintenances/{$maintenance->id}", ['description' => 'Alterada'])->assertForbidden();
+        // A loja corrige o que ela mesma declarou e ainda não tem selo de oficina...
+        $this->putJson("/api/v1/maintenances/{$maintenance->id}", ['description' => 'Alterada'])->assertOk();
+
+        // ...mas isso não vira posse: o vínculo continua exigindo o documento.
         $this->assertDocumentRequired($dealer, $vehicle->id);
+        $this->assertDatabaseMissing('user_vehicles', [
+            'user_id' => $dealer->id,
+            'vehicle_id' => $vehicle->id,
+            'is_current_owner' => true,
+        ]);
+    }
+
+    public function test_consignment_dealer_cannot_touch_what_the_owner_declared(): void
+    {
+        $vehicle = $this->vehicle();
+        $owner = User::factory()->asUser()->create();
+        $this->attachVehicleToUser($owner, $vehicle);
+        $dealer = $this->consignmentDealer($vehicle, 'approved');
+        $maintenance = $this->declaredBy($owner, $vehicle);
+
+        $this->actingAsApiUser($dealer);
+
         $this->putJson("/api/v1/maintenances/{$maintenance->id}", ['description' => 'Alterada'])->assertForbidden();
         $this->deleteJson("/api/v1/maintenances/{$maintenance->id}")->assertForbidden();
         $this->assertModelExists($maintenance);
@@ -210,11 +232,11 @@ class VehicleLinkRequiresOwnershipTest extends TestCase
             'tenant_id' => $dealer->tenant_id,
             'ownership_type' => 'consignment',
         ]);
-        VehicleAccessGrant::create([
-            'user_id' => $dealer->id,
+        VehicleConsignment::factory()->create([
             'vehicle_id' => $vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => $status,
+            'garage_user_id' => $dealer->id,
+            'tenant_id' => $dealer->tenant_id,
+            'history_access_status' => $status,
             'power_of_attorney_path' => 'procuracoes/teste.pdf',
         ]);
 

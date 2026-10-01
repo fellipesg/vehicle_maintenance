@@ -256,7 +256,7 @@ class VehicleController extends Controller
         $vehicle = Vehicle::findOrFail($id);
         Gate::authorize('viewMaintenances', $vehicle);
 
-        $maintenances = $vehicle->maintenances()
+        $maintenances = $vehicle->maintenancesVisibleTo($request->user())
             ->with(['items.warranty', 'generalWarranty', 'invoices', 'checklists', 'user', 'workshop', 'verifiedWorkshop'])
             ->withCount('invoices')
             ->when($request->has('verified'), function ($query) use ($request) {
@@ -276,7 +276,7 @@ class VehicleController extends Controller
     public function timeline(Request $request, string $id): JsonResponse
     {
         $vehicle = Vehicle::findOrFail($id);
-        Gate::authorize('view', $vehicle);
+        Gate::authorize('viewFullHistory', $vehicle);
 
         return ApiResponse::success(
             new TimelineResource(app(VehicleTimelineBuilder::class)->build($vehicle)),

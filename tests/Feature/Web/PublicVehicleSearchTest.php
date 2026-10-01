@@ -172,7 +172,7 @@ class PublicVehicleSearchTest extends TestCase
             ->assertOk()
             ->assertSee('encontrado por uma placa anterior'));
 
-        $alert = $this->element($page, '[data-slot="vehicle-search-result"] [data-slot="alert"]');
+        $alert = $this->element($page, '[data-slot="vehicle-search-result"] [data-slot="alert"]:not([data-ownership-unverified])');
         $this->assertSame('status', $alert->getAttribute('role'));
         $this->assertStringContainsString('A placa OLD5E67 pertenceu a este veículo até', $this->text($alert));
         $this->assertStringContainsString('Placa atual: CUR4D56.', $this->text($alert));

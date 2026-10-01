@@ -81,6 +81,18 @@ class VehicleEntryWizardTest extends TestCase
         $this->assertSame('Lendo CRLV-e…', $read->getAttribute('data-loading-label'));
         $this->assertSame('primary', $read->getAttribute('data-variant'));
 
+        if (! $flow->allowsManualEntry()) {
+            // No Lojista o CRLV-e é obrigatório: sem ele a loja se cadastraria como dona de um
+            // carro de terceiro, e é o documento que separa estoque próprio de consignação.
+            $this->assertNull($page->querySelector('details[data-vehicle-entry-manual]'));
+            $this->assertNotNull($page->querySelector('[data-manual-entry-blocked]'));
+
+            $this->assertStringNotContainsString('Vincular com CRLV-e', $page->body->textContent);
+            $this->assertNull($page->querySelector('a[href="'.route($prefix.'.vehicles.claim').'"]'), 'O vínculo não tem mais tela própria.');
+
+            return;
+        }
+
         $manual = $page->querySelector('details[data-vehicle-entry-manual]');
         $this->assertFalse($manual->hasAttribute('open'), 'O formulário manual começa recolhido.');
         $this->assertStringContainsString('preencher manualmente', $manual->querySelector('summary')->textContent);
@@ -126,7 +138,9 @@ class VehicleEntryWizardTest extends TestCase
         $this->assertSame('true', $file->getAttribute('aria-invalid'));
         $this->assertContains('crlv-error', explode(' ', (string) $file->getAttribute('aria-describedby')));
         $this->assertNotSame('', trim($page->querySelector('#crlv-error')->textContent));
-        $this->assertFalse($page->querySelector('details[data-vehicle-entry-manual]')->hasAttribute('open'), 'Erro do CRLV-e não abre o manual.');
+        if ($flow->allowsManualEntry()) {
+            $this->assertFalse($page->querySelector('details[data-vehicle-entry-manual]')->hasAttribute('open'), 'Erro do CRLV-e não abre o manual.');
+        }
     }
 
     public function test_missing_crlv_file_has_a_portuguese_message(): void
@@ -480,7 +494,7 @@ class VehicleEntryWizardTest extends TestCase
 
         $page = $this->page($this->actingAs($this->garage)->get(route('garage.vehicles.consignment'))->assertOk()->getContent());
 
-        $this->assertSingleH1($page, 'Enviar procuração');
+        $this->assertSingleH1($page, 'Veículo em consignação');
         $this->assertSame('Consignação', trim($page->querySelector('[data-slot="page-header-eyebrow"]')->textContent));
         $this->assertCurrentStep($page, 3, 4, 'Procuração');
 
@@ -493,14 +507,16 @@ class VehicleEntryWizardTest extends TestCase
         $this->assertStringContainsString('Honda Civic · 2016', $vehicle);
         $this->assertStringContainsString('PHF9J95', $vehicle);
         $this->assertStringContainsString('RODRIGO SANCHES DEVIGO · •••.528.458-••', $vehicle);
-        $this->assertStringContainsString('Novo: entra junto com a procuração', $vehicle);
+        $this->assertStringContainsString('Novo: entra junto com a consignação', $vehicle);
 
-        $form = $page->querySelector('form[data-vehicle-entry-form="power-of-attorney"]');
+        $form = $page->querySelector('form[data-vehicle-entry-form="consignment"]');
         $this->assertSame(route('garage.vehicles.consignment.store'), $form->getAttribute('action'));
         $file = $form->querySelector('input[type="file"][name="power_of_attorney"]');
-        $this->assertTrue($file->hasAttribute('required'));
+        $this->assertFalse($file->hasAttribute('required'), 'A procuração é opcional: a declaração já libera o registro de manutenções.');
         $this->assertStringContainsString('application/pdf', $file->getAttribute('accept'));
-        $this->assertSame('Enviando procuração…', $form->querySelector('button[type="submit"]:not([form])')->getAttribute('data-loading-label'));
+        $this->assertNotNull($form->querySelector('input[name="consignment_declaration"]'));
+        $this->assertNotNull($form->querySelector('input[name="consignment_owner_name"]'));
+        $this->assertSame('Salvando…', $form->querySelector('button[type="submit"]:not([form])')->getAttribute('data-loading-label'));
 
         $cancel = $form->querySelector('button[data-consignment-cancel]');
         $cancelForm = $page->getElementById($cancel->getAttribute('form'));
@@ -527,7 +543,7 @@ class VehicleEntryWizardTest extends TestCase
         $this->assertStringContainsString('Já cadastrado, com o histórico no chassi', $page->querySelector('[data-consignment-vehicle]')->textContent);
     }
 
-    public function test_sending_the_power_of_attorney_after_the_wizard_adds_the_vehicle_in_consignment(): void
+    public function test_declaring_the_consignment_after_the_wizard_adds_the_vehicle_in_consignment(): void
     {
         Storage::fake(AppStorage::diskName());
 
@@ -536,10 +552,13 @@ class VehicleEntryWizardTest extends TestCase
 
         $this->actingAs($this->garage)
             ->post(route('garage.vehicles.consignment.store'), [
+                'consignment_owner_name' => 'Rodrigo Sanches Devigo',
+                'consignment_owner_email' => 'rodrigo@example.com',
+                'consignment_declaration' => '1',
                 'power_of_attorney' => UploadedFile::fake()->create('procuracao.pdf', 120, 'application/pdf'),
             ])
             ->assertRedirect(route('garage.vehicles.index'))
-            ->assertSessionHas('success', 'Veículo adicionado em consignação. Ele aparece no estoque como "Procuração em análise" até a aprovação.')
+            ->assertSessionHas('success', 'Veículo em consignação adicionado. Você já pode registrar manutenções; a procuração foi enviada para análise e o histórico anterior abre depois dela.')
             ->assertSessionMissing('consignment_pending')
             ->assertSessionMissing('crlv_verification');
 
@@ -551,27 +570,45 @@ class VehicleEntryWizardTest extends TestCase
             'ownership_type' => 'consignment',
             'is_current_owner' => false,
         ]);
-        $this->assertDatabaseHas('vehicle_access_grants', [
-            'user_id' => $this->garage->id,
+        $this->assertDatabaseHas('vehicle_consignments', [
+            'garage_user_id' => $this->garage->id,
             'vehicle_id' => $vehicle->id,
-            'status' => 'pending',
+            'owner_name' => 'Rodrigo Sanches Devigo',
+            'owner_email' => 'rodrigo@example.com',
+            'status' => 'active',
+            'history_access_status' => 'pending',
         ]);
+    }
+
+    public function test_consignment_needs_the_declaration_and_a_contact_for_the_owner(): void
+    {
+        $this->actingAs($this->garage)->post(route('garage.vehicles.import-crlv'), ['crlv' => $this->crlvUpload()]);
+        $this->actingAs($this->garage)->post(route('garage.vehicles.store'), $this->hondaPayload());
+
+        $this->actingAs($this->garage)
+            ->post(route('garage.vehicles.consignment.store'), ['consignment_owner_name' => 'Rodrigo Sanches Devigo'])
+            ->assertSessionHasErrors([
+                'consignment_declaration' => 'Confirme que você tem autorização do proprietário para registrar manutenções.',
+                'consignment_owner_email' => 'Informe e-mail ou telefone do proprietário para podermos avisá-lo.',
+            ]);
+
+        $this->assertDatabaseCount('vehicle_consignments', 0);
     }
 
     public function test_power_of_attorney_must_be_a_pdf_up_to_ten_megabytes(): void
     {
         $this->actingAs($this->garage)
             ->withSession(['consignment_pending' => ['vehicle_id' => 1]])
-            ->post(route('garage.vehicles.consignment.store'), [
+            ->post(route('garage.vehicles.consignment.store'), $this->declarationPayload([
                 'power_of_attorney' => UploadedFile::fake()->create('procuracao.jpg', 120, 'image/jpeg'),
-            ])
+            ]))
             ->assertSessionHasErrors(['power_of_attorney' => 'A procuração precisa ser um arquivo PDF.']);
 
         $this->actingAs($this->garage)
             ->withSession(['consignment_pending' => ['vehicle_id' => 1]])
-            ->post(route('garage.vehicles.consignment.store'), [
+            ->post(route('garage.vehicles.consignment.store'), $this->declarationPayload([
                 'power_of_attorney' => UploadedFile::fake()->create('procuracao.pdf', 11 * 1024, 'application/pdf'),
-            ])
+            ]))
             ->assertSessionHasErrors(['power_of_attorney' => 'A procuração pode ter no máximo 10 MB.']);
     }
 
@@ -581,9 +618,9 @@ class VehicleEntryWizardTest extends TestCase
 
         $this->actingAs($this->garage)
             ->withSession(['consignment_pending' => ['vehicle_id' => 1]])
-            ->post(route('garage.vehicles.consignment.store'), [
+            ->post(route('garage.vehicles.consignment.store'), $this->declarationPayload([
                 'power_of_attorney' => UploadedFile::fake()->create('procuracao.pdf', 120, 'application/pdf'),
-            ])
+            ]))
             ->assertRedirect(route('garage.vehicles.create'))
             ->assertSessionHasErrors(['crlv' => 'A leitura do CRLV-e expirou. Envie o documento de novo.'])
             ->assertSessionMissing('consignment_pending');
@@ -626,7 +663,7 @@ class VehicleEntryWizardTest extends TestCase
             ->assertOk()
             ->getContent());
 
-        $this->assertSingleH1($page, 'Enviar procuração');
+        $this->assertSingleH1($page, 'Veículo em consignação');
         $this->assertSame('Documento em nome de outra pessoa', trim($page->querySelector('[data-slot="page-header-eyebrow"]')->textContent));
         $this->assertStringNotContainsString('estoque', $page->querySelector('[data-consignment-steps]')->textContent);
         $this->assertSame(route('user.vehicles.consignment.cancel'), $page->querySelector('form[method="POST"][hidden]')->getAttribute('action'));
@@ -678,6 +715,19 @@ class VehicleEntryWizardTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         VehicleEntryFlow::for(Portal::Workshop);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function declarationPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'consignment_owner_name' => 'Rodrigo Sanches Devigo',
+            'consignment_owner_email' => 'rodrigo@example.com',
+            'consignment_declaration' => '1',
+        ], $overrides);
     }
 
     private function flowFor(string $prefix): VehicleEntryFlow

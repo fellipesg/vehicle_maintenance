@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\VehicleConsignment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -93,13 +94,15 @@ class DashboardController extends Controller
             ->filter(fn (Vehicle $vehicle): bool => $user->holdsOnConsignment($vehicle) && ! $user->canViewStockVehicleHistory($vehicle))
             ->map(fn (Vehicle $vehicle): array => [
                 'vehicle' => $vehicle,
-                'reason' => match ($user->consignmentGrantFor($vehicle)?->status) {
-                    'pending' => 'consignment_pending',
-                    null => 'consignment_missing',
-                    default => 'consignment_rejected',
+                'reason' => match ($user->consignmentFor($vehicle)?->history_access_status) {
+                    VehicleConsignment::HISTORY_PENDING => 'consignment_pending',
+                    VehicleConsignment::HISTORY_REJECTED => 'consignment_rejected',
+                    default => 'consignment_missing',
                 },
-                'can_open' => false,
-                'can_add_maintenance' => false,
+                // A consignação declarada já abre o veículo e aceita manutenção; o que falta aqui
+                // é só o histórico anterior.
+                'can_open' => true,
+                'can_add_maintenance' => $user->consignmentFor($vehicle)?->allowsMaintenance() ?? false,
             ])
             ->sortBy(fn (array $item): int => $item['reason'] === 'consignment_pending' ? 1 : 0);
 

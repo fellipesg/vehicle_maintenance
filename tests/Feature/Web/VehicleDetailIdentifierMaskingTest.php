@@ -4,7 +4,7 @@ namespace Tests\Feature\Web;
 
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessGrant;
+use App\Models\VehicleConsignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -58,13 +58,19 @@ class VehicleDetailIdentifierMaskingTest extends TestCase
         $this->assertFull($this->actingAs($dealer)->get(route('garage.vehicles.show', $vehicle))->assertOk());
     }
 
-    public function test_owner_account_viewing_through_an_approved_consignment_sees_partial_numbers(): void
+    public function test_dealer_viewing_through_an_approved_consignment_sees_partial_numbers(): void
     {
         $vehicle = $this->ownedVehicle();
-        $account = User::factory()->asUser()->create();
-        $this->approveConsignment($account, $vehicle);
+        $dealer = User::factory()->asGarage()->create()->refresh();
+        $dealer->vehicles()->attach($vehicle->id, [
+            'is_current_owner' => false,
+            'purchase_date' => now(),
+            'tenant_id' => $dealer->tenant_id,
+            'ownership_type' => 'consignment',
+        ]);
+        $this->approveConsignment($dealer, $vehicle);
 
-        $this->assertMasked($this->actingAs($account)->get(route('user.vehicles.show', $vehicle))->assertOk());
+        $this->assertMasked($this->actingAs($dealer)->get(route('garage.vehicles.show', $vehicle))->assertOk());
     }
 
     public function test_current_owner_sees_the_full_numbers(): void
@@ -117,11 +123,11 @@ class VehicleDetailIdentifierMaskingTest extends TestCase
 
     private function approveConsignment(User $account, Vehicle $vehicle): void
     {
-        VehicleAccessGrant::create([
-            'user_id' => $account->id,
+        VehicleConsignment::factory()->create([
             'vehicle_id' => $vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => 'approved',
+            'garage_user_id' => $account->id,
+            'tenant_id' => $account->tenant_id,
+            'history_access_status' => 'approved',
             'power_of_attorney_path' => 'procuracoes/teste.pdf',
         ]);
     }

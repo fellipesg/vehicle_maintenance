@@ -74,14 +74,14 @@ class GarageMaintenanceDetailTest extends TestCase
             ->assertSee('Declarada pelo proprietário');
     }
 
-    public function test_approved_consignment_opens_the_detail_without_register_action(): void
+    public function test_consignment_opens_the_detail_with_the_register_action(): void
     {
         $vehicle = $this->consignedStockVehicle($this->garage, 'approved');
         $maintenance = Maintenance::factory()->sealedByWorkshop()->create(['vehicle_id' => $vehicle->id]);
 
         $xpath = $this->garagePage($this->actingAs($this->garage)->get(route('garage.maintenances.show', $maintenance)));
 
-        $this->assertSame(0, $xpath->query('//*[@data-slot="page-header-actions"]')->length);
+        $this->assertSame(1, $xpath->query('//*[@data-slot="page-header-actions"]')->length);
     }
 
     public function test_detail_is_forbidden_outside_the_visible_stock_history(): void

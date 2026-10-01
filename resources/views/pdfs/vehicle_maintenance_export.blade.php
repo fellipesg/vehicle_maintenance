@@ -162,6 +162,16 @@
             white-space: nowrap;
         }
 
+        .ownership-unverified {
+            border: 1px solid #c2a21a;
+            background: #fdf7e2;
+            color: #6b5600;
+            padding: 8px 10px;
+            margin-bottom: 12px;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
         .vehicle-section-title {
             font-size: 13pt;
             font-weight: bold;
@@ -491,6 +501,14 @@
                     </table>
 
                     <div class="cover-body">
+                        @unless($vehicle->hasVerifiedOwnership())
+                            <div class="ownership-unverified">
+                                <strong>Propriedade não confirmada.</strong>
+                                O veículo foi cadastrado sem o CRLV-e, então ninguém confirmou de quem ele é. As
+                                manutenções com Selo da oficina seguem confirmadas por quem prestou o serviço.
+                            </div>
+                        @endunless
+
                         <div class="vehicle-section-title">Informações do veículo</div>
 
                         @if(! empty($coverImageSrc))

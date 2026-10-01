@@ -77,10 +77,16 @@
     // A linha do tempo carrega as manutenções com itens, garantia, oficina e NF; o histórico reusa.
     if (is_array($timeline)) {
         $detailTimeline = $timeline;
-        $detailMaintenances = $vehicle->maintenances()
-            ->with(['items.warranty', 'generalWarranty', 'workshop', 'verifiedWorkshop', 'user', 'invoices'])
-            ->withCount('photos')
-            ->get();
+        // Relação já carregada manda: pode vir limitada ao que o usuário pode ler
+        // (Vehicle::restrictHistoryTo), e uma consulta nova aqui desfaria isso.
+        $detailMaintenances = $vehicle->relationLoaded('maintenances')
+            ? $vehicle->maintenances
+            : $vehicle->maintenances()
+                ->with(['items.warranty', 'generalWarranty', 'workshop', 'verifiedWorkshop', 'user', 'invoices'])
+                ->withCount('photos')
+                ->get();
+        $detailMaintenances->loadMissing(['items.warranty', 'generalWarranty', 'workshop', 'verifiedWorkshop', 'user', 'invoices']);
+        $detailMaintenances->loadCount('photos');
     } else {
         $detailTimeline = app(VehicleTimelineBuilder::class)->build($vehicle);
         $detailMaintenances = $vehicle->maintenances;

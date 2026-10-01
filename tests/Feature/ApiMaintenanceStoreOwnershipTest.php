@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessGrant;
+use App\Models\VehicleConsignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -34,7 +34,7 @@ class ApiMaintenanceStoreOwnershipTest extends TestCase
         $this->assertSame(65_000, $vehicle->fresh()->current_kilometers);
     }
 
-    public function test_dealer_with_an_approved_consignment_cannot_register_on_the_owners_vehicle(): void
+    public function test_dealer_with_an_active_consignment_registers_on_the_owners_vehicle(): void
     {
         [, $vehicle] = $this->ownerWithVehicle();
         $dealer = User::factory()->asGarage()->create()->refresh();
@@ -44,20 +44,22 @@ class ApiMaintenanceStoreOwnershipTest extends TestCase
             'tenant_id' => $dealer->tenant_id,
             'ownership_type' => 'consignment',
         ]);
-        VehicleAccessGrant::create([
-            'user_id' => $dealer->id,
+        VehicleConsignment::factory()->create([
             'vehicle_id' => $vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => 'approved',
+            'garage_user_id' => $dealer->id,
+            'tenant_id' => $dealer->tenant_id,
+            'history_access_status' => 'approved',
             'power_of_attorney_path' => 'procuracoes/teste.pdf',
         ]);
 
         $this->actingAsApiUser($dealer);
         $this->getJson("/api/v1/vehicles/{$vehicle->id}")->assertOk();
 
-        $this->postJson('/api/v1/maintenances', $this->payload($vehicle, 90_000))->assertForbidden();
+        // A loja está com o carro na mão: ela registra, e o proprietário é avisado.
+        $this->postJson('/api/v1/maintenances', $this->payload($vehicle, 90_000))->assertCreated();
 
-        $this->assertNothingRegistered($vehicle);
+        $this->assertSame(1, Maintenance::query()->where('vehicle_id', $vehicle->id)->count());
+        $this->assertSame(90_000, $vehicle->fresh()->current_kilometers);
     }
 
     public function test_admin_cannot_register_on_someone_elses_vehicle(): void

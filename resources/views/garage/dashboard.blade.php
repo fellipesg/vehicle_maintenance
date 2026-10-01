@@ -12,9 +12,9 @@
     $stockUrl = fn (?string $filter = null): string => route('garage.vehicles.index', $filter !== null ? ['filtro' => $filter] : []);
     $vehicleLine = fn ($vehicle): string => collect([$vehicle->year, $vehicle->license_plate])->filter(fn (mixed $part): bool => filled($part))->implode(' · ');
     $attentionCopy = [
-        'consignment_rejected' => ['badge' => 'Procuração recusada', 'variant' => 'danger', 'text' => 'Envie uma nova procuração para liberar o histórico.'],
-        'consignment_missing' => ['badge' => 'Procuração não enviada', 'variant' => 'warning', 'text' => 'Envie a procuração do proprietário para liberar o histórico.'],
-        'consignment_pending' => ['badge' => 'Procuração em análise', 'variant' => 'warning', 'text' => 'Aguardando a análise da equipe.'],
+        'consignment_rejected' => ['badge' => 'Pedido de histórico recusado', 'variant' => 'danger', 'text' => 'Peça a liberação ao proprietário para ver o histórico anterior.'],
+        'consignment_missing' => ['badge' => 'Histórico restrito ao proprietário', 'variant' => 'warning', 'text' => 'Peça a liberação ao proprietário para ver o histórico anterior.'],
+        'consignment_pending' => ['badge' => 'Histórico aguardando liberação', 'variant' => 'warning', 'text' => 'Aguardando o proprietário ou a análise da procuração.'],
         'without_history' => ['badge' => 'Sem histórico', 'variant' => 'neutral', 'text' => 'Nenhuma manutenção registrada. Registre a revisão pré-venda.'],
         'declared_only' => ['badge' => 'Só declaradas', 'variant' => 'declared', 'text' => 'Leve a uma oficina da rede para ter o Selo da oficina.'],
     ];
@@ -137,7 +137,7 @@
                                         <p class="text-sm text-muted-foreground tabular-nums">{{ $vehicleLine($vehicle) }}</p>
                                         <p class="text-sm text-foreground">{{ $copy['text'] }}</p>
                                         @if (in_array($item['reason'], ['consignment_rejected', 'consignment_missing'], true))
-                                            <x-ui.link :href="route('garage.vehicles.create')" class="text-sm" arrow>{{ $item['reason'] === 'consignment_missing' ? 'Enviar procuração' : 'Reenviar procuração' }}</x-ui.link>
+                                            <x-ui.link :href="route('garage.vehicles.show', $item['vehicle'])" class="text-sm" arrow>Pedir liberação ao proprietário</x-ui.link>
                                         @elseif ($item['reason'] === 'without_history' && $item['can_add_maintenance'])
                                             <x-ui.link :href="route('garage.maintenances.create', ['vehicle_id' => $vehicle->id])" icon="plus" class="text-sm">Registrar manutenção<span class="sr-only"> em {{ trim($vehicle->brand.' '.$vehicle->model) }}</span></x-ui.link>
                                         @endif

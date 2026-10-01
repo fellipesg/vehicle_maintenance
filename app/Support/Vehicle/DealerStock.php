@@ -3,6 +3,7 @@
 namespace App\Support\Vehicle;
 
 use App\Models\User;
+use App\Models\VehicleConsignment;
 use App\Support\VehiclePlateSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -233,17 +234,19 @@ final class DealerStock
     }
 
     /**
-     * Dono atual, ou consignação com a procuração deste lojista aprovada (User::canViewStockVehicleHistory).
+     * Dono atual, ou consignação cujo histórico anterior já foi liberado — pelo proprietário ou pela
+     * equipe, ao aprovar a procuração (User::canViewStockVehicleHistory).
      */
     private function withVisibleHistory(BelongsToMany $query): BelongsToMany
     {
         return $query->where(function (Builder $visible): void {
             // Postgres rejects "boolean = 1"; use a SQL boolean literal.
             $visible->whereRaw('user_vehicles.is_current_owner = true')
-                ->orWhereHas('accessGrants', fn (Builder $grants) => $grants
-                    ->where('user_id', $this->user->id)
-                    ->where('grant_type', 'consignment')
-                    ->where('status', 'approved'));
+                ->orWhereHas('consignments', fn (Builder $consignments) => $consignments
+                    ->where('garage_user_id', $this->user->id)
+                    ->where('status', VehicleConsignment::STATUS_ACTIVE)
+                    ->whereNull('owner_disputed_at')
+                    ->where('history_access_status', VehicleConsignment::HISTORY_APPROVED));
         });
     }
 

@@ -4,7 +4,7 @@ namespace Tests\Feature\Web\Concerns;
 
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessGrant;
+use App\Models\VehicleConsignment;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
@@ -52,11 +52,11 @@ trait InspectsGaragePages
             'ownership_type' => 'consignment',
         ]);
 
-        VehicleAccessGrant::create([
-            'user_id' => $garage->id,
+        VehicleConsignment::factory()->create([
             'vehicle_id' => $vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => $status,
+            'garage_user_id' => $garage->id,
+            'tenant_id' => $garage->tenant_id,
+            'history_access_status' => $status,
             'power_of_attorney_path' => 'procuracoes/teste.pdf',
         ]);
 

@@ -190,7 +190,7 @@ class GarageStockListTest extends TestCase
             ->assertDontSee('data-stack="md"', false);
     }
 
-    public function test_pending_consignment_in_table_has_no_link_and_hides_history(): void
+    public function test_pending_consignment_in_table_opens_but_hides_the_previous_history(): void
     {
         $pending = $this->consignedStockVehicle($this->garage, 'pending', ['brand' => 'Fiat', 'model' => 'Toro']);
         Maintenance::factory()->sealedByWorkshop()->create(['vehicle_id' => $pending->id]);
@@ -198,9 +198,10 @@ class GarageStockListTest extends TestCase
         $xpath = $this->garagePage($this->actingAs($this->garage)->get(route('garage.vehicles.index', ['visao' => 'tabela'])));
         $row = $this->garageElement($xpath, '//tr[@data-stock-vehicle="'.$pending->id.'"]');
 
-        $this->assertSame(0, $xpath->query('.//a[@href="'.route('garage.vehicles.show', $pending).'"]', $row)->length);
-        $this->assertStringContainsString('Procuração em análise', $this->garageText($row));
-        $this->assertStringContainsString('Aguardando a procuração', $this->garageText($row));
+        // A ficha abre: é nela que a loja registra as manutenções do veículo consignado.
+        $this->assertSame(1, $xpath->query('.//a[@href="'.route('garage.vehicles.show', $pending).'"]', $row)->length);
+        $this->assertStringContainsString('Histórico aguardando liberação', $this->garageText($row));
+        $this->assertStringContainsString('Só o que você registrou', $this->garageText($row));
         $this->assertStringNotContainsString('com selo', $this->garageText($row));
     }
 

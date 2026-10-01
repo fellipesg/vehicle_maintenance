@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -127,9 +128,9 @@ class User extends Authenticatable
     /**
      * Estoque do lojista: veículos de que ele é dono atual mais os que recebeu em consignação,
      * no tenant dele. A consignação é anexada com is_current_owner=false (o dono é outra pessoa),
-     * então currentVehicles() não a enxerga. Aqui ela entra em qualquer estado da procuração
-     * (em análise, aprovada ou recusada), com a procuração deste usuário já carregada em
-     * accessGrants, para o estoque mostrar o status.
+     * então currentVehicles() não a enxerga. Aqui ela entra em qualquer estado do acesso ao
+     * histórico (sem pedido, em análise, aprovado ou recusado), com a consignação deste usuário
+     * já carregada em activeConsignment, para o estoque mostrar o status.
      */
     public function stockVehicles(): BelongsToMany
     {
@@ -140,9 +141,7 @@ class User extends Authenticatable
                     ->orWhere('user_vehicles.ownership_type', 'consignment');
             })
             ->with([
-                'accessGrants' => fn (HasMany $query) => $query
-                    ->where('user_id', $this->id)
-                    ->where('grant_type', 'consignment'),
+                'activeConsignment' => fn (HasOne $query) => $query->where('garage_user_id', $this->id),
             ]);
 
         if ($this->tenant_id) {
@@ -167,21 +166,37 @@ class User extends Authenticatable
     /**
      * Procuração de consignação que este usuário enviou para o veículo, se houver.
      */
-    public function consignmentGrantFor(Vehicle $vehicle): ?VehicleAccessGrant
+    public function consignmentFor(Vehicle $vehicle): ?VehicleConsignment
     {
-        $grants = $vehicle->relationLoaded('accessGrants')
-            ? $vehicle->accessGrants
-            : $vehicle->accessGrants()->where('user_id', $this->id)->where('grant_type', 'consignment')->get();
+        if ($vehicle->relationLoaded('activeConsignment')) {
+            $consignment = $vehicle->activeConsignment;
 
-        return $grants->first(
-            fn (VehicleAccessGrant $grant): bool => (int) $grant->user_id === (int) $this->id
-                && $grant->grant_type === 'consignment'
-        );
+            return $consignment !== null && (int) $consignment->garage_user_id === (int) $this->id
+                ? $consignment
+                : null;
+        }
+
+        return VehicleConsignment::query()
+            ->active()
+            ->where('garage_user_id', $this->id)
+            ->where('vehicle_id', $vehicle->id)
+            ->first();
     }
 
     /**
-     * Espelha VehiclePolicy::viewMaintenances nas listas do estoque, sem uma consulta por veículo:
-     * o histórico abre para o dono atual e para a consignação com procuração aprovada.
+     * A loja abre a ficha de qualquer veículo do estoque, inclusive a consignação sem liberação do
+     * histórico: é nela que ela registra as manutenções e acompanha o que já registrou.
+     */
+    public function canOpenStockVehicle(Vehicle $vehicle): bool
+    {
+        return $this->stockPivotFor($vehicle) !== null;
+    }
+
+    /**
+     * Espelha VehiclePolicy::viewFullHistory nas listas do estoque, sem uma consulta por veículo: o
+     * histórico anterior abre para o dono atual e para a consignação que o proprietário liberou (ou
+     * cuja procuração a equipe aprovou). Em consignação sem essa liberação o lojista continua
+     * entrando no veículo e vendo o que ele mesmo registrou.
      */
     public function canViewStockVehicleHistory(Vehicle $vehicle): bool
     {
@@ -195,7 +210,7 @@ class User extends Authenticatable
             return true;
         }
 
-        return $this->consignmentGrantFor($vehicle)?->isApproved() ?? false;
+        return $this->consignmentFor($vehicle)?->grantsHistoryAccess() ?? false;
     }
 
     /**
@@ -233,6 +248,14 @@ class User extends Authenticatable
         $stockVehicle = $this->stockVehicles()->where('vehicles.id', $vehicle->id)->first();
 
         return $stockVehicle?->getRelation('pivot');
+    }
+
+    /**
+     * Consignações que este usuário mantém como lojista.
+     */
+    public function consignments(): HasMany
+    {
+        return $this->hasMany(VehicleConsignment::class, 'garage_user_id');
     }
 
     public function tenant()

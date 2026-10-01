@@ -1,43 +1,54 @@
 {{--
     Status da consignação de um veículo do estoque do lojista.
-    $grant: VehicleAccessGrant de consignação deste lojista (null quando a procuração não chegou).
+    $consignment: VehicleConsignment ativa deste lojista (null quando o veículo não está consignado aqui).
     $compact: true mostra só as badges; false soma a explicação, o motivo da recusa e a próxima ação.
-    Reenviar a procuração passa pelo assistente "Adicionar ao estoque" (garage.vehicles.create; /vincular só
-    redireciona para ele): o CRLV-e é lido de novo e o fluxo pede a nova procuração.
+
+    A consignação declarada já deixa registrar manutenções: o que estes estados contam é o acesso ao
+    histórico que o veículo tinha antes dela. Liberar depende do proprietário (um clique no aviso que
+    ele recebeu) ou da equipe, ao aprovar a procuração. "Contestada" trava tudo até a equipe decidir.
 --}}
 @php
     $compact = $compact ?? false;
-    $consignmentStatus = match ($grant?->status) {
-        'approved' => [
+    $consignmentStatus = match (true) {
+        $consignment?->isDisputed() => [
+            'key' => 'disputed',
+            'label' => 'Contestada pelo proprietário',
+            'variant' => 'danger',
+            'icon' => 'exclamation-triangle',
+            'message' => 'O proprietário contestou esta consignação. Novos registros estão bloqueados até a equipe RevisaLog analisar o caso.',
+        ],
+        $consignment?->history_access_status === \App\Models\VehicleConsignment::HISTORY_APPROVED => [
             'key' => 'approved',
-            'label' => 'Procuração aprovada',
+            'label' => 'Histórico liberado',
             'variant' => 'success',
             'icon' => 'check-circle',
-            'message' => 'A equipe aprovou a procuração e o histórico do veículo está liberado para consulta.',
+            'message' => $consignment->history_approved_via === 'owner'
+                ? 'O proprietário liberou o histórico do veículo para consulta.'
+                : 'A equipe aprovou a procuração e o histórico do veículo está liberado para consulta.',
         ],
-        'pending' => [
+        $consignment?->history_access_status === \App\Models\VehicleConsignment::HISTORY_PENDING => [
             'key' => 'pending',
-            'label' => 'Procuração em análise',
+            'label' => 'Histórico aguardando liberação',
             'variant' => 'warning',
             'icon' => 'clock',
-            'message' => 'Recebemos a procuração. O histórico do veículo abre aqui quando a análise for concluída.',
+            'message' => 'O pedido foi enviado. O histórico abre aqui quando o proprietário liberar ou a equipe aprovar a procuração.',
         ],
-        null => [
-            'key' => 'missing',
-            'label' => 'Procuração não enviada',
-            'variant' => 'warning',
-            'icon' => 'exclamation-circle',
-            'message' => 'Envie a procuração do proprietário para liberar o histórico do veículo.',
-        ],
-        default => [
+        $consignment?->history_access_status === \App\Models\VehicleConsignment::HISTORY_REJECTED => [
             'key' => 'rejected',
-            'label' => 'Procuração recusada',
+            'label' => 'Pedido de histórico recusado',
             'variant' => 'danger',
             'icon' => 'x-circle',
-            'message' => 'A procuração não foi aceita. Envie uma nova para liberar o histórico do veículo.',
+            'message' => 'O pedido de acesso ao histórico não foi aceito. Você continua registrando manutenções normalmente.',
+        ],
+        default => [
+            'key' => 'missing',
+            'label' => 'Histórico restrito ao proprietário',
+            'variant' => 'warning',
+            'icon' => 'lock-closed',
+            'message' => 'Você vê apenas as manutenções registradas pela sua loja. Peça a liberação ao proprietário para ver o histórico anterior.',
         ],
     };
-    $needsResend = in_array($consignmentStatus['key'], ['rejected', 'missing'], true);
+    $needsRequest = in_array($consignmentStatus['key'], ['rejected', 'missing'], true);
 @endphp
 
 <div data-consignment-status="{{ $consignmentStatus['key'] }}">
@@ -49,15 +60,15 @@
     @unless ($compact)
         <p class="mt-2 text-sm text-muted-foreground">{{ $consignmentStatus['message'] }}</p>
 
-        @if ($consignmentStatus['key'] === 'rejected' && filled($grant?->review_notes))
-            <p class="mt-1 text-sm text-foreground"><span class="font-medium">Motivo:</span> {{ $grant->review_notes }}</p>
+        @if ($consignmentStatus['key'] === 'rejected' && filled($consignment?->review_notes))
+            <p class="mt-1 text-sm text-foreground"><span class="font-medium">Motivo:</span> {{ $consignment->review_notes }}</p>
         @endif
 
-        @if ($needsResend)
-            <x-ui.link :href="route('garage.vehicles.create')" class="relative z-10 mt-2 text-sm" arrow data-consignment-resend>
-                {{ $consignmentStatus['key'] === 'missing' ? 'Enviar procuração' : 'Reenviar procuração' }}
+        @if ($needsRequest && $consignment !== null)
+            <x-ui.link :href="route('garage.vehicles.show', $consignment->vehicle_id)" class="relative z-10 mt-2 text-sm" arrow data-consignment-request>
+                Pedir liberação ao proprietário
             </x-ui.link>
-            <p class="mt-0.5 text-xs text-muted-foreground">Você envia o CRLV-e de novo e, em seguida, a procuração.</p>
+            <p class="mt-0.5 text-xs text-muted-foreground">Ele libera com um clique no aviso que recebe por e-mail.</p>
         @endif
     @endunless
 </div>

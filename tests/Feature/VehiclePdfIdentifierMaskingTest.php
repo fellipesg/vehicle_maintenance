@@ -6,7 +6,7 @@ use App\Mail\VehicleMaintenancePdfMail;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessGrant;
+use App\Models\VehicleConsignment;
 use App\Models\VehiclePdfExport;
 use App\Support\AppStorage;
 use App\Support\DemoWarrantyPdfValidator;
@@ -68,16 +68,15 @@ class VehiclePdfIdentifierMaskingTest extends TestCase
         $this->assertFullPdf($this->apiExport($owner, $vehicle));
     }
 
-    public function test_emailed_pdf_for_an_account_with_an_approved_consignment_masks_the_numbers(): void
+    public function test_emailed_pdf_for_an_account_without_the_vehicle_is_refused(): void
     {
         Mail::fake();
         [, $vehicle] = $this->ownerWithVehicle();
         $account = User::factory()->asUser()->create();
-        $this->approveConsignment($account, $vehicle);
 
-        $this->actingAs($account)->post(route('user.vehicles.export-pdf', $vehicle))->assertRedirect();
-
-        $this->assertMaskedPdf($this->emailedPdf($account));
+        // Consignação é coisa de lojista: uma conta de proprietário que não é dona do veículo não
+        // exporta o histórico dele (a versão mascarada do lojista está no teste da API acima).
+        $this->actingAs($account)->post(route('user.vehicles.export-pdf', $vehicle))->assertForbidden();
     }
 
     public function test_emailed_pdf_for_the_owner_keeps_the_full_numbers(): void
@@ -155,11 +154,11 @@ class VehiclePdfIdentifierMaskingTest extends TestCase
 
     private function approveConsignment(User $account, Vehicle $vehicle): void
     {
-        VehicleAccessGrant::create([
-            'user_id' => $account->id,
+        VehicleConsignment::factory()->create([
             'vehicle_id' => $vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => 'approved',
+            'garage_user_id' => $account->id,
+            'tenant_id' => $account->tenant_id,
+            'history_access_status' => 'approved',
             'power_of_attorney_path' => 'procuracoes/teste.pdf',
         ]);
     }

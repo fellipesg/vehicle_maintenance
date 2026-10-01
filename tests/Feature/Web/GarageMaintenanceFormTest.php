@@ -109,13 +109,12 @@ class GarageMaintenanceFormTest extends TestCase
         );
     }
 
-    public function test_vehicle_outside_the_owned_stock_is_not_preselected(): void
+    public function test_vehicle_outside_the_stock_is_not_preselected(): void
     {
         $this->stockVehicle($this->garage);
-        $consigned = $this->consignedStockVehicle($this->garage, 'approved');
         $foreign = Vehicle::factory()->create();
 
-        foreach ([$consigned, $foreign] as $vehicle) {
+        foreach ([$foreign] as $vehicle) {
             $xpath = $this->garagePage($this->actingAs($this->garage)->get(route('garage.maintenances.create', ['vehicle_id' => $vehicle->id])));
 
             $this->assertSame(0, $xpath->query('//select[@name="vehicle_id"]/option[@selected][@value!=""]')->length);

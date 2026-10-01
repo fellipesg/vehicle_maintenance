@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessGrant;
+use App\Models\VehicleConsignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -47,11 +47,11 @@ class VehicleIdentifierMaskingApiTest extends TestCase
             'tenant_id' => $dealer->tenant_id,
             'ownership_type' => 'consignment',
         ]);
-        VehicleAccessGrant::create([
-            'user_id' => $dealer->id,
+        VehicleConsignment::factory()->create([
             'vehicle_id' => $vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => 'approved',
+            'garage_user_id' => $dealer->id,
+            'tenant_id' => $dealer->tenant_id,
+            'history_access_status' => 'approved',
             'power_of_attorney_path' => 'procuracoes/teste.pdf',
         ]);
 

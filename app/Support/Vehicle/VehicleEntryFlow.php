@@ -71,6 +71,19 @@ final class VehicleEntryFlow
         return new self($portal);
     }
 
+    /**
+     * O cadastro manual existe só no Proprietário.
+     *
+     * No Lojista o CRLV-e é obrigatório: é ele que identifica o proprietário do veículo e, com isso,
+     * separa o que é estoque próprio do que é consignação. Sem o documento, uma loja se cadastraria
+     * como dona de um carro de terceiro. A loja tem o CRLV-e de todo carro do estoque de qualquer
+     * forma, porque precisa dele para vender.
+     */
+    public function allowsManualEntry(): bool
+    {
+        return ! $this->isDealer();
+    }
+
     public function isDealer(): bool
     {
         return $this->portal === Portal::Dealer;

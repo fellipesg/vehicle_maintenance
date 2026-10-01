@@ -505,6 +505,13 @@ class VehicleMaintenancePdfExporterTest extends TestCase
             $coverChildren,
             fn (\DOMNode $node): bool => $node->nodeType === XML_ELEMENT_NODE,
         ));
+
+        // Aviso de propriedade não confirmada: abre a capa quando o veículo entrou sem CRLV-e e não
+        // faz parte da sequência fixa abaixo.
+        if (str_contains($coverTags[0]->getAttribute('class'), 'ownership-unverified')) {
+            array_shift($coverTags);
+        }
+
         $this->assertSame('div', $coverTags[0]->nodeName);
         $this->assertStringContainsString('vehicle-section-title', $coverTags[0]->getAttribute('class'));
         $this->assertSame('img', $coverTags[1]->nodeName);

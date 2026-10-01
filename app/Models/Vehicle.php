@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Gate;
 
 class Vehicle extends Model
 {
@@ -145,6 +146,23 @@ class Vehicle extends Model
         return $this->hasMany(Maintenance::class);
     }
 
+    /**
+     * Consulta do histórico limitada ao que o usuário pode ler: tudo para o dono atual, e só o que a
+     * própria loja registrou para o lojista em consignação sem liberação do proprietário.
+     *
+     * @return HasMany<Maintenance, Vehicle>
+     */
+    public function maintenancesVisibleTo(User $viewer): HasMany
+    {
+        $relation = $this->maintenances();
+
+        if (! Gate::forUser($viewer)->allows('viewFullHistory', $this)) {
+            $relation->where('maintenances.tenant_id', $viewer->tenant_id);
+        }
+
+        return $relation;
+    }
+
     public function plates(): HasMany
     {
         return $this->hasMany(VehiclePlate::class);
@@ -161,6 +179,37 @@ class Vehicle extends Model
             ->select(['id', 'vehicle_id', 'maintenance_date', 'verified_at', 'maintenance_type', 'registered_by_type'])
             ->orderBy('maintenance_date')
             ->orderBy('id');
+    }
+
+    /**
+     * Deixa o histórico deste veículo pré-carregado com o que o usuário pode ler, para que ninguém
+     * rio abaixo precise repetir a regra: VehicleTimelineBuilder e <x-vehicle.detail> usam a relação
+     * já carregada (loadMissing / relationLoaded) em vez de consultar de novo.
+     *
+     * Não dá para fazer isso dentro de maintenances(): o eager loading do Eloquent resolve a relação
+     * num newInstance() do model, onde qualquer estado guardado na instância se perde.
+     */
+    /**
+     * A propriedade do dono atual foi confirmada pelo CRLV-e?
+     *
+     * O cadastro manual grava ownership_verified_at nulo: os dados batem com o documento que a pessoa
+     * tem na mão, mas ninguém conferiu que o veículo é dela. A diferença precisa aparecer nas telas —
+     * manutenção declarada sobre uma posse não confirmada é o que corrói a confiança no histórico.
+     */
+    public function hasVerifiedOwnership(): bool
+    {
+        $owner = $this->owners()
+            ->whereRaw('user_vehicles.is_current_owner = true')
+            ->first();
+
+        return $owner?->pivot?->ownership_verified_at !== null;
+    }
+
+    public function restrictHistoryTo(User $viewer): static
+    {
+        $this->setRelation('maintenances', $this->maintenancesVisibleTo($viewer)->get());
+
+        return $this;
     }
 
     public function owners(): BelongsToMany
@@ -185,6 +234,18 @@ class Vehicle extends Model
     public function accessGrants(): HasMany
     {
         return $this->hasMany(VehicleAccessGrant::class);
+    }
+
+    public function consignments(): HasMany
+    {
+        return $this->hasMany(VehicleConsignment::class);
+    }
+
+    public function activeConsignment(): HasOne
+    {
+        return $this->hasOne(VehicleConsignment::class)
+            ->where('status', VehicleConsignment::STATUS_ACTIVE)
+            ->latestOfMany();
     }
 
     public static function findByRenavam(string $renavam): ?self

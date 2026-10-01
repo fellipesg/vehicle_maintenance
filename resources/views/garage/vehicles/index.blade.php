@@ -110,8 +110,8 @@
                     </x-slot:head>
                     @foreach ($vehicles as $vehicle)
                         @php
-                            $canOpenHistory = $garageUser->canViewStockVehicleHistory($vehicle);
                             $vehicleName = trim($vehicle->brand.' '.$vehicle->model);
+                            $seesFullHistory = $garageUser->canViewStockVehicleHistory($vehicle);
                             $sealedCount = (int) $vehicle->verified_maintenances_count;
                             $declaredCount = max(0, (int) $vehicle->maintenances_count - $sealedCount);
                         @endphp
@@ -120,17 +120,13 @@
                                 <div class="flex items-center gap-3">
                                     <x-vehicle-cover :vehicle="$vehicle" />
                                     <div class="min-w-0">
-                                        @if ($canOpenHistory)
-                                            <a href="{{ route('garage.vehicles.show', $vehicle) }}" class="link">{{ $vehicleName }}</a>
-                                        @else
-                                            <span class="text-foreground">{{ $vehicleName }}</span>
-                                        @endif
+                                        <a href="{{ route('garage.vehicles.show', $vehicle) }}" class="link">{{ $vehicleName }}</a>
                                         @if (filled($vehicle->color))
                                             <span class="block text-xs font-normal text-muted-foreground">{{ $vehicle->color }}</span>
                                         @endif
                                         @if ($garageUser->holdsOnConsignment($vehicle))
                                             <div class="mt-1 font-normal">
-                                                @include('garage.vehicles._consignment-status', ['grant' => $garageUser->consignmentGrantFor($vehicle), 'compact' => true])
+                                                @include('garage.vehicles._consignment-status', ['consignment' => $garageUser->consignmentFor($vehicle), 'compact' => $garageUser->canViewStockVehicleHistory($vehicle)])
                                             </div>
                                         @endif
                                     </div>
@@ -140,15 +136,15 @@
                             <td class="text-right">{{ $vehicle->year ?: '—' }}</td>
                             <td class="text-right whitespace-nowrap">{{ $stockKm($vehicle->current_kilometers) }}</td>
                             <td>
-                                @if (! $canOpenHistory)
-                                    <span class="text-muted-foreground">Aguardando a procuração</span>
+                                @if (! $seesFullHistory)
+                                    <span class="text-muted-foreground">Só o que você registrou</span>
                                 @elseif ((int) $vehicle->maintenances_count === 0)
                                     <span class="text-muted-foreground">Sem manutenções</span>
                                 @else
                                     <span class="whitespace-nowrap">{{ $sealedCount }} com selo · {{ $stockDeclaredLabel($declaredCount) }}</span>
                                 @endif
                             </td>
-                            <td class="whitespace-nowrap">{{ $canOpenHistory ? ($stockLastMaintenance($vehicle) ?? '—') : '—' }}</td>
+                            <td class="whitespace-nowrap">{{ $stockLastMaintenance($vehicle) ?? '—' }}</td>
                             <td class="whitespace-nowrap">{{ $vehicle->pivot?->created_at?->format('d/m/Y') ?? '—' }}</td>
                         </tr>
                     @endforeach
@@ -158,43 +154,25 @@
                     @foreach ($vehicles as $vehicle)
                         @php
                             $onConsignment = $garageUser->holdsOnConsignment($vehicle);
-                            $canOpenHistory = $garageUser->canViewStockVehicleHistory($vehicle);
                             $lastMaintenance = $stockLastMaintenance($vehicle);
                         @endphp
-                        @if ($canOpenHistory)
-                            <x-vehicle.card
-                                :vehicle="$vehicle"
-                                :href="route('garage.vehicles.show', $vehicle)"
-                                as="li"
-                                heading-level="h2"
-                                :add-cover-url="$onConsignment ? null : route('garage.vehicles.edit', $vehicle).'#capas'"
-                                data-stock-vehicle="{{ $vehicle->id }}"
-                            >
-                                @if ($lastMaintenance !== null)
-                                    <p class="text-muted-foreground">Última manutenção em <time class="tabular-nums">{{ $lastMaintenance }}</time></p>
-                                @endif
-                                @if ($onConsignment)
-                                    <div class="mt-2">
-                                        @include('garage.vehicles._consignment-status', ['grant' => $garageUser->consignmentGrantFor($vehicle), 'compact' => true])
-                                    </div>
-                                @endif
-                            </x-vehicle.card>
-                        @else
-                            {{-- Consignação sem procuração aprovada: sem link para a ficha, com o status e a próxima ação. --}}
-                            <li class="flex flex-col overflow-hidden rounded-card border border-dashed border-border-strong bg-surface text-foreground" data-stock-vehicle="{{ $vehicle->id }}">
-                                <x-vehicle-cover :vehicle="$vehicle" variant="card" />
-                                <div class="flex flex-1 flex-col gap-3 p-4 sm:p-5">
-                                    <div class="min-w-0">
-                                        <h2 class="text-base leading-6 font-semibold text-foreground">{{ trim($vehicle->brand.' '.$vehicle->model) }}</h2>
-                                        <p class="text-sm text-muted-foreground">{{ collect([$vehicle->year, $vehicle->color])->filter(fn (mixed $part): bool => filled($part))->implode(' · ') }}</p>
-                                    </div>
-                                    @if (filled($vehicle->license_plate))
-                                        <p class="text-sm"><span class="rounded-md border border-border-strong px-1.5 py-px font-mono text-xs font-semibold tracking-wider text-foreground"><span class="sr-only">Placa </span>{{ $vehicle->license_plate }}</span></p>
-                                    @endif
-                                    @include('garage.vehicles._consignment-status', ['grant' => $garageUser->consignmentGrantFor($vehicle), 'compact' => false])
+                        <x-vehicle.card
+                            :vehicle="$vehicle"
+                            :href="route('garage.vehicles.show', $vehicle)"
+                            as="li"
+                            heading-level="h2"
+                            :add-cover-url="$onConsignment ? null : route('garage.vehicles.edit', $vehicle).'#capas'"
+                            data-stock-vehicle="{{ $vehicle->id }}"
+                        >
+                            @if ($lastMaintenance !== null)
+                                <p class="text-muted-foreground">Última manutenção em <time class="tabular-nums">{{ $lastMaintenance }}</time></p>
+                            @endif
+                            @if ($onConsignment)
+                                <div class="mt-2">
+                                    @include('garage.vehicles._consignment-status', ['consignment' => $garageUser->consignmentFor($vehicle), 'compact' => $garageUser->canViewStockVehicleHistory($vehicle)])
                                 </div>
-                            </li>
-                        @endif
+                            @endif
+                        </x-vehicle.card>
                     @endforeach
                 </ul>
             @endif

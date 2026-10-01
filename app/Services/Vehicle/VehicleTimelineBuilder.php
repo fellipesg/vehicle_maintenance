@@ -22,7 +22,9 @@ class VehicleTimelineBuilder
      */
     public function build(Vehicle $vehicle): array
     {
-        $vehicle->load([
+        // loadMissing, não load: quem já pré-carregou um histórico limitado (Vehicle::restrictHistoryTo,
+        // para o lojista em consignação) não pode ter essa restrição desfeita aqui.
+        $vehicle->loadMissing([
             'maintenances.items.warranty',
             'maintenances.generalWarranty',
             'maintenances.workshop',

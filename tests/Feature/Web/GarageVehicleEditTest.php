@@ -70,14 +70,16 @@ class GarageVehicleEditTest extends TestCase
         );
     }
 
-    public function test_approved_consignment_page_is_read_only(): void
+    public function test_consignment_page_registers_maintenance_but_does_not_edit_the_vehicle(): void
     {
         $vehicle = $this->consignedStockVehicle($this->garage, 'approved');
 
         $this->actingAs($this->garage)
             ->get(route('garage.vehicles.show', $vehicle))
             ->assertOk()
-            ->assertSee('data-add-maintenance-denied', false)
+            ->assertSee('data-consignment-notice', false)
+            ->assertSee('Registrar manutenção')
+            // Editar o veículo continua sendo só do dono atual.
             ->assertDontSee('Editar veículo e capas')
             ->assertDontSee(route('garage.vehicles.edit', $vehicle), false);
     }
@@ -85,7 +87,6 @@ class GarageVehicleEditTest extends TestCase
     public function test_vehicle_page_is_forbidden_outside_the_stock(): void
     {
         $foreign = Vehicle::factory()->create();
-        $pending = $this->consignedStockVehicle($this->garage, 'pending');
         $sold = Vehicle::factory()->create();
         $this->garage->vehicles()->attach($sold->id, [
             'is_current_owner' => false,
@@ -93,9 +94,14 @@ class GarageVehicleEditTest extends TestCase
             'tenant_id' => $this->garage->tenant_id,
         ]);
 
-        foreach ([$foreign, $pending, $sold] as $vehicle) {
+        foreach ([$foreign, $sold] as $vehicle) {
             $this->actingAs($this->garage)->get(route('garage.vehicles.show', $vehicle))->assertForbidden();
         }
+
+        // A consignação declarada abre: é nela que a loja registra as manutenções.
+        $this->actingAs($this->garage)
+            ->get(route('garage.vehicles.show', $this->consignedStockVehicle($this->garage, 'pending')))
+            ->assertOk();
     }
 
     public function test_edit_page_has_the_two_cover_croppers_and_the_vehicle_fields(): void
