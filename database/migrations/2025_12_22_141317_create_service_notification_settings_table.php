@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('notify_1_day_before')->default(true);
             $table->boolean('notify_expired')->default(true);
             $table->timestamps();
-            
+
             $table->unique('service_id');
         });
     }

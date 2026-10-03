@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
             $table->integer('quantity')->default(1);
             $table->timestamps();
-            
+
             $table->unique(['service_id', 'item_id']);
         });
     }
