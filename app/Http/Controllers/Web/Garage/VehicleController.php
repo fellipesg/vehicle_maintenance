@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers\Web\Garage;
 
+use App\Enums\Portal;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Web\Concerns\AddsVehicleCovers;
+use App\Http\Controllers\Web\Concerns\HandlesVehicleConsignment;
 use App\Http\Controllers\Web\Concerns\ImportsVehicleFromCrlv;
 use App\Http\Controllers\Web\Concerns\RegistersVehicleWithOwnership;
+use App\Http\Controllers\Web\Concerns\UpdatesVehicleDetails;
 use App\Models\Vehicle;
-use App\Services\Crlv\CrlvParseResult;
-use App\Services\Vehicle\VehicleOwnershipService;
+use App\Services\Vehicle\VehicleConsignmentService;
+use App\Services\Vehicle\VehicleCoverService;
 use App\Services\VehicleCatalogService;
-use App\Support\AppStorage;
+use App\Support\Vehicle\DealerStock;
+use App\Support\Vehicle\VehicleEntryFlow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -18,82 +23,34 @@ use RuntimeException;
 
 class VehicleController extends Controller
 {
+    use AddsVehicleCovers;
+    use HandlesVehicleConsignment;
     use ImportsVehicleFromCrlv;
     use RegistersVehicleWithOwnership;
+    use UpdatesVehicleDetails;
 
-    protected function vehicleCreateRoute(): string
+    /**
+     * Assistente "Adicionar ao estoque" (passos, rotas e textos do Lojista).
+     */
+    protected function vehicleEntryFlow(): VehicleEntryFlow
     {
-        return 'garage.vehicles.create';
+        return VehicleEntryFlow::for(Portal::Dealer);
     }
 
-    protected function vehiclePreviewRoute(): string
-    {
-        return 'garage.vehicles.import.preview';
-    }
-
-    protected function vehicleClaimPreviewRoute(): string
-    {
-        return 'garage.vehicles.claim.preview';
-    }
-
-    protected function vehicleStoreRoute(): string
-    {
-        return 'garage.vehicles.store';
-    }
-
-    protected function vehicleClaimStoreRoute(): string
-    {
-        return 'garage.vehicles.claim.store';
-    }
-
-    protected function vehiclePreviewView(): string
-    {
-        return 'garage.vehicles.preview-import';
-    }
-
-    protected function vehicleClaimPreviewView(): string
-    {
-        return 'garage.vehicles.preview-claim';
-    }
-
-    protected function vehicleClaimView(): string
-    {
-        return 'garage.vehicles.claim';
-    }
-
-    protected function vehicleClaimImportRoute(): string
-    {
-        return 'garage.vehicles.claim.import-crlv';
-    }
-
-    protected function vehicleShowRoute(): string
-    {
-        return 'garage.vehicles.show';
-    }
-
-    protected function vehicleClaimRoute(): string
-    {
-        return 'garage.vehicles.claim';
-    }
-
-    protected function vehicleConsignmentRoute(): string
-    {
-        return 'garage.vehicles.consignment';
-    }
-
+    /**
+     * Estoque: busca, filtros de procedência, ordenação, cards ou tabela e paginação (DealerStock).
+     */
     public function index(Request $request): View
     {
-        $vehicles = $request->user()->currentVehicles()
-            ->withCount('maintenances')
-            ->get();
+        $stock = DealerStock::fromRequest($request);
+        $stockTotal = $stock->total();
 
-        return view('garage.vehicles.index', compact('vehicles'));
-    }
-
-    public function create(VehicleCatalogService $catalog): View
-    {
-        return view('garage.vehicles.create', [
-            'catalog' => $catalog->all(),
+        return view('garage.vehicles.index', [
+            'stock' => $stock,
+            'stockTotal' => $stockTotal,
+            'stockView' => DealerStock::viewFromRequest($request),
+            'counts' => $stockTotal > 0 ? $stock->counts() : [],
+            'vehicles' => $stock->query()->paginate(DealerStock::PER_PAGE)->withQueryString(),
         ]);
     }
 
@@ -107,93 +64,101 @@ class VehicleController extends Controller
         return $this->claimVehicle($request);
     }
 
-    public function showConsignmentForm(Request $request): View|RedirectResponse
-    {
-        if (! session('consignment_pending')) {
-            return redirect()->route('garage.vehicles.index');
-        }
-
-        return view('garage.vehicles.consignment', [
-            'pending' => session('consignment_pending'),
-        ]);
-    }
-
-    public function storeConsignment(Request $request): RedirectResponse
-    {
-        $pending = session('consignment_pending');
-
-        if (! is_array($pending)) {
-            return redirect()->route('garage.vehicles.index');
-        }
-
-        $request->validate([
-            'power_of_attorney' => ['required', 'file', 'mimes:pdf', 'max:10240'],
-        ]);
-
-        $path = $request->file('power_of_attorney')->store('procuracoes', AppStorage::diskName());
-        $crlv = $this->crlvFromVerification($pending['crlv_verification'] ?? session('crlv_verification'));
-        $ownership = app(VehicleOwnershipService::class);
-
-        try {
-            if (isset($pending['vehicle_id'])) {
-                $vehicle = Vehicle::findOrFail($pending['vehicle_id']);
-                $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-                $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
-                $request->session()->forget(['consignment_pending', 'crlv_verification', 'claim_vehicle_id']);
-
-                return redirect()->route('garage.vehicles.index')
-                    ->with('success', 'Procuração enviada para análise.');
-            }
-
-            $vehicle = $ownership->registerNew($request->user(), $pending['vehicle_data'], $crlv, 'consignment');
-            $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-            $request->session()->forget(['consignment_pending', 'crlv_verification']);
-
-            return redirect()->route('garage.vehicles.index')
-                ->with('success', 'Veículo adicionado em consignação.');
-        } catch (RuntimeException $exception) {
-            return back()->withErrors(['power_of_attorney' => $exception->getMessage()]);
-        }
-    }
-
-    public function show(Vehicle $vehicle): View
+    /**
+     * Ficha do veículo (<x-vehicle.detail>). Abre para qualquer veículo do estoque deste lojista,
+     * inclusive a consignação sem liberação do histórico: ela mostra só o que a própria loja
+     * registrou (Vehicle::restrictHistoryTo). Chassi e RENAVAM inteiros (e CRV e motor) só para
+     * o dono atual (VehiclePolicy::update), como na API; em consignação saem parciais
+     * (App\Support\Vehicle\VehicleIdentifierMask).
+     */
+    public function show(Request $request, Vehicle $vehicle): View
     {
         Gate::authorize('view', $vehicle);
 
-        $vehicle->loadCount([
-            'maintenances',
-            'maintenances as verified_maintenances_count' => fn ($query) => $query->whereNotNull('verified_at'),
-        ]);
-        $vehicle->load([
-            'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
-            'provenanceStripMaintenances',
-            'maintenances' => fn ($query) => $query->with(['items', 'workshop', 'verifiedWorkshop', 'user', 'invoices']),
+        $user = $request->user();
+        $canAddMaintenance = Gate::allows('addMaintenance', $vehicle);
+        $canEdit = Gate::allows('update', $vehicle);
+        $identifiersMasked = ! $canEdit;
+        $consignment = $user->consignmentFor($vehicle);
+
+        $vehicle->restrictHistoryTo($user);
+
+        return view('garage.vehicles.show', compact('vehicle', 'canAddMaintenance', 'canEdit', 'identifiersMasked', 'consignment'));
+    }
+
+    public function endConsignment(Request $request, Vehicle $vehicle, VehicleConsignmentService $consignments): RedirectResponse
+    {
+        Gate::authorize('endConsignment', $vehicle);
+
+        $data = $request->validate([
+            'end_reason' => ['required', 'in:sold,owner_withdrew'],
+        ], [
+            'end_reason.in' => 'Informe se o veículo foi vendido ou devolvido ao proprietário.',
         ]);
 
-        return view('garage.vehicles.show', compact('vehicle'));
+        $consignment = $consignments->activeFor($request->user(), $vehicle);
+
+        if ($consignment === null) {
+            return back()->withErrors(['consignment' => 'Este veículo não está em consignação nesta loja.']);
+        }
+
+        try {
+            $consignments->end($consignment, $data['end_reason']);
+        } catch (RuntimeException $exception) {
+            return back()->withErrors(['consignment' => $exception->getMessage()]);
+        }
+
+        return redirect()->route('garage.vehicles.index')
+            ->with('success', 'Consignação encerrada. As manutenções que você registrou seguem no histórico do veículo.');
+    }
+
+    public function requestHistoryAccess(Request $request, Vehicle $vehicle, VehicleConsignmentService $consignments): RedirectResponse
+    {
+        Gate::authorize('endConsignment', $vehicle);
+
+        $consignment = $consignments->activeFor($request->user(), $vehicle);
+
+        if ($consignment === null) {
+            return back()->withErrors(['consignment' => 'Este veículo não está em consignação nesta loja.']);
+        }
+
+        try {
+            $consignments->requestHistoryAccess($consignment);
+        } catch (RuntimeException $exception) {
+            return back()->withErrors(['consignment' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Pedido enviado ao proprietário. Ele libera o histórico com um clique.');
     }
 
     /**
-     * @param  array<string, mixed>|null  $verification
+     * "Editar veículo e capas": só o dono atual (VehiclePolicy::update); consignação não edita.
      */
-    private function crlvFromVerification(?array $verification): CrlvParseResult
+    public function edit(Request $request, Vehicle $vehicle, VehicleCatalogService $catalog): View
     {
-        $preview = $verification['parsed'] ?? null;
+        $this->authorizeStockVehicle($request, $vehicle);
+        Gate::authorize('update', $vehicle);
 
-        if (! is_array($preview)) {
-            throw new RuntimeException('Dados do CRLV-e não encontrados.');
-        }
+        return view('garage.vehicles.edit', [
+            'vehicle' => $vehicle,
+            'catalog' => $catalog->all(),
+            'coverMaxMb' => VehicleEntryFlow::COVER_MAX_KILOBYTES / 1024,
+        ]);
+    }
 
-        return new CrlvParseResult(
-            licensePlate: $preview['license_plate'],
-            renavam: $preview['renavam'],
-            brand: $preview['brand'],
-            model: $preview['model'],
-            year: (int) $preview['year'],
-            crvNumber: $preview['crv_number'] ?? null,
-            exerciseYear: isset($preview['exercise_year']) ? (int) $preview['exercise_year'] : null,
-            ownerName: $preview['owner_name'] ?? null,
-            ownerDocument: $preview['owner_document'] ?? null,
-        );
+    public function update(Request $request, Vehicle $vehicle, VehicleCoverService $covers): RedirectResponse
+    {
+        $this->authorizeStockVehicle($request, $vehicle);
+        Gate::authorize('update', $vehicle);
+
+        $this->updateVehicleDetails($request, $vehicle, $covers);
+
+        return redirect()->route('garage.vehicles.show', $vehicle)
+            ->with('success', 'Veículo atualizado.');
+    }
+
+    private function authorizeStockVehicle(Request $request, Vehicle $vehicle): void
+    {
+        abort_unless($request->user()->canViewStockVehicleHistory($vehicle), 403);
     }
 }

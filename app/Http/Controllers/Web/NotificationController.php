@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Support\NotificationLink;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
@@ -12,16 +13,18 @@ class NotificationController extends Controller
 {
     public function index(Request $request): View
     {
-        $notifications = $request->user()
-            ->notifications()
-            ->latest()
-            ->paginate(20);
+        $user = $request->user();
 
         return view('notifications.index', [
-            'notifications' => $notifications,
+            'notifications' => $user->notifications()->latest()->paginate(20),
+            'unreadCount' => $user->unreadNotifications()->count(),
         ]);
     }
 
+    /**
+     * Marca como lida e abre a ficha do veículo citado no portal da conta. Sem ficha para abrir
+     * (notificação sem veículo ou conta de oficina), volta para a página de onde veio.
+     */
     public function markAsRead(Request $request, string $notificationId): RedirectResponse
     {
         $notification = $this->findOwnedNotification($request, $notificationId);
@@ -30,29 +33,20 @@ class NotificationController extends Controller
             $notification->markAsRead();
         }
 
-        $vehicleId = data_get($notification->data, 'vehicle_id');
-        if (is_numeric($vehicleId)) {
-            return redirect()->route($this->vehicleShowRoute($request), (int) $vehicleId);
+        $vehicleUrl = NotificationLink::vehicleUrl($notification, $request->user());
+
+        if ($vehicleUrl !== null) {
+            return redirect($vehicleUrl);
         }
 
-        $url = data_get($notification->data, 'vehicle_url');
-
-        if (is_string($url) && str_starts_with($url, '/')) {
-            return redirect($url);
-        }
-
-        if (is_string($url) && $url !== '') {
-            return redirect()->to($url);
-        }
-
-        return redirect()->route($this->dashboardRoute($request));
+        return redirect()->back(fallback: route($request->user()->portal()->dashboardRoute()));
     }
 
     public function markAllAsRead(Request $request): RedirectResponse
     {
         $request->user()->unreadNotifications->markAsRead();
 
-        return redirect()->route($this->dashboardRoute($request))
+        return redirect()->back(fallback: route($request->user()->portal()->dashboardRoute()))
             ->with('success', 'Notificações marcadas como lidas.');
     }
 
@@ -65,22 +59,5 @@ class NotificationController extends Controller
             ->firstOrFail();
 
         return $notification;
-    }
-
-    private function dashboardRoute(Request $request): string
-    {
-        return match ($request->user()->user_type) {
-            'garage' => 'garage.dashboard',
-            'workshop' => 'workshop.dashboard',
-            default => 'user.dashboard',
-        };
-    }
-
-    private function vehicleShowRoute(Request $request): string
-    {
-        return match ($request->user()->user_type) {
-            'garage' => 'garage.vehicles.show',
-            default => 'user.vehicles.show',
-        };
     }
 }

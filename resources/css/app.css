@@ -1,13 +1,24 @@
 @import 'tailwindcss';
 @import '../../node_modules/preline/variants.css';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+/* A paginação usa as views publicadas em resources/views/vendor/pagination (cobertas pelo glob de
+   .blade.php abaixo), e não a view do framework. */
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
 @source '../../node_modules/preline/dist/*.js';
 
-@plugin '@tailwindcss/forms';
+/* Só a estratégia base: a estratégia "class" do plugin gera .form-input/.form-select na camada
+   de utilities e sobrescreve os componentes de mesmo nome definidos abaixo. */
+@plugin '@tailwindcss/forms' {
+    strategy: 'base';
+}
+
+/* O app não tem tema escuro. Sem esta linha, o Tailwind 4 liga toda variante dark: (Preline, views
+   de terceiros) pelo prefers-color-scheme do sistema e pinta componentes de escuro numa página
+   clara. Assim dark: só vale dentro de um elemento com a classe .dark, que o app não usa.
+   Superfícies escuras da marca usam o escopo .theme-inverse (ver @layer base), não dark:. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
@@ -26,6 +37,7 @@
     --color-wrench-50: #e6faf8;
     --color-wrench-100: #ccf5f0;
     --color-wrench-200: #99ebe1;
+    --color-wrench-300: #7ddfd5;
     --color-wrench-400: #4dd4c8;
     --color-wrench-500: #2ec4b6;
     --color-wrench-600: #26a99d;
@@ -35,77 +47,311 @@
     --color-wrench-950: #0b2e2b;
 }
 
+/* Papéis semânticos. Views e componentes usam estes nomes (bg-surface, text-muted-foreground,
+   border-input, bg-danger-soft...), não a paleta crua, que acima continua igual. Os valores daqui
+   são os da superfície clara, o padrão. O escopo .theme-inverse (em @layer base) os redefine para
+   superfícies escuras e .theme-default volta a eles. Não é dark mode. "static" faz todos saírem em
+   :root mesmo sem utilitário que os use, para var(--color-...) valer em CSS próprio, em style
+   inline e no JS. */
+@theme static {
+    /* Contraste (WCAG 2.1) medido no branco (b), em automotive-50 (a50) e em automotive-100 (a100).
+       O teal wrench-400 a 700 é cor de preenchimento: como texto sobre fundo claro reprova o AA
+       (wrench-600 dá 2,90:1 e wrench-700 dá 4,20:1). */
+
+    /* Superfícies. background: fundo da página. surface: card, campo, dropdown, dialog, tabela.
+       surface-muted: trilho de abas, hover de linha, skeleton, campo desabilitado. */
+    --color-background: var(--color-automotive-50);
+    --color-surface: #ffffff;
+    --color-surface-muted: var(--color-automotive-100);
+
+    /* Texto. foreground: 15,39 b / 14,31 a50. muted-foreground (descrição, dica, rótulo de
+       tabela, texto sobre surface-muted): 7,14 b / 6,64 a50 / 6,06 a100. subtle-foreground
+       (metadado em text-xs, data, contador): 5,00 b / 4,65 a50; nunca sobre surface-muted (4,24). */
+    --color-foreground: var(--color-automotive-900);
+    --color-muted-foreground: var(--color-automotive-600);
+    --color-subtle-foreground: var(--color-automotive-500);
+
+    /* Bordas. border (card, divisor, linha de tabela) e border-strong (botão secundário, badge)
+       são decorativas. input é o limite de campo, checkbox e dropzone: 3,26 b / 3,03 a50
+       (WCAG 1.4.11). ring é o contorno de foco e a borda do campo em foco: 6,31 b / 5,36 a100. */
+    --color-border: var(--color-automotive-200);
+    --color-border-strong: var(--color-automotive-300);
+    --color-input: var(--color-automotive-400);
+    --color-ring: var(--color-wrench-800);
+
+    /* Ação principal. primary é só preenchimento, nunca texto em fundo claro (2,17 b).
+       primary-foreground: 7,96 sobre primary e 9,51 sobre primary-hover. */
+    --color-primary: var(--color-wrench-500);
+    --color-primary-hover: var(--color-wrench-400);
+    --color-primary-foreground: var(--color-automotive-950);
+
+    /* Link de texto e de ação ("Ver todos", "Voltar"): 6,31 b / 5,87 a50 / 5,36 a100. Gera
+       text-link e decoration-link. Hover: 9,77 b. */
+    --color-link: var(--color-wrench-800);
+    --color-link-hover: var(--color-wrench-900);
+
+    /* Destaque da marca (badge brand, chip ativo, drag-over): accent-foreground sobre accent, 5,83.
+       Não é status de sucesso: o teal é da marca e do Selo. */
+    --color-accent: var(--color-wrench-50);
+    --color-accent-foreground: var(--color-wrench-800);
+    --color-accent-border: var(--color-wrench-200);
+
+    /* Estados. A cor de cada um é texto e ícone sobre a própria -soft e sobre o branco. Status
+       nunca depende só da cor: vem com ícone ou texto.
+       - danger: 5,88 sobre danger-soft / 6,42 b. Também preenche o botão destrutivo, com
+         danger-foreground (6,42; 8,37 no hover).
+       - success: 6,78 sobre success-soft / 7,09 b. Verde, não emerald, para não parecer o Selo.
+       - warning: 8,17 sobre warning-soft / 9,09 b.
+       - info: neutro de propósito, sem azul. 8,50 sobre info-soft. */
+    --color-danger: var(--color-red-700);
+    --color-danger-hover: var(--color-red-800);
+    --color-danger-soft: var(--color-red-50);
+    --color-danger-foreground: #ffffff;
+    --color-success: var(--color-green-800);
+    --color-success-soft: var(--color-green-50);
+    --color-warning: var(--color-amber-900);
+    --color-warning-soft: var(--color-amber-100);
+    --color-info: var(--color-automotive-700);
+    --color-info-soft: var(--color-automotive-100);
+
+    /* Fundo atrás de dialog, sheet e gaveta (backdrop:bg-overlay). */
+    --color-overlay: rgb(11 28 44 / 0.5);
+
+    /* Navegação lateral (admin). Sempre escura: não muda com o escopo. Sobre sidebar:
+       sidebar-foreground 8,51; sidebar-muted (rótulo de grupo) 5,30; sidebar-active (texto e
+       indicador do item ativo) 9,51, e 6,92 sobre o fundo do ativo, bg-sidebar-active/15.
+       sidebar-border é decorativa. */
+    --color-sidebar: var(--color-automotive-950);
+    --color-sidebar-foreground: var(--color-automotive-300);
+    --color-sidebar-muted: var(--color-automotive-400);
+    --color-sidebar-active: var(--color-wrench-400);
+    --color-sidebar-border: var(--color-automotive-800);
+
+    /* Contrato de procedência (.ai/rules/theme.md): os mesmos valores de provenance.css e de
+       provenance.dart. Selo da oficina 5,47 b; Declarada 6,84 sobre a própria superfície. Geram
+       text-prov-verified, bg-prov-declared-surface etc. Não mudar sem espelhar no Flutter. */
+    --color-prov-verified: #0f766e;
+    --color-prov-verified-surface: #ffffff;
+    --color-prov-declared: #92400e;
+    --color-prov-declared-surface: #fffbeb;
+
+    /* Raios com nome próprio (rounded-control, rounded-card, rounded-overlay), iguais aos
+       rounded-lg e rounded-xl de hoje, sem redefinir a escala do Tailwind.
+       control: botão, campo, item de menu, tooltip. card: card, tabela, alert, toast, dropdown.
+       overlay: dialog, sheet, card do guest. */
+    --radius-control: 0.5rem;
+    --radius-card: 0.75rem;
+    --radius-overlay: 1rem;
+
+    /* Easing: smooth-out para abrir, fechar, entrar e revelar; spring só no pop de badge ou
+       contador. Geram ease-smooth-out e ease-spring. */
+    --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+
+    /* Durações: geram duration-fast, duration-base e duration-slow a partir das variáveis de
+       :root (@layer base). duration-150/200/250 também valem. */
+    --transition-duration-fast: var(--duration-fast);
+    --transition-duration-base: var(--duration-base);
+    --transition-duration-slow: var(--duration-slow);
+}
+
+@layer base {
+    /* Movimento curto: fast (150ms) para hover, pressionar, tooltip e fechar; base (200ms) para
+       abrir dropdown e dialog, trocar de aba e mostrar toast; slow (250ms) para sheet e gaveta.
+       hero (500ms) só na entrada da landing (.landing-reveal). Sempre com ease-smooth-out e
+       motion-safe:/motion-reduce:. As variáveis também servem ao CSS próprio e ao JS. */
+    :root {
+        --duration-fast: 150ms;
+        --duration-base: 200ms;
+        --duration-slow: 250ms;
+        --duration-hero: 500ms;
+        --distance-micro: 4px;
+        --distance-base: 8px;
+        --distance-reveal: 12px;
+    }
+
+    /* Foco visível global (WCAG 2.4.7 e 1.4.11): contorno de 2px na cor --color-ring, afastado
+       2px do elemento. O afastamento é transparente, então não vira halo claro em fundo escuro.
+       Só aparece na navegação por teclado (:focus-visible). Os campos .form-input e .form-select
+       trocam o contorno por borda e anel próprios. */
+    :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+        outline: 2px solid var(--color-ring);
+        outline-offset: 2px;
+    }
+
+    /* Destino do "Pular para o conteúdo" (<main id="conteudo" tabindex="-1">): recebe foco por
+       script e não é controle, então não ganha contorno. */
+    main[tabindex='-1']:focus {
+        outline: none;
+    }
+
+    /* Superfície escura da marca: navbar, sidebar do admin, gaveta mobile, body do guest e seções
+       escuras da landing. Não é dark mode. É um escopo aplicado com class="theme-inverse" no
+       contêiner escuro, que redefine os papéis semânticos para fundo escuro, e com isso .form-*,
+       .card, .link e os x-ui.* (botão, badge, campo) ficam legíveis ali sem sobrescritas com "!". Um painel
+       claro dentro dele, como o dropdown branco do sino, volta ao padrão com class="theme-default".
+       Contraste sobre automotive-950 (a950), automotive-900 (a900, surface) e automotive-800
+       (a800, surface-muted):
+       - foreground 17,26 a950 / 15,39 a900 / 13,34 a800; muted-foreground 8,51 / 7,59 / 6,58;
+         subtle-foreground 5,30 / 4,72, nunca sobre a800 (4,09).
+       - ring e link (wrench-400) 9,51 / 8,48 / 7,35, no lugar de wrench-800, que no escuro dá
+         2,73; link-hover 12,60 a950. input 4,72 a900.
+       - accent-foreground sobre accent: 7,18 a950 / 6,35 a900.
+       - danger 8,99 a950 / 8,01 a900, 7,23 sobre danger-soft; danger-foreground sobre danger
+         8,99. success 11,01 a900 / 8,41 sobre success-soft. warning 10,64 a900 / 8,23 sobre
+         warning-soft. info sobre info-soft 9,44. */
+    .theme-inverse {
+        --color-background: var(--color-automotive-950);
+        --color-surface: var(--color-automotive-900);
+        --color-surface-muted: var(--color-automotive-800);
+        --color-foreground: #ffffff;
+        --color-muted-foreground: var(--color-automotive-300);
+        --color-subtle-foreground: var(--color-automotive-400);
+        --color-border: var(--color-automotive-800);
+        --color-border-strong: var(--color-automotive-600);
+        --color-input: var(--color-automotive-400);
+        --color-ring: var(--color-wrench-400);
+        --color-link: var(--color-wrench-400);
+        --color-link-hover: var(--color-wrench-200);
+        --color-accent: color-mix(in oklab, var(--color-wrench-500) 15%, transparent);
+        --color-accent-foreground: var(--color-wrench-400);
+        --color-accent-border: color-mix(in oklab, var(--color-wrench-500) 30%, transparent);
+        --color-danger: var(--color-red-300);
+        --color-danger-hover: var(--color-red-200);
+        --color-danger-soft: color-mix(in oklab, var(--color-red-500) 15%, transparent);
+        --color-danger-foreground: var(--color-automotive-950);
+        --color-success: var(--color-green-300);
+        --color-success-soft: color-mix(in oklab, var(--color-green-500) 15%, transparent);
+        --color-warning: var(--color-amber-300);
+        --color-warning-soft: color-mix(in oklab, var(--color-amber-500) 15%, transparent);
+        --color-info: var(--color-automotive-200);
+        --color-info-soft: var(--color-automotive-800);
+    }
+
+    /* Os mesmos papéis de .theme-inverse, com os valores claros do @theme. */
+    .theme-default {
+        --color-background: var(--color-automotive-50);
+        --color-surface: #ffffff;
+        --color-surface-muted: var(--color-automotive-100);
+        --color-foreground: var(--color-automotive-900);
+        --color-muted-foreground: var(--color-automotive-600);
+        --color-subtle-foreground: var(--color-automotive-500);
+        --color-border: var(--color-automotive-200);
+        --color-border-strong: var(--color-automotive-300);
+        --color-input: var(--color-automotive-400);
+        --color-ring: var(--color-wrench-800);
+        --color-link: var(--color-wrench-800);
+        --color-link-hover: var(--color-wrench-900);
+        --color-accent: var(--color-wrench-50);
+        --color-accent-foreground: var(--color-wrench-800);
+        --color-accent-border: var(--color-wrench-200);
+        --color-danger: var(--color-red-700);
+        --color-danger-hover: var(--color-red-800);
+        --color-danger-soft: var(--color-red-50);
+        --color-danger-foreground: #ffffff;
+        --color-success: var(--color-green-800);
+        --color-success-soft: var(--color-green-50);
+        --color-warning: var(--color-amber-900);
+        --color-warning-soft: var(--color-amber-100);
+        --color-info: var(--color-automotive-700);
+        --color-info-soft: var(--color-automotive-100);
+    }
+}
+
 @layer components {
-    .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-wrench-500 px-4 py-2.5 text-sm font-semibold text-automotive-950 shadow-sm transition hover:bg-wrench-400 focus:outline-none focus:ring-2 focus:ring-wrench-500 focus:ring-offset-2 focus:ring-offset-automotive-50 disabled:opacity-60;
+    /* Botões, badges e KPIs não têm classe aqui: <x-ui.button>, <x-ui.badge> e <x-ui.stat> (no JS,
+       buttonClass() de resources/js/ui/button.js). As classes antigas de botão, badge e card de KPI
+       saíram quando o último uso foi migrado. */
+
+    /* Link de texto ou de ação ("Ver todos", "Voltar") sobre fundo claro. Link dentro de parágrafo
+       leva sublinhado fixo: somar a classe underline. */
+    .link {
+        @apply font-medium text-link underline-offset-2 hover:text-link-hover hover:underline focus-visible:underline;
     }
 
-    .btn-secondary {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-automotive-300 bg-white px-4 py-2.5 text-sm font-semibold text-automotive-800 shadow-sm transition hover:bg-automotive-100 focus:outline-none focus:ring-2 focus:ring-automotive-500 focus:ring-offset-2;
-    }
-
-    .btn-danger {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700;
+    /* "Pular para o conteúdo": primeiro elemento do body, invisível até receber foco. Pílula
+       escura com anel teal, legível tanto sobre o navbar escuro quanto sobre página clara. z-[70]
+       fica acima do sheet mobile e da gaveta do admin (z-[60]). */
+    .skip-link {
+        @apply sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[70] focus:rounded-lg focus:bg-automotive-950 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg focus:ring-2 focus:ring-wrench-400;
     }
 
     .card {
-        @apply rounded-xl border border-automotive-200 bg-white p-6 shadow-sm;
+        @apply rounded-card border border-border bg-surface p-6 shadow-sm;
     }
 
     .form-label {
-        @apply mb-1 block text-sm font-medium text-automotive-800;
+        @apply mb-1 block text-sm font-medium text-foreground;
     }
 
+    /* Campos: borda --color-input (3,26:1 no branco, 3,03:1 em automotive-50; WCAG 1.4.11), porque
+       o campo branco fica dentro de card branco e a borda é a única pista do limite. No foco, borda
+       --color-ring (6,31:1) e anel suave. outline-hidden mantém o contorno transparente, que o modo
+       de alto contraste do sistema torna visível. Placeholder em subtle-foreground: 5,00:1 no
+       branco e 4,72:1 no escuro (o cinza padrão do plugin dava cerca de 3:1 em .theme-inverse).
+       Desabilitado: texto subtle sobre surface-muted (4,24:1), aceito porque controle desabilitado
+       não entra no critério de contraste. Texto em 16px abaixo de sm: com menos, o Safari do iOS dá
+       zoom na página ao focar o campo (x-ui.input faz o mesmo). */
     .form-input {
-        @apply w-full rounded-lg border border-automotive-300 bg-white px-3 py-2 text-sm text-automotive-900 shadow-sm focus:border-wrench-500 focus:outline-none focus:ring-2 focus:ring-wrench-500/25;
+        @apply w-full rounded-control border border-input bg-surface px-3 py-2 text-base text-foreground shadow-sm placeholder:text-subtle-foreground sm:text-sm focus:border-ring focus:outline-hidden focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-subtle-foreground;
     }
 
+    /* pr-10 preserva a folga da seta que a estratégia base do @tailwindcss/forms desenha no select
+       (padding-right 2.5rem); px-3 a anulava e o texto passava por baixo da seta. */
     .form-select {
-        @apply w-full rounded-lg border border-automotive-300 bg-white px-3 py-2 text-sm text-automotive-900 shadow-sm focus:border-wrench-500 focus:outline-none focus:ring-2 focus:ring-wrench-500/25;
+        @apply w-full rounded-control border border-input bg-surface py-2 pr-10 pl-3 text-base text-foreground shadow-sm sm:text-sm focus:border-ring focus:outline-hidden focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-subtle-foreground;
     }
 
-    .badge {
-        @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
-    }
-
-    .badge-blue {
-        @apply border border-automotive-300/60 bg-automotive-100 text-automotive-700;
-    }
-
-    .badge-orange {
-        @apply border border-wrench-500/30 bg-wrench-500/15 text-wrench-600;
-    }
-
-    .badge-green {
-        @apply border border-automotive-400/40 bg-automotive-200/80 text-automotive-700;
+    /* Leitura longa: artigo do blog (Markdown), prévia do editor e documentos legais. Coluna de
+       56ch (na Inter, ~72 caracteres por linha; 68ch dava ~89), 17px no celular e 18px a partir de
+       sm, entrelinha 1,8. O texto corrido fica em automotive-700 (10,4:1 no branco); títulos,
+       negrito e tabela em foreground. .blog-content centraliza a coluna; .doc-content fica ao lado
+       do sumário dos termos, alinhada à esquerda como o page-header. */
+    .blog-content,
+    .doc-content {
+        @apply max-w-[56ch] text-[1.0625rem] leading-[1.8] text-automotive-700 sm:text-lg;
     }
 
     .blog-content {
-        @apply text-base leading-relaxed text-automotive-700;
+        @apply mx-auto;
     }
 
     .blog-content > * + * {
-        @apply mt-4;
+        @apply mt-5;
+    }
+
+    .blog-content :is(h2, h3, h4),
+    .doc-content h2 {
+        @apply scroll-mt-24 text-balance text-foreground;
     }
 
     .blog-content h2 {
-        @apply mt-10 text-2xl font-bold text-automotive-900;
+        @apply mt-12 text-2xl leading-tight font-bold;
     }
 
     .blog-content h3 {
-        @apply mt-8 text-xl font-semibold text-automotive-900;
+        @apply mt-8 text-xl leading-snug font-semibold;
     }
 
     .blog-content h4 {
-        @apply mt-6 text-lg font-semibold text-automotive-900;
+        @apply mt-6 text-lg font-semibold;
     }
 
-    .blog-content a {
-        @apply font-medium text-wrench-700 underline underline-offset-2 hover:text-wrench-600;
+    .blog-content :is(h2, h3, h4) + * {
+        @apply mt-3;
+    }
+
+    .doc-content h2 {
+        @apply mt-10 text-xl leading-snug font-semibold;
+    }
+
+    .blog-content a,
+    .doc-content a {
+        @apply font-medium text-link underline decoration-1 underline-offset-2 hover:text-link-hover hover:decoration-2;
     }
 
     .blog-content strong {
-        @apply font-semibold text-automotive-900;
+        @apply font-semibold text-foreground;
     }
 
     .blog-content ul {
@@ -116,57 +362,78 @@
         @apply list-decimal space-y-2 pl-6;
     }
 
+    .blog-content li::marker,
+    .doc-content li::marker {
+        color: var(--color-subtle-foreground);
+    }
+
     .blog-content blockquote {
-        @apply border-l-4 border-wrench-500 bg-automotive-50 px-4 py-3 italic text-automotive-700;
+        @apply border-l-4 border-accent-border bg-surface-muted/60 px-5 py-3 text-muted-foreground italic;
     }
 
     .blog-content img {
-        @apply w-full rounded-xl border border-automotive-200 shadow-sm;
+        @apply w-full rounded-card border border-border shadow-sm;
     }
 
     .blog-content code {
-        @apply rounded bg-automotive-100 px-1.5 py-0.5 text-sm text-automotive-800;
+        @apply rounded bg-surface-muted px-1.5 py-0.5 text-[0.875em] text-foreground;
     }
 
+    /* Bloco de código: superfície escura da marca (automotive-950), como a do hero. */
     .blog-content pre {
-        @apply overflow-x-auto rounded-lg bg-automotive-950 p-4 text-sm text-automotive-100;
+        @apply overflow-x-auto rounded-control bg-automotive-950 p-4 text-sm leading-relaxed text-automotive-100;
     }
 
     .blog-content pre code {
-        @apply bg-transparent p-0 text-automotive-100;
+        @apply bg-transparent p-0 text-inherit;
     }
 
     .blog-content hr {
-        @apply my-8 border-automotive-200;
+        @apply my-10 border-border;
     }
 
     .blog-content table {
-        @apply w-full border-collapse overflow-hidden rounded-lg border border-automotive-200 text-sm;
+        @apply w-full border-collapse overflow-hidden rounded-control border border-border text-sm leading-normal;
     }
 
     .blog-content th {
-        @apply border-b border-automotive-200 bg-automotive-50 px-3 py-2 text-left font-semibold text-automotive-800;
+        @apply border-b border-border bg-surface-muted px-3 py-2 text-left font-semibold text-foreground;
     }
 
     .blog-content td {
-        @apply border-b border-automotive-100 px-3 py-2;
+        @apply border-b border-border px-3 py-2;
     }
 
-    .stat-card {
-        @apply min-w-0 overflow-hidden rounded-xl border border-automotive-200 bg-gradient-to-br from-white to-automotive-100/60 p-5 shadow-sm;
-    }
-
+    /* Flutuação do mock do hero (só lá): laço lento e decorativo, pausado pelo botão "Pausar
+       animação" (resources/js/landing.js) e desligado com prefers-reduced-motion. */
     .landing-float {
         animation: landing-float 5s ease-in-out infinite;
     }
 
-    .landing-float-delay {
-        animation-delay: 1.4s;
+    /* Entrada do hero (padrão landing-intro do ObsidianUI): selo, título, texto e ações sobem 12px
+       e ganham nitidez em 500ms, com o atraso de cada um em --landing-intro-delay (40, 100 e 160ms,
+       no próprio markup). Só com prefers-reduced-motion: no-preference; fora disso o hero já
+       aparece pronto. O blur é estático e pequeno (3px), só no texto do hero. */
+    @media (prefers-reduced-motion: no-preference) {
+        .landing-intro {
+            animation: landing-intro var(--duration-hero) var(--ease-smooth-out) both;
+            animation-delay: var(--landing-intro-delay, 0ms);
+        }
     }
 
     .landing-scroller {
         scrollbar-width: thin;
         scrollbar-color: var(--color-automotive-300) transparent;
+    }
+
+    /* Filtro de procedência no lugar (resources/js/provenance-ui.js): o card que volta à lista
+       entra com fade de 150ms. Só depois do primeiro filtro ([data-provenance-filtered]), para a
+       ficha não piscar ao carregar, e só com movimento permitido. O x-provenance-card com link já
+       traz transition-[box-shadow,opacity] (o utilitário vence esta camada). */
+    @media (prefers-reduced-motion: no-preference) {
+        [data-provenance-filtered] [data-provenance-list] > [data-verified] {
+            transition: opacity var(--duration-fast) var(--ease-smooth-out);
+        }
     }
 
     .landing-faq summary::-webkit-details-marker {
@@ -175,13 +442,13 @@
 
     .landing-reveal {
         transition:
-            opacity 0.7s ease,
-            transform 0.7s ease;
+            opacity var(--duration-hero) var(--ease-smooth-out),
+            transform var(--duration-hero) var(--ease-smooth-out);
     }
 
     .landing-reveal.is-pending {
         opacity: 0;
-        transform: translateY(1.5rem);
+        transform: translateY(var(--distance-reveal));
     }
 
     .landing-reveal.is-visible {
@@ -189,12 +456,10 @@
         transform: translateY(0);
     }
 
+    /* Três ciclos de 1,5s (4,5s) e para: indicação de rolagem, não um loop. Abaixo de 5s, não
+       precisa de controle de pausa (WCAG 2.2.2). */
     .landing-bounce {
-        animation: landing-bounce 2s ease-in-out infinite;
-    }
-
-    .landing-dot-pulse {
-        animation: landing-dot-pulse 2.4s ease-in-out infinite;
+        animation: landing-bounce 1.5s ease-in-out 3;
     }
 
     .landing-marquee {
@@ -209,8 +474,18 @@
         animation: landing-marquee 40s linear infinite;
     }
 
-    .landing-marquee:hover .landing-marquee-track {
+    /* Pausa no hover e no foco do próprio marquee. O controle de pausa (WCAG 2.2.2) é o botão
+       "Pausar animação", irmão da faixa, que pausa por estilo inline (resources/js/landing.js);
+       por isso o hover e o foco no botão não pausam a faixa, senão "Retomar" não retomaria. */
+    .landing-marquee:hover .landing-marquee-track,
+    .landing-marquee:focus-within .landing-marquee-track {
         animation-play-state: paused;
+    }
+}
+
+@starting-style {
+    [data-provenance-filtered] [data-provenance-list] > [data-verified] {
+        opacity: 0;
     }
 }
 
@@ -236,16 +511,11 @@
     }
 }
 
-@keyframes landing-dot-pulse {
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.45;
-        transform: scale(0.85);
+@keyframes landing-intro {
+    from {
+        opacity: 0;
+        transform: translateY(var(--distance-reveal));
+        filter: blur(3px);
     }
 }
 
@@ -261,9 +531,8 @@
 
 @media (prefers-reduced-motion: reduce) {
     .landing-float,
-    .landing-float-delay,
+    .landing-intro,
     .landing-bounce,
-    .landing-dot-pulse,
     .landing-marquee-track {
         animation: none !important;
     }
@@ -273,6 +542,18 @@
         opacity: 1;
         transform: none;
         transition: none;
+    }
+
+    /* Rede de segurança para o resto do app: transições e animações viram instantâneas (os
+       eventos transitionend/animationend continuam disparando) e a rolagem suave do
+       html.scroll-smooth vira rolagem direta. */
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }
 

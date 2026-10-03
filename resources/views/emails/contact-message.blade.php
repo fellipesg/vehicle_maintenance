@@ -9,5 +9,5 @@
 
 {{ $body }}
 
-Revisalog
+RevisaLog
 </x-mail::message>

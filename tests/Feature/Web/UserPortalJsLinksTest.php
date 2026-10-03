@@ -10,28 +10,42 @@ use Tests\TestCase;
 class UserPortalJsLinksTest extends TestCase
 {
     /**
-     * The portal is rendered client-side, so its hard-coded hrefs are never
-     * exercised by a controller test. Match each one against the router so a
-     * typo cannot ship a link that falls through to a `{id}` route.
+     * The owner portal is server-rendered now; the only link its scripts build is the PDF download
+     * (/usuario/exportacoes-pdf/{id}/{file}.pdf). Match every hard-coded path against the router so
+     * a typo cannot ship a link that falls through to a `{id}` route.
      */
     public function test_hard_coded_portal_links_resolve_to_registered_routes(): void
     {
-        $source = file_get_contents(resource_path('js/user-portal.js'));
+        $paths = [];
 
-        preg_match_all('#href="(/[^"`\s]*)#', $source, $matches);
+        foreach (['js/user-portal.js', 'js/utils/vehicle-pdf-export.js'] as $script) {
+            $source = file_get_contents(resource_path($script));
 
-        $paths = array_values(array_unique($matches[1]));
+            preg_match_all('#href="(/[^"`\s]*)#', $source, $hrefs);
+            preg_match_all("#'(/usuario/[^'\s]*)'#", $source, $constants);
+
+            $paths = [...$paths, ...$hrefs[1], ...$constants[1]];
+        }
+
+        $paths = array_values(array_unique($paths));
 
         $this->assertNotEmpty($paths, 'No hard-coded portal links were found to verify.');
 
         foreach ($paths as $path) {
             $resolvable = preg_replace('#\$\{[^}]*\}#', '1', $path);
 
-            try {
-                $this->app['router']->getRoutes()->match(Request::create($resolvable, 'GET'));
-            } catch (NotFoundHttpException|UrlGenerationException) {
-                $this->fail("user-portal.js links to {$path}, which matches no registered GET route.");
+            // Prefixo de caminho (termina em /): completa com um id e um nome de arquivo PDF.
+            if (str_ends_with($resolvable, '/')) {
+                $resolvable .= '1/historico_manutencoes.pdf';
             }
+
+            try {
+                $route = $this->app['router']->getRoutes()->match(Request::create($resolvable, 'GET'));
+            } catch (NotFoundHttpException|UrlGenerationException) {
+                $this->fail("A owner portal script links to {$path}, which matches no registered GET route.");
+            }
+
+            $this->assertNotSame('user.vehicles.show', $route->getName(), "{$path} caiu numa rota {id}.");
         }
     }
 }

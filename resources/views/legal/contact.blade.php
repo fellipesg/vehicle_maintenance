@@ -1,76 +1,71 @@
 @extends('layouts.app')
 
-@section('title', 'Contato — Revisalog')
+@section('title', 'Contato')
 
-@if($turnstileSiteKey)
-    @push('head')
+@push('head')
+    <meta name="description" content="Fale com o suporte do RevisaLog: dúvidas, ajuda com o histórico do veículo, parcerias com oficinas e lojistas e pedidos sobre dados pessoais (LGPD).">
+    @if($turnstileSiteKey)
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    @endpush
-@endif
+    @endif
+@endpush
 
 @section('content')
-<div class="mx-auto max-w-xl px-4 py-10">
-    <p class="text-sm font-semibold uppercase tracking-wide text-automotive-500">Revisalog</p>
-    <h1 class="mt-2 text-2xl font-bold text-automotive-900">Contato</h1>
-    <p class="mt-3 text-sm leading-relaxed text-automotive-600">
-        Fale com a gente em
-        <a href="mailto:{{ $supportEmail }}" class="font-medium text-wrench-700 hover:underline">{{ $supportEmail }}</a>
-        ou envie a mensagem abaixo.
-    </p>
+<x-ui.container size="sm" padded>
+    <x-ui.page-header eyebrow="Suporte" title="Contato">
+        <x-slot:description>
+            Escreva para <x-ui.link :href="'mailto:'.$supportEmail" variant="inline">{{ $supportEmail }}</x-ui.link> ou envie a mensagem abaixo. Respondemos por e-mail.
+        </x-slot:description>
+    </x-ui.page-header>
 
-    <form method="POST" action="{{ route('contact.store') }}" class="card mt-8 space-y-4">
-        @csrf
+    <x-ui.card padding="lg">
+        <form method="POST" action="{{ route('contact.store') }}" class="relative grid gap-5" data-slot="contact-form">
+            @csrf
 
-        <div class="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
-            <label for="website">Website</label>
-            <input type="text" name="website" id="website" tabindex="-1" autocomplete="off">
-        </div>
+            <x-ui.form-errors :ids="['cf-turnstile-response' => null]" />
 
-        <div>
-            <label for="name" class="form-label">Nome *</label>
-            <input type="text" name="name" id="name" value="{{ old('name', auth()->user()?->name) }}" required maxlength="120"
-                   class="form-input" autocomplete="name">
-            @error('name')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-        </div>
-
-        <div>
-            <label for="email" class="form-label">E-mail *</label>
-            <input type="email" name="email" id="email" value="{{ old('email', auth()->user()?->email) }}" required maxlength="255"
-                   class="form-input" autocomplete="email">
-            @error('email')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-        </div>
-
-        <div>
-            <label for="subject" class="form-label">Assunto *</label>
-            <select name="subject" id="subject" required class="form-select">
-                <option value="" disabled @selected(! old('subject', request('assunto')))>Selecione</option>
-                @foreach($subjects as $value => $label)
-                    <option value="{{ $value }}" @selected(old('subject', request('assunto')) === $value)>{{ $label }}</option>
-                @endforeach
-            </select>
-            @error('subject')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-        </div>
-
-        <div>
-            <label for="message" class="form-label">Mensagem *</label>
-            <textarea name="message" id="message" required maxlength="4000" rows="6"
-                      class="form-input">{{ old('message') }}</textarea>
-            @error('message')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-        </div>
-
-        @if($turnstileSiteKey)
-            <div>
-                <div class="cf-turnstile" data-sitekey="{{ $turnstileSiteKey }}" data-language="pt-br"></div>
-                @error('cf-turnstile-response')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+            {{-- Armadilha para robôs: fora da tela, sem foco e escondida do leitor de tela. --}}
+            <div class="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
+                <label for="website">Website</label>
+                <input type="text" name="website" id="website" tabindex="-1" autocomplete="off">
             </div>
-        @endif
 
-        <p class="text-xs text-automotive-500">
-            Usamos seus dados só para responder esta mensagem. Veja a
-            <a href="{{ route('legal.privacy') }}" class="underline hover:text-wrench-700">Política de privacidade</a>.
-        </p>
+            <x-ui.field name="name" label="Nome" required>
+                <x-ui.input :value="auth()->user()?->name" required maxlength="120" autocomplete="name" />
+            </x-ui.field>
 
-        <button type="submit" class="btn-primary">Enviar</button>
-    </form>
-</div>
+            <x-ui.field name="email" label="E-mail" hint="A resposta chega neste endereço." required>
+                <x-ui.input type="email" :value="auth()->user()?->email" required maxlength="255" autocomplete="email" inputmode="email" />
+            </x-ui.field>
+
+            <x-ui.field name="subject" label="Assunto" required>
+                <x-ui.select :options="$subjects" :value="request('assunto')" placeholder="Selecione" required />
+            </x-ui.field>
+
+            <x-ui.field name="message" label="Mensagem" hint="Se for sobre um veículo, informe a placa ou o chassi." required>
+                <x-ui.textarea rows="6" maxlength="4000" autosize counter required />
+            </x-ui.field>
+
+            @if($turnstileSiteKey)
+                <div class="grid gap-1.5">
+                    <div class="cf-turnstile" data-sitekey="{{ $turnstileSiteKey }}" data-language="pt-br"></div>
+                    @error('cf-turnstile-response')
+                        <p class="flex items-start gap-1.5 text-sm text-danger" data-slot="field-error">
+                            <x-ui.icon name="exclamation-circle" variant="solid" class="mt-0.5 size-4" />
+                            <span><span class="sr-only">Erro: </span>{{ $message }}</span>
+                        </p>
+                    @enderror
+                </div>
+            @endif
+
+            <p class="text-sm text-muted-foreground">
+                Usamos seus dados só para responder esta mensagem. Veja a
+                <x-ui.link :href="route('legal.privacy')" variant="inline">Política de privacidade</x-ui.link>.
+            </p>
+
+            <div class="flex justify-end border-t border-border pt-5 max-sm:*:grow" data-slot="form-actions">
+                <x-ui.button type="submit" icon="envelope" loading-label="Enviando…">Enviar mensagem</x-ui.button>
+            </div>
+        </form>
+    </x-ui.card>
+</x-ui.container>
 @endsection

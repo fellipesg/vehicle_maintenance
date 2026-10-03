@@ -18,10 +18,12 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -37,6 +39,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->configureLocale();
+
         Model::preventLazyLoading(! $this->app->isProduction());
 
         if (! $this->app->runningInConsole() && $this->requestIsHttps()) {
@@ -47,7 +51,7 @@ class AppServiceProvider extends ServiceProvider
             $request,
             fn (Request $request, array $headers) => response()->json([
                 'success' => false,
-                'message' => 'Too many attempts. Please try again later.',
+                'message' => $this->tooManyAttemptsMessage($headers),
             ], 429, $headers),
         ));
 
@@ -57,7 +61,7 @@ class AppServiceProvider extends ServiceProvider
                 ->back()
                 ->withInput($request->only('email', 'name', 'phone', 'document'))
                 ->withErrors([
-                    'email' => 'Too many attempts. Please try again later.',
+                    'email' => $this->tooManyAttemptsMessage($headers),
                 ]),
         ));
 
@@ -67,6 +71,11 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('search', fn (Request $request) => Limit::perMinute(20)->by(
             'search|'.$request->ip(),
+        ));
+
+        // Claiming a vehicle is guarded by plate + RENAVAM, so cap the guesses per account.
+        RateLimiter::for('vehicle-link', fn (Request $request) => Limit::perMinute(10)->by(
+            'vehicle-link|'.($request->user()?->id ?: $request->ip()),
         ));
 
         RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(10)->by(
@@ -96,6 +105,29 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
+     * Carbon's package provider already follows app.locale; setting it here keeps
+     * diffForHumans()/translatedFormat() and Number helpers in pt_BR even if that
+     * provider stops being discovered.
+     */
+    private function configureLocale(): void
+    {
+        $locale = $this->app->getLocale();
+
+        Carbon::setLocale($locale);
+        Number::useLocale($locale);
+    }
+
+    /**
+     * @param  array<string, mixed>  $headers  Rate limiter headers, including Retry-After.
+     */
+    private function tooManyAttemptsMessage(array $headers): string
+    {
+        $seconds = max(1, (int) ($headers['Retry-After'] ?? 60));
+
+        return trans_choice('auth.too_many_attempts', $seconds, ['seconds' => $seconds]);
+    }
+
+    /**
      * Login is keyed on email+IP, so it also gets a per-IP cap to stop one IP
      * spraying many emails. Register and OAuth buckets are already per-IP.
      *
@@ -120,13 +152,17 @@ class AppServiceProvider extends ServiceProvider
 
     private function isLoginRequest(Request $request): bool
     {
-        return ! $request->is('api/v1/register', 'register', 'api/v1/auth/*/callback');
+        return ! $request->is('api/v1/register', 'register', 'api/v1/auth/*/callback', 'api/v1/auth/apple');
     }
 
     private function authRateLimitKey(Request $request): string
     {
         if ($request->is('api/v1/register', 'register')) {
             return 'register|'.$request->ip();
+        }
+
+        if ($request->is('api/v1/auth/apple')) {
+            return 'oauth:apple|'.$request->ip();
         }
 
         if ($request->is('api/v1/auth/*/callback')) {

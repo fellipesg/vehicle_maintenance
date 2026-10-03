@@ -2,8 +2,12 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Models\User;
+use App\Models\Vehicle;
+use App\Support\Vehicle\VehicleIdentifierVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 
 /** @mixin \App\Models\User */
 class UserResource extends JsonResource
@@ -33,9 +37,26 @@ class UserResource extends JsonResource
             'avatar_url' => $this->avatar_url,
             'subscription_active' => (bool) $this->subscription_active,
             'has_two_factor_enabled' => $this->hasTwoFactorEnabled(),
-            'vehicles' => VehicleResource::collection($this->whenLoaded('currentVehicles')),
+            'vehicles' => $this->whenLoaded('currentVehicles', fn (): Collection => $this->currentVehiclesFor($request)),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Os veículos de que a conta é dona atual. Quem os vê é o usuário da requisição ou, no login e
+     * no cadastro (requisição ainda sem usuário), a própria conta que acabou de entrar: para ela
+     * chassi e RENAVAM saem inteiros.
+     *
+     * @return Collection<int, VehicleResource>
+     */
+    private function currentVehiclesFor(Request $request): Collection
+    {
+        /** @var User $viewer */
+        $viewer = VehicleIdentifierVisibility::viewerOf($request) ?? $this->resource;
+
+        return $this->currentVehicles->map(
+            fn (Vehicle $vehicle): VehicleResource => (new VehicleResource($vehicle))->viewedBy($viewer),
+        );
     }
 }

@@ -12,9 +12,23 @@ use Illuminate\Validation\Rule;
 
 class VehicleModelController extends Controller
 {
+    /**
+     * Error bag do diálogo "Novo modelo" da página da marca.
+     */
+    public const CREATE_BAG = 'createModel';
+
+    /**
+     * Error bag do diálogo de edição de um modelo: cada linha tem o seu, então o erro e o texto
+     * digitado voltam só no diálogo que foi enviado.
+     */
+    public static function updateBag(VehicleModel|int $model): string
+    {
+        return 'updateModel'.($model instanceof VehicleModel ? $model->id : $model);
+    }
+
     public function store(Request $request, VehicleBrand $brand): RedirectResponse
     {
-        $data = $request->validate([
+        $data = $request->validateWithBag(self::CREATE_BAG, [
             'name' => [
                 'required',
                 'string',
@@ -32,12 +46,12 @@ class VehicleModelController extends Controller
         VehicleCatalogService::clearCache();
 
         return redirect()->route('admin.brands.show', $brand)
-            ->with('success', 'Modelo cadastrado com sucesso!');
+            ->with('success', 'Modelo cadastrado.');
     }
 
     public function update(Request $request, VehicleModel $model): RedirectResponse
     {
-        $data = $request->validate([
+        $data = $request->validateWithBag(self::updateBag($model), [
             'name' => [
                 'required',
                 'string',
@@ -57,7 +71,7 @@ class VehicleModelController extends Controller
         VehicleCatalogService::clearCache();
 
         return redirect()->route('admin.brands.show', $model->brand)
-            ->with('success', 'Modelo atualizado com sucesso!');
+            ->with('success', 'Modelo atualizado.');
     }
 
     public function destroy(VehicleModel $model): RedirectResponse
@@ -68,6 +82,6 @@ class VehicleModelController extends Controller
         VehicleCatalogService::clearCache();
 
         return redirect()->route('admin.brands.show', $brand)
-            ->with('success', 'Modelo removido com sucesso!');
+            ->with('success', 'Modelo excluído.');
     }
 }

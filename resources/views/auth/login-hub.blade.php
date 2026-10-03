@@ -1,50 +1,50 @@
+{{--
+    Hub de entrada (/login): os 3 perfis públicos. O Painel Administrador abre só por /login/admin.
+
+    Variáveis (AuthController::showLoginHub):
+    - $portalOptions: [slug, label, description, icon, url] de Proprietário, Lojista e Oficina.
+    - $intendedNotice: 'search' (o visitante tentou abrir a busca de veículo), 'protected' (outra
+      página que exige conta) ou null.
+--}}
 @extends('layouts.guest')
 
 @section('title', 'Entrar')
 
 @section('content')
-    <h1 class="mb-2 text-xl font-semibold">Como você deseja entrar?</h1>
-    <p class="mb-6 text-sm text-automotive-400">Escolha o portal correspondente ao seu perfil</p>
+    <x-auth.header title="Entrar" description="Escolha o tipo da sua conta." />
 
-    <div class="space-y-3">
-        <a href="{{ route('login.usuario') }}"
-           class="group flex items-center gap-4 rounded-xl border border-automotive-600 bg-automotive-800/50 p-4 transition hover:border-wrench-500 hover:bg-automotive-800">
-            @include('auth.partials.portal-icon', ['portal' => 'usuario', 'size' => 'sm', 'class' => 'group-hover:border-wrench-500 group-hover:text-wrench-400'])
-            <div>
-                <p class="font-semibold">Proprietário de veículo</p>
-                <p class="text-sm text-automotive-400">Histórico pessoal de carros e manutenções</p>
-            </div>
-        </a>
+    @if($intendedNotice === 'search')
+        <x-ui.alert variant="info" icon="magnifying-glass" title="A busca de veículo exige uma conta." class="mb-6">
+            Para consultar o histórico de um veículo, entre ou crie sua conta grátis de proprietário. Depois, levamos você direto para a busca.
+        </x-ui.alert>
+    @elseif($intendedNotice === 'protected')
+        <x-ui.alert variant="info" icon="lock-closed" class="mb-6">
+            Entre para continuar. Essa página exige uma conta.
+        </x-ui.alert>
+    @endif
 
-        <a href="{{ route('login.lojista') }}"
-           class="group flex items-center gap-4 rounded-xl border border-automotive-600 bg-automotive-800/50 p-4 transition hover:border-wrench-500 hover:bg-automotive-800">
-            @include('auth.partials.portal-icon', ['portal' => 'lojista', 'size' => 'sm', 'class' => 'group-hover:border-wrench-500 group-hover:text-wrench-400'])
-            <div>
-                <p class="font-semibold">Lojista / Garagem</p>
-                <p class="text-sm text-automotive-400">Estoque de veículos e revisões pré-venda</p>
-            </div>
-        </a>
+    <ul role="list" class="space-y-3" aria-label="Tipos de conta">
+        @foreach($portalOptions as $portalOption)
+            <x-auth.portal-option
+                :href="$portalOption['url']"
+                :icon="$portalOption['icon']"
+                :title="$portalOption['label']"
+                :description="$portalOption['description']"
+                :highlighted="$intendedNotice === 'search' && $portalOption['slug'] === 'usuario'"
+            />
+        @endforeach
+    </ul>
 
-        <a href="{{ route('login.oficina') }}"
-           class="group flex items-center gap-4 rounded-xl border border-automotive-600 bg-automotive-800/50 p-4 transition hover:border-wrench-500 hover:bg-automotive-800">
-            @include('auth.partials.portal-icon', ['portal' => 'oficina', 'size' => 'sm', 'class' => 'group-hover:border-wrench-500 group-hover:text-wrench-400'])
-            <div>
-                <p class="font-semibold">Oficina</p>
-                <p class="text-sm text-automotive-400">Serviços realizados e perfil no diretório</p>
-            </div>
-        </a>
-
-        <a href="{{ route('login.admin') }}"
-           class="group flex items-center gap-4 rounded-xl border border-automotive-600 bg-automotive-800/50 p-4 transition hover:border-wrench-500 hover:bg-automotive-800">
-            @include('auth.partials.portal-icon', ['portal' => 'admin', 'size' => 'sm', 'class' => 'group-hover:border-wrench-500 group-hover:text-wrench-400'])
-            <div>
-                <p class="font-semibold">Administrador</p>
-                <p class="text-sm text-automotive-400">Gestão da plataforma e catálogo</p>
-            </div>
-        </a>
+    <div class="mt-6 space-y-3 border-t border-border pt-6">
+        @if($intendedNotice === 'search')
+            <x-ui.button :href="route('register')" size="lg" full>Criar conta grátis</x-ui.button>
+        @else
+            <p class="text-sm text-muted-foreground">
+                Proprietário sem conta? <x-ui.link :href="route('register')" variant="inline">Criar conta grátis</x-ui.link>
+            </p>
+        @endif
+        <p class="text-sm text-muted-foreground">
+            Lojista ou oficina? <x-ui.link :href="route('contact.show', ['assunto' => 'partnership'])" variant="inline">Fale com a equipe</x-ui.link>
+        </p>
     </div>
-
-    <p class="mt-6 text-center text-sm text-automotive-400">
-        Não tem conta? <a href="{{ route('register') }}" class="text-wrench-400 hover:underline">Cadastre-se</a>
-    </p>
 @endsection

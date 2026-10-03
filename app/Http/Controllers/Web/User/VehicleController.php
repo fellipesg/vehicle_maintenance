@@ -2,102 +2,75 @@
 
 namespace App\Http\Controllers\Web\User;
 
+use App\Enums\Portal;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Web\Concerns\AddsVehicleCovers;
+use App\Http\Controllers\Web\Concerns\HandlesVehicleConsignment;
 use App\Http\Controllers\Web\Concerns\ImportsVehicleFromCrlv;
 use App\Http\Controllers\Web\Concerns\RegistersVehicleWithOwnership;
+use App\Http\Controllers\Web\Concerns\UpdatesVehicleDetails;
 use App\Jobs\EmailVehicleMaintenancePdf;
 use App\Models\Vehicle;
 use App\Rules\CrlvPdfFile;
 use App\Services\Crlv\CrlvExerciseValidator;
-use App\Services\Crlv\CrlvParseResult;
 use App\Services\Crlv\CrlvPdfParser;
 use App\Services\Vehicle\VehicleCoverService;
-use App\Services\Vehicle\VehicleOwnershipService;
+use App\Services\Vehicle\VehicleMaintenanceReminderService;
 use App\Services\VehicleCatalogService;
-use App\Support\AppStorage;
+use App\Support\Vehicle\VehicleEntryFlow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
 
 class VehicleController extends Controller
 {
+    use AddsVehicleCovers;
+    use HandlesVehicleConsignment;
     use ImportsVehicleFromCrlv;
     use RegistersVehicleWithOwnership;
+    use UpdatesVehicleDetails;
 
-    protected function vehicleCreateRoute(): string
+    /**
+     * Assistente "Adicionar veículo" (passos, rotas e textos do Proprietário).
+     */
+    protected function vehicleEntryFlow(): VehicleEntryFlow
     {
-        return 'user.vehicles.create';
+        return VehicleEntryFlow::for(Portal::Owner);
     }
 
-    protected function vehiclePreviewRoute(): string
+    /**
+     * Meus veículos: os de que a conta é dona atual (mesmo escopo de /api/v1/my-vehicles), com as
+     * contagens e os pontos de procedência carregados de uma vez (x-vehicle.card não consulta por
+     * card) e a próxima revisão estimada de cada um.
+     */
+    public function index(Request $request, VehicleMaintenanceReminderService $reminders): View
     {
-        return 'user.vehicles.import.preview';
-    }
+        $vehicles = $request->user()->currentVehicles()
+            ->with([
+                'provenanceStripMaintenances',
+                'maintenances' => fn ($query) => $query->select(['id', 'vehicle_id', 'kilometers']),
+            ])
+            ->withCount([
+                'maintenances',
+                'maintenances as verified_maintenances_count' => fn ($query) => $query->whereNotNull('verified_at'),
+            ])
+            ->orderByDesc('vehicles.created_at')
+            ->paginate(24)
+            ->withQueryString();
 
-    protected function vehicleClaimPreviewRoute(): string
-    {
-        return 'user.vehicles.claim.preview';
-    }
+        $revisions = [];
 
-    protected function vehicleStoreRoute(): string
-    {
-        return 'user.vehicles.store';
-    }
+        foreach ($vehicles as $vehicle) {
+            $revisions[$vehicle->id] = $reminders->summarize($vehicle);
+        }
 
-    protected function vehicleClaimStoreRoute(): string
-    {
-        return 'user.vehicles.claim.store';
-    }
-
-    protected function vehiclePreviewView(): string
-    {
-        return 'user.vehicles.preview-import';
-    }
-
-    protected function vehicleClaimPreviewView(): string
-    {
-        return 'user.vehicles.preview-claim';
-    }
-
-    protected function vehicleClaimView(): string
-    {
-        return 'user.vehicles.claim';
-    }
-
-    protected function vehicleClaimImportRoute(): string
-    {
-        return 'user.vehicles.claim.import-crlv';
-    }
-
-    protected function vehicleShowRoute(): string
-    {
-        return 'user.vehicles.show';
-    }
-
-    protected function vehicleClaimRoute(): string
-    {
-        return 'user.vehicles.claim';
-    }
-
-    protected function vehicleConsignmentRoute(): string
-    {
-        return 'user.vehicles.consignment';
-    }
-
-    public function index(Request $request): View
-    {
-        return view('user.vehicles.index');
-    }
-
-    public function create(VehicleCatalogService $catalog): View
-    {
-        return view('user.vehicles.create', [
-            'catalog' => $catalog->all(),
+        return view('user.vehicles.index', [
+            'vehicles' => $vehicles,
+            'revisions' => $revisions,
         ]);
     }
 
@@ -111,66 +84,24 @@ class VehicleController extends Controller
         return $this->claimVehicle($request);
     }
 
-    public function showConsignmentForm(Request $request): View|RedirectResponse
-    {
-        if (! session('consignment_pending')) {
-            return redirect()->route('user.vehicles.index');
-        }
-
-        return view('user.vehicles.consignment', [
-            'pending' => session('consignment_pending'),
-        ]);
-    }
-
-    public function storeConsignment(Request $request): RedirectResponse
-    {
-        $pending = session('consignment_pending');
-
-        if (! is_array($pending)) {
-            return redirect()->route('user.vehicles.index');
-        }
-
-        $request->validate([
-            'power_of_attorney' => ['required', 'file', 'mimes:pdf', 'max:10240'],
-        ]);
-
-        $path = $request->file('power_of_attorney')->store('procuracoes', AppStorage::diskName());
-        $crlv = $this->crlvFromVerification($pending['crlv_verification'] ?? session('crlv_verification'));
-        $ownership = app(VehicleOwnershipService::class);
-
-        try {
-            if (isset($pending['vehicle_id'])) {
-                $vehicle = Vehicle::findOrFail($pending['vehicle_id']);
-                $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-                $ownership->attachConsignmentUser($request->user(), $vehicle, $crlv);
-                $request->session()->forget(['consignment_pending', 'crlv_verification', 'claim_vehicle_id']);
-
-                return redirect()->route('user.vehicles.index')
-                    ->with('success', 'Procuração enviada. O histórico ficará disponível após análise.');
-            }
-
-            $vehicle = $ownership->registerNew(
-                $request->user(),
-                $pending['vehicle_data'],
-                $crlv,
-                'consignment',
-            );
-            $ownership->requestConsignmentAccess($request->user(), $vehicle, $crlv, $path);
-            $request->session()->forget(['consignment_pending', 'crlv_verification']);
-
-            return redirect()->route('user.vehicles.index')
-                ->with('success', 'Veículo cadastrado em consignação. A procuração será analisada pela equipe.');
-        } catch (RuntimeException $exception) {
-            return back()->withErrors(['power_of_attorney' => $exception->getMessage()]);
-        }
-    }
-
+    /**
+     * Ficha do veículo renderizada no servidor (x-vehicle.detail monta a linha do tempo, o histórico
+     * e os documentos). As ações do cabeçalho seguem a VehiclePolicy. Chassi e RENAVAM inteiros (e
+     * CRV e motor) só para o dono atual (VehiclePolicy::update), como na API; a conta que vê o
+     * veículo por uma consignação aprovada recebe os números parciais.
+     */
     public function show(Vehicle $vehicle): View
     {
         Gate::authorize('view', $vehicle);
 
+        $canEdit = Gate::allows('update', $vehicle);
+
         return view('user.vehicles.show', [
-            'vehicleId' => $vehicle->id,
+            'vehicle' => $vehicle,
+            'canEdit' => $canEdit,
+            'identifiersMasked' => ! $canEdit,
+            'canAddMaintenance' => Gate::allows('addMaintenance', $vehicle),
+            'canExportPdf' => Gate::allows('viewMaintenances', $vehicle),
         ]);
     }
 
@@ -219,8 +150,22 @@ class VehicleController extends Controller
                 ]);
         }
 
-        // Persiste na hora — o preenchimento só em formulário se perdia no ngrok.
-        $vehicle->update($parsed->toFormData());
+        // Persiste na hora — o preenchimento só em formulário se perdia no ngrok. A placa nova entra
+        // pelo histórico de placas (origem CRLV-e), como na edição manual.
+        $crlvData = $parsed->toFormData();
+        $crlvPlate = $crlvData['license_plate'] ?? null;
+        unset($crlvData['license_plate']);
+
+        $vehicle->update($crlvData);
+
+        if (filled($crlvPlate)) {
+            app(\App\Services\Vehicle\VehiclePlateHistoryService::class)->changePlate(
+                $vehicle->fresh(),
+                (string) $crlvPlate,
+                'crlv_import',
+                $request->user(),
+            );
+        }
 
         return redirect()
             ->route('user.vehicles.show', $vehicle)
@@ -230,73 +175,18 @@ class VehicleController extends Controller
             );
     }
 
+    /**
+     * "Editar veículo": o mesmo contrato do Lojista (UpdatesVehicleDetails): chassi obrigatório,
+     * quilometragem atual nunca abaixo da última manutenção e as duas capas recortadas no navegador.
+     */
     public function update(Request $request, Vehicle $vehicle, VehicleCoverService $covers): RedirectResponse
     {
         Gate::authorize('update', $vehicle);
 
-        $chassisRules = ['nullable', 'string', 'max:50', \Illuminate\Validation\Rule::unique('vehicles', 'chassis')->ignore($vehicle->id), new \App\Rules\Chassis((int) $request->input('year', $vehicle->year))];
-        if ($vehicle->chassis === null || $vehicle->chassis === '') {
-            $chassisRules = ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('vehicles', 'chassis')->ignore($vehicle->id), new \App\Rules\Chassis((int) $request->input('year', $vehicle->year))];
-        }
-
-        $data = $request->validate([
-            'license_plate' => ['required', 'string', 'max:10', 'unique:vehicles,license_plate,'.$vehicle->id],
-            'renavam' => ['required', 'string', 'max:20', 'unique:vehicles,renavam,'.$vehicle->id],
-            'crv_number' => ['required', 'string', 'max:20'],
-            'brand' => ['required', 'string', 'max:100'],
-            'model' => ['required', 'string', 'max:100'],
-            'year' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
-            'color' => ['nullable', 'string', 'max:50'],
-            'chassis' => $chassisRules,
-            'motorization' => ['nullable', 'string', 'max:100'],
-            'engine' => ['nullable', 'string', 'max:50'],
-            'cover' => [
-                'nullable',
-                File::image(allowSvg: false)
-                    ->types(['jpg', 'jpeg', 'png', 'webp'])
-                    ->max(5 * 1024),
-            ],
-            'cover_portrait' => [
-                'nullable',
-                File::image(allowSvg: false)
-                    ->types(['jpg', 'jpeg', 'png', 'webp'])
-                    ->max(5 * 1024),
-            ],
-        ]);
-
-        $cover = $request->file('cover');
-        $coverPortrait = $request->file('cover_portrait');
-        unset($data['cover'], $data['cover_portrait']);
-
-        $previousPlate = $vehicle->license_plate;
-        $newPlate = $data['license_plate'];
-        unset($data['license_plate']);
-
-        if (isset($data['chassis'])) {
-            $data['chassis'] = \App\Models\Vehicle::normalizeChassis((string) $data['chassis']);
-        }
-
-        $vehicle->update($data);
-
-        if (strtoupper((string) $newPlate) !== strtoupper((string) $previousPlate)) {
-            app(\App\Services\Vehicle\VehiclePlateHistoryService::class)->changePlate(
-                $vehicle->fresh(),
-                $newPlate,
-                'manual',
-                $request->user(),
-            );
-        }
-
-        if ($cover !== null) {
-            $covers->storeLandscape($vehicle, $cover);
-        }
-
-        if ($coverPortrait !== null) {
-            $covers->storePortrait($vehicle, $coverPortrait);
-        }
+        $this->updateVehicleDetails($request, $vehicle, $covers);
 
         return redirect()->route('user.vehicles.show', $vehicle)
-            ->with('success', 'Veículo atualizado com sucesso!');
+            ->with('success', 'Veículo atualizado.');
     }
 
     public function exportPdf(Vehicle $vehicle): RedirectResponse
@@ -310,35 +200,6 @@ class VehicleController extends Controller
         return back()->with(
             'success',
             "O relatório será processado e enviado para {$user->email}."
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $verification
-     */
-    private function crlvFromVerification(?array $verification): CrlvParseResult
-    {
-        $preview = $verification['parsed'] ?? null;
-
-        if (! is_array($preview)) {
-            throw new RuntimeException('Dados do CRLV-e não encontrados. Envie o documento novamente.');
-        }
-
-        return new CrlvParseResult(
-            licensePlate: $preview['license_plate'],
-            renavam: $preview['renavam'],
-            brand: $preview['brand'],
-            model: $preview['model'],
-            year: (int) $preview['year'],
-            color: $preview['color'] ?? null,
-            chassis: $preview['chassis'] ?? null,
-            engine: $preview['engine'] ?? null,
-            motorization: $preview['motorization'] ?? null,
-            crvNumber: $preview['crv_number'] ?? null,
-            exerciseYear: isset($preview['exercise_year']) ? (int) $preview['exercise_year'] : null,
-            manufacturingYear: isset($preview['manufacturing_year']) ? (int) $preview['manufacturing_year'] : null,
-            ownerName: $preview['owner_name'] ?? null,
-            ownerDocument: $preview['owner_document'] ?? null,
         );
     }
 }

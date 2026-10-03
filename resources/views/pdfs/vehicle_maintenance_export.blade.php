@@ -1,8 +1,29 @@
+{{--
+    Histórico de manutenções em PDF (Dompdf, App\Services\Vehicle\VehicleMaintenancePdfExporter).
+
+    Paleta: textos e bordas na escala automotive do web (#344453 texto, #5a7289 rótulo, #d1dae4
+    borda, #e8edf2 e #f4f7fa fundos), navy #0B1C2C nos títulos e os tokens de procedência (#0f766e
+    Selo da oficina, #92400e Declarada). O timbre da OS mantém a borda #d1d5db (.ai/rules/pdfs.md).
+    Datas e horas no fuso de exibição (App\Support\DisplayTime, America/Sao_Paulo), o mesmo do
+    /v/{código}. Sem SVG: o Dompdf não desenha QR em SVG de forma
+    confiável, então o selo leva só o código e o endereço de conferência. O rodapé com
+    "Página X de Y" é desenhado pelo exporter (page_text), fora do HTML. Com $identifiersMasked (quem
+    pediu o PDF não é o dono atual), chassi e RENAVAM saem parciais (VehicleIdentifierMask) e o código
+    do motor não aparece.
+--}}
+@php
+    $displayTimezone = \App\Support\DisplayTime::timezone();
+    $hasMaintenances = $vehicle->maintenances->count() > 0;
+    $pdfIdentifiersMasked = (bool) ($identifiersMasked ?? false);
+    $pdfChassis = $pdfIdentifiersMasked ? \App\Support\Vehicle\VehicleIdentifierMask::chassis($vehicle->chassis) : $vehicle->chassis;
+    $pdfRenavam = $pdfIdentifiersMasked ? \App\Support\Vehicle\VehicleIdentifierMask::renavam($vehicle->renavam) : $vehicle->renavam;
+    $pdfEngine = $pdfIdentifiersMasked ? null : $vehicle->engine;
+@endphp
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Histórico de Manutenções - {{ $vehicle->brand }} {{ $vehicle->model }}</title>
+    <title>Histórico de manutenções · {{ $vehicle->brand }} {{ $vehicle->model }} · RevisaLog</title>
     <style>
         * {
             margin: 0;
@@ -14,7 +35,7 @@
             font-family: 'DejaVu Sans', sans-serif;
             font-size: 10pt;
             line-height: 1.4;
-            color: #333;
+            color: #344453;
         }
 
         .document-table {
@@ -37,6 +58,11 @@
 
         .cover-document {
             page-break-after: always;
+        }
+
+        /* Sem manutenções, a capa é a única página: o aviso fica nela, sem folha em branco depois. */
+        .cover-document--only {
+            page-break-after: auto;
         }
 
         .cover-document > tbody > tr > td {
@@ -72,7 +98,7 @@
 
         .letterhead-line {
             font-size: 9pt;
-            color: #374151;
+            color: #344453;
             margin-bottom: 3px;
             line-height: 1.35;
         }
@@ -136,6 +162,16 @@
             white-space: nowrap;
         }
 
+        .ownership-unverified {
+            border: 1px solid #c2a21a;
+            background: #fdf7e2;
+            color: #6b5600;
+            padding: 8px 10px;
+            margin-bottom: 12px;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
         .vehicle-section-title {
             font-size: 13pt;
             font-weight: bold;
@@ -148,12 +184,12 @@
             width: 100%;
             max-width: 100%;
             height: auto;
-            border: 1px solid #d1d5db;
+            border: 1px solid #d1dae4;
             margin-bottom: 12px;
         }
 
         .info-table-wrapper {
-            border: 1px solid #d1d5db;
+            border: 1px solid #d1dae4;
             padding: 12px;
         }
 
@@ -170,54 +206,37 @@
 
         .info-label {
             font-weight: bold;
-            color: #666;
+            color: #5a7289;
             font-size: 9pt;
         }
 
         .info-value {
-            color: #333;
+            color: #344453;
             font-size: 10pt;
         }
 
-        /* Procedência — resumo (capa) */
-        .prov-summary {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 10px 0;
-            margin: 14px -10px 0;
-        }
-
-        .prov-count {
-            width: 50%;
-            padding: 10px 12px;
-            border-radius: 6px;
-            vertical-align: top;
-        }
-
-        .prov-count--verified {
-            background-color: #f0fdfa;
-            border: 1px solid #99f6e4;
-            border-left: 4px solid #0f766e;
-        }
-
-        .prov-count--declared {
-            background-color: #fffbeb;
-            border: 1px dashed #d97706;
-        }
-
-        .prov-count-num {
-            font-size: 18pt;
+        /* Procedência — resumo (capa): contador compacto e linha de pontos (.ai/rules/theme.md) */
+        .prov-heading {
+            font-size: 11pt;
             font-weight: bold;
-            line-height: 1;
+            color: #0B1C2C;
+            margin-top: 16px;
         }
 
-        .prov-count--verified .prov-count-num { color: #0f766e; }
-        .prov-count--declared .prov-count-num { color: #92400e; }
-
-        .prov-count-label {
-            font-size: 8pt;
-            color: #4b5563;
+        .prov-counter {
+            font-size: 10pt;
+            color: #5a7289;
             margin-top: 4px;
+        }
+
+        .prov-counter--sealed {
+            font-weight: bold;
+            color: #0f766e;
+        }
+
+        .prov-counter--declared {
+            font-weight: bold;
+            color: #92400e;
         }
 
         .prov-dots {
@@ -227,14 +246,14 @@
 
         .prov-dots td {
             text-align: center;
-            padding: 0 4px;
+            padding: 0 2px;
             vertical-align: top;
         }
 
         .prov-dot {
-            width: 11px;
-            height: 11px;
-            border-radius: 6px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
             margin: 0 auto;
         }
 
@@ -243,22 +262,22 @@
         }
 
         .prov-dot--declared {
-            width: 7px;
-            height: 7px;
+            width: 6px;
+            height: 6px;
             background-color: #fffbeb;
             border: 2px dashed #92400e;
         }
 
         .prov-dot-date {
             font-size: 6.5pt;
-            color: #6b7280;
+            color: #5a7289;
             margin-top: 3px;
             white-space: nowrap;
         }
 
         .prov-dots-caption {
             font-size: 7.5pt;
-            color: #6b7280;
+            color: #5a7289;
             margin-top: 6px;
         }
 
@@ -305,13 +324,13 @@
         .seal-name {
             font-size: 10pt;
             font-weight: bold;
-            color: #111827;
+            color: #0B1C2C;
             margin-top: 2px;
         }
 
         .seal-meta {
             font-size: 7.5pt;
-            color: #4b5563;
+            color: #455a6e;
             margin-top: 2px;
             line-height: 1.35;
         }
@@ -326,7 +345,7 @@
 
         .seal-verify {
             font-size: 7pt;
-            color: #6b7280;
+            color: #5a7289;
             margin-top: 2px;
         }
 
@@ -339,7 +358,7 @@
         .os-body-card {
             width: 100%;
             border-collapse: collapse;
-            border: 1px solid #d1d5db;
+            border: 1px solid #d1dae4;
         }
 
         .os-body-card td {
@@ -362,7 +381,7 @@
             border-collapse: collapse;
             margin: 0;
             font-size: 9pt;
-            border: 1px solid #d1d5db;
+            border: 1px solid #d1dae4;
             page-break-inside: auto;
         }
 
@@ -371,16 +390,17 @@
         }
 
         .items-table th {
-            background-color: #e5e7eb;
+            background-color: #e8edf2;
+            color: #0B1C2C;
             padding: 8px;
             text-align: left;
-            border: 1px solid #d1d5db;
+            border: 1px solid #d1dae4;
             font-weight: bold;
         }
 
         .items-table td {
             padding: 8px;
-            border: 1px solid #d1d5db;
+            border: 1px solid #d1dae4;
         }
 
         .items-table tr {
@@ -389,7 +409,23 @@
         }
 
         .items-table tr:nth-child(even) td {
-            background-color: #f9fafb;
+            background-color: #f4f7fa;
+        }
+
+        .item-detail {
+            color: #5a7289;
+            font-size: 8pt;
+        }
+
+        .plates-table {
+            margin-top: 6px;
+            font-size: 8pt;
+            border-collapse: collapse;
+        }
+
+        .plates-table th {
+            background-color: #e8edf2;
+            color: #0B1C2C;
         }
 
         .warranty-small {
@@ -411,9 +447,9 @@
 
         .invoice-item {
             padding: 8px 12px;
-            background-color: #f9fafb;
+            background-color: #f4f7fa;
             margin-bottom: 8px;
-            border: 1px solid #d1d5db;
+            border: 1px solid #d1dae4;
             font-size: 9pt;
         }
 
@@ -429,24 +465,26 @@
         }
 
         .empty-state {
+            margin-top: 16px;
+            padding: 16px 12px;
+            border: 1px dashed #d1dae4;
             text-align: center;
-            padding: 40px 18px;
-            color: #666;
+            color: #5a7289;
         }
 
         .doc-footer {
             margin-top: 18px;
             padding-top: 10px;
-            border-top: 1px solid #d1d5db;
+            border-top: 1px solid #d1dae4;
             text-align: center;
             font-size: 8pt;
-            color: #666;
+            color: #5a7289;
         }
     </style>
 </head>
 <body>
     {{-- Página 1: capa RevisaLog + dados do veículo --}}
-    <table class="document-table cover-document" cellpadding="0" cellspacing="0">
+    <table class="document-table cover-document{{ $hasMaintenances ? '' : ' cover-document--only' }}" cellpadding="0" cellspacing="0">
         <tbody>
             <tr>
                 <td>
@@ -458,11 +496,19 @@
                     <table class="title-band title-band--cover" cellpadding="0" cellspacing="0">
                         <tr>
                             <td class="band-left" width="70%" valign="middle">Histórico de manutenções</td>
-                            <td class="band-right" width="30%" valign="middle">{{ now()->format('d/m/Y H:i') }}</td>
+                            <td class="band-right" width="30%" valign="middle">Gerado em {{ now($displayTimezone)->format('d/m/Y H:i') }}</td>
                         </tr>
                     </table>
 
                     <div class="cover-body">
+                        @unless($vehicle->hasVerifiedOwnership())
+                            <div class="ownership-unverified">
+                                <strong>Propriedade não confirmada.</strong>
+                                O veículo foi cadastrado sem o CRLV-e, então ninguém confirmou de quem ele é. As
+                                manutenções com Selo da oficina seguem confirmadas por quem prestou o serviço.
+                            </div>
+                        @endunless
+
                         <div class="vehicle-section-title">Informações do veículo</div>
 
                         @if(! empty($coverImageSrc))
@@ -485,11 +531,11 @@
                                         <span class="info-value">{{ $vehicle->year }}</span>
                                     </td>
                                 </tr>
-                                @if($vehicle->chassis)
+                                @if($pdfChassis)
                                 <tr>
                                     <td colspan="2">
                                         <span class="info-label">Chassi:</span>
-                                        <span class="info-value" style="font-family: DejaVu Sans Mono, monospace; font-size: 13px; letter-spacing: 0.05em;">{{ $vehicle->chassis }}</span>
+                                        <span class="info-value" style="font-family: DejaVu Sans Mono, monospace; font-size: 13px; letter-spacing: 0.05em;">{{ $pdfChassis }}</span>
                                     </td>
                                 </tr>
                                 @endif
@@ -500,7 +546,7 @@
                                     </td>
                                     <td>
                                         <span class="info-label">RENAVAM:</span>
-                                        <span class="info-value">{{ $vehicle->renavam }}</span>
+                                        <span class="info-value">{{ $pdfRenavam }}</span>
                                     </td>
                                 </tr>
                                 @if($vehicle->current_kilometers)
@@ -523,8 +569,8 @@
                                 <tr>
                                     <td colspan="2">
                                         <span class="info-label">Histórico de placas</span>
-                                        <table cellpadding="4" cellspacing="0" width="100%" style="margin-top:6px;font-size:10px;border-collapse:collapse;">
-                                            <tr style="background:#f3f4f6;">
+                                        <table class="plates-table" cellpadding="4" cellspacing="0" width="100%">
+                                            <tr>
                                                 <th align="left">Placa</th>
                                                 <th align="left">De</th>
                                                 <th align="left">Até</th>
@@ -542,7 +588,7 @@
                                     </td>
                                 </tr>
                                 @endif
-                                @if($vehicle->motorization || $vehicle->engine)
+                                @if($vehicle->motorization || $pdfEngine)
                                 <tr>
                                     @if($vehicle->motorization)
                                     <td>
@@ -552,10 +598,10 @@
                                     @else
                                     <td></td>
                                     @endif
-                                    @if($vehicle->engine)
+                                    @if($pdfEngine)
                                     <td>
                                         <span class="info-label">Código do motor:</span>
-                                        <span class="info-value">{{ $vehicle->engine }}</span>
+                                        <span class="info-value">{{ $pdfEngine }}</span>
                                     </td>
                                     @else
                                     <td></td>
@@ -565,28 +611,20 @@
                             </table>
                         </div>
 
-                        @php
-                            $provenanceStrip = \App\Support\VehicleProvenanceStrip::segmentsForVehicle($vehicle);
-                            $verifiedMaintenanceCount = $vehicle->maintenances->filter(fn ($m) => $m->isVerified())->count();
-                            $totalMaintenanceCount = $vehicle->maintenances->count();
-                        @endphp
-                        @if($totalMaintenanceCount > 0)
+                        @if($hasMaintenances)
                             @php
-                                $declaredMaintenanceCount = $totalMaintenanceCount - $verifiedMaintenanceCount;
+                                $provenanceStrip = \App\Support\VehicleProvenanceStrip::segmentsForVehicle($vehicle);
+                                $totalMaintenanceCount = $vehicle->maintenances->count();
+                                $sealedMaintenanceCount = $vehicle->maintenances->filter(fn ($m) => $m->isVerified())->count();
+                                $declaredMaintenanceCount = $totalMaintenanceCount - $sealedMaintenanceCount;
                                 $provenanceDotRows = array_chunk($provenanceStrip, 12);
                             @endphp
-                            <table class="prov-summary" cellpadding="0" cellspacing="0">
-                                <tr>
-                                    <td class="prov-count prov-count--verified">
-                                        <div class="prov-count-num">{{ $verifiedMaintenanceCount }}</div>
-                                        <div class="prov-count-label">Com selo de oficina</div>
-                                    </td>
-                                    <td class="prov-count prov-count--declared">
-                                        <div class="prov-count-num">{{ $declaredMaintenanceCount }}</div>
-                                        <div class="prov-count-label">{{ $declaredMaintenanceCount === 1 ? 'Declarada, sem selo de oficina' : 'Declaradas, sem selo de oficina' }}</div>
-                                    </td>
-                                </tr>
-                            </table>
+                            <div class="prov-heading">Procedência das manutenções</div>
+                            <p class="prov-counter">
+                                <span class="prov-counter--sealed">{{ number_format($sealedMaintenanceCount, 0, ',', '.') }} com selo</span>
+                                ·
+                                <span class="prov-counter--declared">{{ \App\Support\Vehicle\VehicleMaintenanceHistory::declaredLabel($declaredMaintenanceCount) }}</span>
+                            </p>
                             @foreach($provenanceDotRows as $dotRow)
                                 <table class="prov-dots" cellpadding="0" cellspacing="0">
                                     <tr>
@@ -600,10 +638,14 @@
                                 </table>
                             @endforeach
                             <p class="prov-dots-caption">
-                                Linha do tempo das {{ $totalMaintenanceCount }} manutenções, da mais antiga à mais recente:
-                                <span style="color:#0f766e;">●</span> manutenções com selo de oficina ·
-                                <span style="color:#92400e;">◌</span> declaradas. Detalhes nas páginas seguintes.
+                                Um ponto por manutenção, da mais antiga à mais recente:
+                                <span style="color:#0f766e;">●</span> Selo da oficina (registrada pela própria oficina) ·
+                                <span style="color:#92400e;">◌</span> Declarada pelo proprietário ou lojista. Detalhes nas páginas seguintes.
                             </p>
+                        @else
+                            <div class="empty-state">
+                                <p>Nenhuma manutenção registrada para este veículo até {{ now($displayTimezone)->format('d/m/Y') }}.</p>
+                            </div>
                         @endif
                     </div>
                 </td>
@@ -611,7 +653,7 @@
         </tbody>
     </table>
 
-    @if($vehicle->maintenances->count() > 0)
+    @if($hasMaintenances)
         @foreach($vehicle->maintenances as $maintenance)
             @php
                 $workshopName = $maintenance->displayWorkshopName();
@@ -703,7 +745,7 @@
                                             <div class="seal-kicker">Selo da oficina</div>
                                             <div class="seal-name">{{ $sealWorkshopName }}</div>
                                             <div class="seal-meta">
-                                                Registro feito pela própria oficina em {{ $maintenance->verified_at?->format('d/m/Y') }}
+                                                Registro feito pela própria oficina em {{ $maintenance->verified_at?->copy()->timezone($displayTimezone)->format('d/m/Y') }}
                                                 · não pode ser alterado pelo proprietário
                                             </div>
                                         </td>
@@ -747,16 +789,7 @@
                                             @if($maintenance->service_category)
                                                 <div class="meta-line">
                                                     <span class="info-label">Categoria:</span>
-                                                    <span class="info-value">
-                                                        @if($maintenance->service_category === 'mechanical') Mecânica
-                                                        @elseif($maintenance->service_category === 'electrical') Elétrica
-                                                        @elseif($maintenance->service_category === 'suspension') Suspensão
-                                                        @elseif($maintenance->service_category === 'painting') Pintura
-                                                        @elseif($maintenance->service_category === 'finishing') Acabamento
-                                                        @elseif($maintenance->service_category === 'interior') Interior
-                                                        @else Outra
-                                                        @endif
-                                                    </span>
+                                                    <span class="info-value">{{ \App\Enums\ServiceCategory::labelFor($maintenance->service_category) ?? 'Outros' }}</span>
                                                 </div>
                                             @endif
                                             @if($maintenance->generalWarranty)
@@ -802,10 +835,10 @@
                                                 <td>
                                                     <strong>{{ $item->name }}</strong>
                                                     @if($item->description)
-                                                        <br><span style="color: #666; font-size: 8pt;">{{ $item->description }}</span>
+                                                        <br><span class="item-detail">{{ $item->description }}</span>
                                                     @endif
                                                     @if($item->part_number)
-                                                        <br><span style="color: #999; font-size: 8pt;">Código: {{ $item->part_number }}</span>
+                                                        <br><span class="item-detail">Código: {{ $item->part_number }}</span>
                                                     @endif
                                                     @if($item->warranty)
                                                         <br><span class="warranty-small">{{ $item->warranty->name }} — até {{ $item->warranty->ends_at->format('d/m/Y') }}</span>
@@ -848,15 +881,11 @@
                 </tbody>
             </table>
         @endforeach
-    @else
-        <div class="empty-state">
-            <p>Nenhuma manutenção registrada para este veículo.</p>
-        </div>
     @endif
 
     <div class="doc-footer">
-        <p>Valide qualquer selo em revisalog.com.br/v/{código}</p>
-        <p>Relatório gerado automaticamente pela Revisalog (revisalog.com.br)</p>
+        <p>Confira qualquer Selo da oficina em revisalog.com.br/verificar ou em revisalog.com.br/v/{código}</p>
+        <p>Relatório gerado automaticamente pela RevisaLog (revisalog.com.br) em {{ now($displayTimezone)->format('d/m/Y') }} às {{ now($displayTimezone)->format('H:i') }}</p>
     </div>
 </body>
 </html>

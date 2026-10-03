@@ -46,18 +46,13 @@ api.interceptors.request.use(async (config) => {
     return config;
 });
 
+/**
+ * Chamadas da API usadas pela web. As telas são renderizadas no servidor; só a exportação do PDF do
+ * histórico (resources/js/user-portal.js) passa pela API /api/v1, que é a mesma do app Flutter.
+ */
 export default {
-    getMe: () => api.get('/me'),
-    getMyVehicles: (params = {}) => api.get('/my-vehicles', { params }),
-    getVehicles: (params = {}) => api.get('/vehicles', { params }),
-    getVehicle: (id) => api.get(`/vehicles/${id}`),
-    getVehicleMaintenances: (id, params = {}) => api.get(`/vehicles/${id}/maintenances`, { params }),
-    getVehicleTimeline: (id) => api.get(`/vehicles/${id}/timeline`),
     requestVehiclePdfExport: (id) => api.post(`/vehicles/${id}/export-pdf`),
     getVehiclePdfExportStatus: (exportId) => api.get(`/vehicle-pdf-exports/${exportId}`),
-    getMaintenances: (params = {}) => api.get('/maintenances', { params }),
-    getMaintenance: (id) => api.get(`/maintenances/${id}`),
-    getWorkshops: (params = {}) => api.get('/workshops', { params }),
 };
 
 export { api };

@@ -16,7 +16,7 @@ class WelcomePushNotifier
 
             (new FcmService)->sendToUser(
                 $user->id,
-                'Bem-vindo à Revisalog! 🚗',
+                'Bem-vindo à RevisaLog!',
                 "Olá {$greeting}! Sua conta foi criada com sucesso. Comece a registrar as manutenções do seu veículo.",
                 [
                     'type' => 'welcome',

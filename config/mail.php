@@ -105,6 +105,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Markdown Mail Settings
+    |--------------------------------------------------------------------------
+    |
+    | Tema "revisalog" (resources/views/vendor/mail/html/themes/revisalog.css)
+    | para todo e-mail em markdown: os mailables e também as notificações com
+    | MailMessage (redefinição de senha, troca de e-mail, lembrete de km...).
+    |
+    */
+
+    'markdown' => [
+        'theme' => env('MAIL_MARKDOWN_THEME', 'revisalog'),
+
+        'paths' => [
+            resource_path('views/vendor/mail'),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Global "From" Address
     |--------------------------------------------------------------------------
     |
@@ -116,12 +135,12 @@ return [
 
     'from' => [
         'address' => env('MAIL_FROM_ADDRESS', 'noreply@revisalog.com.br'),
-        'name' => 'Revisalog',
+        'name' => 'RevisaLog',
     ],
 
     'reply_to' => [
         'address' => env('MAIL_REPLY_TO_ADDRESS', env('MAIL_SUPPORT_ADDRESS', 'suporte@revisalog.com.br')),
-        'name' => env('MAIL_REPLY_TO_NAME', env('MAIL_FROM_NAME', 'Revisalog')),
+        'name' => env('MAIL_REPLY_TO_NAME', env('MAIL_FROM_NAME', 'RevisaLog')),
     ],
 
 ];

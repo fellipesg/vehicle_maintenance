@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\ServiceCategory;
 use App\Enums\WorkshopMessageTrigger;
 use App\Models\Workshop;
 use Illuminate\Support\Facades\Gate;
@@ -24,7 +25,7 @@ class StoreWorkshopMessageTemplateRequest extends ApiFormRequest
     {
         return [
             'trigger' => ['required', Rule::enum(WorkshopMessageTrigger::class)],
-            'service_category' => 'nullable|in:mechanical,electrical,suspension,painting,finishing,interior,other',
+            'service_category' => ['nullable', Rule::in(ServiceCategory::values())],
             'title' => 'required|string|max:255',
             'body' => 'required|string|max:5000',
             'lead_kilometers' => 'nullable|integer|min:0|max:50000',

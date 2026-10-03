@@ -29,8 +29,9 @@ class AdminFleetTest extends TestCase
             ->get('/admin/dashboard')
             ->assertOk()
             ->assertSee('id="nav-admin"', false)
-            ->assertSee('Mapas', false)
+            ->assertSee('Cadastros', false)
             ->assertSee('Veículos', false)
+            ->assertSee('Cadastros recentes', false)
             ->assertDontSee('Meus Veículos');
     }
 

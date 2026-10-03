@@ -28,16 +28,16 @@ class NewUserSignupAlertNotificationTest extends TestCase
         $mail = (new NewUserSignupAlertNotification($user, RegistrationSource::Web))
             ->toMail($user);
 
-        $this->assertSame(['noreply@revisalog.com.br', 'Revisalog'], $mail->from);
-        $this->assertSame('Revisalog', $mail->salutation);
+        $this->assertSame(['noreply@revisalog.com.br', 'RevisaLog'], $mail->from);
+        $this->assertSame('RevisaLog', $mail->salutation);
         $this->assertSame('Novo cadastro — Cursor Agent', $mail->subject);
 
         $html = $mail->render();
 
-        $this->assertStringContainsString('Novo cadastro na Revisalog', $html);
+        $this->assertStringContainsString('Novo cadastro na RevisaLog', $html);
         $this->assertStringContainsString('Cursor Agent', $html);
         $this->assertStringContainsString('fgoncalves2008+from@gmail.com', $html);
-        $this->assertStringContainsString('Revisalog', $html);
+        $this->assertStringContainsString('RevisaLog', $html);
         $this->assertStringContainsString('lockup-horizontal.png', $html);
         $this->assertStringNotContainsString('Vehicle Maintenance', $html);
         $this->assertStringNotContainsString('Vehicle Maintenance System', $html);

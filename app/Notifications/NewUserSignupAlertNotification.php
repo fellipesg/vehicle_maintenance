@@ -31,14 +31,27 @@ class NewUserSignupAlertNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->from('noreply@revisalog.com.br', 'Revisalog')
+            ->theme('revisalog')
+            ->from('noreply@revisalog.com.br', 'RevisaLog')
             ->subject("Novo cadastro — {$this->user->name}")
-            ->greeting('Novo cadastro na Revisalog')
+            ->greeting('Novo cadastro na RevisaLog')
             ->line("**Nome:** {$this->user->name}")
             ->line("**E-mail:** {$this->user->email}")
-            ->line("**Tipo:** {$this->user->user_type}")
-            ->line("**Origem:** {$this->source->value}")
-            ->salutation('Revisalog');
+            ->line("**Perfil:** {$this->user->typeLabel()}")
+            ->line('**Origem:** '.self::sourceLabel($this->source))
+            ->salutation('RevisaLog');
+    }
+
+    /**
+     * Por onde a conta foi criada, como o suporte lê.
+     */
+    public static function sourceLabel(RegistrationSource $source): string
+    {
+        return match ($source) {
+            RegistrationSource::Web => 'Site',
+            RegistrationSource::Api => 'App (e-mail e senha)',
+            RegistrationSource::Oauth => 'App (Google ou Facebook)',
+        };
     }
 
     /**

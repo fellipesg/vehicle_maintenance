@@ -1,18 +1,23 @@
 @extends('layouts.admin')
 
-@section('title', 'Novo post')
+@section('title', 'Novo artigo')
+@section('admin_content_width', 'max-w-6xl')
+
+@php
+    $adminBreadcrumbs = [['Conteúdo'], ['Artigos do blog', route('admin.blog.index')], ['Novo artigo']];
+@endphp
 
 @section('content')
-<div class="mx-auto max-w-3xl px-4 py-8">
-    <div class="mb-6">
-        <a href="{{ route('admin.blog.index') }}" class="text-sm text-wrench-600 hover:underline">← Voltar para o blog</a>
-        <h1 class="mt-2 text-3xl font-bold">Novo post</h1>
-    </div>
+    <x-ui.page-header title="Novo artigo" description="Salve como rascunho para revisar antes de publicar." />
 
-    <form method="POST" action="{{ route('admin.blog.store') }}" enctype="multipart/form-data" class="card space-y-4">
+    <form
+        method="POST"
+        action="{{ route('admin.blog.store') }}"
+        enctype="multipart/form-data"
+        data-admin-blog-editor
+        data-preview-url="{{ route('admin.blog.preview') }}"
+    >
         @csrf
-        @include('admin.blog._form', ['post' => null])
-        <button type="submit" class="btn-primary">Salvar post</button>
+        @include('admin.blog._form', ['post' => null, 'submitLabel' => 'Salvar artigo', 'cancelUrl' => route('admin.blog.index')])
     </form>
-</div>
 @endsection

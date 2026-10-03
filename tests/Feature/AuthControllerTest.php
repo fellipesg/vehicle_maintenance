@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class AuthControllerTest extends TestCase
@@ -319,11 +320,12 @@ class AuthControllerTest extends TestCase
             ])->assertUnauthorized();
         }
 
-        $this->postJson('/api/v1/login', [
+        $response = $this->postJson('/api/v1/login', [
             'email' => 'ratelimit@example.com',
             'password' => 'wrong-password',
-        ])->assertStatus(429)
-            ->assertJsonPath('message', 'Too many attempts. Please try again later.');
+        ])->assertStatus(429);
+
+        $this->assertTooManyAttemptsMessage($response);
     }
 
     public function test_login_is_limited_per_ip_across_different_emails(): void
@@ -335,11 +337,12 @@ class AuthControllerTest extends TestCase
             ])->assertUnauthorized();
         }
 
-        $this->postJson('/api/v1/login', [
+        $response = $this->postJson('/api/v1/login', [
             'email' => 'spray-31@example.com',
             'password' => 'wrong-password',
-        ])->assertStatus(429)
-            ->assertJsonPath('message', 'Too many attempts. Please try again later.');
+        ])->assertStatus(429);
+
+        $this->assertTooManyAttemptsMessage($response);
     }
 
     public function test_two_factor_challenge_is_limited_per_ip_across_tokens(): void
@@ -369,13 +372,14 @@ class AuthControllerTest extends TestCase
             ])->assertStatus(422);
         }
 
-        $this->postJson('/api/v1/register', [
+        $response = $this->postJson('/api/v1/register', [
             'name' => 'Blocked User',
             'email' => 'register-limit-blocked@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-        ])->assertStatus(429)
-            ->assertJsonPath('message', 'Too many attempts. Please try again later.');
+        ])->assertStatus(429);
+
+        $this->assertTooManyAttemptsMessage($response);
     }
 
     public function test_oauth_callback_rate_limit_is_segmented_by_provider(): void
@@ -388,9 +392,10 @@ class AuthControllerTest extends TestCase
         $response = $this->getJson('/api/v1/auth/facebook/callback');
         $this->assertNotSame(429, $response->status());
 
-        $this->getJson('/api/v1/auth/google/callback')
-            ->assertStatus(429)
-            ->assertJsonPath('message', 'Too many attempts. Please try again later.');
+        $response = $this->getJson('/api/v1/auth/google/callback')
+            ->assertStatus(429);
+
+        $this->assertTooManyAttemptsMessage($response);
     }
 
     public function test_oauth_callback_rate_limit_does_not_block_login_bucket(): void
@@ -448,5 +453,20 @@ class AuthControllerTest extends TestCase
         ])->assertOk();
 
         $this->assertGuest('web');
+    }
+
+    /**
+     * The auth limiter answers in pt-BR and tells how long to wait, using the
+     * same number of seconds it sends in Retry-After.
+     */
+    private function assertTooManyAttemptsMessage(TestResponse $response): void
+    {
+        $seconds = (int) $response->headers->get('Retry-After');
+
+        $this->assertGreaterThan(0, $seconds);
+        $response->assertJsonPath('success', false)
+            ->assertJsonPath('message', $seconds === 1
+                ? 'Muitas tentativas. Aguarde 1 segundo e tente de novo.'
+                : "Muitas tentativas. Aguarde {$seconds} segundos e tente de novo.");
     }
 }

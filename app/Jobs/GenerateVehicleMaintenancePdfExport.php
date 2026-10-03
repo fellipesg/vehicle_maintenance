@@ -7,6 +7,7 @@ use App\Models\VehiclePdfExport;
 use App\Services\Vehicle\VehicleMaintenancePdfExporter;
 use App\Services\Vehicle\VehiclePdfExportService;
 use App\Support\AppStorage;
+use App\Support\Vehicle\VehicleIdentifierVisibility;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -36,7 +37,10 @@ class GenerateVehicleMaintenancePdfExport implements ShouldQueue
         $file = null;
 
         try {
-            $file = $exporter->generate($vehicle);
+            $file = $exporter->generate(
+                $vehicle,
+                maskIdentifiers: ! VehicleIdentifierVisibility::showsFullIdentifiers($export->user, $vehicle),
+            );
             $path = config('vehicle-pdf-export.storage_path_prefix').'/'.$export->id.'.pdf';
 
             AppStorage::disk()->put($path, $file['content']);

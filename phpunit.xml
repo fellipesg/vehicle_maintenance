@@ -22,6 +22,9 @@
         <env name="FIREBASE_CREDENTIALS_BASE64" value="" force="true"/>
         <env name="FIREBASE_CREDENTIALS_JSON" value="" force="true"/>
         <env name="APP_ENV" value="testing"/>
+        <env name="APP_LOCALE" value="pt_BR" force="true"/>
+        <env name="APP_FALLBACK_LOCALE" value="pt_BR" force="true"/>
+        <env name="APP_FAKER_LOCALE" value="pt_BR" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

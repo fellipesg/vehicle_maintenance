@@ -4,6 +4,7 @@ namespace Tests\Feature\Web;
 
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Services\Crlv\CrlvPdfParser;
 use Database\Seeders\VehicleCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -46,6 +47,8 @@ class VehicleOwnershipTest extends TestCase
 
     public function test_user_can_claim_existing_vehicle_with_crlv(): void
     {
+        // O CRLV-e está no CPF da conta de quem vincula: só assim o veículo sai da conta do dono atual.
+        $this->user->update(['document' => $this->fixtureOwnerDocument('divesa_c180_pr.pdf')]);
         $owner = User::factory()->asUser()->create();
         $vehicle = Vehicle::factory()->create([
             'license_plate' => 'QOS6H54',
@@ -79,9 +82,9 @@ class VehicleOwnershipTest extends TestCase
         );
     }
 
-    public function test_vehicle_show_renders_api_driven_shell(): void
+    public function test_vehicle_show_is_rendered_on_the_server(): void
     {
-        $vehicle = Vehicle::factory()->create();
+        $vehicle = Vehicle::factory()->create(['brand' => 'Nissan', 'model' => 'Kicks']);
         $this->user->vehicles()->attach($vehicle->id, [
             'is_current_owner' => true,
             'tenant_id' => $this->user->tenant_id,
@@ -90,9 +93,10 @@ class VehicleOwnershipTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('user.vehicles.show', $vehicle))
             ->assertOk()
-            ->assertSee('data-api-page="vehicle-show"', false)
+            ->assertSee('data-vehicle-detail', false)
+            ->assertSee('>Nissan Kicks</h1>', false)
             ->assertSee('data-vehicle-id="'.$vehicle->id.'"', false)
-            ->assertSee('Carregando veículo...');
+            ->assertDontSee('Carregando');
     }
 
     public function test_subscribed_user_api_returns_maintenances_for_vehicle(): void
@@ -118,5 +122,12 @@ class VehicleOwnershipTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonFragment(['maintenance_type' => 'Revisão Premium Visível']);
+    }
+
+    private function fixtureOwnerDocument(string $fixture): string
+    {
+        return (string) app(CrlvPdfParser::class)
+            ->parseFile(base_path('tests/fixtures/crlv/'.$fixture))
+            ->normalizedOwnerDocument();
     }
 }

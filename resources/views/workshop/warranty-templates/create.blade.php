@@ -1,19 +1,30 @@
 @extends('layouts.app')
 
-@section('title', 'Novo template de garantia')
+@section('title', 'Novo modelo de garantia')
 
 @section('content')
-<div class="mx-auto max-w-2xl px-4 py-8">
-    <span class="badge badge-orange mb-2">🔧 Oficina</span>
-    <h1 class="mb-6 text-3xl font-bold">Novo template de garantia</h1>
+    <x-ui.container size="md" padded>
+        <x-ui.page-header
+            title="Novo modelo de garantia"
+            :description="$source ? 'Cópia de '.$source->name.': ajuste o texto e salve como um modelo novo. O original continua como está.' : 'O modelo aparece ao registrar uma OS, com a validade calculada a partir da data do serviço.'"
+            :breadcrumbs="[['Modelos de garantia', route('workshop.warranty-templates.index')], ['Novo modelo']]"
+        />
 
-    <form method="POST" action="{{ route('workshop.warranty-templates.store') }}" class="card space-y-4">
-        @csrf
-        @include('workshop.warranty-templates._form', ['workshop' => $workshop, 'templatesLocked' => $templatesLocked])
-        <div class="flex gap-3">
-            <button type="submit" class="btn-primary">Salvar template</button>
-            <a href="{{ route('workshop.warranty-templates.index') }}" class="btn-secondary">Cancelar</a>
-        </div>
-    </form>
-</div>
+        <form method="POST" action="{{ route('workshop.warranty-templates.store') }}" class="space-y-6" data-warranty-template-form>
+            @csrf
+
+            <x-ui.form-errors />
+
+            @include('workshop.warranty-templates._form', [
+                'workshop' => $workshop,
+                'templatesLocked' => $templatesLocked,
+                'source' => $source,
+            ])
+
+            <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-sm max-sm:*:grow sm:-mx-6 sm:px-6" data-slot="form-actions">
+                <x-ui.button variant="secondary" :href="route('workshop.warranty-templates.index')">Cancelar</x-ui.button>
+                <x-ui.button type="submit" icon="check" loading-label="Salvando…">Salvar modelo</x-ui.button>
+            </div>
+        </form>
+    </x-ui.container>
 @endsection

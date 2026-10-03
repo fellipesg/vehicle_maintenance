@@ -6,7 +6,7 @@ use App\Jobs\EmailVehicleMaintenancePdf;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\VehicleAccessGrant;
+use App\Models\VehicleConsignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -80,20 +80,25 @@ class PortalAuthorizationTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_garage_with_approved_consignment_grant_can_view_vehicle(): void
+    public function test_garage_with_active_consignment_can_view_vehicle(): void
     {
         $garage = User::factory()->asGarage()->create();
-        $this->consignmentGrant($garage, 'approved');
+        $this->consignment($garage, VehicleConsignment::HISTORY_NONE);
 
         $this->actingAs($garage)
             ->get(route('garage.vehicles.show', $this->vehicle))
             ->assertOk();
     }
 
-    public function test_garage_with_pending_consignment_grant_cannot_view_vehicle(): void
+    public function test_garage_with_ended_consignment_cannot_view_vehicle(): void
     {
         $garage = User::factory()->asGarage()->create();
-        $this->consignmentGrant($garage, 'pending');
+        $consignment = $this->consignment($garage, VehicleConsignment::HISTORY_APPROVED);
+        $consignment->update([
+            'status' => VehicleConsignment::STATUS_ENDED,
+            'ended_at' => now(),
+            'end_reason' => 'sold',
+        ]);
 
         $this->actingAs($garage)
             ->get(route('garage.vehicles.show', $this->vehicle))
@@ -173,7 +178,7 @@ class PortalAuthorizationTest extends TestCase
         ]);
     }
 
-    private function consignmentGrant(User $garage, string $status): void
+    private function consignment(User $garage, string $historyStatus): VehicleConsignment
     {
         $garage->vehicles()->attach($this->vehicle->id, [
             'is_current_owner' => false,
@@ -182,12 +187,11 @@ class PortalAuthorizationTest extends TestCase
             'ownership_type' => 'consignment',
         ]);
 
-        VehicleAccessGrant::create([
-            'user_id' => $garage->id,
+        return VehicleConsignment::factory()->create([
             'vehicle_id' => $this->vehicle->id,
-            'grant_type' => 'consignment',
-            'status' => $status,
-            'power_of_attorney_path' => 'procuracoes/test.pdf',
+            'garage_user_id' => $garage->id,
+            'tenant_id' => $garage->tenant_id,
+            'history_access_status' => $historyStatus,
         ]);
     }
 
