@@ -267,4 +267,35 @@ class SendWorkshopProspectInviteJobTest extends TestCase
         $replyTo = array_map(fn ($address): string => $address->getAddress(), $sent->getOriginalMessage()->getReplyTo());
         $this->assertSame(['felipe@revisalog.com.br'], $replyTo);
     }
+
+    public function test_a_prospect_without_a_name_gets_a_neutral_subject_and_greeting(): void
+    {
+        $prospect = WorkshopProspect::factory()->create([
+            'trade_name' => null,
+            'legal_name' => null,
+            'first_message_id' => 'abc@mail.revisalog.com.br',
+        ]);
+
+        $firstTouch = new WorkshopProspectInviteMail($prospect, WorkshopProspectInviteMail::FIRST_TOUCH);
+        $followUp = new WorkshopProspectInviteMail($prospect, WorkshopProspectInviteMail::FOLLOW_UP);
+
+        $this->assertSame('Sua oficina no RevisaLog', $firstTouch->envelope()->subject);
+        $this->assertSame('Re: Sua oficina no RevisaLog', $followUp->envelope()->subject);
+
+        foreach ([$firstTouch, $followUp] as $mail) {
+            $html = $mail->render();
+            $this->assertStringContainsString('Olá, tudo bem?', $html);
+            $this->assertStringNotContainsString('equipe da sua oficina', $html);
+        }
+    }
+
+    public function test_a_named_prospect_is_greeted_by_name(): void
+    {
+        $prospect = WorkshopProspect::factory()->create(['trade_name' => 'Auto Zé']);
+
+        $mail = new WorkshopProspectInviteMail($prospect, WorkshopProspectInviteMail::FIRST_TOUCH);
+
+        $this->assertSame('Auto Zé no RevisaLog', $mail->envelope()->subject);
+        $this->assertStringContainsString('Olá, equipe da Auto Zé.', $mail->render());
+    }
 }

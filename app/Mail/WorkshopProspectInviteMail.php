@@ -44,12 +44,14 @@ class WorkshopProspectInviteMail extends Mailable
             throw new RuntimeException('OUTREACH_FROM_ADDRESS não está configurado.');
         }
 
-        $name = $this->prospect->displayName();
+        $topic = $this->prospect->hasName()
+            ? "{$this->prospect->displayName()} no RevisaLog"
+            : 'Sua oficina no RevisaLog';
 
         return new Envelope(
             from: new Address($fromAddress, (string) config('outreach.from.name')),
             replyTo: [new Address($this->replyToAddress())],
-            subject: $this->isThreadedFollowUp() ? "Re: {$name} no RevisaLog" : "{$name} no RevisaLog",
+            subject: $this->isThreadedFollowUp() ? "Re: {$topic}" : $topic,
         );
     }
 
@@ -59,7 +61,9 @@ class WorkshopProspectInviteMail extends Mailable
             view: 'emails.outreach.invite',
             text: 'emails.outreach.invite-text',
             with: [
-                'nome' => $this->prospect->displayName(),
+                'saudacao' => $this->prospect->hasName()
+                    ? "Olá, equipe da {$this->prospect->displayName()}."
+                    : 'Olá, tudo bem?',
                 'assinatura' => (string) config('outreach.sender_signature_name'),
                 'link' => $this->clickUrl(),
                 'sair' => $this->unsubscribeUrl(),

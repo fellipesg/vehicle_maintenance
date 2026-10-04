@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <body style="font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #222;">
 @if($followUp)
-<p>Olá, equipe da {{ $nome }}.</p>
+<p>{{ $saudacao }}</p>
 
 <p>Passando só para saber se a mensagem anterior chegou. Se a oficina quiser aparecer com o próprio nome no histórico dos carros que atende, o cadastro é gratuito: <a href="{{ $link }}">{{ $link }}</a></p>
 
@@ -12,7 +12,7 @@
 
 <p style="color: #666; font-size: 13px;">—<br>Para não receber mensagens do RevisaLog: <a href="{{ $sair }}">{{ $sair }}</a></p>
 @else
-<p>Olá, equipe da {{ $nome }}.</p>
+<p>{{ $saudacao }}</p>
 
 <p>Sou o {{ $assinatura }}, do RevisaLog, um app em que donos de carro guardam o histórico de manutenção do veículo.</p>
 

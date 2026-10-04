@@ -1,5 +1,5 @@
 @if($followUp)
-Olá, equipe da {!! $nome !!}.
+{!! $saudacao !!}
 
 Passando só para saber se a mensagem anterior chegou. Se a oficina quiser aparecer com o próprio nome no histórico dos carros que atende, o cadastro é gratuito: {!! $link !!}
 
@@ -11,7 +11,7 @@ Abraço,
 —
 Para não receber mensagens do RevisaLog: {!! $sair !!}
 @else
-Olá, equipe da {!! $nome !!}.
+{!! $saudacao !!}
 
 Sou o {!! $assinatura !!}, do RevisaLog, um app em que donos de carro guardam o histórico de manutenção do veículo.
 

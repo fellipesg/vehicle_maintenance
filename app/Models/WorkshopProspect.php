@@ -88,6 +88,14 @@ class WorkshopProspect extends Model
         return self::formatCnpj($this->cnpj);
     }
 
+    /**
+     * Tem nome fantasia ou razão social. Sem nenhum (a maioria dos MEIs), o e-mail não cita nome.
+     */
+    public function hasName(): bool
+    {
+        return filled($this->trade_name) || filled($this->legal_name);
+    }
+
     public function displayName(): string
     {
         if (filled($this->trade_name)) {
