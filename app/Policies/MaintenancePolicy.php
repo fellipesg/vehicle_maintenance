@@ -58,6 +58,18 @@ class MaintenancePolicy
         return $this->canChange($user, $maintenance);
     }
 
+    /**
+     * Validar (confirmar ou não reconhecer) uma declarada: só a conta da oficina que ela cita,
+     * enquanto espera a resposta (WorkshopReviewService).
+     */
+    public function review(User $user, Maintenance $maintenance): bool
+    {
+        return $user->isWorkshop()
+            && $user->workshop !== null
+            && $maintenance->isAwaitingWorkshopReview()
+            && (int) $maintenance->workshop_id === (int) $user->workshop->id;
+    }
+
     private function canChange(User $user, Maintenance $maintenance): Response
     {
         if ($user->isWorkshop()) {

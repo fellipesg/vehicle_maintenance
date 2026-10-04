@@ -89,7 +89,7 @@ class CommandPaletteShellTest extends TestCase
         return [
             'proprietário' => ['asUser', 'user.dashboard', ['Início', 'Meus veículos', 'Manutenções', 'Oficinas'], 'Adicionar veículo', 'user.vehicles.create'],
             'lojista' => ['asGarage', 'garage.dashboard', ['Início', 'Estoque', 'Manutenções'], 'Adicionar ao estoque', 'garage.vehicles.create'],
-            'oficina' => ['asWorkshop', 'workshop.dashboard', ['Início', 'Ordens de serviço', 'Modelos de garantia', 'Minha oficina'], 'Nova OS', 'workshop.maintenances.create'],
+            'oficina' => ['asWorkshop', 'workshop.dashboard', ['Início', 'Ordens de serviço', 'Validações', 'Modelos de garantia', 'Minha oficina'], 'Nova OS', 'workshop.maintenances.create'],
         ];
     }
 

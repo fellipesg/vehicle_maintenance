@@ -30,9 +30,10 @@
                     $notificationTitle = is_string($notificationData['title'] ?? null) && $notificationData['title'] !== '' ? $notificationData['title'] : 'Notificação';
                     $notificationBody = is_string($notificationData['body'] ?? null) ? $notificationData['body'] : '';
                     $notificationIsUnread = $notification->read_at === null;
-                    $notificationVehicleUrl = \App\Support\NotificationLink::vehicleUrl($notificationData, auth()->user());
+                    $notificationVehicleUrl = \App\Support\NotificationLink::actionUrl($notificationData, auth()->user());
+                    $notificationActionLabel = \App\Support\NotificationLink::actionLabel($notificationData, auth()->user());
                     // Não lida: botão que marca como lida (e abre o veículo, se houver). Lida: link
-                    // para o veículo, ou só o texto.
+                    // para o destino, ou só o texto.
                     $notificationTag = $notificationIsUnread ? 'button' : ($notificationVehicleUrl !== null ? 'a' : 'div');
                 @endphp
                 <li @if($notificationIsUnread) data-unread @endif>
@@ -62,7 +63,7 @@
                             </span>
                             @if($notificationVehicleUrl !== null)
                                 <span class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-link">
-                                    Ver veículo
+                                    {{ $notificationActionLabel }}
                                     <x-ui.icon name="arrow-right" class="size-3.5" />
                                 </span>
                             @elseif($notificationIsUnread)

@@ -167,6 +167,7 @@ enum Portal: string
             self::Workshop => [
                 self::item('Início', 'workshop.dashboard', 'home', ['workshop.dashboard']),
                 self::item('Ordens de serviço', 'workshop.maintenances.index', 'clipboard-document', ['workshop.maintenances.*']),
+                self::item('Validações', 'workshop.reviews.index', 'check-circle', ['workshop.reviews.*']),
                 self::item('Modelos de garantia', 'workshop.warranty-templates.index', 'shield-check', ['workshop.warranty-templates.*']),
                 self::item('Minha oficina', 'workshop.profile.show', 'building-storefront', ['workshop.profile.*']),
             ],

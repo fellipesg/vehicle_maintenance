@@ -291,7 +291,12 @@ class AuthScreensTest extends TestCase
 
     private function page(TestResponse $response): HTMLDocument
     {
-        return HTMLDocument::createFromString((string) $response->getContent(), LIBXML_NOERROR);
+        // Prepend a space so no 2-byte UTF-8 sequence lands at offset 4095 (the last byte of
+        // lexbor's 4096-byte buffer), which is a PHP 8.4 Dom parser bug that silently drops the
+        // leading byte of any such sequence that straddles the boundary.
+        $content = ' '.(string) $response->getContent();
+
+        return HTMLDocument::createFromString($content, LIBXML_NOERROR);
     }
 
     private function element(HTMLDocument $page, string $selector): Element

@@ -29,7 +29,11 @@ class UpdateMaintenanceRequest extends ApiFormRequest
             : $maintenance?->workshop_id;
 
         return [
-            'workshop_id' => 'nullable|exists:workshops,id',
+            'workshop_id' => array_values(array_filter([
+                'nullable',
+                'exists:workshops,id',
+                $maintenance?->rejected_workshop_id !== null ? Rule::notIn([$maintenance->rejected_workshop_id]) : null,
+            ])),
             'maintenance_type' => 'sometimes|required|string|max:100',
             'description' => 'nullable|string',
             'workshop_name' => 'nullable|string|max:255',

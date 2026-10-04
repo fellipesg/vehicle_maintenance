@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\WarrantyScope;
+use App\Enums\WorkshopReviewStatus;
 use App\Support\DisplayTime;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,12 +35,34 @@ class Maintenance extends Model
             'maintenance_date' => 'date',
             'is_manufacturer_required' => 'boolean',
             'verified_at' => 'datetime',
+            'workshop_review_status' => WorkshopReviewStatus::class,
+            'workshop_reviewed_at' => 'datetime',
+            'workshop_review_requested_at' => 'datetime',
+            'workshop_review_reminded_at' => 'datetime',
         ];
     }
 
     public function isVerified(): bool
     {
         return $this->verified_at !== null;
+    }
+
+    /**
+     * Declarada citando uma oficina da rede, ainda sem resposta dela.
+     */
+    public function isAwaitingWorkshopReview(): bool
+    {
+        return $this->workshop_review_status === WorkshopReviewStatus::Pending
+            && $this->workshop_id !== null
+            && $this->verified_at === null;
+    }
+
+    /**
+     * O selo veio da confirmação de uma manutenção que o cliente declarou.
+     */
+    public function wasConfirmedByWorkshop(): bool
+    {
+        return $this->isVerified() && $this->verification_method === 'confirmed';
     }
 
     /**
@@ -124,6 +147,31 @@ class Maintenance extends Model
     public function scopeUnverified($query)
     {
         return $query->whereNull('verified_at');
+    }
+
+    /**
+     * Declaradas que citam a oficina e esperam a validação dela.
+     */
+    public function scopeAwaitingReviewBy($query, int $workshopId)
+    {
+        return $query->where('workshop_id', $workshopId)
+            ->whereNull('verified_at')
+            ->where('workshop_review_status', WorkshopReviewStatus::Pending->value);
+    }
+
+    public function workshopReviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'workshop_reviewed_by');
+    }
+
+    public function rejectedWorkshop(): BelongsTo
+    {
+        return $this->belongsTo(Workshop::class, 'rejected_workshop_id');
+    }
+
+    public function workshopLead(): BelongsTo
+    {
+        return $this->belongsTo(WorkshopLead::class);
     }
 
     /**

@@ -76,7 +76,7 @@ class PortalTest extends TestCase
 
         $this->assertSame(['Início', 'Meus veículos', 'Manutenções', 'Oficinas'], $labels(Portal::Owner));
         $this->assertSame(['Início', 'Estoque', 'Manutenções'], $labels(Portal::Dealer));
-        $this->assertSame(['Início', 'Ordens de serviço', 'Modelos de garantia', 'Minha oficina'], $labels(Portal::Workshop));
+        $this->assertSame(['Início', 'Ordens de serviço', 'Validações', 'Modelos de garantia', 'Minha oficina'], $labels(Portal::Workshop));
 
         foreach ([Portal::Owner, Portal::Dealer, Portal::Workshop] as $portal) {
             $this->assertLessThanOrEqual(5, count($portal->navigation()));

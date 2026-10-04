@@ -12,6 +12,7 @@ use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
 use App\Services\Invoice\InvoiceUploadProcessor;
 use App\Services\Maintenance\MaintenanceWarrantyApplicator;
+use App\Services\Maintenance\WorkshopReviewService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Support\ApiResponse;
 use App\Support\AppStorage;
@@ -285,7 +286,12 @@ class MaintenanceController extends Controller
             }
         }
 
+        $previousWorkshopId = $maintenance->workshop_id;
         $maintenance->update($data);
+
+        if (! $request->user()->isWorkshop()) {
+            app(WorkshopReviewService::class)->syncAfterDeclaration($maintenance->fresh(), $previousWorkshopId);
+        }
 
         if (isset($data['kilometers'])) {
             app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());

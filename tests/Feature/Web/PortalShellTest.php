@@ -30,7 +30,7 @@ class PortalShellTest extends TestCase
         return [
             'proprietário' => ['asUser', 'user.vehicles.index', ['Início', 'Meus veículos', 'Manutenções', 'Oficinas'], 'Meus veículos', 'Adicionar veículo', 'user.vehicles.create', 'Proprietário'],
             'lojista' => ['asGarage', 'garage.vehicles.index', ['Início', 'Estoque', 'Manutenções'], 'Estoque', 'Adicionar ao estoque', 'garage.vehicles.create', 'Lojista'],
-            'oficina' => ['asWorkshop', 'workshop.maintenances.index', ['Início', 'Ordens de serviço', 'Modelos de garantia', 'Minha oficina'], 'Ordens de serviço', 'Nova OS', 'workshop.maintenances.create', 'Oficina'],
+            'oficina' => ['asWorkshop', 'workshop.maintenances.index', ['Início', 'Ordens de serviço', 'Validações', 'Modelos de garantia', 'Minha oficina'], 'Ordens de serviço', 'Nova OS', 'workshop.maintenances.create', 'Oficina'],
         ];
     }
 

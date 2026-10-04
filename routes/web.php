@@ -33,7 +33,9 @@ use App\Http\Controllers\Web\User\VehiclePdfExportDownloadController;
 use App\Http\Controllers\Web\User\WorkshopDirectoryController;
 use App\Http\Controllers\Web\Workshop\DashboardController as WorkshopDashboardController;
 use App\Http\Controllers\Web\Workshop\MaintenanceController as WorkshopMaintenanceController;
+use App\Http\Controllers\Web\Workshop\MessageTemplateController as WorkshopMessageTemplateController;
 use App\Http\Controllers\Web\Workshop\ProfileController as WorkshopProfileController;
+use App\Http\Controllers\Web\Workshop\ReviewController as WorkshopReviewController;
 use App\Http\Controllers\Web\Workshop\WarrantyTemplateController as WorkshopWarrantyTemplateController;
 use Illuminate\Support\Facades\Route;
 
@@ -208,6 +210,17 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::delete('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'destroy'])
             ->whereNumber('maintenance')
             ->name('maintenances.destroy');
+        Route::get('/validacoes', [WorkshopReviewController::class, 'index'])->name('reviews.index');
+        Route::post('/validacoes/{maintenance}/confirmar', [WorkshopReviewController::class, 'confirm'])
+            ->whereNumber('maintenance')
+            ->name('reviews.confirm');
+        Route::post('/validacoes/{maintenance}/nao-reconheco', [WorkshopReviewController::class, 'reject'])
+            ->whereNumber('maintenance')
+            ->name('reviews.reject');
+        Route::resource('mensagens', WorkshopMessageTemplateController::class)
+            ->except(['show'])
+            ->names('message-templates')
+            ->parameters(['mensagens' => 'message_template']);
         Route::resource('garantias/templates', WorkshopWarrantyTemplateController::class)
             ->except(['show'])
             ->names('warranty-templates')

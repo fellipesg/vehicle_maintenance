@@ -4,6 +4,7 @@ namespace App\Services\Maintenance;
 
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Services\Workshop\WorkshopLeadRecorder;
 use Illuminate\Support\Facades\DB;
 
 class MaintenanceVerificationStamper
@@ -20,7 +21,7 @@ class MaintenanceVerificationStamper
             return $this->applyWorkshopSeal($maintenance, $actor->workshop->id);
         }
 
-        if (config('maintenance.auto_verify_linked_workshop') && $maintenance->workshop_id !== null) {
+        if (self::autoVerifyEnabled() && $maintenance->workshop_id !== null) {
             return $this->applyWorkshopSeal($maintenance, (int) $maintenance->workshop_id);
         }
 
@@ -36,7 +37,29 @@ class MaintenanceVerificationStamper
             'verification_code' => null,
         ])->save();
 
+        $maintenance = $maintenance->fresh();
+        app(WorkshopReviewService::class)->syncAfterDeclaration($maintenance);
+        app(WorkshopLeadRecorder::class)->record($maintenance);
+
         return $maintenance->fresh();
+    }
+
+    /**
+     * Selo para uma declarada que a oficina citada confirmou (WorkshopReviewService::confirm). O
+     * registro continua com o tenant e o autor de quem declarou; só a procedência muda.
+     */
+    public function confirmDeclared(Maintenance $maintenance, int $workshopId): Maintenance
+    {
+        return $this->applyWorkshopSeal($maintenance, $workshopId, 'confirmed');
+    }
+
+    /**
+     * O atalho de QA que dá o selo a toda declarada que cita uma oficina nunca vale em produção:
+     * ali o selo só nasce da OS registrada ou confirmada pela própria oficina.
+     */
+    public static function autoVerifyEnabled(): bool
+    {
+        return (bool) config('maintenance.auto_verify_linked_workshop') && ! app()->isProduction();
     }
 
     public function verifyLinkedWorkshopMaintenances(): int
@@ -55,13 +78,15 @@ class MaintenanceVerificationStamper
         return $count;
     }
 
-    private function applyWorkshopSeal(Maintenance $maintenance, int $workshopId): Maintenance
+    private function applyWorkshopSeal(Maintenance $maintenance, int $workshopId, string $method = 'registered'): Maintenance
     {
         $maintenance->forceFill([
             'registered_by_type' => 'workshop',
             'verified_at' => now(),
             'verified_workshop_id' => $workshopId,
             'verification_code' => $this->generateUniqueCode(),
+            'verification_method' => $method,
+            'workshop_id' => $workshopId,
         ])->save();
 
         return $maintenance->fresh();
