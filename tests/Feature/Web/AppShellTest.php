@@ -97,7 +97,7 @@ class AppShellTest extends TestCase
 
         $menu = $this->mobileMenu($this->actingAs($workshop)->get(route('workshop.maintenances.index'))->assertOk());
 
-        foreach (['workshop.dashboard', 'workshop.profile.show', 'workshop.maintenances.index', 'workshop.warranty-templates.index'] as $routeName) {
+        foreach (['workshop.dashboard', 'workshop.profile.show', 'workshop.maintenances.index', 'workshop.warranty-templates.index', 'workshop.reviews.index'] as $routeName) {
             $this->assertStringContainsString('href="'.route($routeName).'"', $menu);
         }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\LegalController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\MaintenancePhotoController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\UserFcmTokenController;
 use App\Http\Controllers\Api\VehicleController;
@@ -117,6 +118,12 @@ Route::prefix('v1')->group(function () {
                 'update' => 'ability:workshops:write',
                 'destroy' => 'ability:workshops:write',
             ]);
+
+        // Notificações da conta (sino). Usa as abilities de perfil, que todo token do app já tem.
+        Route::get('/notifications', [NotificationController::class, 'index'])->middleware('ability:profile:read');
+        Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->middleware('ability:profile:read');
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->middleware('ability:profile:write');
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->middleware('ability:profile:write');
 
         // FCM Token routes
         Route::get('/fcm-tokens', [UserFcmTokenController::class, 'index'])->middleware('ability:fcm:write');

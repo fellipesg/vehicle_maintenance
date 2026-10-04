@@ -3,7 +3,7 @@
     "Editar manutenção" do Proprietário): antes do envio, diz que o registro aparece como Declarada
     pelo proprietário/lojista, com o mesmo bloco .prov-declared e o marcador PR/LJ dos cards e da
     x-provenance-legend (.ai/rules/theme.md). O Selo da oficina só vem quando a oficina da rede
-    registra o serviço no portal dela.
+    registra o serviço no portal dela ou confirma o que foi declarado (fila "Validações").
 
     Com config('maintenance.auto_verify_linked_workshop') (ambiente de testes), o aviso diz que
     escolher uma oficina da rede aplica o selo.
@@ -17,7 +17,7 @@
     $noticeDeclaredLabel = $noticeByGarage ? 'Declarada pelo lojista' : 'Declarada pelo proprietário';
     $noticeMarker = $noticeByGarage ? 'LJ' : 'PR';
     $noticeTitle = $title ?? 'Aparecerá como '.$noticeDeclaredLabel;
-    $noticeAutoSeal = (bool) config('maintenance.auto_verify_linked_workshop');
+    $noticeAutoSeal = \App\Services\Maintenance\MaintenanceVerificationStamper::autoVerifyEnabled();
 @endphp
 
 @if ($noticeAutoSeal)
@@ -30,7 +30,7 @@
         <div class="min-w-0 space-y-1">
             <p id="aviso-procedencia-titulo" class="font-semibold text-foreground">{{ $noticeTitle }}</p>
             <p class="text-muted-foreground">
-                O Selo da oficina só é aplicado quando a oficina da rede registra o serviço no portal dela. Informar a oficina aqui identifica quem fez o serviço, mas não aplica o selo.
+                O Selo da oficina só é aplicado quando a oficina da rede registra o serviço no portal dela. Ao escolher uma oficina da rede aqui, ela recebe um pedido para confirmar o serviço; se confirmar, a manutenção ganha o selo.
                 @unless ($noticeByGarage)
                     A nota fiscal ajuda a comprovar o que você declara.
                 @endunless

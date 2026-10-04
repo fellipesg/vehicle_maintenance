@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\WorkshopPlan;
 use App\Support\AppStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,7 +33,16 @@ class Workshop extends Model
         'latitude',
         'longitude',
         'logo_path',
+        'weekly_digest_enabled',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'plan' => WorkshopPlan::class,
+            'weekly_digest_enabled' => 'boolean',
+        ];
+    }
 
     /**
      * Get the user (owner) of this workshop
@@ -74,6 +84,24 @@ class Workshop extends Model
     public function messageTemplates(): HasMany
     {
         return $this->hasMany(WorkshopMessageTemplate::class);
+    }
+
+    public function messageDispatches(): HasMany
+    {
+        return $this->hasMany(WorkshopMessageDispatch::class);
+    }
+
+    /**
+     * Manutenções declaradas por clientes que citam a oficina e esperam a validação dela.
+     */
+    public function maintenancesAwaitingReview(): HasMany
+    {
+        return $this->maintenances()->awaitingReviewBy($this->id);
+    }
+
+    public function planOrDefault(): WorkshopPlan
+    {
+        return $this->plan ?? WorkshopPlan::Free;
     }
 
     public function warrantyTemplates(): HasMany

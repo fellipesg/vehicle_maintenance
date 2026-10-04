@@ -47,6 +47,6 @@ class VerifyLinkedWorkshopMaintenances extends Command
             return true;
         }
 
-        return (bool) config('maintenance.auto_verify_linked_workshop');
+        return MaintenanceVerificationStamper::autoVerifyEnabled();
     }
 }

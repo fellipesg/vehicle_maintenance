@@ -52,7 +52,8 @@
                         $notificationData = (array) $notification->data;
                         $notificationTitle = is_string($notificationData['title'] ?? null) && $notificationData['title'] !== '' ? $notificationData['title'] : 'Lembrete de revisão';
                         $notificationBody = is_string($notificationData['body'] ?? null) ? $notificationData['body'] : '';
-                        $notificationVehicleUrl = \App\Support\NotificationLink::vehicleUrl($notificationData, $notificationUser);
+                        $notificationVehicleUrl = \App\Support\NotificationLink::actionUrl($notificationData, $notificationUser);
+                        $notificationActionLabel = \App\Support\NotificationLink::actionLabel($notificationData, $notificationUser);
                     @endphp
                     <li>
                         <form method="POST" action="{{ route('notifications.read', $notification->id) }}">
@@ -67,7 +68,7 @@
                                 </span>
                                 @if($notificationVehicleUrl !== null)
                                     <span class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-link">
-                                        Ver veículo
+                                        {{ $notificationActionLabel }}
                                         <x-ui.icon name="arrow-right" class="size-3.5" />
                                     </span>
                                 @endif

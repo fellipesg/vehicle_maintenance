@@ -87,6 +87,18 @@ class DashboardController extends Controller
     {
         $items = [];
 
+        $awaitingReview = $workshop->maintenancesAwaitingReview()->count();
+        if ($awaitingReview > 0) {
+            $items[] = [
+                'key' => 'validacoes-pendentes',
+                'count' => $awaitingReview,
+                'label' => $awaitingReview === 1 ? '1 serviço aguardando validação' : "{$awaitingReview} serviços aguardando validação",
+                'description' => 'Confirme os serviços que foram feitos na sua oficina para emitir o Selo.',
+                'url' => route('workshop.reviews.index'),
+                'action' => 'Ver validações',
+            ];
+        }
+
         $withoutInvoice = $this->sealedOrders($workshop)->doesntHave('invoices')->count();
         if ($withoutInvoice > 0) {
             $items[] = [

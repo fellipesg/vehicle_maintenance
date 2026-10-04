@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
 Schedule::command('maintenance:check-km-reminders')->dailyAt('08:00');
+Schedule::command('workshop-reviews:remind')->dailyAt('09:00');
 Schedule::command('vehicle-pdf-exports:cleanup')->daily();
 
 Schedule::command('queue:work --stop-when-empty --max-time=25 --tries=1')

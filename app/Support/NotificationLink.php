@@ -13,6 +13,50 @@ use Illuminate\Notifications\DatabaseNotification;
 class NotificationLink
 {
     /**
+     * URL de destino da notificação: resolve action_url (campo explícito na notificação, ex.:
+     * fila de validações da oficina) ou cai para vehicleUrl. Garante que o endereço é interno.
+     *
+     * @param  DatabaseNotification|array<string, mixed>  $notification
+     */
+    public static function actionUrl(DatabaseNotification|array $notification, User $user): ?string
+    {
+        $data = $notification instanceof DatabaseNotification ? (array) $notification->data : $notification;
+
+        $actionUrl = $data['action_url'] ?? null;
+
+        if (is_string($actionUrl) && self::isInternalUrl($actionUrl)) {
+            return $actionUrl;
+        }
+
+        return self::vehicleUrl($notification, $user);
+    }
+
+    /**
+     * Rótulo do link de destino: action_label se vier junto com action_url, "Ver veículo" quando a
+     * URL é a ficha do veículo, null quando não há URL.
+     *
+     * @param  DatabaseNotification|array<string, mixed>  $notification
+     */
+    public static function actionLabel(DatabaseNotification|array $notification, User $user): ?string
+    {
+        $data = $notification instanceof DatabaseNotification ? (array) $notification->data : $notification;
+        $url = self::actionUrl($notification, $user);
+
+        if ($url === null) {
+            return null;
+        }
+
+        $actionUrl = $data['action_url'] ?? null;
+        $actionLabel = $data['action_label'] ?? null;
+
+        if (is_string($actionUrl) && self::isInternalUrl($actionUrl) && is_string($actionLabel) && filled($actionLabel)) {
+            return $actionLabel;
+        }
+
+        return 'Ver veículo';
+    }
+
+    /**
      * URL da ficha do veículo, ou null quando a notificação não cita veículo ou o portal da conta
      * não tem ficha (oficina).
      *

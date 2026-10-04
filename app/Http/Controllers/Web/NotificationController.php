@@ -33,7 +33,7 @@ class NotificationController extends Controller
             $notification->markAsRead();
         }
 
-        $vehicleUrl = NotificationLink::vehicleUrl($notification, $request->user());
+        $vehicleUrl = NotificationLink::actionUrl($notification, $request->user());
 
         if ($vehicleUrl !== null) {
             return redirect($vehicleUrl);

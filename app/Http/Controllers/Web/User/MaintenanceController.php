@@ -14,8 +14,10 @@ use App\Rules\InvoiceFile;
 use App\Rules\RequiresInvoiceWhenWorkshopAssigned;
 use App\Services\Maintenance\MaintenancePhotoService;
 use App\Services\Maintenance\MaintenanceVerificationStamper;
+use App\Services\Maintenance\WorkshopReviewService;
 use App\Services\User\OwnerDashboard;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Workshop\WorkshopLeadRecorder;
 use App\Support\AppStorage;
 use App\Support\Maintenance\MaintenanceListFilters;
 use App\Support\Vehicle\MaintenanceMileageContext;
@@ -122,11 +124,15 @@ class MaintenanceController extends Controller
             $data['maintenance_date'],
         );
 
+        $workshopContact = $data['workshop_contact'] ?? null;
+        unset($data['workshop_contact']);
+
         $result = $this->storeMaintenanceWithInvoices(
             $request,
-            function () use ($data, $request) {
+            function () use ($data, $request, $workshopContact) {
                 $maintenance = Maintenance::create($data);
-                app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
+                $maintenance = app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
+                app(WorkshopLeadRecorder::class)->rememberContact($maintenance, $workshopContact);
                 $this->mileage->applyMaintenanceKilometers(
                     Vehicle::findOrFail($data['vehicle_id']),
                     (int) $data['kilometers'],
@@ -195,9 +201,10 @@ class MaintenanceController extends Controller
         }
 
         $data = $this->validateMaintenance($request, $maintenance);
-        unset($data['invoices']);
+        unset($data['invoices'], $data['workshop_contact']);
 
         $data = $this->withWorkshopName($data);
+        $previousWorkshopId = $maintenance->workshop_id;
         $data['is_manufacturer_required'] = $request->boolean('is_manufacturer_required');
 
         $vehicle = $maintenance->vehicle;
@@ -212,6 +219,8 @@ class MaintenanceController extends Controller
         }
 
         $maintenance->update($data);
+        app(WorkshopReviewService::class)->syncAfterDeclaration($maintenance->fresh(), $previousWorkshopId);
+        $maintenance->refresh();
 
         if ($vehicle !== null) {
             $this->mileage->refreshCurrentKilometers($vehicle->fresh());
@@ -270,7 +279,12 @@ class MaintenanceController extends Controller
         $existingInvoices = $maintenance?->invoices()->count() ?? 0;
 
         $rules = [
-            'workshop_id' => ['nullable', 'exists:workshops,id'],
+            'workshop_id' => array_values(array_filter([
+                'nullable',
+                'exists:workshops,id',
+                $maintenance?->rejected_workshop_id !== null ? Rule::notIn([$maintenance->rejected_workshop_id]) : null,
+            ])),
+            'workshop_contact' => ['nullable', 'string', 'max:255'],
             'maintenance_type' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
             'workshop_name' => ['nullable', 'string', 'max:255'],
@@ -299,6 +313,7 @@ class MaintenanceController extends Controller
             'invoices.*.uploaded' => 'Falha ao enviar o arquivo. Verifique se o PDF ou XML não está corrompido e se o tamanho está dentro do limite do servidor.',
             'invoices.*.mimes' => 'Apenas arquivos PDF ou XML são aceitos.',
             'invoices.*.max' => 'Cada arquivo pode ter no máximo 10 MB.',
+            'workshop_id.not_in' => 'Essa oficina informou que não fez este serviço. Escolha outra oficina ou deixe sem oficina da rede.',
         ]);
     }
 
