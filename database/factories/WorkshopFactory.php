@@ -15,7 +15,7 @@ class WorkshopFactory extends Factory
     {
         return [
             'user_id' => User::factory()->asWorkshop(),
-            'name' => fake()->company() . ' Mecânica',
+            'name' => fake()->company().' Mecânica',
             'phone' => fake()->numerify('11#########'),
             'whatsapp' => fake()->numerify('11#########'),
             'email' => fake()->companyEmail(),

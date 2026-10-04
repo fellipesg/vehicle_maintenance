@@ -32,7 +32,7 @@ class FelipeVehicleSeeder extends Seeder
         }
 
         if (! $user->tenant_id) {
-            (new TenantService())->createForUser($user);
+            (new TenantService)->createForUser($user);
             $user->refresh();
         }
 
@@ -144,6 +144,6 @@ class FelipeVehicleSeeder extends Seeder
 
         $this->command?->info("Usuário: {$user->email} / senha: password123");
         $this->command?->info("Veículo: {$vehicle->brand} {$vehicle->model} ({$vehicle->license_plate})");
-        $this->command?->info("Manutenção: Revisão B DIVESA em 10/03/2026");
+        $this->command?->info('Manutenção: Revisão B DIVESA em 10/03/2026');
     }
 }
