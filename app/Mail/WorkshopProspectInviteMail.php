@@ -26,6 +26,7 @@ class WorkshopProspectInviteMail extends Mailable
     public function __construct(
         public WorkshopProspect $prospect,
         public string $variant = self::FIRST_TOUCH,
+        public ?string $messageId = null,
     ) {}
 
     public function envelope(): Envelope
@@ -40,7 +41,7 @@ class WorkshopProspectInviteMail extends Mailable
         return new Envelope(
             from: new Address($fromAddress, (string) config('outreach.from.name')),
             replyTo: [new Address($this->replyToAddress())],
-            subject: $this->variant === self::FOLLOW_UP ? "Re: {$name} no RevisaLog" : "{$name} no RevisaLog",
+            subject: $this->isThreadedFollowUp() ? "Re: {$name} no RevisaLog" : "{$name} no RevisaLog",
         );
     }
 
@@ -61,10 +62,26 @@ class WorkshopProspectInviteMail extends Mailable
 
     public function headers(): Headers
     {
-        return new Headers(text: [
-            'List-Unsubscribe' => '<'.$this->unsubscribeUrl().'>, <mailto:'.$this->replyToAddress().'?subject=descadastrar>',
-            'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
-        ]);
+        $threadId = $this->isThreadedFollowUp() ? $this->prospect->first_message_id : null;
+
+        return new Headers(
+            messageId: $this->variant === self::FIRST_TOUCH ? $this->messageId : null,
+            references: $threadId === null ? [] : [$threadId],
+            text: [
+                ...($threadId === null ? [] : ['In-Reply-To' => '<'.$threadId.'>']),
+                'List-Unsubscribe' => '<'.$this->unsubscribeUrl().'>, <mailto:'.$this->replyToAddress().'?subject=descadastrar>',
+                'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+            ],
+        );
+    }
+
+    /**
+     * O follow-up só vira resposta ("Re:") se o primeiro envio guardou o Message-ID; sem ele (linha antiga)
+     * não finge uma conversa que não existe.
+     */
+    private function isThreadedFollowUp(): bool
+    {
+        return $this->variant === self::FOLLOW_UP && filled($this->prospect->first_message_id);
     }
 
     public function clickUrl(): string

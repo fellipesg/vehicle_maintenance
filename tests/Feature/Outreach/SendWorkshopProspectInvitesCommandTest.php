@@ -148,4 +148,21 @@ class SendWorkshopProspectInvitesCommandTest extends TestCase
         $this->assertSame('America/Sao_Paulo', $event->timezone);
         $this->assertTrue($event->withoutOverlapping);
     }
+
+    public function test_pending_jobs_on_the_database_queue_count_even_when_the_default_connection_differs(): void
+    {
+        config(['queue.default' => 'sync', 'outreach.daily_limit' => 1]);
+        \Illuminate\Support\Facades\DB::table('jobs')->insert([
+            'queue' => 'default',
+            'payload' => json_encode(['displayName' => SendWorkshopProspectInvite::class]),
+            'attempts' => 0,
+            'available_at' => now()->timestamp,
+            'created_at' => now()->timestamp,
+        ]);
+        WorkshopProspect::factory()->create();
+
+        $this->artisan('outreach:send')->assertSuccessful();
+
+        Queue::assertNothingPushed();
+    }
 }

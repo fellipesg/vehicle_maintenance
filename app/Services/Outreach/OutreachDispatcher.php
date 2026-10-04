@@ -113,12 +113,22 @@ class OutreachDispatcher
         return null;
     }
 
+    /**
+     * O job sempre usa a conexão database, qualquer que seja QUEUE_CONNECTION.
+     */
     private function queuedJobs(): int
     {
-        if (config('queue.default') !== 'database' || ! Schema::hasTable('jobs')) {
+        $connection = config('queue.connections.database', []);
+        $table = $connection['table'] ?? 'jobs';
+        $schema = Schema::connection($connection['connection'] ?? null);
+
+        if (! $schema->hasTable($table)) {
             return 0;
         }
 
-        return DB::table('jobs')->where('payload', 'like', '%'.class_basename(SendWorkshopProspectInvite::class).'%')->count();
+        return DB::connection($connection['connection'] ?? null)
+            ->table($table)
+            ->where('payload', 'like', '%'.class_basename(SendWorkshopProspectInvite::class).'%')
+            ->count();
     }
 }

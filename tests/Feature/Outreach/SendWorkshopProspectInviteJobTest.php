@@ -70,6 +70,23 @@ class SendWorkshopProspectInviteJobTest extends TestCase
         $prospect->refresh();
         $this->assertSame(WorkshopProspectStatus::Sent, $prospect->status);
         $this->assertNotNull($prospect->first_sent_at);
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{32}@mail\.revisalog\.com\.br$/', $prospect->first_message_id);
+    }
+
+    public function test_first_touch_sets_an_explicit_message_id_header_matching_the_stored_one(): void
+    {
+        Mail::fake();
+        $prospect = WorkshopProspect::factory()->create();
+
+        $this->run_($prospect);
+
+        Mail::mailer('outreach')->assertSent(WorkshopProspectInviteMail::class, function (WorkshopProspectInviteMail $mail) use ($prospect): bool {
+            $this->assertSame($prospect->fresh()->first_message_id, $mail->headers()->messageId);
+            $this->assertSame([], $mail->headers()->references);
+            $this->assertArrayNotHasKey('In-Reply-To', $mail->headers()->text);
+
+            return true;
+        });
     }
 
     public function test_the_html_has_no_tracking_pixel_or_images(): void
@@ -83,12 +100,15 @@ class SendWorkshopProspectInviteJobTest extends TestCase
     public function test_it_sends_the_follow_up_variant_for_a_sent_prospect(): void
     {
         Mail::fake();
-        $prospect = WorkshopProspect::factory()->sent(now()->subDays(10))->create(['trade_name' => 'Auto Zé']);
+        $prospect = WorkshopProspect::factory()->sent(now()->subDays(10))->create(['trade_name' => 'Auto Zé', 'first_message_id' => 'abc123@mail.revisalog.com.br']);
 
         $this->run_($prospect);
 
         Mail::mailer('outreach')->assertSent(WorkshopProspectInviteMail::class, function (WorkshopProspectInviteMail $mail): bool {
             $this->assertSame('Re: Auto Zé no RevisaLog', $mail->envelope()->subject);
+            $this->assertSame(['abc123@mail.revisalog.com.br'], $mail->headers()->references);
+            $this->assertSame('<abc123@mail.revisalog.com.br>', $mail->headers()->text['In-Reply-To']);
+            $this->assertNull($mail->headers()->messageId);
             $mail->assertSeeInText('Passando só para saber se a mensagem anterior chegou');
             $mail->assertDontSeeInText('Sou o Felipe');
 
@@ -214,5 +234,21 @@ class SendWorkshopProspectInviteJobTest extends TestCase
     {
         $this->assertSame('Auto Pecas Zé Ltda', WorkshopProspect::factory()->make(['trade_name' => null, 'legal_name' => 'AUTO PECAS ZÉ LTDA'])->displayName());
         $this->assertSame('sua oficina', WorkshopProspect::factory()->make(['trade_name' => null, 'legal_name' => null])->displayName());
+    }
+
+    public function test_follow_up_without_a_stored_message_id_has_no_re_and_no_threading_headers(): void
+    {
+        Mail::fake();
+        $prospect = WorkshopProspect::factory()->sent(now()->subDays(10))->create(['trade_name' => 'Auto Zé', 'first_message_id' => null]);
+
+        $this->run_($prospect);
+
+        Mail::mailer('outreach')->assertSent(WorkshopProspectInviteMail::class, function (WorkshopProspectInviteMail $mail): bool {
+            $this->assertSame('Auto Zé no RevisaLog', $mail->envelope()->subject);
+            $this->assertSame([], $mail->headers()->references);
+            $this->assertArrayNotHasKey('In-Reply-To', $mail->headers()->text);
+
+            return true;
+        });
     }
 }

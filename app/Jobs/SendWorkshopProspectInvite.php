@@ -14,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -71,10 +72,14 @@ class SendWorkshopProspectInvite implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        $messageId = $variant === WorkshopProspectInviteMail::FIRST_TOUCH
+            ? Str::random(32).'@'.(Str::after((string) config('outreach.from.address'), '@') ?: 'revisalog.com.br')
+            : null;
+
         try {
             Mail::mailer((string) config('outreach.mailer'))
                 ->to($prospect->email)
-                ->send(new WorkshopProspectInviteMail($prospect, $variant));
+                ->send(new WorkshopProspectInviteMail($prospect, $variant, $messageId));
         } catch (Throwable $exception) {
             $prospect->update([
                 'status' => WorkshopProspectStatus::Failed,
@@ -87,7 +92,7 @@ class SendWorkshopProspectInvite implements ShouldBeUnique, ShouldQueue
         if ($variant === WorkshopProspectInviteMail::FOLLOW_UP) {
             $prospect->update(['status' => WorkshopProspectStatus::FollowedUp, 'follow_up_sent_at' => now()]);
         } else {
-            $prospect->update(['status' => WorkshopProspectStatus::Sent, 'first_sent_at' => now()]);
+            $prospect->update(['status' => WorkshopProspectStatus::Sent, 'first_sent_at' => now(), 'first_message_id' => $messageId]);
         }
     }
 }

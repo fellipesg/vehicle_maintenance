@@ -36,6 +36,7 @@ class WorkshopProspect extends Model
         'token',
         'status',
         'first_sent_at',
+        'first_message_id',
         'follow_up_sent_at',
         'clicked_at',
         'replied_at',
