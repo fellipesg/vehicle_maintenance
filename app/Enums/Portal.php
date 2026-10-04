@@ -178,6 +178,7 @@ enum Portal: string
                 ['label' => 'Cadastros', 'items' => [
                     self::item('Usuários', 'admin.users.index', 'users', ['admin.users.*', 'admin.maps.users']),
                     self::item('Oficinas', 'admin.workshops.index', 'building-storefront', ['admin.workshops.*', 'admin.maps.workshops']),
+                    self::item('Prospecção', 'admin.outreach.index', 'envelope', ['admin.outreach.*']),
                 ]],
                 ['label' => 'Frota', 'items' => [
                     self::item('Veículos', 'admin.vehicles.index', 'truck', ['admin.vehicles.*']),

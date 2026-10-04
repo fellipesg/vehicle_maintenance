@@ -32,7 +32,7 @@ class AdminShellTest extends TestCase
 
         $links = $this->adminElements($xpath, './/a', $nav);
         $this->assertSame(
-            ['Visão geral', 'Usuários', 'Oficinas', 'Veículos', 'Manutenções', 'Artigos do blog', 'Categorias do blog', 'Marcas e modelos'],
+            ['Visão geral', 'Usuários', 'Oficinas', 'Prospecção', 'Veículos', 'Manutenções', 'Artigos do blog', 'Categorias do blog', 'Marcas e modelos'],
             array_map(fn ($link): string => $this->adminText($link), $links),
         );
 

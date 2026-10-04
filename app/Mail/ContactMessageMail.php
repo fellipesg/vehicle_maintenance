@@ -32,6 +32,7 @@ class ContactMessageMail extends Mailable implements ShouldQueue
         public string $email,
         public string $body,
         public ?string $topic = null,
+        public ?string $origin = null,
     ) {}
 
     public function envelope(): Envelope

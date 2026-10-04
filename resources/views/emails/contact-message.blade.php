@@ -6,6 +6,9 @@
 @if($topic)
 **Assunto:** {{ $topic }}
 @endif
+@if($origin)
+**Origem:** {{ $origin }}
+@endif
 
 {{ $body }}
 

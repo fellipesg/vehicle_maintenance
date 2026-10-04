@@ -21,6 +21,10 @@
         <form method="POST" action="{{ route('contact.store') }}" class="relative grid gap-5" data-slot="contact-form">
             @csrf
 
+            @if(filled($ref))
+                <input type="hidden" name="ref" value="{{ $ref }}">
+            @endif
+
             <x-ui.form-errors :ids="['cf-turnstile-response' => null]" />
 
             {{-- Armadilha para robôs: fora da tela, sem foco e escondida do leitor de tela. --}}

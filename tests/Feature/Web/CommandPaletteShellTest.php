@@ -32,7 +32,7 @@ class CommandPaletteShellTest extends TestCase
         $palette = $this->adminElement($xpath, '//dialog[@data-ui-command][@id="comandos"]');
 
         $this->assertSame(
-            ['Visão geral', 'Usuários', 'Oficinas', 'Veículos', 'Manutenções', 'Artigos do blog', 'Categorias do blog', 'Marcas e modelos'],
+            ['Visão geral', 'Usuários', 'Oficinas', 'Prospecção', 'Veículos', 'Manutenções', 'Artigos do blog', 'Categorias do blog', 'Marcas e modelos'],
             $this->optionLabels($xpath, $palette, 'destinos'),
         );
         $this->assertSame(['Novo artigo', 'Nova marca', 'Minha área de proprietário'], $this->optionLabels($xpath, $palette, 'acoes'));

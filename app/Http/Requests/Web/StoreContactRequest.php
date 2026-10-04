@@ -33,6 +33,7 @@ class StoreContactRequest extends FormRequest
             'subject' => ['required', 'in:'.implode(',', array_keys(self::SUBJECTS))],
             'message' => ['required', 'string', 'max:4000'],
             'website' => ['nullable', 'string', 'max:255'],
+            'ref' => ['nullable', 'string', 'max:64'],
         ];
 
         // Sem a chave (local/testes) o captcha fica desligado; honeypot e throttle continuam.

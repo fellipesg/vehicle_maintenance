@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\Admin\ConsignmentController as AdminConsignmentCont
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Web\Admin\MaintenanceController as AdminMaintenanceController;
 use App\Http\Controllers\Web\Admin\MapController as AdminMapController;
+use App\Http\Controllers\Web\Admin\OutreachController as AdminOutreachController;
 use App\Http\Controllers\Web\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Web\Admin\VehicleBrandController as AdminVehicleBrandController;
 use App\Http\Controllers\Web\Admin\VehicleController as AdminVehicleController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\NotificationController;
+use App\Http\Controllers\Web\OutreachController;
 use App\Http\Controllers\Web\PublicVehicleController;
 use App\Http\Controllers\Web\SitemapController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
@@ -48,6 +50,11 @@ Route::get('/blog/categoria/{category}', [BlogController::class, 'category'])->n
 Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
+Route::get('/o/{token}', [OutreachController::class, 'click'])->middleware('throttle:search')->name('outreach.click');
+Route::middleware('signed')->group(function () {
+    Route::get('/descadastrar/{token}', [OutreachController::class, 'showUnsubscribe'])->name('outreach.unsubscribe.show');
+    Route::post('/descadastrar/{token}', [OutreachController::class, 'unsubscribe'])->name('outreach.unsubscribe.perform');
+});
 Route::post('/contato', [ContactController::class, 'store'])
     ->middleware('throttle:contact')
     ->name('contact.store');
@@ -235,6 +242,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
+        Route::get('/prospeccao', [AdminOutreachController::class, 'index'])->name('outreach.index');
+        Route::post('/prospeccao/importar', [AdminOutreachController::class, 'import'])->name('outreach.import');
+        Route::post('/prospeccao/pausar', [AdminOutreachController::class, 'pause'])->name('outreach.pause');
+        Route::post('/prospeccao/retomar', [AdminOutreachController::class, 'resume'])->name('outreach.resume');
+        Route::post('/prospeccao/{prospect}/respondeu', [AdminOutreachController::class, 'markReplied'])->name('outreach.replied');
+        Route::post('/prospeccao/{prospect}/convertida', [AdminOutreachController::class, 'markConverted'])->name('outreach.converted');
+        Route::post('/prospeccao/{prospect}/devolvido', [AdminOutreachController::class, 'markBounced'])->name('outreach.bounced');
+        Route::post('/prospeccao/{prospect}/descadastrar', [AdminOutreachController::class, 'unsubscribe'])->name('outreach.unsubscribe');
         Route::get('/consignacoes', [AdminConsignmentController::class, 'index'])->name('consignments.index');
         Route::get('/consignacoes/{consignment}/procuracao', [AdminConsignmentController::class, 'downloadPowerOfAttorney'])
             ->name('consignments.power-of-attorney');
