@@ -10,10 +10,14 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Support\Facades\URL;
 use RuntimeException;
+use Symfony\Component\Mime\Address as SymfonyAddress;
+use Symfony\Component\Mime\Email;
 
 /**
  * Convite a uma oficina prospectada (primeiro contato ou follow-up). Propositalmente simples: sem o tema
  * de Markdown da marca, sem imagens e sem rastreio de abertura. Ver .ai/rules/outreach.md.
+ *
+ * O Reply-To substitui o global (mail.reply_to → suporte@): a resposta da oficina vai só para a caixa de outreach.
  *
  * Não é ShouldQueue: o job SendWorkshopProspectInvite já é a fila e envia pelo mailer de outreach.
  */
@@ -27,7 +31,11 @@ class WorkshopProspectInviteMail extends Mailable
         public WorkshopProspect $prospect,
         public string $variant = self::FIRST_TOUCH,
         public ?string $messageId = null,
-    ) {}
+    ) {
+        $this->withSymfonyMessage(function (Email $message): void {
+            $message->replyTo(new SymfonyAddress($this->replyToAddress()));
+        });
+    }
 
     public function envelope(): Envelope
     {

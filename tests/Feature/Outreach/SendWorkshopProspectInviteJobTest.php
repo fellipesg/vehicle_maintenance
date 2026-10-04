@@ -251,4 +251,20 @@ class SendWorkshopProspectInviteJobTest extends TestCase
             return true;
         });
     }
+
+    public function test_the_sent_message_replaces_the_global_reply_to_with_the_outreach_address(): void
+    {
+        config([
+            'outreach.mailer' => 'array',
+            'mail.reply_to' => ['address' => 'suporte@revisalog.com.br', 'name' => 'RevisaLog'],
+        ]);
+        $prospect = WorkshopProspect::factory()->create(['email' => 'ze@x.com.br']);
+
+        $this->run_($prospect);
+
+        $sent = app('mail.manager')->mailer('array')->getSymfonyTransport()->messages()->last();
+        $this->assertNotNull($sent);
+        $replyTo = array_map(fn ($address): string => $address->getAddress(), $sent->getOriginalMessage()->getReplyTo());
+        $this->assertSame(['felipe@revisalog.com.br'], $replyTo);
+    }
 }
