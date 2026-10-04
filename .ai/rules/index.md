@@ -13,6 +13,7 @@ must agree on the same contract; they are listed in a separate table below.
 | --- | --- |
 | resources/views/admin/maintenances/**,resources/views/admin/vehicles/show.blade.php | .ai/rules/admin-vehicles.md |
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
+| config/outreach.php,app/Mail/WorkshopProspectInviteMail.php,app/Jobs/SendWorkshopProspectInvite.php,app/Services/Outreach/**,app/Console/Commands/*Prospect*,app/Console/Commands/ExtractReceitaProspects.php,app/Http/Controllers/Web/OutreachController.php,app/Http/Controllers/Web/Admin/OutreachController.php,app/Models/WorkshopProspect.php,app/Models/EmailSuppression.php,resources/views/emails/outreach/**,resources/views/outreach/**,resources/views/admin/outreach/** | .ai/rules/outreach.md |
 | app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
 | app/Http/Controllers/Web/BlogController.php,app/Http/Controllers/Web/Admin/BlogPostController.php,app/Models/BlogPost.php,resources/views/blog/**,resources/views/admin/blog/** | .ai/rules/blog.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |

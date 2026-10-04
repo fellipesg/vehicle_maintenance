@@ -17,3 +17,10 @@ Schedule::command('queue:work --stop-when-empty --max-time=25 --tries=1')
     ->everyThirtySeconds()
     ->withoutOverlapping()
     ->environments(['local']);
+
+Schedule::command('outreach:send')
+    ->everyFifteenMinutes()
+    ->weekdays()
+    ->between('9:00', '17:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();

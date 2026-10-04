@@ -12,7 +12,7 @@ return [
 
     'terms_version' => '2026-09-21',
 
-    'privacy_version' => '2026-09-22',
+    'privacy_version' => '2026-10-05',
 
     'terms_of_use' => <<<'TEXT'
 Termos de Uso — RevisaLog
@@ -55,12 +55,14 @@ O tratamento é feito pela RevisaLog, identificada no rodapé do site. Para exer
 - Veículos e histórico: chassi, placa, RENAVAM, marca, modelo, ano, quilometragem, manutenções, fotos, garantias, notas fiscais (NF-e/DANFE) e CRLV enviados por você.
 - Uso do serviço: notificações (e-mail e no aplicativo), tokens de dispositivo para aviso push e registros técnicos de acesso (IP, data e hora), mantidos por 6 meses conforme o Marco Civil da Internet.
 - Contato: nome, e-mail e mensagem enviados pela página de contato.
+- Oficinas (prospecção): nome da empresa, e-mail comercial, telefone e endereço publicados no cadastro público de CNPJ da Receita Federal.
 
 3. Para que usamos
 - Prestar o serviço: manter o histórico de manutenções vinculado ao veículo, gerar relatórios em PDF e permitir a consulta por placa, chassi ou RENAVAM (execução de contrato).
 - Segurança: autenticação, verificação em duas etapas, prevenção de fraude e de abuso (legítimo interesse).
 - Comunicação: lembretes de manutenção, avisos de garantia e respostas a solicitações (execução de contrato e legítimo interesse).
 - Cumprir obrigações legais e regulatórias, incluindo a guarda de registros de acesso.
+- Convidar oficinas: usamos dados públicos do cadastro de CNPJ da Receita Federal (nome da empresa, e-mail comercial e telefone) para convidar oficinas mecânicas a conhecer o RevisaLog, com base no legítimo interesse (LGPD, art. 7º, IX). Enviamos no máximo duas mensagens por oficina. Você pode recusar qualquer mensagem pelo link que ela traz ou escrevendo para suporte@revisalog.com.br, e a recusa é permanente: não escrevemos mais para esse e-mail.
 
 4. O histórico fica com o veículo
 O histórico de manutenções é vinculado ao veículo (chassi/VIN), não ao proprietário. Quando o veículo muda de dono, o novo proprietário passa a ver os registros de manutenção anteriores, mas não os seus dados pessoais de cadastro (nome, e-mail, telefone, documento ou endereço).
