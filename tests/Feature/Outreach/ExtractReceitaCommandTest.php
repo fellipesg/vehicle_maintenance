@@ -118,6 +118,29 @@ class ExtractReceitaCommandTest extends TestCase
         $this->assertSame('FUNILARIA SÃO JOÃO', $rows[1]['trade_name']);
     }
 
+    public function test_default_cnaes_include_body_shops_and_tire_shops_but_not_car_washes(): void
+    {
+        $file = $this->write('cnaes.csv', [
+            $this->establishment([0 => '81111111', 11 => '4520002', 27 => 'funilaria@oficina.com.br']),
+            $this->establishment([0 => '82222222', 11 => '4520006', 27 => 'borracharia@oficina.com.br']),
+            $this->establishment([0 => '83333333', 11 => '4520005', 27 => 'lavajato@oficina.com.br']),
+        ]);
+        $output = $this->directory.'/cnaes-out.csv';
+
+        $this->artisan('outreach:extract-receita', [
+            'estabelecimentos' => [$file],
+            '--municipios' => $this->municipios(),
+            '--city' => 'LONDRINA',
+            '--uf' => 'PR',
+            '--output' => $output,
+        ])->assertSuccessful();
+
+        $this->assertSame(
+            ['funilaria@oficina.com.br', 'borracharia@oficina.com.br'],
+            array_column($this->readOutput($output), 'email'),
+        );
+    }
+
     public function test_it_drops_shared_emails_counting_every_cnae_in_the_municipality(): void
     {
         $lines = [
