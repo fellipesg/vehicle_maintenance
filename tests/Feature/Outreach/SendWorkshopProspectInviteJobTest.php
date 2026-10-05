@@ -298,4 +298,23 @@ class SendWorkshopProspectInviteJobTest extends TestCase
         $this->assertSame('Auto Zé no RevisaLog', $mail->envelope()->subject);
         $this->assertStringContainsString('Olá, equipe da Auto Zé.', $mail->render());
     }
+
+    public function test_the_copy_talks_about_the_chassis_and_launch_pricing_never_free_forever(): void
+    {
+        $prospect = WorkshopProspect::factory()->create(['trade_name' => 'Auto Zé', 'first_message_id' => 'abc@mail.revisalog.com.br']);
+
+        $firstTouch = new WorkshopProspectInviteMail($prospect, WorkshopProspectInviteMail::FIRST_TOUCH);
+        $firstTouch->assertSeeInHtml('registrado pelo chassi, e não pela placa nem pelo dono');
+        $firstTouch->assertSeeInText('registrado pelo chassi, e não pela placa nem pelo dono');
+        $firstTouch->assertSeeInHtml('No lançamento, a oficina usa o RevisaLog sem custo');
+        $firstTouch->assertSeeInText('nada é cobrado sem a oficina contratar');
+
+        $followUp = new WorkshopProspectInviteMail($prospect, WorkshopProspectInviteMail::FOLLOW_UP);
+        $followUp->assertSeeInText('no lançamento o RevisaLog é sem custo');
+
+        foreach ([$firstTouch, $followUp] as $mail) {
+            $mail->assertDontSeeInHtml('gratuito');
+            $mail->assertDontSeeInText('gratuito');
+        }
+    }
 }
