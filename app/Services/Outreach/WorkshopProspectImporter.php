@@ -27,10 +27,25 @@ class WorkshopProspectImporter
      */
     public function importFile(string $path): array
     {
-        $handle = fopen($path, 'r');
-        if ($handle === false) {
+        $contents = is_readable($path) ? file_get_contents($path) : false;
+        if ($contents === false) {
             throw new InvalidArgumentException("Não foi possível abrir {$path}.");
         }
+
+        return $this->importCsv($contents);
+    }
+
+    /**
+     * Importa o conteúdo do CSV já lido (o upload do admin vai pela fila com o conteúdo, sem depender
+     * de arquivo no disco do servidor web).
+     *
+     * @return array{created: int, duplicates: int, suppressed: int, customers: int, invalid: int}
+     */
+    public function importCsv(string $contents): array
+    {
+        $handle = fopen('php://temp', 'r+');
+        fwrite($handle, $contents);
+        rewind($handle);
 
         $header = fgetcsv($handle, null, ',', '"', '');
         if (! is_array($header)) {

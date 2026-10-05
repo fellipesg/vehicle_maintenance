@@ -3,12 +3,14 @@
 namespace Tests\Feature\Outreach;
 
 use App\Enums\WorkshopProspectStatus;
+use App\Jobs\ImportWorkshopProspectsCsv;
 use App\Models\User;
 use App\Models\Workshop;
 use App\Models\WorkshopProspect;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class AdminOutreachTest extends TestCase
@@ -73,19 +75,26 @@ class AdminOutreachTest extends TestCase
         $this->assertNull(Cache::get('outreach.paused'));
     }
 
-    public function test_csv_upload_imports_through_the_importer_and_flashes_counts(): void
+    public function test_csv_upload_is_queued_with_its_contents_and_returns_immediately(): void
     {
-        $file = UploadedFile::fake()->createWithContent('prospects.csv', implode("\n", [
+        Queue::fake();
+        $admin = $this->admin();
+        $csv = implode("\n", [
             'cnpj,trade_name,email,phone,cnae,street,number,neighborhood,cep,city,state',
             '12345678000195,Auto Zé,ze@x.com.br,,4520001,,,,,LONDRINA,PR',
-        ])."\n");
+        ])."\n";
+        $file = UploadedFile::fake()->createWithContent('prospects.csv', $csv);
 
-        $this->actingAs($this->admin())
+        $this->actingAs($admin)
             ->post(route('admin.outreach.import'), ['csv' => $file])
             ->assertRedirect(route('admin.outreach.index'))
-            ->assertSessionHas('success', fn (string $message): bool => str_contains($message, '1 criadas'));
+            ->assertSessionHas('success', fn (string $message): bool => str_contains($message, 'na fila') && str_contains($message, $admin->email));
 
-        $this->assertDatabaseHas('workshop_prospects', ['cnpj' => '12345678000195']);
+        Queue::assertPushed(ImportWorkshopProspectsCsv::class, fn (ImportWorkshopProspectsCsv $job): bool => $job->contents === $csv
+            && $job->filename === 'prospects.csv'
+            && $job->requestedById === $admin->id
+            && $job->connection === 'database');
+        $this->assertDatabaseCount('workshop_prospects', 0);
     }
 
     public function test_csv_upload_validates_the_file_in_its_own_bag(): void

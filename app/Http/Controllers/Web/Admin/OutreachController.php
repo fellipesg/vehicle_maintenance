@@ -4,15 +4,14 @@ namespace App\Http\Controllers\Web\Admin;
 
 use App\Enums\WorkshopProspectStatus;
 use App\Http\Controllers\Controller;
+use App\Jobs\ImportWorkshopProspectsCsv;
 use App\Models\EmailSuppression;
 use App\Models\WorkshopProspect;
 use App\Services\Outreach\OutreachDispatcher;
-use App\Services\Outreach\WorkshopProspectImporter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use InvalidArgumentException;
 
 class OutreachController extends Controller
 {
@@ -70,26 +69,28 @@ class OutreachController extends Controller
         ]);
     }
 
-    public function import(Request $request, WorkshopProspectImporter $importer): RedirectResponse
+    /**
+     * O CSV vai para a fila (ImportWorkshopProspectsCsv) e quem enviou recebe o resultado por e-mail:
+     * importar na requisição estourava o tempo do Cloudflare.
+     */
+    public function import(Request $request): RedirectResponse
     {
         $request->validateWithBag(self::IMPORT_BAG, [
             'csv' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
         ]);
 
-        try {
-            $counts = $importer->importFile($request->file('csv')->getRealPath());
-        } catch (InvalidArgumentException $exception) {
-            return redirect()->route('admin.outreach.index')->with('error', $exception->getMessage());
-        }
+        $file = $request->file('csv');
 
-        return redirect()->route('admin.outreach.index')->with('success', sprintf(
-            'Importação concluída: %d criadas, %d duplicadas, %d na lista de supressão, %d já clientes, %d inválidas.',
-            $counts['created'],
-            $counts['duplicates'],
-            $counts['suppressed'],
-            $counts['customers'],
-            $counts['invalid'],
-        ));
+        ImportWorkshopProspectsCsv::dispatch(
+            (string) $file->get(),
+            $file->getClientOriginalName(),
+            (int) $request->user()->id,
+        );
+
+        return redirect()->route('admin.outreach.index')->with(
+            'success',
+            "Importação na fila. Você recebe o resultado em {$request->user()->email} quando terminar.",
+        );
     }
 
     public function pause(OutreachDispatcher $dispatcher): RedirectResponse
