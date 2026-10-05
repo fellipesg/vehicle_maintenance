@@ -6,7 +6,7 @@ paths:
 # Landing Views
 
 ## Landing timeline mock stays ordered and identified
-The landing timeline mock must list oldest-first events with strictly increasing kilometers (smaller km at the top, latest service at the bottom), one provenance dot per event in the same order, and show Placa atual, Chassi and RENAVAM as real-looking values — never the placeholder “2022 · chassi · RENAVAM”. Do not invent testimonials, download counts, price tiers or App Store links. Keep Começar grátis behind @guest.
+The landing timeline mock must list oldest-first events with strictly increasing kilometers (smaller km at the top, latest service at the bottom), one provenance dot per event in the same order, and show Placa atual, Chassi and RENAVAM as real-looking values — never the placeholder “2022 · chassi · RENAVAM”. Do not invent testimonials, download counts or price tiers. The only store link is the real iOS app: <x-landing.app-store-badge> (Apple's official badge SVG, never redrawn or recolored) pointing to config('app.ios_app_store_url'), shown under the hero actions with "Android em breve" until the Play Store listing exists; it is static (not part of the .landing-intro stagger). Keep Começar grátis behind @guest.
 
 ## Landing timeline is oldest-first
 Landing timeline mocks (hero, Produto: Linha do tempo · Busca · PDF, app) are oldest-first: kilometers increase top to bottom, latest service at the bottom. Provenance dots must match that order. Never render newest-first.

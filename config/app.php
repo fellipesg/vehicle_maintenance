@@ -55,6 +55,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | Página do app iOS na App Store (selo da página inicial e e-mail de lançamento).
+    */
+
+    'ios_app_store_url' => env('IOS_APP_STORE_URL', 'https://apps.apple.com/br/app/revisalog/id6814863841'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

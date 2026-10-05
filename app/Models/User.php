@@ -327,6 +327,14 @@ class User extends Authenticatable
         return preg_replace('/\D/', '', $this->document) ?: null;
     }
 
+    /**
+     * Comunicados únicos já enviados (users:announce-ios-app).
+     */
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(UserAnnouncement::class);
+    }
+
     public function maintenances(): HasMany
     {
         return $this->hasMany(Maintenance::class);

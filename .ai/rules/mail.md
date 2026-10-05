@@ -14,3 +14,6 @@ Markdown chrome is the literal string RevisaLog (not APP_NAME, SMTP_FROM_NAME, o
 
 ## Brand theme and welcome CTA
 E-mails use the 'revisalog' theme (resources/views/vendor/mail/html/themes/revisalog.css): config('mail.markdown.theme') defaults to revisalog, so MailMessage notifications get it too, and the mailables also set public $theme = 'revisalog'. Notifications end with salutation('RevisaLog'). The welcome CTA depends on App\Enums\RegistrationSource: Web goes to Adicionar veículo, Api to the browser login, and Oauth (no known password) to password.request, never to the password login.
+
+## Comunicados únicos aos usuários
+`users:announce-ios-app` envia o aviso do app iOS (IosAppLaunchedMail, noreply@) uma vez por usuário, registrando em user_announcements; oficinas e contas de domínios reservados (.test, .invalid, example.com) ficam de fora. Envia em sequência com pausa (--pause-ms) por causa do limite do Resend, e falha não é registrada, para a próxima rodada tentar de novo. Rode antes com --dry-run.
