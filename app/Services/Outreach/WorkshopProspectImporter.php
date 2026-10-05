@@ -2,10 +2,13 @@
 
 namespace App\Services\Outreach;
 
+use App\Enums\WorkshopProspectStatus;
 use App\Models\EmailSuppression;
 use App\Models\User;
 use App\Models\Workshop;
 use App\Models\WorkshopProspect;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -42,68 +45,132 @@ class WorkshopProspectImporter
             throw new InvalidArgumentException('Colunas ausentes no CSV: '.implode(', ', $missing).'.');
         }
 
-        $counts = ['created' => 0, 'duplicates' => 0, 'suppressed' => 0, 'customers' => 0, 'invalid' => 0];
-
+        $rows = [];
         while (($values = fgetcsv($handle, null, ',', '"', '')) !== false) {
             if ($values === [null] || count($values) !== count($header)) {
                 continue;
             }
 
-            $counts[$this->importRow(array_combine($header, $values))]++;
+            $rows[] = array_combine($header, $values);
         }
 
         fclose($handle);
+
+        return $this->importRows($rows);
+    }
+
+    /**
+     * Confere todas as linhas com poucas consultas em lote e insere em blocos: linha a linha eram
+     * seis consultas por oficina e o upload de ~1.200 linhas estourava o tempo do Cloudflare (504).
+     *
+     * @param  list<array<string, string|null>>  $rows
+     * @return array{created: int, duplicates: int, suppressed: int, customers: int, invalid: int}
+     */
+    public function importRows(array $rows): array
+    {
+        $counts = ['created' => 0, 'duplicates' => 0, 'suppressed' => 0, 'customers' => 0, 'invalid' => 0];
+
+        $normalized = array_map(fn (array $row): array => [
+            'row' => $row,
+            'cnpj' => preg_replace('/\D/', '', (string) ($row['cnpj'] ?? '')) ?? '',
+            'email' => mb_strtolower(trim((string) ($row['email'] ?? ''))),
+        ], $rows);
+
+        $cnpjs = array_values(array_unique(array_column($normalized, 'cnpj')));
+        $emails = array_values(array_unique(array_column($normalized, 'email')));
+
+        $existingCnpjs = $this->lookup(fn (array $chunk) => WorkshopProspect::query()->whereIn('cnpj', $chunk)->pluck('cnpj'), $cnpjs);
+        $suppressedEmails = $this->lookup(fn (array $chunk) => EmailSuppression::query()->whereIn('email', $chunk)->pluck('email'), $emails);
+        $customerEmails = $this->lookup(fn (array $chunk) => Workshop::query()->selectRaw('lower(email) as normalized_email')->whereIn(DB::raw('lower(email)'), $chunk)->pluck('normalized_email'), $emails)
+            + $this->lookup(fn (array $chunk) => User::query()->selectRaw('lower(email) as normalized_email')->whereIn(DB::raw('lower(email)'), $chunk)->pluck('normalized_email'), $emails);
+        $prospectEmails = $this->lookup(fn (array $chunk) => WorkshopProspect::query()->whereIn('email', $chunk)->pluck('email'), $emails);
+
+        $now = now();
+        $inserts = [];
+
+        foreach ($normalized as ['row' => $row, 'cnpj' => $cnpj, 'email' => $email]) {
+            if (strlen($cnpj) !== 14 || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $counts['invalid']++;
+
+                continue;
+            }
+
+            if (isset($existingCnpjs[$cnpj])) {
+                $counts['duplicates']++;
+
+                continue;
+            }
+
+            if (isset($suppressedEmails[$email])) {
+                $counts['suppressed']++;
+
+                continue;
+            }
+
+            if (isset($customerEmails[$email])) {
+                $counts['customers']++;
+
+                continue;
+            }
+
+            if (isset($prospectEmails[$email])) {
+                $counts['duplicates']++;
+
+                continue;
+            }
+
+            $existingCnpjs[$cnpj] = true;
+            $prospectEmails[$email] = true;
+            $counts['created']++;
+
+            $inserts[] = [
+                'cnpj' => $cnpj,
+                'trade_name' => $this->nullable($row['trade_name'] ?? null),
+                'legal_name' => $this->nullable($row['legal_name'] ?? null),
+                'email' => $email,
+                'phone' => $this->nullable($row['phone'] ?? null),
+                'cnae' => (string) $row['cnae'],
+                'street' => $this->nullable($row['street'] ?? null),
+                'number' => $this->nullable($row['number'] ?? null),
+                'neighborhood' => $this->nullable($row['neighborhood'] ?? null),
+                'cep' => $this->nullable($row['cep'] ?? null),
+                'city' => (string) $row['city'],
+                'state' => strtoupper((string) $row['state']),
+                'source' => 'receita_cnpj',
+                'token' => Str::random(40),
+                'status' => WorkshopProspectStatus::Pending->value,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        DB::transaction(function () use ($inserts): void {
+            foreach (array_chunk($inserts, 200) as $chunk) {
+                WorkshopProspect::query()->insert($chunk);
+            }
+        });
 
         return $counts;
     }
 
     /**
-     * @param  array<string, string|null>  $row
-     * @return 'created'|'duplicates'|'suppressed'|'customers'|'invalid'
+     * Consulta em blocos de 500 e devolve os valores encontrados como chaves de um mapa.
+     *
+     * @param  callable(list<string>): iterable<string>  $query
+     * @param  list<string>  $values
+     * @return array<string, true>
      */
-    public function importRow(array $row): string
+    private function lookup(callable $query, array $values): array
     {
-        $cnpj = preg_replace('/\D/', '', (string) ($row['cnpj'] ?? '')) ?? '';
-        $email = mb_strtolower(trim((string) ($row['email'] ?? '')));
+        $found = [];
 
-        if (strlen($cnpj) !== 14 || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return 'invalid';
+        foreach (array_chunk($values, 500) as $chunk) {
+            foreach ($query($chunk) as $value) {
+                $found[(string) $value] = true;
+            }
         }
 
-        if (WorkshopProspect::query()->where('cnpj', $cnpj)->exists()) {
-            return 'duplicates';
-        }
-
-        if (EmailSuppression::isSuppressed($email)) {
-            return 'suppressed';
-        }
-
-        if (Workshop::query()->whereRaw('lower(email) = ?', [$email])->exists()
-            || User::query()->whereRaw('lower(email) = ?', [$email])->exists()) {
-            return 'customers';
-        }
-
-        if (WorkshopProspect::query()->where('email', $email)->exists()) {
-            return 'duplicates';
-        }
-
-        WorkshopProspect::query()->create([
-            'cnpj' => $cnpj,
-            'trade_name' => $this->nullable($row['trade_name'] ?? null),
-            'legal_name' => $this->nullable($row['legal_name'] ?? null),
-            'email' => $email,
-            'phone' => $this->nullable($row['phone'] ?? null),
-            'cnae' => (string) $row['cnae'],
-            'street' => $this->nullable($row['street'] ?? null),
-            'number' => $this->nullable($row['number'] ?? null),
-            'neighborhood' => $this->nullable($row['neighborhood'] ?? null),
-            'cep' => $this->nullable($row['cep'] ?? null),
-            'city' => (string) $row['city'],
-            'state' => strtoupper((string) $row['state']),
-            'source' => 'receita_cnpj',
-        ]);
-
-        return 'created';
+        return $found;
     }
 
     private function nullable(?string $value): ?string
