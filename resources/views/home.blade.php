@@ -58,6 +58,11 @@
                 @endauth
             </div>
 
+            <div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2" data-landing-app-badges>
+                <x-landing.app-store-badge />
+                <p class="text-sm text-muted-foreground">Android em breve</p>
+            </div>
+
             <dl class="mt-10 hidden max-w-lg flex-wrap gap-x-8 gap-y-4 border-t border-border pt-8 sm:flex">
                 <div>
                     <dt class="text-xs tracking-wide text-muted-foreground uppercase">No veículo</dt>
