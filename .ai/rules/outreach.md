@@ -19,7 +19,7 @@ paths:
 # Outreach (prospecção de oficinas por e-mail)
 
 ## Mailer próprio, nunca o padrão
-O envio sempre usa Mail::mailer(config('outreach.mailer')) (SMTP próprio em config/mail.php, mailer 'outreach', com remetente e domínio de envio separados). Nunca o mailer padrão (Resend de noreply@): e-mail frio mancharia a reputação do e-mail transacional (boas-vindas, redefinição de senha). Local e testes ficam com OUTREACH_MAILER=log ou Mail::fake(); OUTREACH_ENABLED é false por padrão e nenhum segredo vai no .env versionado.
+O envio sempre usa Mail::mailer(config('outreach.mailer')) (SMTP próprio em config/mail.php, mailer 'outreach'). Em produção sai de contato@revisalog.com.br pela caixa Zoho (OUTREACH_SMTP_HOST=smtppro.zoho.com, porta 587, senha de app do Zoho só nas variáveis do Laravel Cloud); as respostas das oficinas caem nessa mesma caixa. Nunca o mailer padrão (Resend de noreply@): e-mail frio mancharia a reputação do e-mail transacional (boas-vindas, redefinição de senha). Local e testes ficam com OUTREACH_MAILER=log ou Mail::fake(); OUTREACH_ENABLED é false por padrão e nenhum segredo vai no .env versionado.
 
 ## E-mail simples de propósito
 WorkshopProspectInviteMail não usa o tema Markdown da marca: e-mail frio precisa parecer escrito por uma pessoa, e HTML pesado piora a entrega. Há versão texto e um HTML mínimo (fonte do sistema, sem imagem), sem pixel de rastreio e sem rastreio de abertura. O único dado medido é o clique no link /o/{token} (scanners de e-mail podem gerar cliques falsos). Cabeçalhos List-Unsubscribe e List-Unsubscribe-Post (RFC 8058) saem em todo envio.
