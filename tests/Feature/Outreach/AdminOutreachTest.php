@@ -97,6 +97,17 @@ class AdminOutreachTest extends TestCase
         $this->assertDatabaseCount('workshop_prospects', 0);
     }
 
+    public function test_prospects_without_a_name_are_labelled_in_the_panel_not_as_sua_oficina(): void
+    {
+        WorkshopProspect::factory()->create(['trade_name' => null, 'legal_name' => null, 'cnpj' => '12345678000195']);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.outreach.index'))
+            ->assertSee('Sem nome fantasia')
+            ->assertSee('Ações para Oficina CNPJ 12.345.678/0001-95')
+            ->assertDontSee('sua oficina');
+    }
+
     public function test_csv_upload_validates_the_file_in_its_own_bag(): void
     {
         $this->actingAs($this->admin())

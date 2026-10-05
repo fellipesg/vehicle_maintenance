@@ -77,7 +77,11 @@
             @foreach($prospects as $prospect)
                 <tr>
                     <th scope="row" class="font-medium">
-                        {{ $prospect->displayName() }}
+                        @if($prospect->hasName())
+                            {{ $prospect->displayName() }}
+                        @else
+                            <span class="font-normal italic text-muted-foreground">Sem nome fantasia</span>
+                        @endif
                         <span class="block text-xs font-normal text-muted-foreground">CNPJ {{ $prospect->formattedCnpj() }} · {{ $prospect->city }}/{{ $prospect->state }}</span>
                     </th>
                     <td class="text-muted-foreground">
@@ -94,7 +98,7 @@
                     </td>
                     <td class="text-muted-foreground">{{ $formatDate($prospect->first_sent_at) }}</td>
                     <td class="py-2 text-right">
-                        <x-admin.row-actions :label="'Ações para a oficina '.$prospect->displayName()" :id="'prospect-'.$prospect->id.'-acoes'">
+                        <x-admin.row-actions :label="'Ações para '.$prospect->adminLabel()" :id="'prospect-'.$prospect->id.'-acoes'">
                             <x-ui.dropdown-item :action="route('admin.outreach.replied', $prospect)" icon="chat-bubble-left-right">Marcar como respondeu</x-ui.dropdown-item>
                             <x-ui.dropdown-item :action="route('admin.outreach.converted', $prospect)" icon="check-circle">Marcar como convertida</x-ui.dropdown-item>
                             <x-ui.dropdown-item

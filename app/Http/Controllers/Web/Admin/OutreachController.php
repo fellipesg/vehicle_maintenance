@@ -111,14 +111,14 @@ class OutreachController extends Controller
     {
         $prospect->markReplied();
 
-        return $this->back("{$prospect->displayName()} marcada como respondeu.");
+        return $this->back("{$prospect->adminLabel()} marcada como respondeu.");
     }
 
     public function markConverted(WorkshopProspect $prospect): RedirectResponse
     {
         $prospect->markConverted();
 
-        return $this->back("{$prospect->displayName()} marcada como convertida.");
+        return $this->back("{$prospect->adminLabel()} marcada como convertida.");
     }
 
     public function markBounced(WorkshopProspect $prospect): RedirectResponse
@@ -126,7 +126,7 @@ class OutreachController extends Controller
         EmailSuppression::suppress($prospect->email, EmailSuppression::REASON_BOUNCED);
         $prospect->update(['status' => WorkshopProspectStatus::Bounced]);
 
-        return $this->back("{$prospect->displayName()} marcada como devolvida e o e-mail não recebe mais mensagens.");
+        return $this->back("{$prospect->adminLabel()} marcada como devolvida e o e-mail não recebe mais mensagens.");
     }
 
     public function unsubscribe(WorkshopProspect $prospect): RedirectResponse
@@ -137,7 +137,7 @@ class OutreachController extends Controller
             'unsubscribed_at' => $prospect->unsubscribed_at ?? now(),
         ]);
 
-        return $this->back("{$prospect->displayName()} descadastrada.");
+        return $this->back("{$prospect->adminLabel()} descadastrada.");
     }
 
     private function back(string $message): RedirectResponse

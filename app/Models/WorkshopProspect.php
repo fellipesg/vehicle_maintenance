@@ -96,6 +96,15 @@ class WorkshopProspect extends Model
         return filled($this->trade_name) || filled($this->legal_name);
     }
 
+    /**
+     * Como o painel e as mensagens do admin citam a oficina. Sem nome, usa o CNPJ: "sua oficina" é
+     * só para o texto do e-mail.
+     */
+    public function adminLabel(): string
+    {
+        return $this->hasName() ? $this->displayName() : "Oficina CNPJ {$this->formattedCnpj()}";
+    }
+
     public function displayName(): string
     {
         if (filled($this->trade_name)) {

@@ -38,3 +38,6 @@ A origem é o CNPJ aberto da Receita (outreach:extract-receita, local, em stream
 
 ## Importação em lote
 WorkshopProspectImporter confere CNPJ, supressão, clientes e e-mails repetidos com poucas consultas em lote (blocos de 500) e insere em blocos de 200. O upload do admin não importa na requisição: vai para a fila database (App\Jobs\ImportWorkshopProspectsCsv, com o conteúdo do CSV no job, tries=1) e quem enviou recebe o resultado por e-mail (WorkshopProspectImportFinishedMail), inclusive em falha. O comando outreach:import continua síncrono. Não volte a consultar linha a linha: eram seis consultas por oficina e o upload de ~1.200 linhas no admin estourava o tempo do Cloudflare (504). Para comparar e-mail sem diferenciar maiúsculas, selecione lower(email) com alias (selectRaw ... as normalized_email): pluck(DB::raw(...)) funciona no SQLite dos testes mas não no Postgres de produção.
+
+## Teste de envio e rótulo no painel
+`php artisan outreach:send-test {emails*} [--follow-up] [--name=]` manda o convite real pelo mailer de outreach para e-mails de teste, sem gravar prospecto, sem fila e sem contar no limite, mesmo com a prospecção desligada (em produção: `cloud command:run production --cmd=...`). O painel mostra "Sem nome fantasia" e as mensagens do admin citam "Oficina CNPJ ..." (WorkshopProspect::adminLabel); "sua oficina" é só para o texto do e-mail.
