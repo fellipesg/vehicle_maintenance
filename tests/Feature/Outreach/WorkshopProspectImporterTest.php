@@ -8,6 +8,7 @@ use App\Models\Workshop;
 use App\Models\WorkshopProspect;
 use App\Services\Outreach\WorkshopProspectImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class WorkshopProspectImporterTest extends TestCase
@@ -63,6 +64,41 @@ class WorkshopProspectImporterTest extends TestCase
 
         $this->assertSame(['created' => 1, 'duplicates' => 3, 'suppressed' => 1, 'customers' => 2, 'invalid' => 1], $counts);
         $this->assertSame(2, WorkshopProspect::count());
+    }
+
+    public function test_a_large_csv_is_imported_with_a_bounded_number_of_queries(): void
+    {
+        $rows = [];
+        for ($i = 1; $i <= 300; $i++) {
+            $rows[] = sprintf('%014d,Oficina %d,oficina%d@x.com.br,,4520001,,,,,LONDRINA,PR', $i, $i, $i);
+        }
+        $path = $this->csv($rows);
+
+        DB::enableQueryLog();
+        $counts = app(WorkshopProspectImporter::class)->importFile($path);
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertSame(300, $counts['created']);
+        $this->assertSame(300, WorkshopProspect::count());
+        $this->assertSame(300, WorkshopProspect::query()->distinct()->count('token'));
+        $this->assertLessThan(20, $queries);
+    }
+
+    public function test_customers_are_matched_case_insensitively_on_both_sides(): void
+    {
+        User::factory()->create(['email' => 'Dono.Oficina@X.com.br']);
+        Workshop::factory()->create(['email' => 'OFICINA@X.COM.BR']);
+
+        $path = $this->csv([
+            '12345678000195,Dono,dono.oficina@x.com.br,,4520001,,,,,LONDRINA,PR',
+            '22345678000195,Oficina,oficina@x.com.br,,4520001,,,,,LONDRINA,PR',
+        ]);
+
+        $counts = app(WorkshopProspectImporter::class)->importFile($path);
+
+        $this->assertSame(2, $counts['customers']);
+        $this->assertSame(0, WorkshopProspect::count());
     }
 
     public function test_import_command_reports_counts_and_rejects_a_csv_without_required_columns(): void

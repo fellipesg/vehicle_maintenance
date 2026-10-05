@@ -47,11 +47,11 @@
         <x-ui.card>
             <form method="POST" action="{{ route('admin.outreach.import') }}" enctype="multipart/form-data" class="grid gap-3" data-slot="outreach-import">
                 @csrf
-                <x-ui.field name="csv" label="Importar CSV" hint="O arquivo gerado por outreach:extract-receita. Quem já é cliente, está na lista de supressão ou já foi importado fica de fora." :bag="OutreachController::IMPORT_BAG">
+                <x-ui.field name="csv" label="Importar CSV" hint="O arquivo gerado por outreach:extract-receita. A importação roda em segundo plano e você recebe o resultado por e-mail. Quem já é cliente, está na lista de supressão ou já foi importado fica de fora." :bag="OutreachController::IMPORT_BAG">
                     <x-ui.file-input accept=".csv,text/csv,text/plain" :max-mb="5" required />
                 </x-ui.field>
                 <div class="flex justify-end">
-                    <x-ui.button type="submit" icon="arrow-up-tray" loading-label="Importando…">Importar</x-ui.button>
+                    <x-ui.button type="submit" icon="arrow-up-tray" loading-label="Enviando…">Importar</x-ui.button>
                 </div>
             </form>
         </x-ui.card>
