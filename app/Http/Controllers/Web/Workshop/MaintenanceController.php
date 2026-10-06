@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Web\Workshop;
 
 use App\Enums\ServiceCategory;
 use App\Enums\WarrantyScope;
+use App\Http\Controllers\Concerns\SyncsMaintenanceItems;
+use App\Http\Controllers\Concerns\SyncsMaintenanceWarranties;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Web\Concerns\StoresMaintenanceInvoices;
-use App\Http\Controllers\Web\Concerns\SyncsMaintenanceItems;
-use App\Http\Controllers\Web\Concerns\SyncsMaintenanceWarranties;
 use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
 use App\Models\User;

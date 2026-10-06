@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Maintenance;
+use App\Models\MaintenanceItem;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -208,6 +209,127 @@ class MaintenanceControllerTest extends TestCase
             'description' => 'Updated description',
         ])->assertOk()
             ->assertJsonPath('data.description', 'Updated description');
+    }
+
+    public function test_update_persists_the_submitted_items(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+        ]);
+
+        $this->putJson("/api/v1/maintenances/{$maintenance->id}", [
+            'items' => [
+                [
+                    'name' => 'Filtro de óleo',
+                    'quantity' => 1,
+                    'unit_price' => '45.90',
+                    'total_price' => '45.90',
+                ],
+            ],
+        ])->assertOk()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.name', 'Filtro de óleo');
+
+        $this->assertDatabaseHas('maintenance_items', [
+            'maintenance_id' => $maintenance->id,
+            'name' => 'Filtro de óleo',
+            'quantity' => 1,
+        ]);
+    }
+
+    public function test_update_keeps_item_ids_it_was_given_and_drops_the_rest(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+        ]);
+
+        $kept = MaintenanceItem::create([
+            'maintenance_id' => $maintenance->id,
+            'name' => 'Pastilha de freio',
+            'quantity' => 2,
+        ]);
+        $removed = MaintenanceItem::create([
+            'maintenance_id' => $maintenance->id,
+            'name' => 'Item que sai',
+            'quantity' => 1,
+        ]);
+
+        $this->putJson("/api/v1/maintenances/{$maintenance->id}", [
+            'items' => [
+                // Mesma linha, renomeada: atualiza no lugar e preserva o id.
+                ['id' => $kept->id, 'name' => 'Pastilha de freio dianteira', 'quantity' => 4],
+                // Linha nova, sem id.
+                ['name' => 'Fluido de freio', 'quantity' => 1],
+            ],
+        ])->assertOk()
+            ->assertJsonCount(2, 'data.items');
+
+        $this->assertDatabaseHas('maintenance_items', [
+            'id' => $kept->id,
+            'name' => 'Pastilha de freio dianteira',
+            'quantity' => 4,
+        ]);
+        $this->assertDatabaseMissing('maintenance_items', ['id' => $removed->id]);
+        $this->assertDatabaseHas('maintenance_items', [
+            'maintenance_id' => $maintenance->id,
+            'name' => 'Fluido de freio',
+        ]);
+    }
+
+    public function test_update_without_items_leaves_the_existing_ones_alone(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+        ]);
+
+        $item = MaintenanceItem::create([
+            'maintenance_id' => $maintenance->id,
+            'name' => 'Correia dentada',
+            'quantity' => 1,
+        ]);
+
+        $this->putJson("/api/v1/maintenances/{$maintenance->id}", [
+            'description' => 'Só mudando a observação',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('maintenance_items', [
+            'id' => $item->id,
+            'name' => 'Correia dentada',
+        ]);
+    }
+
+    public function test_update_rejects_an_item_without_a_name(): void
+    {
+        $user = $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+        ]);
+
+        $this->putJson("/api/v1/maintenances/{$maintenance->id}", [
+            'items' => [
+                ['quantity' => 1],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('items.0.name');
     }
 
     public function test_can_delete_own_maintenance(): void
