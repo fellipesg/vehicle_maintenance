@@ -5,14 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Enums\RegistrationSource;
 use App\Events\UserRegistered;
 use App\Exceptions\InvalidAppleIdentityTokenException;
+use App\Exceptions\InvalidGoogleIdTokenException;
 use App\Http\Controllers\Api\Concerns\ResolvesPagination;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\AppleLoginRequest;
+use App\Http\Requests\Api\V1\GoogleLoginRequest;
 use App\Http\Requests\Api\V1\LoginRequest;
 use App\Http\Requests\Api\V1\RegisterRequest;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\User;
 use App\Services\Auth\AppleIdentityTokenVerifier;
+use App\Services\Auth\GoogleIdTokenVerifier;
 use App\Services\TenantService;
 use App\Support\ApiResponse;
 use App\Support\SanctumMobileToken;
@@ -252,6 +255,64 @@ class AuthController extends Controller
         title: 'Sign in with Apple',
         description: 'Verifies a native Sign in with Apple identity token and returns a Bearer token or a 2FA challenge. The token audience is the iOS bundle id.',
     )]
+    /**
+     * Login nativo com Google: o app (google_sign_in) envia o ID token, conferido aqui contra as chaves
+     * do Google. Mesmas regras de portal e de vínculo por e-mail do login com a Apple.
+     */
+    public function loginWithGoogle(GoogleLoginRequest $request, GoogleIdTokenVerifier $tokens): JsonResponse
+    {
+        try {
+            $identity = $tokens->verify($request->string('id_token')->toString());
+        } catch (InvalidGoogleIdTokenException $exception) {
+            Log::warning('Google sign-in rejected', ['reason' => $exception->getMessage()]);
+
+            return ApiResponse::error('Unable to authenticate with Google.', 401);
+        }
+
+        $portal = $request->filled('portal') ? $request->string('portal')->toString() : null;
+        $existing = User::query()
+            ->where('provider', 'google')
+            ->where('provider_id', $identity->subject)
+            ->first()
+            ?? User::query()->whereRaw('lower(email) = ?', [$identity->email])->first();
+
+        if ($existing && $portal && ! $this->userMatchesPortal($existing, $portal)) {
+            return ApiResponse::error('This account does not have access to this portal.', 403);
+        }
+
+        if (! $existing && in_array($portal, ['admin', 'oficina'], true)) {
+            return ApiResponse::error('This account does not have access to this portal.', 403);
+        }
+
+        try {
+            ['user' => $user, 'is_new' => $isNewUser] = $this->findOrCreateSocialUser(
+                provider: 'google',
+                providerId: $identity->subject,
+                email: $identity->email,
+                name: $identity->name,
+                avatar: null,
+                userType: $portal === 'lojista' ? 'garage' : null,
+            );
+        } catch (UniqueConstraintViolationException) {
+            return ApiResponse::error('Unable to authenticate with Google.', 409);
+        }
+
+        if ($user->email_verified_at === null) {
+            $user->email_verified_at = now();
+            $user->save();
+        }
+
+        if ($isNewUser) {
+            UserRegistered::dispatch($user, RegistrationSource::Oauth);
+        }
+
+        if ($twoFactorResponse = $this->maybeIssueTwoFactorChallenge($user)) {
+            return $twoFactorResponse;
+        }
+
+        return SanctumMobileToken::loginResponse($user);
+    }
+
     public function loginWithApple(AppleLoginRequest $request, AppleIdentityTokenVerifier $tokens): JsonResponse
     {
         try {
@@ -345,11 +406,11 @@ class AuthController extends Controller
         }
 
         if ($user) {
-            $user->update([
+            $user->update(array_filter([
                 'provider' => $provider,
                 'provider_id' => $providerId,
                 'avatar' => $avatar,
-            ]);
+            ], fn (?string $value): bool => $value !== null));
 
             return ['user' => $user, 'is_new' => false];
         }
