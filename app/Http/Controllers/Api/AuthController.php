@@ -134,6 +134,10 @@ class AuthController extends Controller
             return ApiResponse::error('Invalid provider', 400);
         }
 
+        if (! config('services.mobile_oauth_enabled')) {
+            return $this->mobileOAuthUnavailable($provider);
+        }
+
         $clientId = config("services.{$provider}.client_id");
         $clientSecret = config("services.{$provider}.client_secret");
         $redirectUri = config("services.{$provider}.redirect");
@@ -163,6 +167,23 @@ class AuthController extends Controller
                 500,
             );
         }
+    }
+
+    /**
+     * Login social pelo navegador desligado: o retorno nunca volta ao app (sem deep link) e o callback
+     * de produção apontava para localhost. Responde 200 com error_code OAUTH_NOT_CONFIGURED porque é o
+     * formato que o app (1.0) já entende e transforma em "use o login com e-mail e senha".
+     */
+    private function mobileOAuthUnavailable(string $provider): JsonResponse
+    {
+        $response = ApiResponse::error(
+            'Login com '.ucfirst($provider).' ainda não está disponível no app. Entre com e-mail e senha ou com a Apple.',
+            200,
+        );
+
+        return $response->setData(array_merge((array) $response->getData(true), [
+            'error_code' => 'OAUTH_NOT_CONFIGURED',
+        ]));
     }
 
     /**

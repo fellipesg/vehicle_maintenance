@@ -40,6 +40,12 @@ return [
         ],
     ],
 
+    /*
+     * Login social pelo navegador no app (Google, Facebook, X). Desligado até existir login nativo
+     * com retorno ao app; enquanto isso a API responde OAUTH_NOT_CONFIGURED.
+     */
+    'mobile_oauth_enabled' => (bool) env('MOBILE_OAUTH_ENABLED', false),
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
