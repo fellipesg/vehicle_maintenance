@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\LegalController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\MaintenancePhotoController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\UserFcmTokenController;
 use App\Http\Controllers\Api\VehicleController;
@@ -38,6 +39,10 @@ Route::prefix('v1')->group(function () {
     Route::get('/legal/privacy-policy', [LegalController::class, 'privacyPolicy'])
         ->middleware('throttle:api');
 
+    // Recuperação de senha: o link do e-mail abre a página do portal, que é quem troca a senha.
+    Route::post('/password/forgot', [PasswordController::class, 'forgot'])
+        ->middleware('throttle:password-forgot');
+
     // Workshop routes (public - visible to all users)
     Route::get('/workshops', [WorkshopController::class, 'index'])->middleware('throttle:api');
     Route::get('/workshops/{id}', [WorkshopController::class, 'show'])->middleware('throttle:api');
@@ -50,6 +55,7 @@ Route::prefix('v1')->group(function () {
         Route::put('/me', [ProfileController::class, 'update'])->middleware('ability:profile:write');
         Route::delete('/me', [ProfileController::class, 'destroy'])->middleware('ability:profile:write');
         Route::post('/me/avatar', [ProfileController::class, 'uploadAvatar'])->middleware(['ability:profile:write', 'throttle:uploads']);
+        Route::put('/me/password', [PasswordController::class, 'update'])->middleware('ability:profile:write');
 
         // User's vehicles (vehicles owned by authenticated user)
         Route::get('/my-vehicles', [VehicleController::class, 'myVehicles'])

@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -72,6 +73,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('search', fn (Request $request) => Limit::perMinute(20)->by(
             'search|'.$request->ip(),
         ));
+
+        // Mesmos limites do pedido de link pelo portal (PasswordResetController): por e-mail e
+        // aparelho a cada 15 minutos, mais um teto por aparelho para qualquer e-mail.
+        RateLimiter::for('password-forgot', fn (Request $request) => [
+            Limit::perMinutes(15, 5)->by(
+                'password-forgot|'.Str::lower((string) $request->input('email', '')).'|'.$request->ip(),
+            ),
+            Limit::perHour(20)->by('password-forgot-ip|'.$request->ip()),
+        ]);
 
         // Claiming a vehicle is guarded by plate + RENAVAM, so cap the guesses per account.
         RateLimiter::for('vehicle-link', fn (Request $request) => Limit::perMinute(10)->by(
