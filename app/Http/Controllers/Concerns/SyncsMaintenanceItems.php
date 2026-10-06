@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Web\Concerns;
+namespace App\Http\Controllers\Concerns;
 
 use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
