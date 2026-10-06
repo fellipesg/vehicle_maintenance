@@ -40,10 +40,24 @@ return [
         ],
     ],
 
+    /*
+     * Login social pelo navegador no app (Google, Facebook, X). Desligado até existir login nativo
+     * com retorno ao app; enquanto isso a API responde OAUTH_NOT_CONFIGURED.
+     */
+    'mobile_oauth_enabled' => (bool) env('MOBILE_OAUTH_ENABLED', false),
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
+        /*
+         * Clientes OAuth aceitos como audiência do ID token do login nativo (POST /api/v1/auth/google).
+         * O app pede o token com o cliente Web como serverClientId, então ele é a audiência esperada.
+         */
+        'token_audiences' => array_values(array_filter(array_map('trim', explode(',', (string) env(
+            'GOOGLE_TOKEN_AUDIENCES',
+            '61844221484-b7jtd51c4apn6m9dauah8p7mqhis37e6.apps.googleusercontent.com',
+        ))))),
     ],
 
     'facebook' => [
