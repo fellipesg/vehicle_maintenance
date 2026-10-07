@@ -27,6 +27,7 @@ import { initAdmin } from './admin';
 import { initLanding } from './landing';
 import { initMaintenanceItems } from './maintenance-items';
 import { initGarageMaintenanceForms } from './garage-maintenance-form';
+import { initWorkshopAddressCep } from './workshop-address-cep';
 
 /**
  * Componentes <x-ui.*> primeiro (Preline: overlay, dropdown e remove-element; diálogos, confirmação,
@@ -38,7 +39,7 @@ import { initGarageMaintenanceForms } from './garage-maintenance-form';
  *   lugar, linha do tempo e a aba certa para #manutencao-{id};
  * - Selo da oficina: o "Compartilhar" nativo (copiar é do x-ui.copy-button);
  * - proprietário (PDF e formulário de manutenção), lojista (formulário de manutenção), oficina
- *   (itens da OS), admin (mapas, editor do blog, filtro de manutenções) e landing.
+ *   (itens da OS e o CEP preenchendo o endereço do perfil), admin (mapas, editor do blog, filtro de manutenções) e landing.
  * Os init são idempotentes: para HTML inserido depois (innerHTML), chame de novo o do componente com
  * o trecho como raiz, ex.: initPreline(container), initTabs(container) ou initDialogs(container).
  */
@@ -73,6 +74,7 @@ function initApp() {
     initLanding();
     initMaintenanceItems();
     initGarageMaintenanceForms();
+    initWorkshopAddressCep();
 }
 
 // Módulo roda antes do DOMContentLoaded quando vem do @vite; o else cobre carregamento tardio.
