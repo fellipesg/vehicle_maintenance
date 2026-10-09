@@ -41,3 +41,6 @@ Cadastro manual (só no Proprietário) deixa `ownership_verified_at` nulo: ficha
 e PDF mostram "Propriedade não confirmada" com convite para enviar o CRLV-e. O veículo **não** sai da
 consulta nem do PDF — esconder apagaria junto as manutenções com Selo da oficina, que são confirmadas
 por quem prestou o serviço e não dependem de quem é o dono.
+
+## Anexo de OS sem proprietário exige propriedade verificada
+Aceitar notas e fotos de uma OS de oficina sem dono exige ownership_verified_at (CRLV-e); cadastro manual não basta (422). Vale também para conta de proprietário com propriedade "não confirmada": ela pode vincular o registro mínimo, recusar e ocultar.
