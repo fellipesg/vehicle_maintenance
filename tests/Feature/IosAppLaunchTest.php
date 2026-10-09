@@ -24,6 +24,15 @@ class IosAppLaunchTest extends TestCase
             ->assertSee('Android em breve');
     }
 
+    public function test_home_no_longer_says_the_app_is_missing_from_the_stores(): void
+    {
+        $response = $this->get(route('home'))->assertOk();
+
+        $response->assertDontSee('ainda não está nas lojas');
+        $this->assertSame(2, substr_count($response->getContent(), 'aria-label="Baixar o RevisaLog na App Store"'));
+        $response->assertSee('O app para iPhone está na', false);
+    }
+
     public function test_it_announces_once_to_owners_and_shops_but_not_workshops_or_test_accounts(): void
     {
         Mail::fake();
