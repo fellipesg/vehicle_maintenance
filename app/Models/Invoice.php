@@ -26,6 +26,13 @@ class Invoice extends Model
         'total_amount' => 'decimal:2',
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (Invoice $invoice): void {
+            $invoice->maintenance?->markAttachmentsPendingIfNeeded();
+        });
+    }
+
     /**
      * Get the maintenance that owns this invoice
      */

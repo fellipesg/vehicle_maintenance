@@ -154,7 +154,7 @@ class Vehicle extends Model
      */
     public function maintenancesVisibleTo(User $viewer): HasMany
     {
-        $relation = $this->maintenances();
+        $relation = $this->maintenances()->visibleInHistoryTo($viewer);
 
         if (! Gate::forUser($viewer)->allows('viewFullHistory', $this)) {
             $relation->where('maintenances.tenant_id', $viewer->tenant_id);
@@ -203,6 +203,25 @@ class Vehicle extends Model
             ->first();
 
         return $owner?->pivot?->ownership_verified_at !== null;
+    }
+
+    /**
+     * Alguma conta é a dona atual deste veículo?
+     */
+    public function hasCurrentOwner(): bool
+    {
+        return $this->owners()
+            ->whereRaw('user_vehicles.is_current_owner = true')
+            ->exists();
+    }
+
+    /**
+     * Veículo criado pela oficina só pelo chassi: sem dono, sem placa e sem RENAVAM. É o único que um
+     * proprietário assume apenas com o chassi (o vínculo não é verificado) ou com o CRLV-e.
+     */
+    public function isUnclaimedWorkshopVehicle(): bool
+    {
+        return blank($this->license_plate) && blank($this->renavam) && ! $this->hasCurrentOwner();
     }
 
     public function restrictHistoryTo(User $viewer): static
