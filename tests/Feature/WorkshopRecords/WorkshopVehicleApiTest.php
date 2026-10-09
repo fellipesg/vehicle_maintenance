@@ -81,6 +81,39 @@ class WorkshopVehicleApiTest extends TestCase
         $this->assertNull($vehicle->renavam);
     }
 
+    public function test_vehicle_created_by_the_workshop_accepts_a_backdated_os_with_any_kilometers(): void
+    {
+        $this->actingAsApiUser($this->workshopAccount());
+
+        $vehicleId = $this->postJson('/api/v1/workshop/vehicles', [
+            'chassis' => self::OWNERLESS_CHASSIS, 'brand' => 'Fiat', 'model' => 'Argo', 'year' => 2021,
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicleId,
+            'maintenance_type' => 'Revisão',
+            'maintenance_date' => now()->subDays(20)->toDateString(),
+            'kilometers' => 45_000,
+            'service_category' => 'mechanical',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicleId,
+            'maintenance_type' => 'Revisão anterior',
+            'maintenance_date' => now()->subDays(40)->toDateString(),
+            'kilometers' => 40_000,
+            'service_category' => 'mechanical',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/maintenances', [
+            'vehicle_id' => $vehicleId,
+            'maintenance_type' => 'Revisão impossível',
+            'maintenance_date' => now()->subDays(30)->toDateString(),
+            'kilometers' => 50_000,
+            'service_category' => 'mechanical',
+        ])->assertStatus(422);
+    }
+
     public function test_duplicate_chassis_returns_409_with_the_minimal_payload(): void
     {
         $vehicle = $this->ownerlessVehicle(['brand' => 'Ferrari']);
