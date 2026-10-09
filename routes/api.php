@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\LegalController;
 use App\Http\Controllers\Api\MaintenanceController;
+use App\Http\Controllers\Api\MaintenanceInviteController;
 use App\Http\Controllers\Api\MaintenancePhotoController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordController;
@@ -15,6 +16,8 @@ use App\Http\Controllers\Api\VehiclePdfExportController;
 use App\Http\Controllers\Api\WarrantyTemplateController;
 use App\Http\Controllers\Api\WorkshopController;
 use App\Http\Controllers\Api\WorkshopMessageTemplateController;
+use App\Http\Controllers\Api\WorkshopRecordController;
+use App\Http\Controllers\Api\WorkshopVehicleController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -85,6 +88,16 @@ Route::prefix('v1')->group(function () {
         Route::get('/maintenances/{id}', [MaintenanceController::class, 'show'])->middleware('ability:maintenances:read');
         Route::put('/maintenances/{id}', [MaintenanceController::class, 'update'])->middleware('ability:maintenances:write');
         Route::delete('/maintenances/{id}', [MaintenanceController::class, 'destroy'])->middleware('ability:maintenances:write');
+
+        // OS de oficina em carro sem proprietário: decisão do proprietário e convite do cliente.
+        Route::get('/me/workshop-records', [WorkshopRecordController::class, 'index'])->middleware('ability:maintenances:read');
+        Route::post('/maintenances/{id}/owner-decision', [WorkshopRecordController::class, 'decide'])->middleware('ability:maintenances:write');
+        Route::post('/maintenances/{id}/invites/email', [MaintenanceInviteController::class, 'email'])->middleware(['ability:maintenances:write', 'throttle:workshop-invites']);
+        Route::post('/maintenances/{id}/invites/whatsapp', [MaintenanceInviteController::class, 'whatsapp'])->middleware(['ability:maintenances:write', 'throttle:workshop-invites']);
+
+        // Oficina: veículo pelo chassi, sem placa nem dados do dono.
+        Route::get('/workshop/vehicles/lookup', [WorkshopVehicleController::class, 'lookup'])->middleware(['ability:vehicles:read', 'throttle:workshop-chassis-lookup']);
+        Route::post('/workshop/vehicles', [WorkshopVehicleController::class, 'store'])->middleware(['ability:vehicles:write', 'throttle:workshop-chassis-lookup']);
 
         Route::post('/maintenances/{maintenance}/photos', [MaintenancePhotoController::class, 'store'])
             ->middleware(['ability:maintenances:write', 'throttle:uploads']);

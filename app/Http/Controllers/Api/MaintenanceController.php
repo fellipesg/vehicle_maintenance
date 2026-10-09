@@ -15,11 +15,11 @@ use App\Models\MaintenanceItem;
 use App\Models\Workshop;
 use App\Services\Invoice\InvoiceUploadProcessor;
 use App\Services\Maintenance\MaintenanceWarrantyApplicator;
+use App\Services\Maintenance\OwnerlessMaintenanceService;
 use App\Services\Maintenance\WorkshopReviewService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Support\ApiResponse;
 use App\Support\AppStorage;
-use App\Support\VehicleTenantResolver;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
@@ -131,7 +131,8 @@ class MaintenanceController extends Controller
             if ($user->isWorkshop() && $user->workshop) {
                 $workshopId = $user->workshop->id;
                 $workshopName = $user->workshop->name;
-                $tenantId = VehicleTenantResolver::resolveTenantId($vehicle) ?? $user->tenant_id;
+                // Sem proprietário atual a OS nasce sem tenant e à espera da decisão dele.
+                $tenantId = app(OwnerlessMaintenanceService::class)->tenantIdFor($vehicle);
             } elseif ($request->workshop_id) {
                 $workshop = Workshop::find($request->workshop_id);
                 if ($workshop) {
@@ -152,6 +153,10 @@ class MaintenanceController extends Controller
                 'service_category' => $request->service_category,
                 'is_manufacturer_required' => $isManufacturerRequired,
             ]);
+
+            if ($user->isWorkshop() && app(OwnerlessMaintenanceService::class)->isOwnerless($vehicle)) {
+                app(OwnerlessMaintenanceService::class)->markPending($maintenance);
+            }
 
             app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $user);
 

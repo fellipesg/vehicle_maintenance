@@ -118,7 +118,11 @@ class AuthController extends Controller
         $user = $request->user();
         $user->load('currentVehicles');
 
-        return ApiResponse::success(new UserResource($user));
+        $data = (new UserResource($user))->resolve($request);
+        // Registros que oficinas fizeram nos veículos da conta e esperam a decisão do proprietário.
+        $data['pending_workshop_records_count'] = app(\App\Services\Maintenance\MaintenanceOwnerDecisionService::class)->pendingCountFor($user);
+
+        return ApiResponse::success($data);
     }
 
     /**

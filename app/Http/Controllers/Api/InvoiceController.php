@@ -12,6 +12,7 @@ use App\Support\ApiResponse;
 use App\Support\AppStorage;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -95,6 +96,8 @@ class InvoiceController extends Controller
             }
 
             return AppStorage::disk()->download($invoice->file_path, $invoice->file_name);
+        } catch (AuthorizationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Error downloading invoice', ['exception' => $e->getMessage()]);
 

@@ -88,6 +88,15 @@ class AppServiceProvider extends ServiceProvider
             'vehicle-link|'.($request->user()?->id ?: $request->ip()),
         ));
 
+        // Consulta por chassi da oficina: limitada para não virar sondagem de carros alheios.
+        RateLimiter::for('workshop-chassis-lookup', fn (Request $request) => Limit::perMinute(20)->by(
+            'workshop-chassis|'.($request->user()?->id ?: $request->ip()),
+        ));
+
+        RateLimiter::for('workshop-invites', fn (Request $request) => Limit::perMinute(20)->by(
+            'workshop-invites|'.($request->user()?->id ?: $request->ip()),
+        ));
+
         RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(10)->by(
             'uploads|'.($request->user()?->id ?: $request->ip()),
         ));
