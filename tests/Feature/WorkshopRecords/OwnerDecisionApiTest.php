@@ -153,16 +153,36 @@ class OwnerDecisionApiTest extends TestCase
         $owner = $this->ownerOf($vehicle, verified: false);
 
         $this->actingAsApiUser($owner);
-        $this->getJson('/api/v1/me/workshop-records')->assertJsonPath('data.0.can_accept_attachments', false);
+        $this->getJson('/api/v1/me/workshop-records')
+            ->assertJsonPath('data.0.can_accept_attachments', false)
+            ->assertJsonPath('data.0.can_decide', false);
         $this->postJson("/api/v1/maintenances/{$record->id}/owner-decision", $this->decision(['attach_files' => true]))
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Para aceitar as notas e fotos da oficina, confirme que o veículo é seu enviando o CRLV-e.');
+            ->assertJsonPath('message', 'Para decidir sobre os registros da oficina, confirme que o veículo é seu enviando o CRLV-e.');
 
         $this->assertSame('pending', $record->fresh()->attachments_status);
         $this->assertSame(1, $record->fresh()->invoices()->count());
+    }
 
-        // Vincular o registro mínimo e ocultar continuam possíveis sem verificação.
-        $this->postJson("/api/v1/maintenances/{$record->id}/owner-decision", $this->decision(['hide_from_public' => true]))->assertOk();
+    public function test_unverified_owner_cannot_decline_hide_or_link(): void
+    {
+        $vehicle = $this->ownerlessVehicle();
+        $record = $this->withPendingAttachments($this->ownerlessRecord($this->workshopAccount(), $vehicle));
+        $owner = $this->ownerOf($vehicle, verified: false);
+
+        $this->actingAsApiUser($owner);
+        foreach ([['link' => false], ['hide_from_public' => true], []] as $choice) {
+            $this->postJson("/api/v1/maintenances/{$record->id}/owner-decision", $this->decision($choice))
+                ->assertStatus(422)
+                ->assertJsonPath('message', 'Para decidir sobre os registros da oficina, confirme que o veículo é seu enviando o CRLV-e.');
+        }
+
+        $fresh = $record->fresh();
+        $this->assertSame('pending', $fresh->owner_status ?? 'pending');
+        $this->assertSame('pending', $fresh->attachments_status);
+        $this->assertNull($fresh->hidden_from_public_at);
+        $this->assertNull($fresh->tenant_id);
+        $this->assertSame(1, $fresh->invoices()->count());
     }
 
     public function test_attach_without_link_is_refused(): void

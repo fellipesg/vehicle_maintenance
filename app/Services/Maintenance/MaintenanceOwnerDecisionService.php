@@ -24,6 +24,12 @@ class MaintenanceOwnerDecisionService
 {
     public const UNVERIFIED_MESSAGE = 'Para aceitar as notas e fotos da oficina, confirme que o veículo é seu enviando o CRLV-e.';
 
+    /**
+     * Recusar apaga as notas pendentes e ocultar tira o registro de todos os próximos donos: quem só
+     * informou o chassi (cadastro manual, sem CRLV-e) não pode decidir sobre o registro de outra pessoa.
+     */
+    public const UNVERIFIED_DECISION_MESSAGE = 'Para decidir sobre os registros da oficina, confirme que o veículo é seu enviando o CRLV-e.';
+
     public function __construct(private readonly MaintenanceAttachmentPurger $purger) {}
 
     /**
@@ -44,6 +50,11 @@ class MaintenanceOwnerDecisionService
     public function pendingCountFor(User $owner): int
     {
         return $this->recordsFor($owner)->count();
+    }
+
+    public function canDecide(User $owner, Maintenance $maintenance): bool
+    {
+        return $this->isCurrentOwner($owner, $maintenance) && $this->ownershipVerified($owner, $maintenance);
     }
 
     public function canAcceptAttachments(User $owner, Maintenance $maintenance): bool
@@ -75,6 +86,10 @@ class MaintenanceOwnerDecisionService
     {
         if (! $this->isCurrentOwner($owner, $maintenance)) {
             throw new AuthorizationException('Você não é o proprietário atual deste veículo.');
+        }
+
+        if (! $this->ownershipVerified($owner, $maintenance)) {
+            throw ValidationException::withMessages(['link' => self::UNVERIFIED_DECISION_MESSAGE]);
         }
 
         if (! $maintenance->isOwnerlessRecord()) {

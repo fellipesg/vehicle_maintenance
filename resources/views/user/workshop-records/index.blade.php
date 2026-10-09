@@ -38,6 +38,7 @@
                         $recordVehicle = $record->vehicle;
                         $recordWorkshop = $record->displayWorkshopName() ?? 'Oficina';
                         $canAttach = $decisions->canAcceptAttachments(auth()->user(), $record);
+                        $canDecide = $decisions->canDecide(auth()->user(), $record);
                         $hasFiles = $record->attachments_status === \App\Models\Maintenance::ATTACHMENTS_PENDING;
                         $statusLabel = match ($record->owner_status) {
                             \App\Models\Maintenance::OWNER_LINKED => 'Vinculado ao seu histórico',
@@ -64,6 +65,12 @@
                             </p>
                         @endif
 
+                        @if (! $canDecide)
+                            <div class="mt-4 space-y-3" data-record-needs-verification>
+                                <p class="text-sm text-muted-foreground">{{ \App\Services\Maintenance\MaintenanceOwnerDecisionService::UNVERIFIED_DECISION_MESSAGE }}</p>
+                                <x-ui.button variant="secondary" :href="route('user.vehicles.create')">Enviar o CRLV-e</x-ui.button>
+                            </div>
+                        @else
                         <form method="POST" action="{{ route('user.workshop-records.decide', $record) }}" class="mt-4 space-y-3">
                             @csrf
                             <input type="hidden" name="status" value="{{ $showAll ? 'all' : '' }}">
@@ -88,6 +95,7 @@
                                 @endif
                             </div>
                         </form>
+                        @endif
                     </x-ui.card>
                 @endforeach
             </div>

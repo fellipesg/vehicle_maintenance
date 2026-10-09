@@ -55,6 +55,7 @@ class WorkshopRecordResource extends JsonResource
             'owner_status' => $this->owner_status,
             'attachments_status' => $this->attachments_status,
             'hidden_from_public' => $this->isHiddenFromPublic(),
+            'can_decide' => $request->user() !== null && $decisions->canDecide($request->user(), $this->resource),
             'can_accept_attachments' => $request->user() !== null && $decisions->canAcceptAttachments($request->user(), $this->resource),
         ];
     }
