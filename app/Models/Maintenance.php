@@ -354,6 +354,11 @@ class Maintenance extends Model
             ->where('scope', WarrantyScope::Order);
     }
 
+    public function invite(): HasOne
+    {
+        return $this->hasOne(MaintenanceInvite::class);
+    }
+
     public function publicPhotos(): HasMany
     {
         return $this->photos()

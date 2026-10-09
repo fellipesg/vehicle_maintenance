@@ -40,6 +40,41 @@ class CustomerInviteTest extends TestCase
         Mail::assertQueued(CustomerInviteMail::class, 1);
     }
 
+    public function test_maintenance_json_exposes_invite_timestamps_only_to_the_authoring_workshop(): void
+    {
+        Mail::fake();
+        $workshop = $this->workshopAccount();
+        $vehicle = $this->ownerlessVehicle();
+        $record = $this->ownerlessRecord($workshop, $vehicle);
+        $this->actingAsApiUser($workshop);
+
+        $this->getJson("/api/v1/maintenances/{$record->id}")
+            ->assertOk()
+            ->assertJsonPath('data.whatsapp_invited_at', null)
+            ->assertJsonPath('data.email_invited_at', null);
+
+        $this->postJson("/api/v1/maintenances/{$record->id}/invites/email", ['email' => 'c@exemplo.com'])->assertStatus(202);
+        $this->postJson("/api/v1/maintenances/{$record->id}/invites/whatsapp", ['phone' => '11999998888'])->assertOk();
+
+        $this->getJson("/api/v1/maintenances/{$record->id}")
+            ->assertOk()
+            ->assertJsonPath('data.whatsapp_invited_at', fn ($value) => is_string($value))
+            ->assertJsonPath('data.email_invited_at', fn ($value) => is_string($value));
+
+        $this->getJson('/api/v1/maintenances')
+            ->assertOk()
+            ->assertJsonPath('data.0.email_invited_at', fn ($value) => is_string($value));
+
+        $otherWorkshop = $this->workshopAccount();
+        $this->actingAsApiUser($otherWorkshop);
+        $response = $this->getJson("/api/v1/maintenances/{$record->id}");
+        $this->assertStringNotContainsString('invited_at', $response->getContent());
+
+        $this->actingAsApiUser($this->ownerOf($vehicle));
+        $response = $this->getJson("/api/v1/maintenances/{$record->id}");
+        $this->assertStringNotContainsString('invited_at', $response->getContent());
+    }
+
     public function test_email_content_has_no_plate_chassis_and_carries_opt_out(): void
     {
         $workshop = $this->workshopAccount();

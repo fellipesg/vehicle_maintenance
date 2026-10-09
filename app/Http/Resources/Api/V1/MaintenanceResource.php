@@ -55,6 +55,13 @@ class MaintenanceResource extends JsonResource
             'owner_status' => $maintenance->owner_status,
             'attachments_status' => $isOwnerless ? $maintenance->attachments_status : null,
             'hidden_from_public' => $maintenance->isHiddenFromPublic(),
+            $this->mergeWhen(
+                $isOwnerless && $this->resource->isCreatedByWorkshopOf($request->user()),
+                fn () => [
+                    'whatsapp_invited_at' => $this->resource->invite?->whatsapp_invited_at?->toIso8601String(),
+                    'email_invited_at' => $this->resource->invite?->email_invited_at?->toIso8601String(),
+                ],
+            ),
             'verified_workshop' => new WorkshopResource($this->whenLoaded('verifiedWorkshop')),
             'verification_code' => $this->when($this->isVerified(), $this->verification_code),
             'verification_url' => $this->when($this->isVerified(), $this->verificationUrl()),

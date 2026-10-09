@@ -45,7 +45,7 @@ class MaintenanceController extends Controller
         Gate::authorize('viewAny', Maintenance::class);
 
         $user = $request->user();
-        $query = Maintenance::with(['vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'photos']);
+        $query = Maintenance::with(['vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'photos', 'invite']);
 
         if ($user->isWorkshop() && $user->workshop) {
             $query->where('workshop_id', $user->workshop->id);
@@ -260,6 +260,7 @@ class MaintenanceController extends Controller
             'checklists',
             'workshop',
             'photos',
+            'invite',
         ])->findOrFail($id);
 
         Gate::authorize('view', $maintenance);
