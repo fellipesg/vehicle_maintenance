@@ -6,7 +6,9 @@
     Logado, a partir de lg: logo (Início da área) · destinos do portal (aria-current no ativo) · ação
     principal · busca de veículo · sino · menu de conta (avatar). Abaixo de lg: logo · busca (ícone) ·
     sino · "Abrir menu", que abre layouts.partials.mobile-nav com os mesmos destinos e a conta.
-    Visitante: âncoras da landing (só na home) e Blog a partir de lg, Entrar e "Começar grátis".
+    Visitante: âncoras da landing e Blog a partir de lg, Entrar e "Começar grátis". Na home as âncoras
+    são #seção (rolagem na própria página); nas demais páginas apontam para a home, como
+    home#seção.
 
     Paleta de comandos (logado): a busca de veículo é também o gatilho da <x-ui.command> (Ctrl K,
     ⌘K no Mac), com os destinos do portal, a ação principal e "Buscar veículo por placa, chassi ou
@@ -24,17 +26,17 @@
     $portalPrimaryAction = $portalPrimaryAction !== null && \Illuminate\Support\Facades\Route::has($portalPrimaryAction['route'])
         ? $portalPrimaryAction + ['href' => route($portalPrimaryAction['route'])]
         : null;
-    // Âncoras da landing, na ordem das seções; só existem na home. "Produto" sai da topbar entre
+    // Âncoras da landing, na ordem das seções, em todas as páginas públicas. Na home o href é só
+    // #seção; nas demais páginas aponta para a home#seção. "Produto" sai da topbar entre
     // lg e xl (1024–1279px), onde as seis âncoras mais Entrar e "Começar grátis" não cabem com
     // folga; continua no menu mobile e a partir de xl.
+    $landingAnchorPrefix = request()->routeIs('home') ? '' : route('home');
     $publicNavItems = [
-        ...(request()->routeIs('home') ? [
-            ['label' => 'Como funciona', 'href' => '#como-funciona'],
-            ['label' => 'Procedência', 'href' => '#procedencia'],
-            ['label' => 'Produto', 'href' => '#produto', 'itemClass' => 'lg:max-xl:hidden'],
-            ['label' => 'Para quem', 'href' => '#para-quem'],
-            ['label' => 'Preço', 'href' => '#preco'],
-        ] : []),
+        ['label' => 'Como funciona', 'href' => $landingAnchorPrefix.'#como-funciona'],
+        ['label' => 'Procedência', 'href' => $landingAnchorPrefix.'#procedencia'],
+        ['label' => 'Produto', 'href' => $landingAnchorPrefix.'#produto', 'itemClass' => 'lg:max-xl:hidden'],
+        ['label' => 'Para quem', 'href' => $landingAnchorPrefix.'#para-quem'],
+        ['label' => 'Preço', 'href' => $landingAnchorPrefix.'#preco'],
         ['label' => 'Blog', 'href' => route('blog.index'), 'active' => request()->routeIs('blog.*')],
     ];
     $isVehicleSearchPage = request()->routeIs('vehicle.search');

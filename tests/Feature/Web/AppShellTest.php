@@ -38,11 +38,12 @@ class AppShellTest extends TestCase
         $this->assertStringNotContainsString(route('user.dashboard'), $menu);
     }
 
-    public function test_guest_menu_outside_home_has_blog_marked_as_current_and_no_landing_anchors(): void
+    public function test_guest_menu_outside_home_has_blog_marked_as_current_and_landing_anchors_pointing_to_home(): void
     {
         $menu = $this->mobileMenu($this->get(route('blog.index'))->assertOk());
 
-        $this->assertStringNotContainsString('#como-funciona', $menu);
+        $this->assertStringContainsString('href="'.route('home').'#como-funciona"', $menu);
+        $this->assertStringNotContainsString('href="#como-funciona"', $menu);
         $this->assertMatchesRegularExpression('/href="'.preg_quote(route('blog.index'), '/').'"\s+aria-current="page"/', $menu);
     }
 
