@@ -122,6 +122,12 @@
             </details>
         @endif
 
+        @if ($showsOwnerCta)
+            <x-ui.card as="section" heading-level="h2" title="Este carro é seu?" description="Crie sua conta grátis, confirme com o CRLV-e e guarde o histórico do seu carro." data-owner-cta>
+                <x-ui.button :href="route('register')">Criar conta grátis</x-ui.button>
+            </x-ui.card>
+        @endif
+
         <nav aria-label="Sobre o Selo da oficina" class="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
             <x-ui.link :href="route('home').'#procedencia'">O que é o Selo da oficina?</x-ui.link>
             <x-ui.link :href="route('verification.lookup')">Conferir outro código</x-ui.link>

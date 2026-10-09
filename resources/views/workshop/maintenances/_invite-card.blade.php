@@ -12,6 +12,7 @@
 @php
     $inviteEmailSent = $invite?->email_invited_at !== null;
     $inviteWhatsappAt = $invite?->whatsapp_invited_at ? \App\Support\DisplayTime::local($invite->whatsapp_invited_at) : null;
+    $inviteEmailAt = $invite?->email_invited_at ? \App\Support\DisplayTime::local($invite->email_invited_at) : null;
 @endphp
 
 <x-ui.card as="section" class="mb-6" heading-level="h2" title="Avisar o cliente"
@@ -24,7 +25,7 @@
             </x-ui.field>
             <x-ui.button type="submit" variant="secondary" icon="chat-bubble-left-right" class="max-sm:w-full">Abrir WhatsApp</x-ui.button>
             @if($inviteWhatsappAt)
-                <p class="text-sm text-muted-foreground" data-invite-whatsapp-at>Aberto em {{ $inviteWhatsappAt->format('d/m/Y') }} às {{ $inviteWhatsappAt->format('H:i') }}.</p>
+                <p class="text-sm text-muted-foreground" data-invite-whatsapp-at>WhatsApp enviado em {{ $inviteWhatsappAt->format('d/m/Y') }} às {{ $inviteWhatsappAt->format('H:i') }}.</p>
             @endif
         </form>
 
@@ -32,6 +33,7 @@
             @csrf
             @if($inviteEmailSent)
                 <x-ui.alert variant="success" role="status" title="Convite por e-mail enviado" data-invite-email-sent>
+                    <span class="block" data-invite-email-at>E-mail enviado em {{ $inviteEmailAt?->format('d/m/Y') }} às {{ $inviteEmailAt?->format('H:i') }}.</span>
                     Cada OS aceita um só e-mail de convite. Para falar de novo com o cliente, use o WhatsApp.
                 </x-ui.alert>
             @else

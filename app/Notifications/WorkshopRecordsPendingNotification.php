@@ -64,7 +64,7 @@ class WorkshopRecordsPendingNotification extends Notification implements ShouldQ
 
     public function title(): string
     {
-        return 'Oficinas registraram serviços no seu veículo';
+        return 'Registros de oficina aguardam a sua decisão';
     }
 
     public function body(): string
@@ -72,7 +72,7 @@ class WorkshopRecordsPendingNotification extends Notification implements ShouldQ
         $label = trim("{$this->vehicle->brand} {$this->vehicle->model}");
 
         return $this->count === 1
-            ? "Uma oficina registrou 1 serviço no seu {$label} antes de você chegar ao RevisaLog."
-            : "Oficinas registraram {$this->count} serviços no seu {$label} antes de você chegar ao RevisaLog.";
+            ? "1 registro de oficina aguarda a sua decisão no seu {$label}."
+            : "{$this->count} registros de oficina aguardam a sua decisão no seu {$label}.";
     }
 }

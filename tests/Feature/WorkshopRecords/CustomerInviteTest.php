@@ -228,4 +228,38 @@ class CustomerInviteTest extends TestCase
 
         $this->get(route('invites.unsubscribe.show', ['payload' => 'x']))->assertForbidden();
     }
+
+    public function test_saved_os_shows_when_the_whatsapp_and_email_invites_were_sent(): void
+    {
+        $workshop = $this->workshopAccount();
+        $record = $this->ownerlessRecord($workshop, $this->ownerlessVehicle());
+        $invite = MaintenanceInvite::factory()->create([
+            'maintenance_id' => $record->id,
+            'workshop_id' => $workshop->workshop->id,
+        ]);
+        $whatsappAt = now()->subDay()->setTime(14, 5);
+        $emailAt = now()->setTime(9, 30);
+        $invite->forceFill(['whatsapp_invited_at' => $whatsappAt, 'email_invited_at' => $emailAt, 'email_hash' => hash('sha256', 'c@exemplo.com')])->save();
+
+        $expectedWhatsapp = \App\Support\DisplayTime::local($whatsappAt);
+        $expectedEmail = \App\Support\DisplayTime::local($emailAt);
+
+        $this->actingAs($workshop)
+            ->get(route('workshop.maintenances.show', $record))
+            ->assertOk()
+            ->assertSee('WhatsApp enviado em '.$expectedWhatsapp->format('d/m/Y').' às '.$expectedWhatsapp->format('H:i'))
+            ->assertSee('E-mail enviado em '.$expectedEmail->format('d/m/Y').' às '.$expectedEmail->format('H:i'));
+    }
+
+    public function test_saved_os_shows_no_invite_dates_before_any_invite(): void
+    {
+        $workshop = $this->workshopAccount();
+        $record = $this->ownerlessRecord($workshop, $this->ownerlessVehicle());
+
+        $this->actingAs($workshop)
+            ->get(route('workshop.maintenances.show', $record))
+            ->assertOk()
+            ->assertDontSee('WhatsApp enviado em')
+            ->assertDontSee('E-mail enviado em');
+    }
 }

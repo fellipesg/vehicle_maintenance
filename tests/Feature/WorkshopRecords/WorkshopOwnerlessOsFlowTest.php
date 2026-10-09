@@ -161,4 +161,33 @@ class WorkshopOwnerlessOsFlowTest extends TestCase
         $this->actingAs($stranger)->get(route('user.maintenances.show', $maintenance))->assertForbidden();
         $this->actingAs($this->workshopAccount())->get(route('workshop.maintenances.show', $maintenance))->assertForbidden();
     }
+
+    public function test_os_form_warns_that_attachments_stay_with_the_workshop_for_an_ownerless_car(): void
+    {
+        $workshop = $this->workshopAccount();
+
+        $this->actingAs($workshop)
+            ->get(route('workshop.maintenances.create', ['chassis' => self::OWNERLESS_CHASSIS]))
+            ->assertOk()
+            ->assertSee('Notas fiscais e fotos ficam pendentes e só a oficina vê. São apagadas se o cliente recusar ou se ele não aceitar em 90 dias.');
+
+        $record = $this->ownerlessRecord($workshop, $this->ownerlessVehicle());
+
+        $this->actingAs($workshop)
+            ->get(route('workshop.maintenances.edit', $record))
+            ->assertOk()
+            ->assertSee('ficam pendentes e só a oficina vê');
+    }
+
+    public function test_os_form_hides_the_attachment_warning_when_the_vehicle_has_an_owner(): void
+    {
+        $workshop = $this->workshopAccount();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23', 'current_kilometers' => 10_000, 'odometer_at_registration' => 10_000]);
+        $this->ownerOf($vehicle);
+
+        $this->actingAs($workshop)
+            ->get(route('workshop.maintenances.create', ['license_plate' => 'ABC1D23']))
+            ->assertOk()
+            ->assertDontSee('ficam pendentes e só a oficina vê');
+    }
 }

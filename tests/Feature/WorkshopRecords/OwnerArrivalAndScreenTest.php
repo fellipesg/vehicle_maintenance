@@ -166,4 +166,104 @@ class OwnerArrivalAndScreenTest extends TestCase
             ->post(route('user.workshop-records.decide', $record), ['link' => '1'])
             ->assertForbidden();
     }
+
+    private function checkboxTag(string $html, string $id): string
+    {
+        preg_match('/<input[^>]*id="'.preg_quote($id, '/').'"[^>]*>/', $html, $matches);
+
+        return $matches[0] ?? '';
+    }
+
+    public function test_consent_checkbox_is_unchecked_for_pending_and_checked_only_when_linked(): void
+    {
+        $vehicle = $this->ownerlessVehicle();
+        $pending = $this->ownerlessRecord($this->workshopAccount(), $vehicle);
+        $owner = $this->ownerOf($vehicle);
+        $linked = $this->ownerlessRecord($this->workshopAccount(), $vehicle, ['kilometers' => 51_000]);
+        $linked->forceFill(['owner_status' => Maintenance::OWNER_LINKED, 'tenant_id' => $owner->tenant_id])->save();
+
+        $html = $this->actingAs($owner)->get(route('user.workshop-records.index', ['status' => 'all']))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertDoesNotMatchRegularExpression('/\schecked(=|\s|\/|>)/', $this->checkboxTag($html, 'link-'.$pending->id));
+        $this->assertMatchesRegularExpression('/\schecked(=|\s|\/|>)/', $this->checkboxTag($html, 'link-'.$linked->id));
+    }
+
+    public function test_attachment_warning_shows_only_for_records_with_pending_files(): void
+    {
+        $vehicle = $this->ownerlessVehicle();
+        $owner = $this->ownerOf($vehicle);
+        $withFiles = $this->withPendingAttachments($this->ownerlessRecord($this->workshopAccount(), $vehicle));
+
+        $this->actingAs($owner)->get(route('user.workshop-records.index'))
+            ->assertOk()
+            ->assertSee('Se você não aceitar, as notas fiscais e fotos da oficina são apagadas ao salvar.');
+
+        $withFiles->forceFill(['attachments_status' => Maintenance::ATTACHMENTS_NONE])->save();
+        $withFiles->invoices()->delete();
+        $withFiles->photos()->delete();
+
+        $this->actingAs($owner)->get(route('user.workshop-records.index'))
+            ->assertOk()
+            ->assertDontSee('são apagadas ao salvar.');
+    }
+
+    public function test_claim_wizard_says_records_await_the_owner_decision(): void
+    {
+        $vehicle = $this->ownerlessVehicle();
+        $this->ownerlessRecord($this->workshopAccount(), $vehicle);
+        $this->ownerlessRecord($this->workshopAccount(), $vehicle, ['kilometers' => 51_000]);
+        $owner = User::factory()->asUser()->create(['document' => '52998224725'])->refresh();
+
+        $this->claimPreview($owner, $this->crlv())
+            ->assertOk()
+            ->assertSee('2 registros de oficina aguardam a sua decisão em')
+            ->assertDontSee('no histórico, que passa a aparecer para você');
+    }
+
+    public function test_claim_wizard_keeps_the_old_text_for_ordinary_maintenances(): void
+    {
+        $vehicle = $this->ownerlessVehicle();
+        Maintenance::factory()->sealedByWorkshop()->create(['vehicle_id' => $vehicle->id]);
+        $owner = User::factory()->asUser()->create(['document' => '52998224725'])->refresh();
+
+        $this->claimPreview($owner, $this->crlv())
+            ->assertOk()
+            ->assertSee('no histórico, que passa a aparecer para você')
+            ->assertDontSee('aguarda a sua decisão');
+    }
+
+    public function test_arrival_notification_counts_and_words_only_the_pending_records(): void
+    {
+        Notification::fake();
+        $this->mock(FcmService::class)->shouldReceive('sendToUser')->once();
+        $vehicle = $this->ownerlessVehicle();
+        $this->ownerlessRecord($this->workshopAccount(), $vehicle);
+        $linked = $this->ownerlessRecord($this->workshopAccount(), $vehicle, ['kilometers' => 51_000]);
+        $owner = $this->ownerOf($vehicle);
+        $linked->forceFill(['owner_status' => Maintenance::OWNER_LINKED, 'tenant_id' => $owner->tenant_id])->save();
+
+        app(\App\Services\Maintenance\WorkshopRecordsArrivalNotifier::class)->notify($owner, $vehicle);
+
+        Notification::assertSentTo($owner, WorkshopRecordsPendingNotification::class, function (WorkshopRecordsPendingNotification $notification): bool {
+            return $notification->count === 1
+                && $notification->body() === '1 registro de oficina aguarda a sua decisão no seu Fiat Argo.'
+                && $notification->title() === 'Registros de oficina aguardam a sua decisão';
+        });
+    }
+
+    private function claimPreview(User $user, CrlvParseResult $crlv): \Illuminate\Testing\TestResponse
+    {
+        $this->mock(CrlvPdfParser::class, function ($parser) use ($crlv): void {
+            $parser->shouldReceive('isCrlvDocument')->andReturn(true);
+            $parser->shouldReceive('parseUpload')->andReturn($crlv);
+        });
+
+        $this->actingAs($user)
+            ->post(route('user.vehicles.import-crlv'), ['crlv' => UploadedFile::fake()->create('CRLV-e.pdf', 100, 'application/pdf')])
+            ->assertRedirect(route('user.vehicles.claim.preview'));
+
+        return $this->actingAs($user)->get(route('user.vehicles.claim.preview'));
+    }
 }

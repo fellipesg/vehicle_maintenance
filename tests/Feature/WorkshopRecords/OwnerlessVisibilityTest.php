@@ -3,6 +3,7 @@
 namespace Tests\Feature\WorkshopRecords;
 
 use App\Models\Maintenance;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Feature\Concerns\BuildsOwnerlessRecords;
 use Tests\TestCase;
@@ -135,5 +136,56 @@ class OwnerlessVisibilityTest extends TestCase
             ->assertOk()
             ->assertSee('Fiat')
             ->assertDontSee('data-ownership-unverified', false);
+    }
+
+    public function test_guest_sees_the_signup_cta_on_an_ownerless_seal_and_it_leads_like_the_invite(): void
+    {
+        $record = $this->ownerlessRecord($this->workshopAccount(), $this->ownerlessVehicle());
+
+        $this->get(route('verification.show', $record->verification_code))
+            ->assertOk()
+            ->assertSee('Este carro é seu?')
+            ->assertSee('Crie sua conta grátis, confirme com o CRLV-e e guarde o histórico do seu carro.')
+            ->assertSee('Criar conta grátis')
+            ->assertSee('href="'.route('register').'"', false)
+            ->assertSessionHas('url.intended', route('user.vehicles.create'))
+            ->assertSessionHas('invite_notice', true);
+
+        $this->get(route('invites.show', $this->inviteFor($record)->token))
+            ->assertOk()
+            ->assertSee('href="'.route('register').'"', false)
+            ->assertSessionHas('url.intended', route('user.vehicles.create'));
+    }
+
+    public function test_cta_is_hidden_from_logged_in_users(): void
+    {
+        $record = $this->ownerlessRecord($this->workshopAccount(), $this->ownerlessVehicle());
+
+        $this->actingAs(User::factory()->asUser()->create())
+            ->get(route('verification.show', $record->verification_code))
+            ->assertOk()
+            ->assertDontSee('Este carro é seu?')
+            ->assertDontSee('Criar conta grátis');
+    }
+
+    public function test_cta_is_hidden_when_the_vehicle_has_an_owner(): void
+    {
+        $vehicle = $this->ownerlessVehicle();
+        $this->ownerOf($vehicle);
+        $record = $this->ownerlessRecord($this->workshopAccount(), $vehicle);
+
+        $this->get(route('verification.show', $record->verification_code))
+            ->assertOk()
+            ->assertSee('Selo da oficina confirmado')
+            ->assertDontSee('Este carro é seu?')
+            ->assertDontSee('Criar conta grátis');
+    }
+
+    private function inviteFor(\App\Models\Maintenance $record): \App\Models\MaintenanceInvite
+    {
+        return \App\Models\MaintenanceInvite::factory()->create([
+            'maintenance_id' => $record->id,
+            'workshop_id' => $record->workshop_id,
+        ]);
     }
 }

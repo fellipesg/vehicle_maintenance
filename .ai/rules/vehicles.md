@@ -23,3 +23,6 @@ O endpoint de modelos resolve a marca por chave exata (`VehicleCatalogService::a
 
 ## Veículo sem placa
 license_plate e renavam podem ser null no app: mostrar "Placa não informada" nas telas privadas. Na oficina, a busca é pelo chassi de 17 caracteres e, com has_owner true, o app não mostra marca/modelo/ano (a API nem manda).
+
+## Oficina usa só o site, por enquanto
+O app não tem portal de oficina no login, então o código de oficina do PR #17 (OS por chassi, "Avisar o cliente") fica sem ponto de entrada no app até existirem um portal de oficina e uma lista "Minhas OS" no app. Não apague esse código: as telas continuam só na web (`/oficina`).

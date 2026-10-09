@@ -74,7 +74,7 @@
                         <form method="POST" action="{{ route('user.workshop-records.decide', $record) }}" class="mt-4 space-y-3">
                             @csrf
                             <input type="hidden" name="status" value="{{ $showAll ? 'all' : '' }}">
-                            <x-ui.checkbox name="link" :id="'link-'.$record->id" uncheckedValue="0" :checked="$record->owner_status !== \App\Models\Maintenance::OWNER_DECLINED"
+                            <x-ui.checkbox name="link" :id="'link-'.$record->id" uncheckedValue="0" :checked="$record->owner_status === \App\Models\Maintenance::OWNER_LINKED"
                                 label="Vincular este registro ao meu histórico"
                                 description="O serviço passa a aparecer junto com as suas manutenções. Sem vincular, ele fica só no chassi, com data, quilometragem, serviço, peças e oficina." />
                             <x-ui.checkbox name="attach_files" :id="'attach-'.$record->id" uncheckedValue="0"
@@ -84,6 +84,9 @@
                                 :description="$canAttach || $record->attachments_status === \App\Models\Maintenance::ATTACHMENTS_ACCEPTED
                                     ? 'Os arquivos passam a fazer parte do histórico do veículo. Você pode revogar depois e eles são apagados.'
                                     : ($hasFiles ? 'Para aceitar, confirme que o veículo é seu enviando o CRLV-e.' : 'Esta oficina não anexou arquivos.')" />
+                            @if ($hasFiles)
+                                <p class="-mt-1 pl-7 text-sm font-medium text-warning" data-record-attach-warning>Se você não aceitar, as notas fiscais e fotos da oficina são apagadas ao salvar.</p>
+                            @endif
                             <x-ui.checkbox name="hide_from_public" :id="'hide-'.$record->id" uncheckedValue="0"
                                 :checked="$record->isHiddenFromPublic()"
                                 label="Ocultar do histórico público"

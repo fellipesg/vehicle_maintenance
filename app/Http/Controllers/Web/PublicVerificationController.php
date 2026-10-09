@@ -50,7 +50,7 @@ class PublicVerificationController extends Controller
      * código não encontrado com 404 e o campo para tentar outro. O código digitado em minúsculas
      * ou sem hífens é levado à forma canônica.
      */
-    public function show(string $code): Response|RedirectResponse
+    public function show(Request $request, string $code): Response|RedirectResponse
     {
         $canonicalCode = VerificationCode::normalize($code);
 
@@ -72,12 +72,22 @@ class PublicVerificationController extends Controller
         }
 
         $verificationUrl = $maintenance->verificationUrl();
+        $showsOwnerCta = $request->user() === null
+            && $maintenance->vehicle !== null
+            && ! $maintenance->vehicle->hasCurrentOwner();
+
+        if ($showsOwnerCta) {
+            // Mesmo caminho do /convite/{token}: o cadastro leva ao "Adicionar veículo" com o aviso do CRLV-e.
+            $request->session()->put('url.intended', route('user.vehicles.create'));
+            $request->session()->put('invite_notice', true);
+        }
 
         return response()->view('public.verification', [
             'maintenance' => $maintenance,
             'maskedChassis' => VehicleIdentifierMask::chassis($maintenance->vehicle?->chassis),
             'verificationUrl' => $verificationUrl,
             'qrSvg' => $verificationUrl ? VerificationQr::svg($verificationUrl, 96) : null,
+            'showsOwnerCta' => $showsOwnerCta,
         ]);
     }
 }
