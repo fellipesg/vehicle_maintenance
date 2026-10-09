@@ -87,6 +87,9 @@ Route::get('/verificar', [\App\Http\Controllers\Web\PublicVerificationController
 Route::get('/v/{code}', [\App\Http\Controllers\Web\PublicVerificationController::class, 'show'])
     ->middleware('throttle:search')
     ->name('verification.show');
+Route::get('/v/{code}/sou-o-dono', [\App\Http\Controllers\Web\PublicVerificationController::class, 'startOwnerSignup'])
+    ->middleware('throttle:search')
+    ->name('verification.claim');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginHub'])->name('login');

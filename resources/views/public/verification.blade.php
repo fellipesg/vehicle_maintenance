@@ -124,7 +124,7 @@
 
         @if ($showsOwnerCta)
             <x-ui.card as="section" heading-level="h2" title="Este carro é seu?" description="Crie sua conta grátis, confirme com o CRLV-e e guarde o histórico do seu carro." data-owner-cta>
-                <x-ui.button :href="route('register')">Criar conta grátis</x-ui.button>
+                <x-ui.button :href="route('verification.claim', $maintenance->verification_code)">Criar conta grátis</x-ui.button>
             </x-ui.card>
         @endif
 

@@ -138,7 +138,7 @@ class OwnerlessVisibilityTest extends TestCase
             ->assertDontSee('data-ownership-unverified', false);
     }
 
-    public function test_guest_sees_the_signup_cta_on_an_ownerless_seal_and_it_leads_like_the_invite(): void
+    public function test_guest_sees_the_signup_cta_on_an_ownerless_seal_without_storing_the_signup_destination(): void
     {
         $record = $this->ownerlessRecord($this->workshopAccount(), $this->ownerlessVehicle());
 
@@ -147,7 +147,17 @@ class OwnerlessVisibilityTest extends TestCase
             ->assertSee('Este carro é seu?')
             ->assertSee('Crie sua conta grátis, confirme com o CRLV-e e guarde o histórico do seu carro.')
             ->assertSee('Criar conta grátis')
-            ->assertSee('href="'.route('register').'"', false)
+            ->assertSee('href="'.route('verification.claim', $record->verification_code).'"', false)
+            ->assertSessionMissing('url.intended')
+            ->assertSessionMissing('invite_notice');
+    }
+
+    public function test_clicking_the_owner_cta_sends_a_guest_to_register_with_the_add_vehicle_destination(): void
+    {
+        $record = $this->ownerlessRecord($this->workshopAccount(), $this->ownerlessVehicle());
+
+        $this->get(route('verification.claim', $record->verification_code))
+            ->assertRedirect(route('register'))
             ->assertSessionHas('url.intended', route('user.vehicles.create'))
             ->assertSessionHas('invite_notice', true);
 
@@ -157,9 +167,14 @@ class OwnerlessVisibilityTest extends TestCase
             ->assertSessionHas('url.intended', route('user.vehicles.create'));
     }
 
-    public function test_cta_is_hidden_from_logged_in_users(): void
+    public function test_owner_cta_claim_is_not_offered_to_logged_in_users(): void
     {
         $record = $this->ownerlessRecord($this->workshopAccount(), $this->ownerlessVehicle());
+
+        $this->actingAs(User::factory()->asUser()->create())
+            ->get(route('verification.claim', $record->verification_code))
+            ->assertRedirect(route('home'))
+            ->assertSessionMissing('url.intended');
 
         $this->actingAs(User::factory()->asUser()->create())
             ->get(route('verification.show', $record->verification_code))
@@ -168,17 +183,29 @@ class OwnerlessVisibilityTest extends TestCase
             ->assertDontSee('Criar conta grátis');
     }
 
-    public function test_cta_is_hidden_when_the_vehicle_has_an_owner(): void
+    public function test_owner_cta_claim_for_a_vehicle_with_an_owner_goes_back_to_the_seal_without_storing_the_destination(): void
     {
         $vehicle = $this->ownerlessVehicle();
         $this->ownerOf($vehicle);
         $record = $this->ownerlessRecord($this->workshopAccount(), $vehicle);
+
+        $this->get(route('verification.claim', $record->verification_code))
+            ->assertRedirect(route('verification.show', $record->verification_code))
+            ->assertSessionMissing('url.intended')
+            ->assertSessionMissing('invite_notice');
 
         $this->get(route('verification.show', $record->verification_code))
             ->assertOk()
             ->assertSee('Selo da oficina confirmado')
             ->assertDontSee('Este carro é seu?')
             ->assertDontSee('Criar conta grátis');
+    }
+
+    public function test_owner_cta_claim_with_an_unknown_code_goes_to_the_lookup(): void
+    {
+        $this->get(route('verification.claim', 'ZZZZ-ZZZZ-ZZZZ'))
+            ->assertRedirect(route('verification.lookup'))
+            ->assertSessionMissing('url.intended');
     }
 
     private function inviteFor(\App\Models\Maintenance $record): \App\Models\MaintenanceInvite
