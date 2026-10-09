@@ -18,6 +18,7 @@
     <x-brand-head-icons include-og-image :og-image="$__env->yieldContent('og_image')" :og-image-alt="$__env->yieldContent('og_image_alt')" />
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />
+    <x-analytics />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>

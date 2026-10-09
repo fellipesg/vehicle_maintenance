@@ -9,6 +9,7 @@
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="color-scheme" content="dark">
+    <x-analytics />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>

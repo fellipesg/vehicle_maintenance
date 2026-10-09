@@ -173,7 +173,8 @@ class AuthController extends Controller
         // na mensagem deixa visível um erro de digitação logo depois do cadastro.
         return redirect()
             ->to($this->redirectAfterLogin($request, $user, Portal::Owner))
-            ->with('success', str_replace(':email', $user->email, self::REGISTERED_MESSAGE));
+            ->with('success', str_replace(':email', $user->email, self::REGISTERED_MESSAGE))
+            ->with('analytics_event', 'sign_up');
     }
 
     public function logout(Request $request): RedirectResponse

@@ -76,4 +76,8 @@ return [
         'client_id' => env('APPLE_CLIENT_ID', 'br.com.revisalog.app'),
     ],
 
+    'google_analytics' => [
+        'measurement_id' => env('GA_MEASUREMENT_ID'),
+    ],
+
 ];

@@ -25,6 +25,7 @@ import { initVehicleDetails, initVehicleTimelines } from './vehicle-timeline-por
 import { initAdminMaintenancesFilters } from './admin-maintenances-filters';
 import { initAdmin } from './admin';
 import { initLanding } from './landing';
+import { initAnalytics } from './analytics';
 import { initMaintenanceItems } from './maintenance-items';
 import { initGarageMaintenanceForms } from './garage-maintenance-form';
 import { initWorkshopAddressCep } from './workshop-address-cep';
@@ -45,6 +46,7 @@ import { initWorkshopAddressCep } from './workshop-address-cep';
  */
 function initApp() {
     initPreline();
+    initAnalytics();
     initDialogs();
     initConfirm();
     initToasts();
