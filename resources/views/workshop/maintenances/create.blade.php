@@ -5,6 +5,8 @@
 @php
     $formErrorTargets = [
         'license_plate' => 'license_plate',
+        'chassis' => 'chassis',
+        'new_vehicle*' => 'new_vehicle_brand',
         'photo' => null,
         'invoices*' => 'invoices',
         'photos.vehicle_before*' => 'photos_vehicle_before',
@@ -12,7 +14,7 @@
         'photos.part_before*' => 'photos_part_before',
         'photos.part_after*' => 'photos_part_after',
     ];
-    $showsForm = $workshop && $vehicle && $vehicleHasOwner;
+    $showsForm = $workshop && ($vehicle || $creatingVehicle);
     // Erro de placa, de foto ou de um grupo de fotos fica longe do topo: o resumo aparece já com um.
     $summaryThreshold = collect($errors->keys())->contains(fn (string $key): bool => in_array($key, ['license_plate', 'photo'], true) || str_starts_with($key, 'photos.')) ? 1 : 2;
 @endphp
@@ -21,7 +23,7 @@
     <x-ui.container size="md" padded>
         <x-ui.page-header
             title="Nova ordem de serviço"
-            description="Confirme o veículo pela placa e registre o serviço. A OS recebe o Selo da oficina, que o cliente confere pelo código."
+            description="Confirme o veículo pela placa ou pelo chassi e registre o serviço. A OS recebe o Selo da oficina, que o cliente confere pelo código."
             :breadcrumbs="[['Ordens de serviço', route('workshop.maintenances.index')], ['Nova OS']]"
         />
 
@@ -41,7 +43,15 @@
                 @if($showsForm)
                     <form method="POST" action="{{ route('workshop.maintenances.store') }}" enctype="multipart/form-data" class="space-y-6" data-maintenance-os-form>
                         @csrf
-                        <input type="hidden" name="license_plate" value="{{ $vehicle->license_plate }}">
+                        @if($vehicle && filled($vehicle->license_plate) && $chassis === '')
+                            <input type="hidden" name="license_plate" value="{{ $vehicle->license_plate }}">
+                        @else
+                            <input type="hidden" name="chassis" value="{{ $chassis !== '' ? $chassis : $vehicle->chassis }}">
+                        @endif
+
+                        @if($creatingVehicle)
+                            @include('workshop.maintenances._new-vehicle-fields')
+                        @endif
 
                         @if(session()->hasOldInput() && $errors->any())
                             <x-ui.alert variant="warning" role="status" title="Escolha os arquivos de novo">

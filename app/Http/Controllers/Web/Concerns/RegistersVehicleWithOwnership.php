@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Concerns;
 use App\Models\Vehicle;
 use App\Rules\Chassis;
 use App\Services\Crlv\CrlvParseResult;
+use App\Services\Maintenance\OwnerlessMaintenanceService;
 use App\Services\Vehicle\VehicleOwnershipService;
 use App\Support\Vehicle\VehicleEntryFlow;
 use Illuminate\Http\RedirectResponse;
@@ -216,7 +217,14 @@ trait RegistersVehicleWithOwnership
             return back()->withErrors(['vehicle' => $exception->getMessage()]);
         }
 
-        $request->session()->forget(['crlv_verification', 'crlv_source', 'claim_vehicle_id', 'crlv_mode']);
+        $request->session()->forget(['crlv_verification', 'crlv_source', 'claim_vehicle_id', 'crlv_mode', 'invite_notice']);
+
+        // Chegou a um carro com registros de oficina: a escolha do que entra no histórico vem primeiro.
+        if (! $request->user()->isGarage()
+            && app(OwnerlessMaintenanceService::class)->pendingCountForVehicle($vehicle) > 0) {
+            return redirect()->route('user.workshop-records.index')
+                ->with('success', 'Veículo vinculado. Oficinas registraram serviços nele: escolha abaixo o que entra no seu histórico.');
+        }
 
         return redirect()->route($flow->routeName('covers'), $vehicle)
             ->with('success', $flow->claimedMessage());

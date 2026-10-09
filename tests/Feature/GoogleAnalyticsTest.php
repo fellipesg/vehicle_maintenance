@@ -34,7 +34,7 @@ class GoogleAnalyticsTest extends TestCase
             ->assertSee('Google Analytics (medição de uso das páginas públicas)', false)
             ->assertDontSee('Usamos apenas cookies essenciais', false);
 
-        $this->assertSame('2026-10-09', config('legal.privacy_version'));
+        $this->assertSame('2026-10-10', config('legal.privacy_version'));
     }
 
     public function test_script_is_rendered_on_guest_layout_pages(): void

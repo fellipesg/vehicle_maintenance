@@ -140,7 +140,7 @@ class VehicleController extends Controller
                 ->withErrors(['crlv' => $exception->getMessage()]);
         }
 
-        $vehicleRenavam = preg_replace('/\D/', '', $vehicle->renavam) ?? '';
+        $vehicleRenavam = preg_replace('/\D/', '', (string) $vehicle->renavam) ?? '';
         $crlvRenavam = $parsed->normalizedRenavam();
 
         if ($vehicleRenavam !== $crlvRenavam) {

@@ -15,6 +15,7 @@ use App\Http\Resources\Api\V1\VehiclePdfExportResource;
 use App\Http\Resources\Api\V1\VehiclePlateResource;
 use App\Http\Resources\Api\V1\VehicleResource;
 use App\Models\Vehicle;
+use App\Services\Maintenance\WorkshopRecordsArrivalNotifier;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\VehicleOwnershipService;
@@ -97,11 +98,21 @@ class VehicleController extends Controller
         return ApiResponse::paginated($vehicles, VehicleResource::class);
     }
 
-    public function store(StoreVehicleRequest $request): JsonResponse
+    public function store(StoreVehicleRequest $request, VehicleOwnershipService $ownership): JsonResponse
     {
         $data = collect($request->validated())
             ->except(['terms_accepted', 'purchase_date'])
             ->all();
+
+        $unclaimed = $request->unclaimedWorkshopVehicle();
+
+        if ($unclaimed !== null) {
+            // Chegada do proprietário a um veículo que a oficina criou pelo chassi: o vínculo não é
+            // verificado, e os registros pendentes das oficinas esperam a decisão dele.
+            $vehicle = $ownership->claimUnclaimedWorkshopVehicle($request->user(), $unclaimed, $request->validated());
+
+            return ApiResponse::created(new VehicleResource($vehicle), 'Vehicle created successfully');
+        }
 
         $vehicle = Vehicle::create($data);
         app(VehiclePlateHistoryService::class)->recordInitialPlate($vehicle, 'api', $request->user());
@@ -206,15 +217,17 @@ class VehicleController extends Controller
         }
 
         $vehicle = $lookup->vehicle;
+        // Registros que o proprietário ocultou da consulta pública não entram em nada daqui.
+        $viewer = $request->user('sanctum');
         $vehicle->loadCount([
-            'maintenances',
-            'maintenances as verified_maintenances_count' => fn ($q) => $q->whereNotNull('verified_at'),
+            'maintenances' => fn ($q) => $q->visibleInHistoryTo($viewer),
+            'maintenances as verified_maintenances_count' => fn ($q) => $q->visibleInHistoryTo($viewer)->whereNotNull('verified_at'),
         ]);
         $vehicle->load([
             'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
-            'provenanceStripMaintenances',
-            'maintenances' => function ($query) {
-                $query->orderBy('maintenance_date', 'desc')
+            'provenanceStripMaintenances' => fn ($q) => $q->visibleInHistoryTo($viewer),
+            'maintenances' => function ($query) use ($viewer) {
+                $query->visibleInHistoryTo($viewer)->orderBy('maintenance_date', 'desc')
                     ->with(['photos' => fn ($photos) => $photos
                         ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
                         ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
@@ -355,6 +368,7 @@ class VehicleController extends Controller
         $user = $request->user();
 
         $existingLink = $user->vehicles()->where('vehicle_id', $vehicle->id)->first();
+        $wasCurrentOwner = (bool) $existingLink?->pivot?->is_current_owner;
 
         if ($existingLink) {
             $user->vehicles()->updateExistingPivot($vehicle->id, [
@@ -368,6 +382,10 @@ class VehicleController extends Controller
                 'is_current_owner' => true,
                 'tenant_id' => $user->tenant_id,
             ]);
+        }
+
+        if (! $wasCurrentOwner) {
+            app(WorkshopRecordsArrivalNotifier::class)->notify($user, $vehicle);
         }
 
         return ApiResponse::success(new VehicleResource($vehicle->fresh()), 'Vehicle linked to user successfully');

@@ -18,6 +18,12 @@
 @endphp
 
 @section('entry')
+    @if(session('invite_notice'))
+        <x-ui.alert variant="info" role="status" title="Uma oficina registrou um serviço no seu carro" data-invite-notice>
+            Para ver o registro, adicione o veículo com o CRLV-e: ele confirma que o carro é seu. Depois você escolhe o que entra no seu histórico.
+        </x-ui.alert>
+    @endif
+
     @if($vehicleExists)
         <x-ui.alert variant="info" title="Este veículo já está na RevisaLog" data-vehicle-exists>
             Não é preciso cadastrá-lo de novo. Envie o CRLV-e dele abaixo: a leitura encontra o cadastro e leva à confirmação do vínculo, com o histórico que já existe.

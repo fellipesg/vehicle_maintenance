@@ -17,3 +17,6 @@ The capability strip under the hero is a full-viewport RTL marquee: overflow hid
 
 ## Times shown to people use Brasília time
 Timestamps are stored in UTC (config app.timezone). A time (or a date next to a time) taken from a timestamp goes through App\Support\DisplayTime::local() (config app.display_timezone, America/Sao_Paulo): the seal on /v/{code}, x-provenance-seal, the OS page ("Atualizada em … às HH:MM"), notifications, Maintenance::provenance_meta, the PDF mail and the history PDF agree to the minute. Date-only columns (maintenance_date) are not converted. Not converted yet: the admin blog schedule (its datetime-local input is read as UTC, so fix input and display together) and date-only created_at columns in admin lists.
+
+## Placa nula
+Nunca imprima license_plate direto: use filled() e, nas telas privadas, "Placa não informada". Telas públicas não mostram nada no lugar.

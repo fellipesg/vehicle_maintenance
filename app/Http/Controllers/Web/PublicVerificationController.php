@@ -50,7 +50,7 @@ class PublicVerificationController extends Controller
      * código não encontrado com 404 e o campo para tentar outro. O código digitado em minúsculas
      * ou sem hífens é levado à forma canônica.
      */
-    public function show(string $code): Response|RedirectResponse
+    public function show(Request $request, string $code): Response|RedirectResponse
     {
         $canonicalCode = VerificationCode::normalize($code);
 
@@ -58,11 +58,7 @@ class PublicVerificationController extends Controller
             return redirect()->route('verification.show', $canonicalCode, 301);
         }
 
-        $maintenance = Maintenance::query()
-            ->where('verification_code', $code)
-            ->whereNotNull('verified_at')
-            ->with('verifiedWorkshop', 'workshop', 'vehicle')
-            ->first();
+        $maintenance = $this->findPubliclyVisibleMaintenance($code);
 
         if ($maintenance === null) {
             return response()->view('public.verification-invalid', [
@@ -71,12 +67,62 @@ class PublicVerificationController extends Controller
         }
 
         $verificationUrl = $maintenance->verificationUrl();
+        $showsOwnerCta = $request->user() === null
+            && $maintenance->vehicle !== null
+            && ! $maintenance->vehicle->hasCurrentOwner();
 
         return response()->view('public.verification', [
             'maintenance' => $maintenance,
             'maskedChassis' => VehicleIdentifierMask::chassis($maintenance->vehicle?->chassis),
             'verificationUrl' => $verificationUrl,
             'qrSvg' => $verificationUrl ? VerificationQr::svg($verificationUrl, 96) : null,
+            'showsOwnerCta' => $showsOwnerCta,
         ]);
+    }
+
+    /**
+     * GET /v/{código}/sou-o-dono: o botão "Criar conta grátis" do cartão "Este carro é seu?". Só aqui
+     * o destino do cadastro vai para a sessão (o "Adicionar veículo" com o aviso do CRLV-e), porque
+     * ver o selo não deve mudar para onde um login posterior leva o visitante.
+     */
+    public function startOwnerSignup(Request $request, string $code): RedirectResponse
+    {
+        $canonicalCode = VerificationCode::normalize($code);
+
+        if ($canonicalCode === null) {
+            return redirect()->route('verification.lookup');
+        }
+
+        $maintenance = $this->findPubliclyVisibleMaintenance($canonicalCode);
+
+        if ($maintenance === null) {
+            return redirect()->route('verification.lookup');
+        }
+
+        if ($request->user() !== null) {
+            return redirect()->route('home');
+        }
+
+        $vehicle = $maintenance->vehicle;
+
+        if ($vehicle === null || $vehicle->hasCurrentOwner()) {
+            return redirect()->route('verification.show', $canonicalCode);
+        }
+
+        // Mesmo caminho do /convite/{token}: o cadastro leva ao "Adicionar veículo" com o aviso do CRLV-e.
+        $request->session()->put('url.intended', route('user.vehicles.create'));
+        $request->session()->put('invite_notice', true);
+
+        return redirect()->route('register');
+    }
+
+    private function findPubliclyVisibleMaintenance(string $code): ?Maintenance
+    {
+        return Maintenance::query()
+            ->where('verification_code', $code)
+            ->whereNotNull('verified_at')
+            ->whereNull('hidden_from_public_at')
+            ->with('verifiedWorkshop', 'workshop', 'vehicle')
+            ->first();
     }
 }

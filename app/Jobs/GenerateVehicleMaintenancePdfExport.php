@@ -40,6 +40,7 @@ class GenerateVehicleMaintenancePdfExport implements ShouldQueue
             $file = $exporter->generate(
                 $vehicle,
                 maskIdentifiers: ! VehicleIdentifierVisibility::showsFullIdentifiers($export->user, $vehicle),
+                viewer: $export->user,
             );
             $path = config('vehicle-pdf-export.storage_path_prefix').'/'.$export->id.'.pdf';
 

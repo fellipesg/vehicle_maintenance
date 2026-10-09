@@ -11,18 +11,23 @@ use App\Http\Controllers\Web\Concerns\StoresMaintenanceInvoices;
 use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Models\Workshop;
+use App\Rules\Chassis;
 use App\Rules\InvoiceFile;
+use App\Services\Maintenance\MaintenanceInviteService;
 use App\Services\Maintenance\MaintenancePhotoService;
 use App\Services\Maintenance\MaintenanceVerificationStamper;
+use App\Services\Maintenance\OwnerlessMaintenanceService;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Vehicle\WorkshopVehicleRegistrar;
 use App\Support\AppStorage;
 use App\Support\Maintenance\WorkshopMaintenanceFilters;
 use App\Support\VehiclePlateSearch;
-use App\Support\VehicleTenantResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
@@ -83,26 +88,54 @@ class MaintenanceController extends Controller
     }
 
     /**
-     * Nova OS em duas etapas na mesma página: a placa (GET ?license_plate=) confirma o veículo e
-     * só então o resto do formulário aparece. Depois de um erro de validação, a placa enviada
-     * (old input) vale quando a URL não traz a placa.
+     * Nova OS em duas etapas na mesma página: a placa (GET ?license_plate=) ou o chassi
+     * (GET ?chassis=) confirma o veículo e só então o resto do formulário aparece. Pelo chassi o
+     * veículo que ainda não existe é criado ali mesmo (marca, modelo e ano). Depois de um erro de
+     * validação, o dado enviado (old input) vale quando a URL não traz nada.
      */
     public function create(Request $request): View
     {
         $workshop = $request->user()->workshop;
+        $chassisInput = $request->query('chassis');
+        $chassisInput = is_scalar($chassisInput) && (string) $chassisInput !== '' ? (string) $chassisInput : (string) $request->old('chassis', '');
+        $chassis = substr(Vehicle::normalizeChassis($chassisInput), 0, 17);
+
         $plateInput = $request->query('license_plate');
         $plateInput = is_scalar($plateInput) && (string) $plateInput !== '' ? (string) $plateInput : (string) $request->old('license_plate', '');
-        $licensePlate = substr(VehiclePlateSearch::normalize($plateInput), 0, 10);
+        $licensePlate = $chassis === '' ? substr(VehiclePlateSearch::normalize($plateInput), 0, 10) : '';
+
         $lookup = $licensePlate !== '' ? VehiclePlateSearch::findByPlate($licensePlate) : null;
         $vehicle = $lookup?->vehicle;
+        $chassisOwned = false;
+        $creatingVehicle = false;
+        $chassisInvalid = false;
+
+        if ($chassis !== '') {
+            if (strlen($chassis) !== 17) {
+                $chassisInvalid = true;
+            } else {
+                $vehicle = Vehicle::findByChassis($chassis);
+
+                if ($vehicle !== null && $vehicle->hasCurrentOwner()) {
+                    $chassisOwned = true;
+                    $vehicle = null;
+                } else {
+                    $creatingVehicle = $vehicle === null;
+                }
+            }
+        }
 
         return view('workshop.maintenances.create', array_merge(
             [
                 'workshop' => $workshop,
                 'vehicle' => $vehicle,
                 'licensePlate' => $licensePlate,
+                'chassis' => $chassis,
+                'chassisOwned' => $chassisOwned,
+                'chassisInvalid' => $chassisInvalid,
+                'creatingVehicle' => $creatingVehicle,
                 'lookup' => $lookup,
-                'vehicleHasOwner' => $vehicle !== null && VehicleTenantResolver::resolveTenantId($vehicle) !== null,
+                'vehicleHasOwner' => $vehicle !== null && $vehicle->hasCurrentOwner(),
             ],
             $this->warrantyTemplateOptions($workshop),
         ));
@@ -122,7 +155,12 @@ class MaintenanceController extends Controller
         }
 
         $data = $request->validate(array_merge([
-            'license_plate' => ['required', 'string', 'max:10'],
+            'license_plate' => ['required_without:chassis', 'nullable', 'string', 'max:10'],
+            'chassis' => ['required_without:license_plate', 'nullable', 'string', 'max:30'],
+            'new_vehicle' => ['nullable', 'array'],
+            'new_vehicle.brand' => ['nullable', 'string', 'max:100'],
+            'new_vehicle.model' => ['nullable', 'string', 'max:100'],
+            'new_vehicle.year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'maintenance_type' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
             'maintenance_date' => ['required', 'date'],
@@ -135,37 +173,55 @@ class MaintenanceController extends Controller
             'photos.*' => ['nullable', 'array', 'max:'.MaintenancePhoto::MAX_PER_GROUP],
             'photos.*.*' => $this->photoFileRules(),
         ], $this->maintenanceItemValidationRules(), $this->maintenanceWarrantyValidationRules()), [
-            'license_plate.required' => 'Informe a placa do veículo.',
+            'license_plate.required_without' => 'Informe a placa ou o chassi do veículo.',
+            'chassis.required_without' => 'Informe a placa ou o chassi do veículo.',
             'photos.*.max' => 'Cada grupo aceita até '.MaintenancePhoto::MAX_PER_GROUP.' fotos.',
         ]);
 
-        $licensePlate = VehiclePlateSearch::normalize($data['license_plate']);
-        $vehicle = VehiclePlateSearch::findByPlate($licensePlate)?->vehicle;
+        $newVehicle = null;
+        $chassis = Vehicle::normalizeChassis((string) ($data['chassis'] ?? ''));
 
-        if ($vehicle === null) {
-            return redirect()->back()
-                ->withInput()
-                ->withErrors(['license_plate' => self::vehicleNotFoundMessage($licensePlate)]);
+        if ($chassis !== '') {
+            $vehicle = Vehicle::findByChassis($chassis);
+
+            if ($vehicle !== null && $vehicle->hasCurrentOwner()) {
+                return redirect()->back()->withInput()
+                    ->withErrors(['chassis' => self::chassisOwnedMessage()]);
+            }
+
+            if ($vehicle === null) {
+                $newVehicle = $request->validate([
+                    'chassis' => ['required', 'string', new Chassis(isset($data['new_vehicle']['year']) ? (int) $data['new_vehicle']['year'] : null)],
+                    'new_vehicle.brand' => ['required', 'string', 'max:100'],
+                    'new_vehicle.model' => ['required', 'string', 'max:100'],
+                    'new_vehicle.year' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
+                ], [
+                    'new_vehicle.brand.required' => 'Informe a marca do veículo.',
+                    'new_vehicle.model.required' => 'Informe o modelo do veículo.',
+                    'new_vehicle.year.required' => 'Informe o ano do veículo.',
+                ])['new_vehicle'];
+            }
+        } else {
+            $licensePlate = VehiclePlateSearch::normalize((string) $data['license_plate']);
+            $vehicle = VehiclePlateSearch::findByPlate($licensePlate)?->vehicle;
+
+            if ($vehicle === null) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['license_plate' => self::vehicleNotFoundMessage($licensePlate)]);
+            }
         }
 
-        $tenantId = VehicleTenantResolver::resolveTenantId($vehicle);
-
-        if ($tenantId === null) {
-            return redirect()->back()
-                ->withInput()
-                ->withErrors(['license_plate' => self::vehicleWithoutOwnerMessage()]);
+        if ($vehicle !== null) {
+            app(VehicleMileageService::class)->assertMaintenanceKilometers(
+                $vehicle,
+                (int) $data['kilometers'],
+                $data['maintenance_date'],
+            );
         }
-
-        app(VehicleMileageService::class)->assertMaintenanceKilometers(
-            $vehicle,
-            (int) $data['kilometers'],
-            $data['maintenance_date'],
-        );
 
         $maintenanceData = [
-            'vehicle_id' => $vehicle->id,
             'user_id' => $request->user()->id,
-            'tenant_id' => $tenantId,
             'workshop_id' => $workshop->id,
             'workshop_name' => $workshop->name,
             'maintenance_type' => $data['maintenance_type'],
@@ -178,17 +234,37 @@ class MaintenanceController extends Controller
 
         $result = $this->storeMaintenanceWithInvoices(
             $request,
-            function () use ($maintenanceData, $vehicle, $data, $request, $workshop) {
-                $maintenance = Maintenance::create($maintenanceData);
-                app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
-                app(VehicleMileageService::class)->applyMaintenanceKilometers(
-                    $vehicle,
-                    (int) $data['kilometers'],
-                );
-                $this->syncMaintenanceItems($maintenance, $request);
-                $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
+            function () use ($maintenanceData, $vehicle, $newVehicle, $chassis, $data, $request, $workshop) {
+                return DB::transaction(function () use ($maintenanceData, $vehicle, $newVehicle, $chassis, $data, $request, $workshop) {
+                    $vehicle ??= app(WorkshopVehicleRegistrar::class)->register(
+                        $request->user(),
+                        $chassis,
+                        (string) $newVehicle['brand'],
+                        (string) $newVehicle['model'],
+                        (int) $newVehicle['year'],
+                        (int) $data['kilometers'],
+                    );
 
-                return $maintenance;
+                    $ownerless = app(OwnerlessMaintenanceService::class);
+                    $maintenance = Maintenance::create($maintenanceData + [
+                        'vehicle_id' => $vehicle->id,
+                        'tenant_id' => $ownerless->tenantIdFor($vehicle),
+                    ]);
+
+                    if ($ownerless->isOwnerless($vehicle)) {
+                        $ownerless->markPending($maintenance);
+                    }
+
+                    app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
+                    app(VehicleMileageService::class)->applyMaintenanceKilometers(
+                        $vehicle,
+                        (int) $data['kilometers'],
+                    );
+                    $this->syncMaintenanceItems($maintenance, $request);
+                    $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
+
+                    return $maintenance;
+                });
             },
         );
 
@@ -211,8 +287,12 @@ class MaintenanceController extends Controller
 
         $maintenance->load(['vehicle', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'photos', 'workshop', 'verifiedWorkshop', 'user']);
 
+        $invites = app(MaintenanceInviteService::class);
+
         return view('workshop.maintenances.show', [
             'maintenance' => $maintenance,
+            'canInvite' => $request->user()->workshop !== null && $invites->canInvite($maintenance, $request->user()->workshop),
+            'invite' => $maintenance->owner_status !== null ? \App\Models\MaintenanceInvite::query()->where('maintenance_id', $maintenance->id)->first() : null,
             'canManage' => self::isAuthoredBy($maintenance, $request->user()->workshop),
             'updatedAfterSeal' => self::wasUpdatedAfterSeal($maintenance),
         ]);
@@ -387,12 +467,12 @@ class MaintenanceController extends Controller
 
     public static function vehicleNotFoundMessage(string $licensePlate): string
     {
-        return 'Veículo '.$licensePlate.' ainda não está no RevisaLog. Peça ao proprietário para cadastrar o veículo no app; depois registre a OS aqui.';
+        return 'Veículo '.$licensePlate.' ainda não está no RevisaLog. Cadastre-o pelo chassi para registrar a OS.';
     }
 
-    public static function vehicleWithoutOwnerMessage(): string
+    public static function chassisOwnedMessage(): string
     {
-        return 'Este veículo está no RevisaLog, mas ainda não tem um proprietário vinculado. Peça ao proprietário para adicionar o veículo à conta dele; depois registre a OS aqui.';
+        return 'Este chassi já tem proprietário no RevisaLog. Registre a OS pela placa do veículo.';
     }
 
     private static function createdMessage(Maintenance $maintenance): string

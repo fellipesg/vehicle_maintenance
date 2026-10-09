@@ -40,10 +40,10 @@ class LegalPagesTest extends TestCase
             ->assertOk()
             ->assertSee('<h2', false)
             ->assertSee('<h2 id="seus-direitos"', false)
-            ->assertSee('7. Seus direitos')
+            ->assertSee('8. Seus direitos')
             ->assertSee('list-disc', false)
             ->assertSee('href="mailto:suporte@revisalog.com.br"', false)
-            ->assertSee('Em vigor desde <time datetime="2026-10-09">9 de outubro de 2026</time>', false);
+            ->assertSee('Em vigor desde <time datetime="2026-10-10">10 de outubro de 2026</time>', false);
     }
 
     public function test_api_privacy_policy_matches_web_policy(): void

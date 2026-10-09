@@ -73,6 +73,16 @@
             </x-ui.alert>
         @endunless
 
+        @if($maintenance->isOwnerlessRecord())
+            <x-ui.alert variant="info" role="status" class="mb-6" title="Registro sem proprietário no RevisaLog" data-ownerless-notice>
+                O carro ainda não tem proprietário. Notas fiscais e fotos desta OS ficam só com a sua oficina até o proprietário aceitar; sem resposta em {{ config('maintenance.pending_attachments_retention_days', 90) }} dias, elas são apagadas. O histórico público mostra apenas data, quilometragem, serviço, peças e o nome da oficina.
+            </x-ui.alert>
+        @endif
+
+        @if($canInvite)
+            @include('workshop.maintenances._invite-card', ['maintenance' => $maintenance, 'invite' => $invite])
+        @endif
+
         @include('maintenances._detail', [
             'maintenance' => $maintenance,
             'portal' => \App\Enums\Portal::Workshop,

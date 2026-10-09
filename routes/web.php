@@ -24,6 +24,7 @@ use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceCo
 use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\LegalController;
+use App\Http\Controllers\Web\MaintenanceInviteController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OutreachController;
 use App\Http\Controllers\Web\PublicVehicleController;
@@ -33,8 +34,10 @@ use App\Http\Controllers\Web\User\MaintenanceController as UserMaintenanceContro
 use App\Http\Controllers\Web\User\VehicleController as UserVehicleController;
 use App\Http\Controllers\Web\User\VehiclePdfExportDownloadController;
 use App\Http\Controllers\Web\User\WorkshopDirectoryController;
+use App\Http\Controllers\Web\User\WorkshopRecordController as UserWorkshopRecordController;
 use App\Http\Controllers\Web\Workshop\DashboardController as WorkshopDashboardController;
 use App\Http\Controllers\Web\Workshop\MaintenanceController as WorkshopMaintenanceController;
+use App\Http\Controllers\Web\Workshop\MaintenanceInviteController as WorkshopMaintenanceInviteController;
 use App\Http\Controllers\Web\Workshop\MessageTemplateController as WorkshopMessageTemplateController;
 use App\Http\Controllers\Web\Workshop\ProfileController as WorkshopProfileController;
 use App\Http\Controllers\Web\Workshop\ReviewController as WorkshopReviewController;
@@ -58,6 +61,14 @@ Route::middleware('signed')->group(function () {
     Route::get('/descadastrar/{token}', [OutreachController::class, 'showUnsubscribe'])->name('outreach.unsubscribe.show');
     Route::post('/descadastrar/{token}', [OutreachController::class, 'unsubscribe'])->name('outreach.unsubscribe.perform');
 });
+// Convite que a oficina manda ao cliente de um carro sem proprietário (WhatsApp ou e-mail).
+Route::middleware('signed')->group(function () {
+    Route::get('/convite/descadastrar', [MaintenanceInviteController::class, 'showUnsubscribe'])->name('invites.unsubscribe.show');
+    Route::post('/convite/descadastrar', [MaintenanceInviteController::class, 'unsubscribe'])->name('invites.unsubscribe.perform');
+});
+Route::get('/convite/{token}', [MaintenanceInviteController::class, 'show'])
+    ->middleware('throttle:search')
+    ->name('invites.show');
 Route::post('/contato', [ContactController::class, 'store'])
     ->middleware('throttle:contact')
     ->name('contact.store');
@@ -76,6 +87,9 @@ Route::get('/verificar', [\App\Http\Controllers\Web\PublicVerificationController
 Route::get('/v/{code}', [\App\Http\Controllers\Web\PublicVerificationController::class, 'show'])
     ->middleware('throttle:search')
     ->name('verification.show');
+Route::get('/v/{code}/sou-o-dono', [\App\Http\Controllers\Web\PublicVerificationController::class, 'startOwnerSignup'])
+    ->middleware('throttle:search')
+    ->name('verification.claim');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginHub'])->name('login');
@@ -166,6 +180,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->whereNumber('maintenance')
             ->name('maintenances.destroy');
         Route::get('/oficinas', [WorkshopDirectoryController::class, 'index'])->name('workshops.index');
+        Route::get('/registros-de-oficinas', [UserWorkshopRecordController::class, 'index'])->name('workshop-records.index');
+        Route::post('/registros-de-oficinas/{maintenance}', [UserWorkshopRecordController::class, 'decide'])
+            ->whereNumber('maintenance')
+            ->name('workshop-records.decide');
     });
 
     Route::prefix('garagem')->middleware('user.type:garage')->name('garage.')->group(function () {
@@ -214,6 +232,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'show'])
             ->whereNumber('maintenance')
             ->name('maintenances.show');
+        Route::post('/manutencoes/{maintenance}/convite/whatsapp', [WorkshopMaintenanceInviteController::class, 'whatsapp'])
+            ->whereNumber('maintenance')
+            ->middleware('throttle:30,1')
+            ->name('maintenances.invite.whatsapp');
+        Route::post('/manutencoes/{maintenance}/convite/email', [WorkshopMaintenanceInviteController::class, 'email'])
+            ->whereNumber('maintenance')
+            ->middleware('throttle:30,1')
+            ->name('maintenances.invite.email');
         Route::get('/manutencoes/{maintenance}/editar', [WorkshopMaintenanceController::class, 'edit'])
             ->whereNumber('maintenance')
             ->name('maintenances.edit');

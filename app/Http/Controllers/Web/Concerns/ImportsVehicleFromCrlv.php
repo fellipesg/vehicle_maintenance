@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Concerns;
 
+use App\Models\Maintenance;
 use App\Models\Vehicle;
 use App\Rules\CrlvPdfFile;
 use App\Services\Crlv\CrlvExerciseValidator;
@@ -147,6 +148,7 @@ trait ImportsVehicleFromCrlv
         $vehicle->loadCount([
             'maintenances',
             'maintenances as verified_maintenances_count' => fn ($query) => $query->whereNotNull('verified_at'),
+            'maintenances as awaiting_decision_maintenances_count' => fn ($query) => $query->where('owner_status', Maintenance::OWNER_PENDING),
         ]);
 
         return view('vehicles.entry.claim', [

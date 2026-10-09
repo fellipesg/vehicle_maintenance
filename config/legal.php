@@ -10,9 +10,9 @@ return [
 
     'support_email' => env('MAIL_SUPPORT_ADDRESS', env('MAIL_REPLY_TO_ADDRESS', 'suporte@revisalog.com.br')),
 
-    'terms_version' => '2026-09-21',
+    'terms_version' => '2026-10-10',
 
-    'privacy_version' => '2026-10-09',
+    'privacy_version' => '2026-10-10',
 
     'terms_of_use' => <<<'TEXT'
 Termos de Uso — RevisaLog
@@ -34,10 +34,13 @@ O histórico exportado ou consultado reflete exclusivamente o que foi registrado
 5. Notas fiscais e documentos
 Documentos enviados (NF-e, DANFE, CRLV) são de responsabilidade de quem os anexa. O parse automático pode conter imprecisões; confira sempre os dados antes de salvar.
 
-6. Contato
+6. Oficinas
+A oficina que registra um serviço pelo chassi, num veículo cujo proprietário ainda não tem conta, declara que informou o cliente sobre o registro, que tem base legal para registrar o serviço e que não vai colocar dados pessoais do cliente (nome, CPF, telefone, endereço ou placa) em campos de texto livre. Além da nota fiscal do serviço e das fotos do próprio serviço, não deve anexar outros documentos. Notas fiscais e fotos de um veículo sem proprietário ficam visíveis apenas à oficina até o proprietário aceitá-las, e a oficina é responsável pelo que anexa e por convidar o cliente apenas pelos canais previstos na plataforma.
+
+7. Contato
 Dúvidas, solicitações e reclamações: suporte@revisalog.com.br ou a página de contato em revisalog.com.br/contato.
 
-7. Aceite
+8. Aceite
 Ao marcar que leu e aceita estes termos, você confirma ciência das condições acima e concorda em mantê-las atualizadas conforme alterações futuras publicadas nesta versão.
 TEXT,
 
@@ -69,26 +72,33 @@ O tratamento é feito pela RevisaLog, identificada no rodapé do site. Para exer
 4. O histórico fica com o veículo
 O histórico de manutenções é vinculado ao veículo (chassi/VIN), não ao proprietário. Quando o veículo muda de dono, o novo proprietário passa a ver os registros de manutenção anteriores, mas não os seus dados pessoais de cadastro (nome, e-mail, telefone, documento ou endereço).
 
-5. Compartilhamento
+5. Registros de oficinas em veículos sem conta
+Uma oficina pode registrar um serviço pelo chassi num veículo cujo proprietário ainda não tem conta no RevisaLog. Nesse caso:
+- Criamos o veículo apenas com chassi, marca, modelo e ano. Não guardamos placa, RENAVAM, nome, CPF, telefone nem endereço do proprietário. Esse registro mínimo (data, quilometragem, tipo de serviço, peças e nome da oficina) se apoia no legítimo interesse (LGPD, art. 7º, IX) de manter o histórico do veículo.
+- Notas fiscais e fotos podem conter dados pessoais (nome, CPF, endereço, placa, pessoas). Por isso ficam como anexos pendentes: só a oficina os vê, nunca aparecem na consulta pública, no histórico nem para outras contas, e só entram no histórico se o proprietário, com a propriedade confirmada pelo CRLV-e, aceitar. Anexos não aceitos em 90 dias são apagados automaticamente; se o proprietário recusar, são apagados na hora.
+- Quando o proprietário chega, ele escolhe: vincular o registro ao seu histórico, aceitar ou não os anexos e ocultar o registro do histórico público (direito de oposição, LGPD, art. 18, § 2º). Ele pode mudar o ocultar e revogar o consentimento dos anexos depois, e os arquivos são apagados.
+- Para avisar o cliente, a oficina pode enviar um convite por WhatsApp, do próprio celular dela (não guardamos o telefone), ou por e-mail. No e-mail enviamos uma única mensagem por serviço, guardamos apenas uma marca irreversível (hash) do endereço para não repetir o envio e respeitamos o pedido de não receber mais mensagens, que é permanente. O convite nunca inclui placa nem chassi.
+
+6. Compartilhamento
 Não vendemos seus dados. Compartilhamos apenas o necessário com:
 - Oficinas e lojistas, que veem os dados do veículo e das manutenções no contexto do serviço;
 - Prestadores de infraestrutura que operam em nosso nome: Laravel Cloud (hospedagem), Cloudflare (rede, DNS, armazenamento de arquivos e recebimento de e-mail), Resend (envio de e-mail), Google Firebase (notificações push), Google Analytics (medição de uso das páginas públicas) e OpenStreetMap/Nominatim (geolocalização de endereços);
 - Autoridades públicas, quando exigido por lei ou ordem judicial.
 Alguns desses prestadores armazenam dados fora do Brasil, com as salvaguardas previstas no art. 33 da LGPD.
 
-6. Conservação
+7. Conservação
 Mantemos os dados enquanto a conta estiver ativa e o histórico do veículo for necessário ao serviço, ou pelo prazo exigido por lei. Você pode excluir a conta no aplicativo (Configurações → Excluir conta) ou pelo e-mail de suporte. Ao excluir a conta, apagamos ou anonimizamos os dados pessoais, exceto os que precisamos manter por obrigação legal. Os registros de manutenção continuam vinculados ao veículo, sem identificar você.
 
-7. Seus direitos
+8. Seus direitos
 Você pode solicitar confirmação de tratamento, acesso, correção, anonimização, bloqueio ou eliminação, portabilidade, informação sobre compartilhamentos e revogação de consentimento, quando aplicável. No aplicativo, a exclusão da conta está em Configurações → Excluir conta. Envie o pedido para suporte@revisalog.com.br; respondemos em até 15 dias. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
 
-8. Segurança
+9. Segurança
 Usamos conexão criptografada (HTTPS), senhas armazenadas de forma irreversível, verificação em duas etapas e controle de acesso por perfil. Nenhum sistema é isento de risco; se houver um incidente relevante, avisaremos você e a ANPD. Evite reutilizar senhas e proteja o acesso à sua conta.
 
-9. Cookies
+10. Cookies
 Usamos cookies essenciais para manter a sua sessão e proteger os formulários. Nas páginas públicas, usamos também cookies de medição do Google Analytics (_ga e similares, guardados por até 2 anos) para contar visitas e cliques de forma agregada. Eles não são usados nas áreas logadas. Não usamos cookies de publicidade: os sinais do Google e a personalização de anúncios ficam desligados. Você pode bloquear ou apagar esses cookies nas configurações do navegador sem perder o acesso ao site.
 
-10. Alterações
+11. Alterações
 Esta política pode ser atualizada. A versão vigente, com a data, é a publicada em revisalog.com.br/privacidade; em caso de mudança relevante, avisaremos você.
 TEXT,
 

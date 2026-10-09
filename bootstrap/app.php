@@ -31,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         // Descadastro de um clique (RFC 8058): o provedor de e-mail faz o POST sem sessão; a URL assinada protege.
-        $middleware->validateCsrfTokens(except: ['descadastrar/*']);
+        $middleware->validateCsrfTokens(except: ['descadastrar/*', 'convite/descadastrar/*']);
 
         $middleware->append(\App\Http\Middleware\SetSecurityHeaders::class);
 

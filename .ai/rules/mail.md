@@ -17,3 +17,6 @@ E-mails use the 'revisalog' theme (resources/views/vendor/mail/html/themes/revis
 
 ## Comunicados únicos aos usuários
 `users:announce-ios-app` envia o aviso do app iOS (IosAppLaunchedMail, noreply@) uma vez por usuário, registrando em user_announcements; oficinas e contas de domínios reservados (.test, .invalid, example.com) ficam de fora. Envia em sequência com pausa (--pause-ms) por causa do limite do Resend, e falha não é registrada, para a próxima rodada tentar de novo. Rode antes com --dry-run.
+
+## Convite ao cliente (CustomerInviteMail)
+Sai pelo mailer padrão (transacional), na fila, nunca pelo mailer de outreach. Texto: oficina, marca/modelo/ano, data e link /convite/{token}; sem placa nem chassi. Traz "Você recebeu esta mensagem porque a oficina {nome} registrou um serviço no seu carro", List-Unsubscribe e link assinado /convite/descadastrar (e-mail criptografado na query) que grava em email_suppressions.

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\WarrantyScope;
 use App\Enums\WorkshopReviewStatus;
 use App\Support\DisplayTime;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +15,22 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Maintenance extends Model
 {
     use HasFactory;
+
+    public const OWNER_PENDING = 'pending';
+
+    public const OWNER_LINKED = 'linked';
+
+    public const OWNER_DECLINED = 'declined';
+
+    public const ATTACHMENTS_NONE = 'none';
+
+    public const ATTACHMENTS_PENDING = 'pending';
+
+    public const ATTACHMENTS_ACCEPTED = 'accepted';
+
+    public const ATTACHMENTS_DECLINED = 'declined';
+
+    public const ATTACHMENTS_REVOKED = 'revoked';
 
     protected $fillable = [
         'vehicle_id',
@@ -35,11 +52,105 @@ class Maintenance extends Model
             'maintenance_date' => 'date',
             'is_manufacturer_required' => 'boolean',
             'verified_at' => 'datetime',
+            'hidden_from_public_at' => 'datetime',
+            'owner_decided_at' => 'datetime',
             'workshop_review_status' => WorkshopReviewStatus::class,
             'workshop_reviewed_at' => 'datetime',
             'workshop_review_requested_at' => 'datetime',
             'workshop_review_reminded_at' => 'datetime',
         ];
+    }
+
+    /**
+     * A OS nasceu num carro sem proprietário e depende da decisão dele (owner_status não nulo).
+     */
+    public function isOwnerlessRecord(): bool
+    {
+        return $this->owner_status !== null;
+    }
+
+    public function isHiddenFromPublic(): bool
+    {
+        return $this->hidden_from_public_at !== null;
+    }
+
+    /**
+     * Quem a registrou: a conta da oficina que criou a OS.
+     */
+    public function isCreatedByWorkshopOf(?User $user): bool
+    {
+        return $user !== null
+            && $user->isWorkshop()
+            && $user->workshop !== null
+            && $this->workshop_id !== null
+            && (int) $this->workshop_id === (int) $user->workshop->id;
+    }
+
+    /**
+     * Descrição livre, valores e anexos ficam só com a oficina enquanto o proprietário não vinculou
+     * (ou depois que recusou). Só a oficina que fez a OS vê o registro completo.
+     */
+    public function hidesDetailsFrom(?User $viewer): bool
+    {
+        return in_array($this->owner_status, [self::OWNER_PENDING, self::OWNER_DECLINED], true)
+            && ! $this->isCreatedByWorkshopOf($viewer);
+    }
+
+    /**
+     * Notas e fotos de uma OS sem dono só aparecem para outros depois do aceite do proprietário.
+     */
+    public function hidesAttachmentsFrom(?User $viewer): bool
+    {
+        return $this->isOwnerlessRecord()
+            && $this->attachments_status !== self::ATTACHMENTS_ACCEPTED
+            && ! $this->isCreatedByWorkshopOf($viewer);
+    }
+
+    /**
+     * Fora da consulta pública e do histórico: oculta pelo proprietário (direito de oposição). Só
+     * a oficina autora e quem ocultou ainda a veem.
+     */
+    public function hiddenFrom(?User $viewer): bool
+    {
+        return $this->isHiddenFromPublic()
+            && ! $this->isCreatedByWorkshopOf($viewer)
+            && ! ($viewer !== null && (int) $this->owner_decided_by_user_id === (int) $viewer->id);
+    }
+
+    /**
+     * Registros que o histórico e a consulta pública mostram a este leitor (null = visitante).
+     */
+    public function scopeVisibleInHistoryTo(Builder $query, ?User $viewer): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->where(function (Builder $query) use ($table, $viewer): void {
+            $query->whereNull($table.'.hidden_from_public_at');
+
+            if ($viewer === null) {
+                return;
+            }
+
+            $query->orWhere($table.'.owner_decided_by_user_id', $viewer->id);
+
+            if ($viewer->isWorkshop() && $viewer->workshop !== null) {
+                $query->orWhere($table.'.workshop_id', $viewer->workshop->id);
+            }
+        });
+    }
+
+    /**
+     * Anexos ainda sem consentimento: enviar nota ou foto numa OS sem dono volta o status a pending.
+     */
+    public function markAttachmentsPendingIfNeeded(): void
+    {
+        if (! $this->isOwnerlessRecord() || $this->attachments_status === self::ATTACHMENTS_ACCEPTED) {
+            return;
+        }
+
+        if ($this->attachments_status !== self::ATTACHMENTS_PENDING) {
+            $this->forceFill(['attachments_status' => self::ATTACHMENTS_PENDING])->saveQuietly();
+        }
     }
 
     public function isVerified(): bool
@@ -241,6 +352,11 @@ class Maintenance extends Model
     {
         return $this->hasOne(MaintenanceWarranty::class)
             ->where('scope', WarrantyScope::Order);
+    }
+
+    public function invite(): HasOne
+    {
+        return $this->hasOne(MaintenanceInvite::class);
     }
 
     public function publicPhotos(): HasMany

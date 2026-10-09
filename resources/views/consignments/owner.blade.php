@@ -18,7 +18,7 @@
     <x-ui.container size="md" padded>
         <x-ui.page-header
             title="Seu veículo está em consignação"
-            :description="'A loja '.$consignment->garageUser->name.' informou que está com o seu '.$vehicleName.' ('.$vehicle->license_plate.') para venda desde '.$consignment->started_at->format('d/m/Y').'.'"
+            :description="'A loja '.$consignment->garageUser->name.' informou que está com o seu '.$vehicleName.(filled($vehicle->license_plate) ? ' ('.$vehicle->license_plate.')' : '').' para venda desde '.$consignment->started_at->format('d/m/Y').'.'"
         />
 
         @if($consignment->isDisputed())

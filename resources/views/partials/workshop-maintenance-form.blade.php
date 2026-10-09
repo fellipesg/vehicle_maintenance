@@ -70,7 +70,7 @@
             </x-ui.field>
         </div>
 
-        <x-ui.field name="description" label="Descrição" optional hint="O que o cliente precisa saber: diagnóstico, recomendações, próxima revisão.">
+        <x-ui.field name="description" label="Descrição" optional hint="O que o cliente precisa saber: diagnóstico, recomendações, próxima revisão. Não inclua nome, CPF, telefone ou placa do cliente.">
             <x-ui.textarea :value="$maintenance?->description" rows="4" autosize />
         </x-ui.field>
 
@@ -80,6 +80,11 @@
     </x-ui.form-section>
 
     <x-ui.form-section id="secao-notas" :number="3" title="Notas fiscais" description="Anexe a NF-e antes de listar as peças: com a lista de peças vazia, os itens do XML entram sozinhos na OS.">
+        @if($vehicle === null || ! $vehicle->hasCurrentOwner())
+            <x-ui.alert variant="info" data-ownerless-attachments-notice>
+                Notas fiscais e fotos ficam pendentes e só a oficina vê. São apagadas se o cliente recusar ou se ele não aceitar em {{ config('maintenance.pending_attachments_retention_days', 90) }} dias.
+            </x-ui.alert>
+        @endif
         @if($maintenance && $maintenance->relationLoaded('invoices') && $maintenance->invoices->isNotEmpty())
             <div class="space-y-2">
                 <p class="text-sm font-medium text-foreground">Já anexadas</p>

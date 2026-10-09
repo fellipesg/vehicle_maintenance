@@ -2,7 +2,9 @@
 
 namespace App\Services\Vehicle;
 
+use App\Models\User;
 use App\Models\Vehicle;
+use App\Support\Maintenance\MaintenanceRedactor;
 
 class VehicleTimelineBuilder
 {
@@ -20,7 +22,7 @@ class VehicleTimelineBuilder
      *     reminder: array<string, mixed>
      * }
      */
-    public function build(Vehicle $vehicle): array
+    public function build(Vehicle $vehicle, ?User $viewer = null): array
     {
         // loadMissing, não load: quem já pré-carregou um histórico limitado (Vehicle::restrictHistoryTo,
         // para o lojista em consignação) não pode ter essa restrição desfeita aqui.
@@ -31,13 +33,18 @@ class VehicleTimelineBuilder
             'maintenances.invoices',
         ]);
 
+        // OS de oficina sem proprietário: forma mínima para quem não é a oficina autora, e as
+        // ocultadas pelo proprietário saem (MaintenanceRedactor).
+        $viewer ??= auth()->user();
+        $maintenances = MaintenanceRedactor::redactAll($vehicle->maintenances, $viewer);
+
         $events = [];
         $currentKm = (int) ($vehicle->current_kilometers ?? 0);
 
-        $registration = $this->resolveRegistrationAnchor($vehicle);
+        $registration = $this->resolveRegistrationAnchor($vehicle, $maintenances);
 
         if ($registration !== null) {
-            $hasMaintenanceAtSameKm = $vehicle->maintenances->contains(
+            $hasMaintenanceAtSameKm = $maintenances->contains(
                 fn ($maintenance) => $maintenance->kilometers !== null
                     && (int) $maintenance->kilometers === $registration['kilometers'],
             );
@@ -56,7 +63,7 @@ class VehicleTimelineBuilder
             }
         }
 
-        foreach ($vehicle->maintenances as $maintenance) {
+        foreach ($maintenances as $maintenance) {
             if ($maintenance->kilometers === null) {
                 continue;
             }
@@ -168,7 +175,7 @@ class VehicleTimelineBuilder
     /**
      * @return array{kilometers: int, date: string|null}|null
      */
-    private function resolveRegistrationAnchor(Vehicle $vehicle): ?array
+    private function resolveRegistrationAnchor(Vehicle $vehicle, \Illuminate\Support\Collection $maintenances): ?array
     {
         if ($vehicle->odometer_at_registration !== null) {
             return [
@@ -177,7 +184,7 @@ class VehicleTimelineBuilder
             ];
         }
 
-        $firstMaintenance = $vehicle->maintenances
+        $firstMaintenance = $maintenances
             ->filter(fn ($maintenance) => $maintenance->kilometers !== null)
             ->sortBy('kilometers')
             ->first();

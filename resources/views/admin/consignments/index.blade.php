@@ -27,7 +27,7 @@
                     <div class="min-w-0 text-sm">
                         <p class="font-semibold text-foreground">
                             {{ $consignment->vehicle->brand }} {{ $consignment->vehicle->model }}
-                            <span class="font-mono tracking-wider text-muted-foreground">{{ $consignment->vehicle->license_plate }}</span>
+                            <span class="font-mono tracking-wider text-muted-foreground">{{ $consignment->vehicle->license_plate ?? 'Placa não informada' }}</span>
                         </p>
                         <p class="mt-1 text-muted-foreground">
                             Loja: <span class="font-medium text-foreground">{{ $consignment->garageUser->name }}</span>

@@ -44,3 +44,6 @@ WorkshopProspectImporter confere CNPJ, supressão, clientes e e-mails repetidos 
 
 ## Teste de envio e rótulo no painel
 `php artisan outreach:send-test {emails*} [--follow-up] [--name=]` manda o convite real pelo mailer de outreach para e-mails de teste, sem gravar prospecto, sem fila e sem contar no limite, mesmo com a prospecção desligada (em produção: `cloud command:run production --cmd=...`). O painel mostra "Sem nome fantasia" e as mensagens do admin citam "Oficina CNPJ ..." (WorkshopProspect::adminLabel); "sua oficina" é só para o texto do e-mail.
+
+## Convite do cliente reaproveita email_suppressions
+O convite da OS (MaintenanceInviteService) confere email_suppressions antes de enviar e o descadastro dele escreve ali (motivo unsubscribed). Um e-mail por OS e no máximo maintenance.invite_email_daily_limit (30) por oficina em 24 h. Guardamos só sha256 do e-mail minúsculo; WhatsApp guarda só a data e o telefone nunca é gravado.

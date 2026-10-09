@@ -28,6 +28,11 @@ class StoreVehicleRequest extends ApiFormRequest
     public function rules(): array
     {
         $year = (int) $this->input('year', date('Y'));
+        $chassisUnique = Rule::unique('vehicles', 'chassis');
+
+        if ($this->unclaimedWorkshopVehicle() !== null) {
+            $chassisUnique->ignore($this->unclaimedWorkshopVehicle()->id);
+        }
 
         return [
             'license_plate' => 'required|string|max:10|unique:vehicles,license_plate',
@@ -36,13 +41,30 @@ class StoreVehicleRequest extends ApiFormRequest
             'model' => 'required|string|max:100',
             'year' => 'required|integer|min:1900|max:'.(date('Y') + 1),
             'color' => 'nullable|string|max:50',
-            'chassis' => ['required', 'string', 'max:50', Rule::unique('vehicles', 'chassis'), new Chassis($year)],
+            'chassis' => ['required', 'string', 'max:50', $chassisUnique, new Chassis($year)],
             'motorization' => 'nullable|string|max:100',
             'engine' => 'nullable|string|max:50',
             'current_kilometers' => 'required|integer|min:0|max:9999999',
             'terms_accepted' => 'required|accepted',
             'purchase_date' => 'nullable|date',
         ];
+    }
+
+    /**
+     * Veículo que uma oficina criou só pelo chassi (sem dono, placa nem RENAVAM): o chassi igual
+     * não é duplicidade, é a chegada do proprietário (VehicleOwnershipService::claimUnclaimedWorkshopVehicle).
+     */
+    public function unclaimedWorkshopVehicle(): ?\App\Models\Vehicle
+    {
+        $chassis = $this->input('chassis');
+
+        if (! is_string($chassis) || $chassis === '') {
+            return null;
+        }
+
+        $vehicle = \App\Models\Vehicle::findByChassis($chassis);
+
+        return $vehicle !== null && $vehicle->isUnclaimedWorkshopVehicle() ? $vehicle : null;
     }
 
     /**
