@@ -5,6 +5,7 @@ namespace App\Services\Vehicle;
 use App\Models\Invoice;
 use App\Models\Vehicle;
 use App\Support\AppStorage;
+use App\Support\Maintenance\MaintenanceRedactor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Adapter\CPDF;
 use Dompdf\Dompdf;
@@ -72,7 +73,9 @@ class VehicleMaintenancePdfExporter
 
         $vehicle->setRelation(
             'maintenances',
-            $vehicle->maintenances->sortByDesc('maintenance_date')->values()
+            // O PDF circula fora do RevisaLog: OS de oficina sem proprietário sai na forma mínima, sem
+            // notas nem fotos, e as ocultadas pelo proprietário não entram (MaintenanceRedactor).
+            MaintenanceRedactor::redactAll($vehicle->maintenances, null)->sortByDesc('maintenance_date')->values()
         );
 
         $temps = [];
@@ -193,7 +196,7 @@ class VehicleMaintenancePdfExporter
     {
         $base = sprintf(
             'historico_manutencoes_%s_%s_%s',
-            $vehicle->license_plate,
+            $vehicle->license_plate ?? 'sem-placa',
             $vehicle->brand,
             now()->format('Y-m-d'),
         );

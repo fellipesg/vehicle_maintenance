@@ -78,7 +78,7 @@
                 @if ($matchedBy === \App\Support\Vehicle\VehicleLookupResult::MATCH_PREVIOUS_PLATE && $previousPlateEndedAt)
                     <x-ui.alert variant="info">
                         A placa {{ \App\Support\VehiclePlateSearch::normalize($identifier) }} pertenceu a este veículo até {{ $previousPlateEndedAt->format('d/m/Y') }}.
-                        Placa atual: {{ $vehicle->license_plate }}.
+                        @if(filled($vehicle->license_plate))Placa atual: {{ $vehicle->license_plate }}.@endif
                     </x-ui.alert>
                 @endif
 

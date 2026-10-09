@@ -61,6 +61,7 @@ class PublicVerificationController extends Controller
         $maintenance = Maintenance::query()
             ->where('verification_code', $code)
             ->whereNotNull('verified_at')
+            ->whereNull('hidden_from_public_at')
             ->with('verifiedWorkshop', 'workshop', 'vehicle')
             ->first();
 

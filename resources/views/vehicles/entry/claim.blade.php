@@ -48,7 +48,7 @@
             <x-vehicle-cover :vehicle="$vehicle" />
             <div class="min-w-0 space-y-2">
                 <p class="font-semibold text-foreground">{{ $claimName }}@if($vehicle->year) <span class="font-normal text-muted-foreground">· {{ $vehicle->year }}</span>@endif</p>
-                <p class="text-sm text-muted-foreground">Placa atual <span class="font-mono font-semibold tracking-wider text-foreground">{{ $vehicle->license_plate }}</span></p>
+                <p class="text-sm text-muted-foreground">@if(filled($vehicle->license_plate))Placa atual <span class="font-mono font-semibold tracking-wider text-foreground">{{ $vehicle->license_plate }}</span>@else Placa não informada: ela vem do CRLV-e. @endif</p>
                 <div data-claim-history>
                     @if($claimTotal > 0)
                         <p class="text-sm text-foreground">{{ \App\Support\Vehicle\VehicleMaintenanceHistory::countLabel($claimTotal) }} no histórico, que passa a aparecer para você:</p>

@@ -542,7 +542,7 @@
                                 <tr>
                                     <td>
                                         <span class="info-label">Placa atual:</span>
-                                        <span class="info-value">{{ $vehicle->license_plate }}</span>
+                                        <span class="info-value">{{ filled($vehicle->license_plate) ? $vehicle->license_plate : 'Placa não informada' }}</span>
                                     </td>
                                     <td>
                                         <span class="info-label">RENAVAM:</span>
