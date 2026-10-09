@@ -3,6 +3,7 @@
 namespace App\Services\Vehicle;
 
 use App\Models\Invoice;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Support\AppStorage;
 use App\Support\Maintenance\MaintenanceRedactor;
@@ -41,6 +42,7 @@ class VehicleMaintenancePdfExporter
     private const PAGE_FOOTER_FONT_SIZE = 7.5;
 
     /**
+     * $viewer: quem pediu o PDF, para o MaintenanceRedactor (null = qualquer pessoa de fora).
      * $maskIdentifiers: quem pediu o PDF não é o dono atual (VehiclePolicy::update), como o lojista em
      * consignação ou o admin. O PDF sai com chassi e RENAVAM parciais (VehicleIdentifierMask) e sem
      * o código do motor, a mesma regra da API e da ficha na web. Quem decide é quem enfileira o PDF
@@ -54,7 +56,7 @@ class VehicleMaintenancePdfExporter
      *     temps: list<string>
      * }
      */
-    public function generate(Vehicle $vehicle, bool $maskIdentifiers = false): array
+    public function generate(Vehicle $vehicle, bool $maskIdentifiers = false, ?User $viewer = null): array
     {
         $vehicle->load([
             'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
@@ -74,8 +76,9 @@ class VehicleMaintenancePdfExporter
         $vehicle->setRelation(
             'maintenances',
             // O PDF circula fora do RevisaLog: OS de oficina sem proprietário sai na forma mínima, sem
-            // notas nem fotos, e as ocultadas pelo proprietário não entram (MaintenanceRedactor).
-            MaintenanceRedactor::redactAll($vehicle->maintenances, null)->sortByDesc('maintenance_date')->values()
+            // notas nem fotos, e as ocultadas pelo proprietário não entram (MaintenanceRedactor). Quem
+            // pediu o PDF é o viewer: o proprietário que ocultou um registro ainda o vê no próprio PDF.
+            MaintenanceRedactor::redactAll($vehicle->maintenances, $viewer)->sortByDesc('maintenance_date')->values()
         );
 
         $temps = [];
@@ -178,9 +181,9 @@ class VehicleMaintenancePdfExporter
         });
     }
 
-    public function download(Vehicle $vehicle, bool $maskIdentifiers = false): Response
+    public function download(Vehicle $vehicle, bool $maskIdentifiers = false, ?User $viewer = null): Response
     {
-        $file = $this->generate($vehicle, $maskIdentifiers);
+        $file = $this->generate($vehicle, $maskIdentifiers, $viewer);
 
         try {
             return response($file['content'], 200, [
