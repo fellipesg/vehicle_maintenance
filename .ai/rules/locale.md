@@ -17,3 +17,6 @@ Some API messages (ApiResponse::validation, the error envelope in bootstrap/app.
 
 ## Mensagens de registros de oficinas
 Decisão do proprietário e convite respondem 422 com message em pt-BR no envelope da API (ApiResponse::error com a primeira mensagem); e-mail inválido ou suprimido usa a mesma frase genérica "Não foi possível enviar para este e-mail." para não revelar a supressão.
+
+## Servidor local com limite de upload de 20 MB
+`php artisan serve` não repassa flags `-d` ao processo filho (`php -S`), então `-d upload_max_filesize=20M` no comando dele não tem efeito e uploads acima de 2 MB falham localmente. O `composer run dev` sobe o servidor com `php -S` a partir de `public/`, usando `vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php` e as flags no próprio processo. Não volte a usar `artisan serve` com `-d` para testar upload de nota fiscal. A mensagem de erro em `StoresMaintenanceInvoices` aponta para `composer run dev`.
