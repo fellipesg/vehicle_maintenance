@@ -14,3 +14,6 @@ mail.from.address reads only MAIL_FROM_ADDRESS (default noreply@revisalog.com.br
 
 ## Markdown mail theme
 config/mail.php markdown.theme reads MAIL_MARKDOWN_THEME with default 'revisalog' and markdown.paths points to resources/views/vendor/mail. Do not set MAIL_MARKDOWN_THEME=default in production: notifications would lose the brand chrome.
+
+## Google Analytics follows the privacy policy
+GA4 (x-analytics, GA_MEASUREMENT_ID in Laravel Cloud) loads only on public pages and sets analytics_storage 'granted' with every ad signal denied (ad_storage, ad_user_data, ad_personalization, Google signals). That is legitimate interest disclosed in privacy sections 2, 3, 5 and 9 (privacy_version 2026-10-09). Measuring a portal page, turning on ad signals or adding another tracker changes the policy: update config/legal.php and bump privacy_version in the same change.

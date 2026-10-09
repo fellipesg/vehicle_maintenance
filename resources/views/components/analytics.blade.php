@@ -14,13 +14,13 @@
     $outreachRef = request()->routeIs('contact.show') && request()->filled('ref');
 @endphp
 @if ($measurementId !== '' && ($isPublicPage || $signedUp))
-    {{-- Consentimento negado por padrão: o GA4 mede sem cookies (a política de privacidade só
-         declara cookies essenciais). IP é anonimizado por padrão no GA4. --}}
+    {{-- Cookies de medição liberados (legítimo interesse, declarado na seção 9 da política de
+         privacidade); cookies e sinais de anúncios ficam negados. IP é anonimizado por padrão no GA4. --}}
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ $measurementId }}"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
-        gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+        gtag('consent', 'default', { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
         gtag('js', new Date());
         gtag('config', @json($measurementId), { allow_google_signals: false, allow_ad_personalization_signals: false, send_page_view: {{ $isPublicPage ? 'true' : 'false' }} });
         @if ($signedUp)
