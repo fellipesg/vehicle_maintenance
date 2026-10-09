@@ -123,4 +123,17 @@ class OwnerlessVisibilityTest extends TestCase
             ->assertJsonPath('data.0.hidden_from_public', true);
         $this->assertSame(Maintenance::OWNER_PENDING, $record->fresh()->owner_status);
     }
+
+    public function test_web_search_of_a_vehicle_without_owner_does_not_claim_an_unverified_registration(): void
+    {
+        $workshop = $this->workshopAccount();
+        $vehicle = $this->ownerlessVehicle();
+        $this->ownerlessRecord($workshop, $vehicle);
+
+        $this->actingAs(\App\Models\User::factory()->asUser()->create())
+            ->get(route('vehicle.search', ['identifier' => self::OWNERLESS_CHASSIS]))
+            ->assertOk()
+            ->assertSee('Fiat')
+            ->assertDontSee('data-ownership-unverified', false);
+    }
 }

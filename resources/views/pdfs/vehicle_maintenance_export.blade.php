@@ -501,13 +501,13 @@
                     </table>
 
                     <div class="cover-body">
-                        @unless($vehicle->hasVerifiedOwnership())
+                        @if($vehicle->hasCurrentOwner() && ! $vehicle->hasVerifiedOwnership())
                             <div class="ownership-unverified">
                                 <strong>Propriedade não confirmada.</strong>
                                 O veículo foi cadastrado sem o CRLV-e, então ninguém confirmou de quem ele é. As
                                 manutenções com Selo da oficina seguem confirmadas por quem prestou o serviço.
                             </div>
-                        @endunless
+                        @endif
 
                         <div class="vehicle-section-title">Informações do veículo</div>
 

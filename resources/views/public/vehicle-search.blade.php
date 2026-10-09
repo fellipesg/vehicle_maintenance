@@ -67,13 +67,13 @@
                     @endif
                 </div>
 
-                @unless ($vehicle->hasVerifiedOwnership())
+                @if ($vehicle->hasCurrentOwner() && ! $vehicle->hasVerifiedOwnership())
                     <x-ui.alert variant="warning" title="Propriedade não confirmada" data-ownership-unverified>
                         Quem cadastrou este veículo não enviou o CRLV-e, então ninguém confirmou que ele é dele.
                         As manutenções com Selo da oficina continuam valendo — elas são confirmadas por quem
                         prestou o serviço. As declaradas, não.
                     </x-ui.alert>
-                @endunless
+                @endif
 
                 @if ($matchedBy === \App\Support\Vehicle\VehicleLookupResult::MATCH_PREVIOUS_PLATE && $previousPlateEndedAt)
                     <x-ui.alert variant="info">
