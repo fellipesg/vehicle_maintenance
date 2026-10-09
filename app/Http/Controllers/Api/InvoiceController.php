@@ -36,8 +36,11 @@ class InvoiceController extends Controller
 
         try {
             $file = $request->file('file');
-            $fileName = time().'_'.$file->getClientOriginalName();
-            $filePath = $file->storeAs('invoices', $fileName, AppStorage::diskName());
+            $filePath = app(InvoiceUploadProcessor::class)->storeFile($file);
+
+            if ($filePath === null) {
+                throw new \RuntimeException('Invoice file could not be stored.');
+            }
 
             $invoice = Invoice::create([
                 'maintenance_id' => $request->maintenance_id,
