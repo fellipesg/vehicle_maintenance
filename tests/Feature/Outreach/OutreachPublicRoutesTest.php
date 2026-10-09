@@ -158,9 +158,9 @@ class OutreachPublicRoutesTest extends TestCase
             ->assertOk()
             ->assertSee('cadastro de CNPJ da Receita Federal')
             ->assertSee('no máximo duas mensagens', false)
-            ->assertSee('2026-10-05');
+            ->assertSee('2026-10-09');
 
-        $this->assertSame('2026-10-05', config('legal.privacy_version'));
+        $this->assertSame('2026-10-09', config('legal.privacy_version'));
     }
 
     public function test_suppression_helper_is_case_insensitive_and_idempotent(): void

@@ -21,7 +21,20 @@ class GoogleAnalyticsTest extends TestCase
         $this->get(route('home'))
             ->assertOk()
             ->assertSee('googletagmanager.com/gtag/js?id='.self::MEASUREMENT_ID, false)
-            ->assertSee("analytics_storage: 'denied'", false);
+            ->assertSee("analytics_storage: 'granted'", false)
+            ->assertSee("ad_storage: 'denied'", false)
+            ->assertSee('allow_google_signals: false', false);
+    }
+
+    public function test_privacy_policy_discloses_google_analytics_cookies(): void
+    {
+        $this->get(route('legal.privacy'))
+            ->assertOk()
+            ->assertSee('cookies de medição do Google Analytics', false)
+            ->assertSee('Google Analytics (medição de uso das páginas públicas)', false)
+            ->assertDontSee('Usamos apenas cookies essenciais', false);
+
+        $this->assertSame('2026-10-09', config('legal.privacy_version'));
     }
 
     public function test_script_is_rendered_on_guest_layout_pages(): void
