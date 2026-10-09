@@ -308,7 +308,10 @@
                     <x-landing.cta :href="$landingHomeUrl">Ir para o Início</x-landing.cta>
                 @endguest
             </div>
-            <p class="mt-4 text-sm text-muted-foreground">O app ainda não está nas lojas. Cadastro e consulta já funcionam no navegador do celular.</p>
+            <div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <x-landing.app-store-badge />
+                <p class="text-sm text-muted-foreground">Android em breve. No Android, cadastro e consulta já funcionam no navegador do celular.</p>
+            </div>
         </div>
         <div class="relative mx-auto flex min-h-[22rem] w-full max-w-lg items-end justify-center pb-4 sm:min-h-[32rem]">
             <x-landing.app-phone
@@ -389,7 +392,7 @@
                 Sim. Oficinas aplicam o Selo da oficina e aparecem em Oficinas da rede. Lojas registram a revisão antes da venda no próprio estoque. Para entrar na rede, <x-ui.link :href="$landingPartnershipUrl" variant="inline">fale com a equipe</x-ui.link>.
             </x-landing.faq-item>
             <x-landing.faq-item question="Tem aplicativo?">
-                Tem, com o mesmo histórico do site, mas ainda não está nas lojas. Enquanto isso, cadastro e consulta funcionam no navegador do celular.
+                Tem. O app para iPhone está na <x-ui.link :href="config('app.ios_app_store_url')" external variant="inline">App Store</x-ui.link>, com a mesma conta e o mesmo histórico do site. A versão para Android está a caminho; enquanto isso, cadastro e consulta funcionam no navegador do celular.
             </x-landing.faq-item>
         </div>
 
