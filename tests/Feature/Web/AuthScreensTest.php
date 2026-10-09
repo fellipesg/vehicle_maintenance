@@ -37,7 +37,7 @@ class AuthScreensTest extends TestCase
         return [
             'proprietário' => ['usuario', 'Área do Proprietário', 'Histórico dos seus veículos e manutenções.', 'Criar conta grátis'],
             'lojista' => ['lojista', 'Área do Lojista', 'Estoque, consignações e manutenções da sua loja.', 'Fale com a equipe'],
-            'oficina' => ['oficina', 'Área da Oficina', 'Ordens de serviço com o Selo da oficina e o perfil da sua oficina.', 'Fale com a equipe'],
+            'oficina' => ['oficina', 'Área da Oficina', 'Ordens de serviço com o Selo da oficina e o perfil da sua oficina.', 'Cadastre sua oficina'],
             'admin' => ['admin', 'Painel Administrador', 'Acesso exclusivo para a gestão da plataforma.', null],
         ];
     }

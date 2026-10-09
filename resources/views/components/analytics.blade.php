@@ -8,10 +8,10 @@
     $measurementId = trim((string) config('services.google_analytics.measurement_id'));
     $signedUp = session('analytics_event') === 'sign_up';
     $isPublicPage = request()->routeIs(
-        'home', 'blog.*', 'legal.*', 'contact.*', 'verification.*',
+        'home', 'workshops.*', 'blog.*', 'legal.*', 'contact.*', 'verification.*',
         'login', 'login.*', 'register', 'password.*',
     ) || (request()->routeIs('vehicle.search') && auth()->guest());
-    $outreachRef = request()->routeIs('contact.show') && request()->filled('ref');
+    $outreachRef = request()->routeIs('contact.show', 'workshops.landing') && request()->filled('ref');
 @endphp
 @if ($measurementId !== '' && ($isPublicPage || $signedUp))
     {{-- Cookies de medição liberados (legítimo interesse, declarado na seção 9 da política de
@@ -24,7 +24,7 @@
         gtag('js', new Date());
         gtag('config', @json($measurementId), { allow_google_signals: false, allow_ad_personalization_signals: false, send_page_view: {{ $isPublicPage ? 'true' : 'false' }} });
         @if ($signedUp)
-        gtag('event', 'sign_up', { method: 'email' });
+        gtag('event', 'sign_up', { method: '{{ session('analytics_method') === 'workshop' ? 'workshop' : 'email' }}' });
         @endif
         @if ($outreachRef)
         gtag('event', 'outreach_click', { campaign: 'workshop_prospect_invite' });

@@ -15,12 +15,12 @@ class OutreachPublicRoutesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_click_records_the_first_click_and_redirects_to_the_partnership_contact_with_the_ref(): void
+    public function test_click_records_the_first_click_and_redirects_to_the_workshop_landing_with_the_ref(): void
     {
         $prospect = WorkshopProspect::factory()->sent()->create();
 
         $this->get(route('outreach.click', $prospect->token))
-            ->assertRedirect(route('contact.show', ['assunto' => 'partnership', 'ref' => $prospect->token]));
+            ->assertRedirect(route('workshops.landing', ['ref' => $prospect->token]));
 
         $prospect->refresh();
         $this->assertSame(WorkshopProspectStatus::Clicked, $prospect->status);

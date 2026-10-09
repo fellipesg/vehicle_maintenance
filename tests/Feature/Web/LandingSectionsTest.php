@@ -310,7 +310,7 @@ class LandingSectionsTest extends TestCase
 
         $workshop = $this->element($page, '[data-landing-audience="oficina"]');
         $this->assertSame([
-            'Quero ser oficina parceira' => $partnership,
+            'Quero ser oficina parceira' => route('workshops.landing'),
             'Já tenho conta · Entrar como oficina' => route('login.oficina'),
         ], $this->linksOf($workshop));
 
@@ -327,7 +327,7 @@ class LandingSectionsTest extends TestCase
 
         $this->assertSame([], $this->linksOf($this->element($page, '[data-landing-audience="proprietario"]')));
         $this->assertSame(['Fale com a equipe' => $partnership], $this->linksOf($this->element($page, '[data-landing-audience="lojista"]')));
-        $this->assertSame(['Quero ser oficina parceira' => $partnership], $this->linksOf($this->element($page, '[data-landing-audience="oficina"]')));
+        $this->assertSame(['Quero ser oficina parceira' => route('workshops.landing')], $this->linksOf($this->element($page, '[data-landing-audience="oficina"]')));
     }
 
     public function test_calls_to_action_slide_their_arrow_only_without_reduced_motion(): void
