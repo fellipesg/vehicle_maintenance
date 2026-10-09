@@ -70,7 +70,7 @@
             </x-ui.field>
         </div>
 
-        <x-ui.field name="description" label="Descrição" optional hint="O que o cliente precisa saber: diagnóstico, recomendações, próxima revisão.">
+        <x-ui.field name="description" label="Descrição" optional hint="O que o cliente precisa saber: diagnóstico, recomendações, próxima revisão. Não inclua nome, CPF, telefone ou placa do cliente.">
             <x-ui.textarea :value="$maintenance?->description" rows="4" autosize />
         </x-ui.field>
 
