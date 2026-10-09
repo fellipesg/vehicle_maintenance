@@ -4,7 +4,7 @@
 @if($followUp)
 <p>{{ $saudacao }}</p>
 
-<p>Passando só para saber se a mensagem anterior chegou. Se a oficina quiser aparecer com o próprio nome no histórico dos carros que atende, no lançamento o RevisaLog é sem custo: <a href="{{ $link }}">{{ $link }}</a></p>
+<p>Passando só para saber se a mensagem anterior chegou. Se a oficina quiser aparecer com o próprio nome no histórico dos carros que atende, no lançamento o RevisaLog é sem custo, e a conta se cria direto neste link: <a href="{{ $link }}">{{ $link }}</a></p>
 
 <p>Se não for o momento, tudo bem. Não envio mais nada.</p>
 
@@ -20,7 +20,7 @@
 
 <p>No lançamento, a oficina usa o RevisaLog sem custo. Se no futuro houver planos pagos, avisamos com antecedência, e nada é cobrado sem a oficina contratar.</p>
 
-<p>Se fizer sentido, é só responder este e-mail ou deixar seu contato aqui: <a href="{{ $link }}">{{ $link }}</a></p>
+<p>Se fizer sentido, a oficina pode criar a conta direto neste link, em poucos minutos: <a href="{{ $link }}">{{ $link }}</a><br>Ou é só responder este e-mail.</p>
 
 <p>Abraço,<br>{{ $assinatura }}<br>RevisaLog · revisalog.com.br</p>
 

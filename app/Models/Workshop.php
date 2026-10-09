@@ -21,6 +21,7 @@ class Workshop extends Model
         'user_id',
         'tenant_id',
         'name',
+        'cnpj',
         'phone',
         'whatsapp',
         'email',

@@ -30,13 +30,14 @@ class AuthPagesGuidanceTest extends TestCase
             ->assertSee('Fale com a equipe');
     }
 
-    public function test_oficina_login_points_to_partnership_contact(): void
+    public function test_oficina_login_points_to_the_workshop_landing(): void
     {
         $this->get('/login/oficina')
             ->assertOk()
             ->assertDontSee('href="'.route('register').'"', false)
             ->assertSee('Quer trazer sua oficina para a RevisaLog?')
-            ->assertSee('href="'.route('contact.show', ['assunto' => 'partnership']).'"', false);
+            ->assertSee('Cadastre sua oficina')
+            ->assertSee('href="'.route('workshops.landing').'"', false);
     }
 
     public function test_usuario_login_keeps_owner_signup_link(): void
@@ -191,6 +192,9 @@ class AuthPagesGuidanceTest extends TestCase
             ->assertOk()
             ->assertSee('Crie sua conta de proprietário')
             ->assertSee('Conta gratuita para proprietários de veículos.')
+            ->assertSee('Tem uma oficina?')
+            ->assertSee('href="'.route('workshops.landing').'"', false)
+            ->assertSee('Lojista?')
             ->assertSee('href="'.route('contact.show', ['assunto' => 'partnership']).'"', false)
             ->assertSee('Ao criar a conta, você aceita os')
             ->assertSee('href="'.route('legal.terms').'"', false)

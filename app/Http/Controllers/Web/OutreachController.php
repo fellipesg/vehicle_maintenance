@@ -10,7 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 /**
- * Links do e-mail de prospecção: clique (leva ao contato de parceria com a origem) e descadastro.
+ * Links do e-mail de prospecção: clique (leva à página para oficinas com a origem) e descadastro.
  */
 class OutreachController extends Controller
 {
@@ -30,7 +30,7 @@ class OutreachController extends Controller
 
         $prospect->save();
 
-        return redirect()->route('contact.show', ['assunto' => 'partnership', 'ref' => $prospect->token]);
+        return redirect()->route('workshops.landing', ['ref' => $prospect->token]);
     }
 
     public function showUnsubscribe(string $token): View

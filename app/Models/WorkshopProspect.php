@@ -67,6 +67,18 @@ class WorkshopProspect extends Model
         });
     }
 
+    /**
+     * A prospect do link do e-mail (/o/{token} leva o token em ?ref=). Qualquer outro valor não acha nada.
+     */
+    public static function fromRef(mixed $ref): ?self
+    {
+        if (! is_string($ref) || $ref === '' || mb_strlen($ref) > 64) {
+            return null;
+        }
+
+        return self::query()->where('token', $ref)->first();
+    }
+
     public function workshop(): BelongsTo
     {
         return $this->belongsTo(Workshop::class);

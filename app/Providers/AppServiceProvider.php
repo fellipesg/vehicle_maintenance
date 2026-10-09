@@ -60,7 +60,7 @@ class AppServiceProvider extends ServiceProvider
             $request,
             fn (Request $request, array $headers) => redirect()
                 ->back()
-                ->withInput($request->only('email', 'name', 'phone', 'document'))
+                ->withInput($request->only('email', 'name', 'phone', 'document', 'trade_name', 'cnpj', 'ref'))
                 ->withErrors([
                     'email' => $this->tooManyAttemptsMessage($headers),
                 ]),
@@ -162,12 +162,12 @@ class AppServiceProvider extends ServiceProvider
 
     private function isLoginRequest(Request $request): bool
     {
-        return ! $request->is('api/v1/register', 'register', 'api/v1/auth/*/callback', 'api/v1/auth/apple');
+        return ! $request->is('api/v1/register', 'register', 'para-oficinas/cadastro', 'api/v1/auth/*/callback', 'api/v1/auth/apple');
     }
 
     private function authRateLimitKey(Request $request): string
     {
-        if ($request->is('api/v1/register', 'register')) {
+        if ($request->is('api/v1/register', 'register', 'para-oficinas/cadastro')) {
             return 'register|'.$request->ip();
         }
 

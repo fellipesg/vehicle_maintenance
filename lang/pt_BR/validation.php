@@ -182,6 +182,9 @@ return [
         'email' => [
             'unique' => 'Este e-mail já está cadastrado.',
         ],
+        'cnpj' => [
+            'unique' => 'Já existe uma oficina cadastrada com este CNPJ. Se ela é sua, entre na sua conta ou fale com a equipe.',
+        ],
         'license_plate' => [
             'unique' => 'Esta placa já está cadastrada.',
         ],
@@ -217,6 +220,8 @@ return [
         'phone' => 'telefone',
         'whatsapp' => 'WhatsApp',
         'document' => 'CPF ou CNPJ',
+        'cnpj' => 'CNPJ',
+        'trade_name' => 'nome fantasia',
         'user_type' => 'tipo de conta',
         'portal' => 'área de acesso',
         'terms_accepted' => 'termos de uso',

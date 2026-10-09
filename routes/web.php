@@ -39,6 +39,8 @@ use App\Http\Controllers\Web\Workshop\MessageTemplateController as WorkshopMessa
 use App\Http\Controllers\Web\Workshop\ProfileController as WorkshopProfileController;
 use App\Http\Controllers\Web\Workshop\ReviewController as WorkshopReviewController;
 use App\Http\Controllers\Web\Workshop\WarrantyTemplateController as WorkshopWarrantyTemplateController;
+use App\Http\Controllers\Web\WorkshopLandingController;
+use App\Http\Controllers\Web\WorkshopSignupController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -50,6 +52,7 @@ Route::get('/blog/categoria/{category}', [BlogController::class, 'category'])->n
 Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
+Route::get('/para-oficinas', WorkshopLandingController::class)->name('workshops.landing');
 Route::get('/o/{token}', [OutreachController::class, 'click'])->middleware('throttle:search')->name('outreach.click');
 Route::middleware('signed')->group(function () {
     Route::get('/descadastrar/{token}', [OutreachController::class, 'showUnsubscribe'])->name('outreach.unsubscribe.show');
@@ -86,6 +89,10 @@ Route::middleware('guest')->group(function () {
         ->name('login.submit');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-web');
+    Route::get('/para-oficinas/cadastro', [WorkshopSignupController::class, 'show'])->name('workshops.signup');
+    Route::post('/para-oficinas/cadastro', [WorkshopSignupController::class, 'store'])
+        ->middleware('throttle:auth-web')
+        ->name('workshops.signup.store');
 
     // Recuperação de senha (Password broker). O limite de tentativas fica no controller, com aviso em pt-BR.
     Route::get('/esqueci-senha', [PasswordResetController::class, 'create'])->name('password.request');

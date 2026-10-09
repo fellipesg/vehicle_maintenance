@@ -222,7 +222,7 @@ class AuthController extends Controller
                 'title' => 'Área da Oficina',
                 'subtitle' => 'Ordens de serviço com o Selo da oficina e o perfil da sua oficina.',
                 'icon' => 'wrench-screwdriver',
-                'footer' => ['prompt' => 'Quer trazer sua oficina para a RevisaLog?', 'label' => 'Fale com a equipe', 'url' => $partnershipUrl],
+                'footer' => ['prompt' => 'Quer trazer sua oficina para a RevisaLog?', 'label' => 'Cadastre sua oficina', 'url' => route('workshops.landing')],
             ],
             Portal::Owner => [
                 'title' => 'Área do Proprietário',
