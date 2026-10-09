@@ -25,6 +25,11 @@ class MaintenancePolicy
      */
     public function view(User $user, Maintenance $maintenance): bool
     {
+        // Ocultada pelo proprietário (direito de oposição): só a oficina autora e quem ocultou.
+        if ($maintenance->hiddenFrom($user)) {
+            return false;
+        }
+
         if ($user->isWorkshop() && $user->workshop) {
             return $maintenance->workshop_id === $user->workshop->id;
         }
