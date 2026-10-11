@@ -164,8 +164,8 @@ class PortalTest extends TestCase
         $usersMap = collect(Portal::Admin->navigationItems($this->requestFor(route('admin.maps.users', absolute: false))))
             ->firstWhere('label', 'Cadastros')['items'];
 
-        $this->assertSame(['Usuários' => false, 'Oficinas' => true, 'Prospecção' => false], array_column($workshopsMap, 'active', 'label'));
-        $this->assertSame(['Usuários' => true, 'Oficinas' => false, 'Prospecção' => false], array_column($usersMap, 'active', 'label'));
+        $this->assertSame(['Usuários' => false, 'Lojas' => false, 'Oficinas' => true, 'Prospecção' => false], array_column($workshopsMap, 'active', 'label'));
+        $this->assertSame(['Usuários' => true, 'Lojas' => false, 'Oficinas' => false, 'Prospecção' => false], array_column($usersMap, 'active', 'label'));
     }
 
     public function test_navigation_items_resolve_hrefs_and_mark_the_active_route_family(): void

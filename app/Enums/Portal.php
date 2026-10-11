@@ -198,6 +198,7 @@ enum Portal: string
                 // fica na própria página, e cada mapa ativa o item da lista dele.
                 ['label' => 'Cadastros', 'items' => [
                     self::item('Usuários', 'admin.users.index', 'users', ['admin.users.*', 'admin.maps.users']),
+                    self::item('Lojas', 'admin.garages.index', 'building-office-2', ['admin.garages.*']),
                     self::item('Oficinas', 'admin.workshops.index', 'building-storefront', ['admin.workshops.*', 'admin.maps.workshops']),
                     self::item('Prospecção', 'admin.outreach.index', 'envelope', ['admin.outreach.*']),
                 ]],

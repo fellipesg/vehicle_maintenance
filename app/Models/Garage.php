@@ -76,6 +76,14 @@ class Garage extends Model
     }
 
     /**
+     * Quem decidiu a análise.
+     */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /**
      * CNPJ só com dígitos, para comparar com o documento do dono lido no CRLV-e.
      */
     public function normalizedDocument(): ?string

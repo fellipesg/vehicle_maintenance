@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryCo
 use App\Http\Controllers\Web\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Web\Admin\ConsignmentController as AdminConsignmentController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Web\Admin\GarageController as AdminGarageController;
 use App\Http\Controllers\Web\Admin\MaintenanceController as AdminMaintenanceController;
 use App\Http\Controllers\Web\Admin\MapController as AdminMapController;
 use App\Http\Controllers\Web\Admin\OutreachController as AdminOutreachController;
@@ -253,6 +254,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/prospeccao/{prospect}/convertida', [AdminOutreachController::class, 'markConverted'])->name('outreach.converted');
         Route::post('/prospeccao/{prospect}/devolvido', [AdminOutreachController::class, 'markBounced'])->name('outreach.bounced');
         Route::post('/prospeccao/{prospect}/descadastrar', [AdminOutreachController::class, 'unsubscribe'])->name('outreach.unsubscribe');
+        Route::get('/lojas', [AdminGarageController::class, 'index'])->name('garages.index');
+        Route::post('/lojas/{garage}/aprovar', [AdminGarageController::class, 'approve'])->name('garages.approve');
+        Route::post('/lojas/{garage}/recusar', [AdminGarageController::class, 'reject'])->name('garages.reject');
         Route::get('/consignacoes', [AdminConsignmentController::class, 'index'])->name('consignments.index');
         Route::get('/consignacoes/{consignment}/procuracao', [AdminConsignmentController::class, 'downloadPowerOfAttorney'])
             ->name('consignments.power-of-attorney');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Garage;
 use App\Http\Controllers\Controller;
 use App\Models\Garage;
 use App\Models\User;
+use App\Services\Garage\GarageReview;
 use App\Services\TenantService;
 use App\Support\BrazilianStates;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +24,7 @@ class ProfileController extends Controller
 {
     public function __construct(
         private TenantService $tenants,
+        private GarageReview $review,
     ) {}
 
     public function show(Request $request): View
@@ -36,11 +38,21 @@ class ProfileController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $garage = $this->garageFor($request->user());
+        $documentBefore = $garage->normalizedDocument();
 
         $garage->update($this->validated($request));
 
-        return redirect()->route('garage.profile.show')
-            ->with('success', 'Dados da loja atualizados.');
+        // CNPJ novo, análise nova: sem isto, aprovar o CNPJ A e trocar para B no dia seguinte
+        // tornaria a aprovação inútil.
+        $backToReview = $garage->normalizedDocument() !== $documentBefore
+            && $this->review->resetForDocumentChange($garage);
+
+        return redirect()->route('garage.profile.show')->with(
+            'success',
+            $backToReview
+                ? 'Dados da loja atualizados. Como o CNPJ mudou, a loja voltou para análise.'
+                : 'Dados da loja atualizados.',
+        );
     }
 
     /**
