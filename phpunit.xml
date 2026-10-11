@@ -34,6 +34,16 @@
         <env name="DB_CONNECTION" value="sqlite" force="true"/>
         <env name="DB_DATABASE" value=":memory:" force="true"/>
         <env name="DB_URL" value="" force="true"/>
+        <!--
+            Dentro do Docker o compose exporta DB_* para o processo, e isso chega ao PHP em
+            $_SERVER. O repositório de env do Laravel lê $_SERVER antes de $_ENV, e <env force>
+            só escreve putenv() e $_ENV: sem as linhas <server> abaixo, env('DB_CONNECTION')
+            devolve o 'pgsql' do compose e a suíte roda (e dá migrate:fresh) no banco de
+            desenvolvimento. Mantenha os dois blocos em sincronia.
+        -->
+        <server name="DB_CONNECTION" value="sqlite" force="true"/>
+        <server name="DB_DATABASE" value=":memory:" force="true"/>
+        <server name="DB_URL" value="" force="true"/>
         <env name="FILESYSTEM_DISK" value="local" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

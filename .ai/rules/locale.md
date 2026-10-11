@@ -14,3 +14,12 @@ Validation messages come from lang/pt_BR/validation.php and framework strings fr
 
 ## API messages are still English on purpose
 Some API messages (ApiResponse::validation, the error envelope in bootstrap/app.php, TwoFactor/Auth/Invoice controllers, RegisterRequest, UpdateProfileRequest) are English. Translate them only in an API change that first confirms the Flutter app does not compare those strings.
+
+## Os DB_* dos testes precisam de <server>, não só de <env>
+No Docker o compose exporta `DB_CONNECTION`, `DB_DATABASE` e `DB_URL` para o processo, e o PHP
+recebe isso em `$_SERVER`. O repositório de env do Laravel lê `$_SERVER` **antes** de `$_ENV`, e o
+`<env force="true">` do PHPUnit só escreve `putenv()` e `$_ENV`. Resultado: com apenas as linhas
+`<env>`, `env('DB_CONNECTION')` devolve o `pgsql` do compose e `php artisan test` roda no banco de
+desenvolvimento — o `RefreshDatabase` faz `migrate:fresh` e apaga os dados locais. `phpunit.xml`
+(sqlite `:memory:`) e `phpunit.pgsql.xml` (`vehicle_maintenance_test`) repetem os três `DB_*` em
+`<server>`; mantenha os dois blocos em sincronia ao mexer em qualquer um deles.
