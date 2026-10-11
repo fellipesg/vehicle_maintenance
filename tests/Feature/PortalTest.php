@@ -75,7 +75,7 @@ class PortalTest extends TestCase
         $labels = fn (Portal $portal): array => array_column($portal->navigation(), 'label');
 
         $this->assertSame(['Início', 'Meus veículos', 'Manutenções', 'Oficinas'], $labels(Portal::Owner));
-        $this->assertSame(['Início', 'Estoque', 'Manutenções'], $labels(Portal::Dealer));
+        $this->assertSame(['Início', 'Estoque', 'Manutenções', 'Minha loja'], $labels(Portal::Dealer));
         $this->assertSame(['Início', 'Ordens de serviço', 'Validações', 'Modelos de garantia', 'Minha oficina'], $labels(Portal::Workshop));
 
         foreach ([Portal::Owner, Portal::Dealer, Portal::Workshop] as $portal) {

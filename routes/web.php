@@ -21,6 +21,7 @@ use App\Http\Controllers\Web\ConsignmentOwnerController;
 use App\Http\Controllers\Web\ContactController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
+use App\Http\Controllers\Web\Garage\ProfileController as GarageProfileController;
 use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\LegalController;
@@ -163,6 +164,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
     Route::prefix('garagem')->middleware('user.type:garage')->name('garage.')->group(function () {
         Route::get('/dashboard', [GarageDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/minha-loja', [GarageProfileController::class, 'show'])->name('profile.show');
+        Route::put('/minha-loja', [GarageProfileController::class, 'update'])->name('profile.update');
         Route::get('/estoque', [GarageVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/estoque/novo', [GarageVehicleController::class, 'create'])->name('vehicles.create');
         Route::post('/estoque/importar-crlv', [GarageVehicleController::class, 'importCrlv'])->name('vehicles.import-crlv');

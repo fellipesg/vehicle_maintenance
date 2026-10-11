@@ -163,6 +163,7 @@ enum Portal: string
                 self::item('Início', 'garage.dashboard', 'home', ['garage.dashboard']),
                 self::item('Estoque', 'garage.vehicles.index', 'truck', ['garage.vehicles.*']),
                 self::item('Manutenções', 'garage.maintenances.index', 'wrench-screwdriver', ['garage.maintenances.*']),
+                self::item('Minha loja', 'garage.profile.show', 'building-storefront', ['garage.profile.*']),
             ],
             self::Workshop => [
                 self::item('Início', 'workshop.dashboard', 'home', ['workshop.dashboard']),
