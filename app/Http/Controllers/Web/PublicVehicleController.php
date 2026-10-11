@@ -44,7 +44,7 @@ class PublicVehicleController extends Controller
             'vehiclePortalUrl' => $vehicle !== null && $viewerOwnsVehicle ? $this->vehiclePortalUrl($vehicle, $viewerPortal) : null,
             'adminVehicleUrl' => $vehicle !== null && $viewer->isAdmin() && Route::has('admin.vehicles.show') ? route('admin.vehicles.show', $vehicle) : null,
             'matchLabel' => $this->matchLabel($lookup?->matchedBy),
-            'addVehicleAction' => $viewerPortal !== null && in_array($viewerPortal, [Portal::Owner, Portal::Dealer], true) ? $viewerPortal->primaryAction() : null,
+            'addVehicleAction' => $viewerPortal !== null && in_array($viewerPortal, [Portal::Owner, Portal::Dealer], true) ? $viewerPortal->primaryActionFor($viewer) : null,
         ]);
     }
 

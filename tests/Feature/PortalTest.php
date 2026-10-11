@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\GarageStatus;
 use App\Enums\Portal;
+use App\Models\Garage;
 use App\Models\User;
 use App\Support\PortalAccess;
 use Illuminate\Http\Request;
@@ -136,6 +138,9 @@ class PortalTest extends TestCase
     {
         $admin = User::factory()->asWorkshop()->asAdmin()->make();
         $dealer = User::factory()->asGarage()->make();
+        // Loja aprovada anexada em memória: este teste não toca o banco, e conta sem loja conta
+        // como não aprovada, caindo em "Minha loja" (GarageApprovalGateTest cobre esse caso).
+        $dealer->setRelation('garage', (new Garage)->forceFill(['status' => GarageStatus::Approved->value]));
 
         $this->assertSame('admin.dashboard', PortalAccess::homeRouteName($admin));
         $this->assertSame('Administrador', PortalAccess::accountLabel($admin));

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\GarageStatus;
 use App\Models\User;
 use App\Models\Workshop;
 use App\Services\TenantService;
@@ -84,6 +85,7 @@ class DevPortalUsersSeeder extends Seeder
             }
         }
 
+        $this->approveDevGarage();
         $this->seedDevWorkshop();
 
         $this->command?->info('Dev portal users ready (password: '.self::PASSWORD.'):');
@@ -93,6 +95,20 @@ class DevPortalUsersSeeder extends Seeder
         }
 
         // One-liner: php artisan db:seed --class=DevPortalUsersSeeder
+    }
+
+    /**
+     * A loja de desenvolvimento nasce aprovada, senão a conta de lojista só abre "Minha loja".
+     * Para exercitar a análise, basta voltar o status para 'pending' na mão.
+     */
+    private function approveDevGarage(): void
+    {
+        $garage = User::query()->where('email', self::GARAGE_EMAIL)->first()?->garage;
+
+        $garage?->forceFill([
+            'status' => GarageStatus::Approved,
+            'reviewed_at' => now(),
+        ])->save();
     }
 
     private function seedDevWorkshop(): void

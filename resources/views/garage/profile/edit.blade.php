@@ -16,10 +16,27 @@
         <x-ui.page-header
             title="Minha loja"
             description="Os dados da sua garagem. O CNPJ é o que permite registrar um veículo como estoque próprio."
-            :breadcrumbs="[['Início', route('garage.dashboard')], ['Minha loja']]"
-        />
+            :breadcrumbs="$garage->isApproved() ? [['Início', route('garage.dashboard')], ['Minha loja']] : [['Minha loja']]"
+        >
+            <x-ui.badge :variant="$garage->status->badgeVariant()">{{ $garage->status->label() }}</x-ui.badge>
+        </x-ui.page-header>
 
-        @if($garage->normalizedDocument() === null)
+        @if($garage->status === \App\Enums\GarageStatus::Pending)
+            <x-ui.alert variant="warning" role="status" title="Loja em análise" class="mb-6" data-garage-pending>
+                Estamos conferindo o CNPJ da sua loja. Enquanto isso, só esta tela fica disponível — estoque, manutenções e consignação abrem assim que a análise terminar. Complete os dados abaixo para agilizar.
+            </x-ui.alert>
+        @elseif($garage->status === \App\Enums\GarageStatus::Rejected)
+            <x-ui.alert variant="danger" role="status" title="Cadastro recusado" class="mb-6" data-garage-rejected>
+                @if(filled($garage->review_notes))
+                    {{ $garage->review_notes }}
+                @else
+                    Não conseguimos confirmar o CNPJ desta loja.
+                @endif
+                <x-slot:actions>
+                    <x-ui.button variant="secondary" size="sm" :href="route('contact.show')">Falar com a equipe</x-ui.button>
+                </x-slot:actions>
+            </x-ui.alert>
+        @elseif($garage->normalizedDocument() === null)
             <x-ui.alert variant="warning" role="status" title="Sua loja ainda não tem CNPJ" class="mb-6" data-garage-document-missing>
                 Sem ele não conseguimos confirmar que um veículo é da loja, e todo CRLV-e entra como consignação, com procuração. Preencha o CNPJ abaixo.
             </x-ui.alert>
@@ -87,7 +104,9 @@
             </x-ui.form-section>
 
             <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-sm max-sm:*:grow sm:-mx-6 sm:px-6" data-slot="form-actions">
-                <x-ui.button variant="secondary" :href="route('garage.dashboard')">Cancelar</x-ui.button>
+                @if($garage->isApproved())
+                    <x-ui.button variant="secondary" :href="route('garage.dashboard')">Cancelar</x-ui.button>
+                @endif
                 <x-ui.button type="submit" icon="check" loading-label="Salvando…">Salvar alterações</x-ui.button>
             </div>
         </form>

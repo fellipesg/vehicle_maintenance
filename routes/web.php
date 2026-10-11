@@ -162,7 +162,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/oficinas', [WorkshopDirectoryController::class, 'index'])->name('workshops.index');
     });
 
-    Route::prefix('garagem')->middleware('user.type:garage')->name('garage.')->group(function () {
+    Route::prefix('garagem')->middleware(['user.type:garage', 'garage.approved'])->name('garage.')->group(function () {
         Route::get('/dashboard', [GarageDashboardController::class, 'index'])->name('dashboard');
         Route::get('/minha-loja', [GarageProfileController::class, 'show'])->name('profile.show');
         Route::put('/minha-loja', [GarageProfileController::class, 'update'])->name('profile.update');

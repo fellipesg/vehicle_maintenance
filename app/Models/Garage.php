@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\GarageStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +19,22 @@ class Garage extends Model
 {
     use HasFactory;
 
+    /**
+     * Loja nova nasce em análise já no objeto em memória, não só no default da coluna: sem isto
+     * o model recém-criado volta com status null e qualquer leitura de $garage->status quebra.
+     *
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'status' => GarageStatus::Pending->value,
+    ];
+
+    /**
+     * status, reviewed_by, reviewed_at e review_notes ficam fora de propósito: quem os muda é a
+     * fila de aprovação do admin, nunca o formulário de "Minha loja".
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'tenant_id',
         'user_id',
@@ -34,6 +51,7 @@ class Garage extends Model
         'state',
     ];
 
+
     /**
      * @return array<string, string>
      */
@@ -42,6 +60,8 @@ class Garage extends Model
         return [
             // Mesmo tratamento de users.document: guardado criptografado, nunca consultado por SQL.
             'document' => 'encrypted',
+            'status' => GarageStatus::class,
+            'reviewed_at' => 'datetime',
         ];
     }
 
@@ -65,6 +85,15 @@ class Garage extends Model
         }
 
         return preg_replace('/\D/', '', $this->document) ?: null;
+    }
+
+    /**
+     * Loja liberada para trabalhar: estoque, manutenções e consignação. Pendente e recusada só
+     * abrem "Minha loja" (App\Http\Middleware\EnsureGarageApproved).
+     */
+    public function isApproved(): bool
+    {
+        return $this->status === GarageStatus::Approved;
     }
 
     /**
