@@ -20,11 +20,12 @@ down: ## Stop the stack (keeps the database volume)
 
 restart: down up ## Restart the stack
 
-install: up node-install ## First run: .env, composer/npm deps, APP_KEY, migrations
+install: up node-install ## First run: .env, composer/npm deps, APP_KEY, migrations, seeds
 	@test -f .env || cp .env.example .env
 	$(EXEC) composer install --no-interaction
 	@grep -qE '^APP_KEY=.+' .env || $(EXEC) php artisan key:generate
 	$(EXEC) php artisan migrate --force
+	$(EXEC) php artisan db:seed --force
 	$(NODE) npm run build
 
 node-install: ## npm ci into the node_modules volume (Linux binaries)
