@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\Maintenance\MaintenanceRedactor;
 use App\Support\Vehicle\VehicleIdentifierVisibility;
 use App\Support\VehicleProvenanceStrip;
 use Illuminate\Http\Request;
@@ -54,8 +55,11 @@ class PublicVehicleSearchResource extends JsonResource
                 $this->relationLoaded('provenanceStripMaintenances'),
                 fn () => VehicleProvenanceStrip::segmentsForVehicle($this->resource)
             ),
-            'maintenances' => $this->whenLoaded('maintenances', function () {
-                return $this->maintenances->map(fn ($maintenance) => [
+            'maintenances' => $this->whenLoaded('maintenances', function () use ($request) {
+                // Forma mínima das OS de oficina sem proprietário; as ocultadas saem.
+                $viewer = VehicleIdentifierVisibility::viewerOf($request);
+
+                return MaintenanceRedactor::redactAll($this->maintenances, $viewer)->map(fn ($maintenance) => [
                     'id' => $maintenance->id,
                     'maintenance_type' => $maintenance->maintenance_type,
                     'description' => $maintenance->description,

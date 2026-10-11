@@ -41,6 +41,20 @@ class UpdateMaintenanceRequest extends ApiFormRequest
             'kilometers' => 'sometimes|required|integer|min:0|max:9999999',
             'service_category' => ['sometimes', 'required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => 'boolean',
+
+            // Sem estas regras os itens enviados pelo app caíam fora do
+            // validated() e a edição respondia 200 sem ter gravado nada.
+            'items' => 'nullable|array',
+            'items.*.id' => 'nullable|integer',
+            'items.*.name' => 'required_with:items|string|max:255',
+            'items.*.description' => 'nullable|string',
+            'items.*.quantity' => 'required_with:items|integer|min:1',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.total_price' => 'nullable|numeric|min:0',
+            'items.*.part_number' => 'nullable|string|max:100',
+            'items.*.warranty_template_id' => 'nullable|integer|exists:warranty_templates,id',
+            'general_warranty_template_id' => 'nullable|integer|exists:warranty_templates,id',
+
             'invoices' => [
                 'nullable',
                 'array',

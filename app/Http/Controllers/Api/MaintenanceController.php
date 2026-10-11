@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\ResolvesPagination;
+use App\Http\Controllers\Concerns\SyncsMaintenanceItems;
+use App\Http\Controllers\Concerns\SyncsMaintenanceWarranties;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreMaintenanceRequest;
 use App\Http\Requests\Api\V1\UpdateMaintenanceRequest;
@@ -10,13 +12,14 @@ use App\Http\Resources\Api\V1\MaintenanceResource;
 use App\Models\Checklist;
 use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
+use App\Models\Workshop;
 use App\Services\Invoice\InvoiceUploadProcessor;
 use App\Services\Maintenance\MaintenanceWarrantyApplicator;
+use App\Services\Maintenance\OwnerlessMaintenanceService;
 use App\Services\Maintenance\WorkshopReviewService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Support\ApiResponse;
 use App\Support\AppStorage;
-use App\Support\VehicleTenantResolver;
 use Dedoc\Scramble\Attributes\Group;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +32,8 @@ use Illuminate\Support\Facades\Log;
 class MaintenanceController extends Controller
 {
     use ResolvesPagination;
+    use SyncsMaintenanceItems;
+    use SyncsMaintenanceWarranties;
 
     #[QueryParameter('vehicle_id', 'Filter by vehicle ID.', type: 'integer')]
     #[QueryParameter('service_category', 'Filter by category: mechanical, electrical, suspension, painting, finishing, interior, other.')]
@@ -40,7 +45,7 @@ class MaintenanceController extends Controller
         Gate::authorize('viewAny', Maintenance::class);
 
         $user = $request->user();
-        $query = Maintenance::with(['vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'photos']);
+        $query = Maintenance::with(['vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'photos', 'invite']);
 
         if ($user->isWorkshop() && $user->workshop) {
             $query->where('workshop_id', $user->workshop->id);
@@ -126,9 +131,10 @@ class MaintenanceController extends Controller
             if ($user->isWorkshop() && $user->workshop) {
                 $workshopId = $user->workshop->id;
                 $workshopName = $user->workshop->name;
-                $tenantId = VehicleTenantResolver::resolveTenantId($vehicle) ?? $user->tenant_id;
+                // Sem proprietário atual a OS nasce sem tenant e à espera da decisão dele.
+                $tenantId = app(OwnerlessMaintenanceService::class)->tenantIdFor($vehicle);
             } elseif ($request->workshop_id) {
-                $workshop = \App\Models\Workshop::find($request->workshop_id);
+                $workshop = Workshop::find($request->workshop_id);
                 if ($workshop) {
                     $workshopName = $workshop->name;
                 }
@@ -147,6 +153,10 @@ class MaintenanceController extends Controller
                 'service_category' => $request->service_category,
                 'is_manufacturer_required' => $isManufacturerRequired,
             ]);
+
+            if ($user->isWorkshop() && app(OwnerlessMaintenanceService::class)->isOwnerless($vehicle)) {
+                app(OwnerlessMaintenanceService::class)->markPending($maintenance);
+            }
 
             app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $user);
 
@@ -168,7 +178,7 @@ class MaintenanceController extends Controller
             if ($user->isWorkshop() && $user->workshop) {
                 $workshop = $user->workshop;
             } elseif ($workshopId !== null) {
-                $workshop = \App\Models\Workshop::find($workshopId);
+                $workshop = Workshop::find($workshopId);
             }
 
             if ($workshop !== null) {
@@ -250,6 +260,7 @@ class MaintenanceController extends Controller
             'checklists',
             'workshop',
             'photos',
+            'invite',
         ])->findOrFail($id);
 
         Gate::authorize('view', $maintenance);
@@ -267,7 +278,7 @@ class MaintenanceController extends Controller
             $data['workshop_id'] = $request->user()->workshop->id;
             $data['workshop_name'] = $request->user()->workshop->name;
         } elseif (isset($data['workshop_id'])) {
-            $workshop = \App\Models\Workshop::find($data['workshop_id']);
+            $workshop = Workshop::find($data['workshop_id']);
             if ($workshop) {
                 $data['workshop_name'] = $workshop->name;
             }
@@ -287,6 +298,11 @@ class MaintenanceController extends Controller
         }
 
         $previousWorkshopId = $maintenance->workshop_id;
+        $previousDate = $maintenance->maintenance_date?->toDateString();
+
+        // Relações, não colunas: sincronizadas abaixo.
+        unset($data['items'], $data['general_warranty_template_id'], $data['invoices']);
+
         $maintenance->update($data);
 
         if (! $request->user()->isWorkshop()) {
@@ -297,8 +313,30 @@ class MaintenanceController extends Controller
             app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
         }
 
+        // Mesma ordem do portal web: itens primeiro, para que as garantias
+        // casem com os itens que ficaram. Sem a chave `items` a lista fica como
+        // está — um PUT parcial não deve zerar os itens da OS.
+        if ($request->has('items')) {
+            $this->syncMaintenanceItems($maintenance, $request);
+
+            // Garantia é promessa da oficina, então só o portal dela aplica
+            // template. Item removido já leva a garantia junto: a FK
+            // maintenance_warranties.maintenance_item_id é cascadeOnDelete.
+            $workshop = $request->user()->isWorkshop() ? $request->user()->workshop : null;
+
+            if ($workshop !== null) {
+                $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
+            }
+        }
+
+        if ($previousDate !== $maintenance->maintenance_date?->toDateString()) {
+            $this->recomputeMaintenanceWarrantyDates($maintenance->fresh(['warranties']));
+        }
+
         return ApiResponse::success(
-            new MaintenanceResource($maintenance->fresh(['vehicle', 'user', 'items', 'invoices', 'checklists', 'workshop'])),
+            new MaintenanceResource($maintenance->fresh([
+                'vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop',
+            ])),
             'Maintenance updated successfully',
         );
     }

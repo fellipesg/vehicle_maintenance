@@ -128,8 +128,17 @@ class VehicleMileageService
         return $ceiling;
     }
 
+    /**
+     * Veículo criado pela oficina pelo chassi nasce sem hodômetro de cadastro e sem placa: não há
+     * leitura "no cadastro" a usar de teto, e o km corrente (que só cresce com as OS) travaria o
+     * registro de serviços antigos.
+     */
     private function registrationKilometers(Vehicle $vehicle): ?int
     {
+        if ($vehicle->odometer_at_registration === null && $vehicle->license_plate === null) {
+            return null;
+        }
+
         $kilometers = $vehicle->odometer_at_registration ?? $vehicle->current_kilometers;
 
         return $kilometers === null ? null : (int) $kilometers;

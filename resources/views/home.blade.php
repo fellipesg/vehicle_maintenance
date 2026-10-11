@@ -7,6 +7,7 @@
     $landingPortal = \App\Enums\Portal::current(auth()->user());
     $landingHomeUrl = $landingPortal ? route($landingPortal->dashboardRoute()) : null;
     $landingPartnershipUrl = route('contact.show', ['assunto' => 'partnership']);
+    $landingWorkshopsUrl = route('workshops.landing');
     $landingCapabilities = ['Histórico no chassi', 'Selo da oficina', 'Declaração do dono', 'PDF com notas fiscais', 'Busca por placa, chassi ou RENAVAM', 'Oficinas da rede', 'App e navegador'];
 @endphp
 
@@ -282,7 +283,7 @@
             >
                 O Selo da oficina põe o nome da sua oficina no histórico do carro, e quem procura serviço encontra você em Oficinas da rede.
                 <x-slot:actions>
-                    <x-landing.cta :href="$landingPartnershipUrl" variant="secondary" size="md">Quero ser oficina parceira</x-landing.cta>
+                    <x-landing.cta :href="$landingWorkshopsUrl" variant="secondary" size="md">Quero ser oficina parceira</x-landing.cta>
                     @guest
                         <x-ui.link :href="route('login.oficina')">Já tenho conta · Entrar<span class="sr-only"> como oficina</span></x-ui.link>
                     @endguest
@@ -308,7 +309,10 @@
                     <x-landing.cta :href="$landingHomeUrl">Ir para o Início</x-landing.cta>
                 @endguest
             </div>
-            <p class="mt-4 text-sm text-muted-foreground">O app ainda não está nas lojas. Cadastro e consulta já funcionam no navegador do celular.</p>
+            <div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <x-landing.app-store-badge />
+                <p class="text-sm text-muted-foreground">Android em breve. No Android, cadastro e consulta já funcionam no navegador do celular.</p>
+            </div>
         </div>
         <div class="relative mx-auto flex min-h-[22rem] w-full max-w-lg items-end justify-center pb-4 sm:min-h-[32rem]">
             <x-landing.app-phone
@@ -386,10 +390,10 @@
                 Para buscar pela placa, pelo chassi ou pelo RENAVAM, sim: uma conta gratuita. Para conferir o código de um selo, não: qualquer pessoa confere em <x-ui.link :href="route('verification.lookup')" variant="inline">Conferir selo da oficina</x-ui.link>.
             </x-landing.faq-item>
             <x-landing.faq-item question="Oficinas e lojas também podem usar?">
-                Sim. Oficinas aplicam o Selo da oficina e aparecem em Oficinas da rede. Lojas registram a revisão antes da venda no próprio estoque. Para entrar na rede, <x-ui.link :href="$landingPartnershipUrl" variant="inline">fale com a equipe</x-ui.link>.
+                Sim. Oficinas aplicam o Selo da oficina e aparecem em Oficinas da rede: <x-ui.link :href="$landingWorkshopsUrl" variant="inline">cadastre sua oficina</x-ui.link> direto no site. Lojas registram a revisão antes da venda no próprio estoque; para entrar, <x-ui.link :href="$landingPartnershipUrl" variant="inline">fale com a equipe</x-ui.link>.
             </x-landing.faq-item>
             <x-landing.faq-item question="Tem aplicativo?">
-                Tem, com o mesmo histórico do site, mas ainda não está nas lojas. Enquanto isso, cadastro e consulta funcionam no navegador do celular.
+                Tem. O app para iPhone está na <x-ui.link :href="config('app.ios_app_store_url')" external variant="inline">App Store</x-ui.link>, com a mesma conta e o mesmo histórico do site. A versão para Android está a caminho; enquanto isso, cadastro e consulta funcionam no navegador do celular.
             </x-landing.faq-item>
         </div>
 

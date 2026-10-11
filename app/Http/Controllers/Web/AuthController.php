@@ -173,7 +173,8 @@ class AuthController extends Controller
         // na mensagem deixa visível um erro de digitação logo depois do cadastro.
         return redirect()
             ->to($this->redirectAfterLogin($request, $user, Portal::Owner))
-            ->with('success', str_replace(':email', $user->email, self::REGISTERED_MESSAGE));
+            ->with('success', str_replace(':email', $user->email, self::REGISTERED_MESSAGE))
+            ->with('analytics_event', 'sign_up');
     }
 
     public function logout(Request $request): RedirectResponse
@@ -221,7 +222,7 @@ class AuthController extends Controller
                 'title' => 'Área da Oficina',
                 'subtitle' => 'Ordens de serviço com o Selo da oficina e o perfil da sua oficina.',
                 'icon' => 'wrench-screwdriver',
-                'footer' => ['prompt' => 'Quer trazer sua oficina para a RevisaLog?', 'label' => 'Fale com a equipe', 'url' => $partnershipUrl],
+                'footer' => ['prompt' => 'Quer trazer sua oficina para a RevisaLog?', 'label' => 'Cadastre sua oficina', 'url' => route('workshops.landing')],
             ],
             Portal::Owner => [
                 'title' => 'Área do Proprietário',

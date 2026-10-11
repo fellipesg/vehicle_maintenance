@@ -49,6 +49,15 @@
         </x-ui.page-header>
 
         <div class="space-y-6">
+            @if (($pendingWorkshopRecords ?? 0) > 0)
+                <x-ui.alert variant="info" title="Oficinas registraram serviços no seu veículo" data-workshop-records-card>
+                    {{ $pendingWorkshopRecords === 1 ? '1 registro espera' : $pendingWorkshopRecords.' registros esperam' }} a sua escolha: você decide se vincula ao seu histórico, se aceita as notas e fotos e se oculta da consulta pública.
+                    <x-slot:actions>
+                        <x-ui.button size="sm" :href="route('user.workshop-records.index')">Ver registros de oficinas</x-ui.button>
+                    </x-slot:actions>
+                </x-ui.alert>
+            @endif
+
             @unless ($ownerFirstSteps['complete'])
                 <x-ui.card
                     as="section"

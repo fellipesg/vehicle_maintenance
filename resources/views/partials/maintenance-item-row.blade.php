@@ -119,6 +119,7 @@
         <div class="grid gap-1.5 sm:col-span-3">
             <x-ui.label :for="$messageId('description')" optional data-item-label="description">Descrição</x-ui.label>
             <x-ui.textarea :id="$messageId('description')" :name="$namePrefix.'[description]'" :value="$item?->description" data-item-field="description" rows="2" class="min-h-16" />
+            <p class="text-sm text-muted-foreground">Não inclua nome, CPF, telefone ou placa do cliente.</p>
         </div>
 
         @if($showsWarranty)

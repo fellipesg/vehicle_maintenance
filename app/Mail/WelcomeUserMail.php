@@ -56,7 +56,7 @@ class WelcomeUserMail extends Mailable implements ShouldQueue
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.welcome-user',
+            markdown: $this->isWorkshop() ? 'emails.welcome-workshop' : 'emails.welcome-user',
             with: [
                 'firstName' => $this->firstName(),
                 'actionUrl' => $this->actionUrl(),
@@ -68,11 +68,16 @@ class WelcomeUserMail extends Mailable implements ShouldQueue
         );
     }
 
+    public function isWorkshop(): bool
+    {
+        return $this->user->user_type === 'workshop';
+    }
+
     public function firstName(): string
     {
         $firstName = trim((string) Str::of($this->user->name)->explode(' ')->first());
 
-        return $firstName !== '' ? $firstName : 'motorista';
+        return $firstName !== '' ? $firstName : ($this->isWorkshop() ? 'equipe' : 'motorista');
     }
 
     /**
@@ -85,6 +90,10 @@ class WelcomeUserMail extends Mailable implements ShouldQueue
 
     public function actionUrl(): string
     {
+        if ($this->isWorkshop() && $this->source === RegistrationSource::Web) {
+            return route('workshop.dashboard');
+        }
+
         return match ($this->source) {
             RegistrationSource::Web => route('user.vehicles.create'),
             RegistrationSource::Api => route('login.usuario'),
@@ -94,6 +103,10 @@ class WelcomeUserMail extends Mailable implements ShouldQueue
 
     public function actionLabel(): string
     {
+        if ($this->isWorkshop() && $this->source === RegistrationSource::Web) {
+            return 'Ir para o Início';
+        }
+
         return match ($this->source) {
             RegistrationSource::Web => 'Adicionar meu veículo',
             RegistrationSource::Api => 'Entrar pelo navegador',

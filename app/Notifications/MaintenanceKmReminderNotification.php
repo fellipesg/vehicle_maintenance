@@ -41,6 +41,7 @@ class MaintenanceKmReminderNotification extends Notification implements ShouldQu
     {
         $vehicleLabel = trim("{$this->vehicle->brand} {$this->vehicle->model}");
         $plate = $this->vehicle->license_plate;
+        $plateText = filled($plate) ? " (placa {$plate})" : '';
         $isOverdue = (bool) ($this->summary['is_overdue'] ?? false);
         $remaining = (int) ($this->summary['kilometers_remaining'] ?? 0);
         $nextDue = (int) ($this->summary['next_due_kilometers'] ?? 0);
@@ -48,11 +49,11 @@ class MaintenanceKmReminderNotification extends Notification implements ShouldQu
 
         if ($isOverdue) {
             $subject = "Revisão em atraso — {$vehicleLabel}";
-            $intro = "O veículo **{$vehicleLabel}** (placa {$plate}) passou da quilometragem estimada para a próxima revisão preventiva.";
+            $intro = "O veículo **{$vehicleLabel}**{$plateText} passou da quilometragem estimada para a próxima revisão preventiva.";
         } else {
             $formattedRemaining = number_format($remaining, 0, ',', '.');
             $subject = "Faltam {$formattedRemaining} km para revisão — {$vehicleLabel}";
-            $intro = "Faltam **{$formattedRemaining} km** para a próxima revisão estimada do **{$vehicleLabel}** (placa {$plate}).";
+            $intro = "Faltam **{$formattedRemaining} km** para a próxima revisão estimada do **{$vehicleLabel}**{$plateText}.";
         }
 
         $formattedNextDue = number_format($nextDue, 0, ',', '.');
@@ -81,11 +82,11 @@ class MaintenanceKmReminderNotification extends Notification implements ShouldQu
 
         if ($isOverdue) {
             $title = "Revisão em atraso — {$vehicleLabel}";
-            $body = "O veículo {$vehicleLabel} ({$this->vehicle->license_plate}) passou da quilometragem estimada para a próxima revisão.";
+            $body = "O veículo {$vehicleLabel}{$this->plateSuffix()} passou da quilometragem estimada para a próxima revisão.";
         } else {
             $formattedRemaining = number_format($remaining, 0, ',', '.');
             $title = "Faltam {$formattedRemaining} km para revisão";
-            $body = "Próxima revisão estimada do {$vehicleLabel} ({$this->vehicle->license_plate}).";
+            $body = "Próxima revisão estimada do {$vehicleLabel}{$this->plateSuffix()}.";
         }
 
         return [
@@ -121,5 +122,10 @@ class MaintenanceKmReminderNotification extends Notification implements ShouldQu
         $firstName = trim(explode(' ', trim($notifiable->name), 2)[0] ?? '');
 
         return $firstName !== '' ? $firstName : 'motorista';
+    }
+
+    private function plateSuffix(): string
+    {
+        return filled($this->vehicle->license_plate) ? " ({$this->vehicle->license_plate})" : '';
     }
 }

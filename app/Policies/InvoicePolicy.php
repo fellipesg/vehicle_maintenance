@@ -40,6 +40,11 @@ class InvoicePolicy
             return false;
         }
 
+        // Nota de OS sem proprietário: só a oficina autora até o aceite do proprietário.
+        if ($maintenance->hidesAttachmentsFrom($user)) {
+            return false;
+        }
+
         return app(MaintenancePolicy::class)->view($user, $maintenance);
     }
 

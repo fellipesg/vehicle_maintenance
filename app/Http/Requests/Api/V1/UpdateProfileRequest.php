@@ -18,6 +18,21 @@ class UpdateProfileRequest extends ApiFormRequest
     ];
 
     /**
+     * O país é NOT NULL no banco (padrão Brasil). O app manda null quando o campo fica em branco;
+     * sem este padrão o UPDATE estoura 23502 em vez de gravar o perfil.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (! array_key_exists('country', $this->all())) {
+            return;
+        }
+
+        if (blank($this->input('country'))) {
+            $this->merge(['country' => 'Brasil']);
+        }
+    }
+
+    /**
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array

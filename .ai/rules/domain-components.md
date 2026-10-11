@@ -21,3 +21,6 @@ Proprietário (user/maintenances/_form), Lojista (garage/maintenances/create) an
 
 ## Maintenance detail and provenance copy
 maintenances/_detail draws seal, service data, warranty, items, invoices and photos (before and after side by side; they open in <x-ui.lightbox> (resources/js/ui/lightbox.js) with arrows, swipe and alt "Foto 2 de 6 — serviço, data. grupo", not in the old maintenance-photos.js). x-provenance-seal shows "Atualizada em" when the order changed after the seal (Maintenance::wasUpdatedAfterSeal), the workshop logo whole (object-contain p-1.5 bg-surface ring-1 ring-border) and, for a declared record that cites a registered workshop, says it has no Selo da oficina. Declared markers use PR/LJ, never the initials of whoever declared. Plate history "Origem" comes from VehiclePlate::sourceLabel (CRLV-e, Informada manualmente, Cadastro), never the raw source.
+
+## Detalhe da OS usa a forma mínima
+maintenances/_detail passa a maintenance por MaintenanceRedactor::redact antes de desenhar, e x-vehicle.detail passa a coleção por redactAll: não leia description, valores, invoices ou photos de um Maintenance de histórico sem passar por eles.

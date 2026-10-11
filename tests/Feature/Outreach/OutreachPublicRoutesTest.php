@@ -15,12 +15,12 @@ class OutreachPublicRoutesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_click_records_the_first_click_and_redirects_to_the_partnership_contact_with_the_ref(): void
+    public function test_click_records_the_first_click_and_redirects_to_the_workshop_landing_with_the_ref(): void
     {
         $prospect = WorkshopProspect::factory()->sent()->create();
 
         $this->get(route('outreach.click', $prospect->token))
-            ->assertRedirect(route('contact.show', ['assunto' => 'partnership', 'ref' => $prospect->token]));
+            ->assertRedirect(route('workshops.landing', ['ref' => $prospect->token]));
 
         $prospect->refresh();
         $this->assertSame(WorkshopProspectStatus::Clicked, $prospect->status);
@@ -158,9 +158,9 @@ class OutreachPublicRoutesTest extends TestCase
             ->assertOk()
             ->assertSee('cadastro de CNPJ da Receita Federal')
             ->assertSee('no máximo duas mensagens', false)
-            ->assertSee('2026-10-05');
+            ->assertSee('2026-10-10');
 
-        $this->assertSame('2026-10-05', config('legal.privacy_version'));
+        $this->assertSame('2026-10-10', config('legal.privacy_version'));
     }
 
     public function test_suppression_helper_is_case_insensitive_and_idempotent(): void

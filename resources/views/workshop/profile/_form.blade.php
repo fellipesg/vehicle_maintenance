@@ -4,6 +4,9 @@
     (resources/js/form-ux.js); o servidor também tira pontos e traços antes de validar, então
     "01310-100" vale. UF é uma lista. Redes aceitam "@perfil" ou o link.
 
+    O CEP tem data-cep-autofill: com os 8 dígitos, resources/js/workshop-address-cep.js busca no
+    ViaCEP e preenche rua, bairro, cidade e UF. Sem o script, tudo continua sendo digitado.
+
     Variável: $workshop (na edição).
 --}}
 @php
@@ -59,7 +62,8 @@
         <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
             <x-ui.field name="cep" label="CEP" hint="8 dígitos." required>
                 <x-ui.input :value="$workshop?->cep" required autocomplete="postal-code" inputmode="numeric"
-                            data-mask="digits" data-min-digits="8" data-max-digits="8" placeholder="01310100" class="tabular-nums" />
+                            data-mask="digits" data-min-digits="8" data-max-digits="8" data-cep-autofill
+                            placeholder="01310100" class="tabular-nums" />
             </x-ui.field>
             <x-ui.field name="street" label="Rua" required class="sm:col-span-2">
                 <x-ui.input :value="$workshop?->street" required maxlength="255" autocomplete="address-line1" />

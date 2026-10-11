@@ -276,8 +276,9 @@ class PortalShellTest extends TestCase
         $blog = $this->page($this->get(route('blog.index'))->assertOk());
         $blogLinks = $blog->query('//header[@data-shell-topbar]//nav[@aria-label="Principal"]//a');
 
-        $this->assertSame(1, $blogLinks->length);
-        $this->assertSame('page', $blogLinks->item(0)->getAttribute('aria-current'));
+        $this->assertSame(6, $blogLinks->length);
+        $this->assertSame(route('home').'#como-funciona', $this->element($blog, '//header[@data-shell-topbar]//nav[@aria-label="Principal"]//a[normalize-space()="Como funciona"]')->getAttribute('href'));
+        $this->assertSame('page', $this->element($blog, '//header[@data-shell-topbar]//nav[@aria-label="Principal"]//a[normalize-space()="Blog"]')->getAttribute('aria-current'));
     }
 
     public function test_logged_in_user_on_a_public_page_gets_the_portal_shell_without_sign_up(): void

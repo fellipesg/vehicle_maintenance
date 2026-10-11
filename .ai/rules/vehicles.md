@@ -15,3 +15,14 @@ After the history PDF is saved, push PdfViewerPage (printing PdfPreview). Do not
 
 ## PDF export snackbar must be cancellable
 The Gerando PDF snackbar must include a Cancelar action that increments the export generation and stops polling/opening the viewer. Do not use a 5-minute snackbar without an action — iOS users cannot dismiss it.
+
+## Brand and model suggest from the catalog, they do not constrain
+Marca e modelo usam CatalogAutocomplete sobre GET /api/v1/vehicle-catalog/brands e /models, mas seguem aceitando texto livre: o catálogo não cobre todo lançamento ou importado, e StoreVehicleRequest valida apenas `string|max:100`. Não troque por dropdown fechado sem antes resolver o cadastro do que falta no catálogo.
+
+O endpoint de modelos resolve a marca por chave exata (`VehicleCatalogService::all()[$brand]`), então mande o nome vindo do catálogo, não o que o usuário digitou — "fiat" não acha os modelos de "Fiat". Falha do catálogo é silenciosa: sem sugestão os campos continuam funcionando.
+
+## Veículo sem placa
+license_plate e renavam podem ser null no app: mostrar "Placa não informada" nas telas privadas. Na oficina, a busca é pelo chassi de 17 caracteres e, com has_owner true, o app não mostra marca/modelo/ano (a API nem manda).
+
+## Oficina usa só o site, por enquanto
+O app não tem portal de oficina no login, então o código de oficina do PR #17 (OS por chassi, "Avisar o cliente") fica sem ponto de entrada no app até existirem um portal de oficina e uma lista "Minhas OS" no app. Não apague esse código: as telas continuam só na web (`/oficina`).

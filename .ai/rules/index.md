@@ -15,6 +15,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
 | config/outreach.php,app/Mail/WorkshopProspectInviteMail.php,app/Jobs/SendWorkshopProspectInvite.php,app/Services/Outreach/**,app/Console/Commands/*Prospect*,app/Console/Commands/ExtractReceitaProspects.php,app/Http/Controllers/Web/OutreachController.php,app/Http/Controllers/Web/Admin/OutreachController.php,app/Models/WorkshopProspect.php,app/Models/EmailSuppression.php,resources/views/emails/outreach/**,resources/views/outreach/**,resources/views/admin/outreach/** | .ai/rules/outreach.md |
 | app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
+| app/Http/Requests/Api/** | .ai/rules/requests-api.md |
 | app/Http/Controllers/Web/BlogController.php,app/Http/Controllers/Web/Admin/BlogPostController.php,app/Models/BlogPost.php,resources/views/blog/**,resources/views/admin/blog/** | .ai/rules/blog.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
 | config/legal.php, config/mail.php | .ai/rules/config.md |
@@ -22,7 +23,7 @@ must agree on the same contract; they are listed in a separate table below.
 | resources/css/**,resources/views/**,resources/js/** | .ai/rules/design-tokens.md |
 | resources/views/components/{vehicle,maintenance}/**,resources/views/maintenances/**,resources/views/components/provenance-*.blade.php | .ai/rules/domain-components.md |
 | resources/views/garage/**,app/Http/Controllers/Web/Garage/** | .ai/rules/garage.md |
-| app/Jobs/** | .ai/rules/jobs.md |
+| app/Jobs/**,app/Console/Commands/PurgePendingMaintenanceAttachments.php | .ai/rules/jobs.md |
 | resources/js/user-portal.js,resources/js/owner-maintenance-form.js,resources/js/maintenance-kilometer-range.js,resources/js/utils/maintenance-kilometers.js | .ai/rules/js.md |
 | resources/views/components/landing/**,resources/views/home.blade.php | .ai/rules/landing-views.md |
 | resources/views/layouts/** | .ai/rules/layouts.md |
@@ -31,7 +32,7 @@ must agree on the same contract; they are listed in a separate table below.
 | lang/**,app/Http/**,config/app.php,phpunit.xml,phpunit.pgsql.xml | .ai/rules/locale.md |
 | app/Mail/** | .ai/rules/mail.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
-| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php | .ai/rules/models.md |
+| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
 | resources/views/pdfs/vehicle_maintenance_export.blade.php | .ai/rules/pdfs.md |
 | app/Policies/** | .ai/rules/policies.md |

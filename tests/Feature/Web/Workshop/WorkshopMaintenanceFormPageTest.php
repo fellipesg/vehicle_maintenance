@@ -53,7 +53,7 @@ class WorkshopMaintenanceFormPageTest extends TestCase
         $notFound = $this->element($xpath, '//*[@data-vehicle-not-found]');
         $this->assertSame('status', $notFound->getAttribute('role'));
         $this->assertStringContainsString('Veículo ZZZ9Z99 ainda não está no RevisaLog', $this->text($notFound));
-        $this->assertStringContainsString('Peça ao proprietário para cadastrar o veículo no app; depois registre a OS aqui.', $this->text($notFound));
+        $this->assertStringContainsString('Cadastre o veículo pelo chassi', $this->text($notFound));
 
         $invite = $this->element($xpath, './/button[@data-copy-button]', $notFound);
         $this->assertStringContainsString(route('register'), $invite->getAttribute('data-copy-value'));
@@ -118,7 +118,7 @@ class WorkshopMaintenanceFormPageTest extends TestCase
         $this->assertSame(route('workshop.maintenances.index'), $this->element($xpath, './/a[normalize-space()="Cancelar"]', $actions)->getAttribute('href'));
     }
 
-    public function test_vehicle_without_owner_explains_and_does_not_show_the_form(): void
+    public function test_vehicle_without_owner_explains_and_still_shows_the_form(): void
     {
         $user = $this->workshopUser();
         Vehicle::factory()->create(['license_plate' => 'SEM1D00']);
@@ -127,8 +127,8 @@ class WorkshopMaintenanceFormPageTest extends TestCase
         $xpath = $this->page($response);
 
         $this->assertSame(1, $this->countNodes($xpath, '//*[@data-vehicle-found]'));
-        $response->assertSee('Veículo sem proprietário vinculado');
-        $this->assertSame(0, $this->countNodes($xpath, '//form[@data-maintenance-os-form]'));
+        $response->assertSee('Veículo sem proprietário no RevisaLog');
+        $this->assertSame(1, $this->countNodes($xpath, '//form[@data-maintenance-os-form]'));
     }
 
     public function test_warranty_section_is_always_there_with_the_empty_state_when_there_is_no_active_template(): void
@@ -298,7 +298,7 @@ class WorkshopMaintenanceFormPageTest extends TestCase
                 'service_category' => 'mechanical',
             ])
             ->assertRedirect(route('workshop.maintenances.create', ['license_plate' => 'NAO0A00']))
-            ->assertSessionHasErrors(['license_plate' => 'Veículo NAO0A00 ainda não está no RevisaLog. Peça ao proprietário para cadastrar o veículo no app; depois registre a OS aqui.']);
+            ->assertSessionHasErrors(['license_plate' => 'Veículo NAO0A00 ainda não está no RevisaLog. Cadastre-o pelo chassi para registrar a OS.']);
 
         $this->assertSame(0, Maintenance::count());
     }

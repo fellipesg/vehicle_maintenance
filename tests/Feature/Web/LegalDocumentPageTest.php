@@ -67,8 +67,8 @@ class LegalDocumentPageTest extends TestCase
     {
         $page = $this->page($this->get(route('legal.privacy'))->assertOk());
 
-        $this->assertSame('7. Seus direitos', $this->text($this->find($page, 'h2#seus-direitos')));
-        $this->assertSame('7. Seus direitos', $this->text($this->find($page, '[data-slot="legal-toc"] a[href="#seus-direitos"]')));
+        $this->assertSame('8. Seus direitos', $this->text($this->find($page, 'h2#seus-direitos')));
+        $this->assertSame('8. Seus direitos', $this->text($this->find($page, '[data-slot="legal-toc"] a[href="#seus-direitos"]')));
     }
 
     public function test_table_of_contents_is_collapsible_on_small_screens_and_sticky_on_desktop(): void

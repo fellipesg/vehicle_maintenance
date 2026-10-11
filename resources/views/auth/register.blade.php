@@ -1,5 +1,5 @@
 {{--
-    Cadastro público (só proprietário; lojas e oficinas falam com a equipe).
+    Cadastro público (só proprietário; oficinas se cadastram em /para-oficinas e lojas falam com a equipe).
 
     Variáveis (AuthController::showRegister):
     - $emailTaken: o envio anterior parou em "Este e-mail já está cadastrado.". A tela oferece entrar
@@ -22,7 +22,8 @@
 @section('content')
     <x-auth.header icon="user" title="Crie sua conta de proprietário" description="Conta gratuita para proprietários de veículos.">
         <p class="text-sm text-muted-foreground">
-            Lojista ou oficina? <x-ui.link :href="route('contact.show', ['assunto' => 'partnership'])" variant="inline">Fale com a equipe</x-ui.link>
+            Tem uma oficina? <x-ui.link :href="route('workshops.landing')" variant="inline">Cadastre sua oficina</x-ui.link>.
+            Lojista? <x-ui.link :href="route('contact.show', ['assunto' => 'partnership'])" variant="inline">Fale com a equipe</x-ui.link>
         </p>
     </x-auth.header>
 
