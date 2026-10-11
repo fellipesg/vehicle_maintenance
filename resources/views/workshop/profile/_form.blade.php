@@ -7,10 +7,10 @@
     Variável: $workshop (na edição).
 --}}
 @php
-    use App\Http\Controllers\Web\Workshop\ProfileController;
+    use App\Support\BrazilianStates;
 
     $workshop = $workshop ?? null;
-    $stateOptions = collect(ProfileController::STATES)->mapWithKeys(fn (string $name, string $uf) => [$uf => "{$name} ({$uf})"])->all();
+    $stateOptions = BrazilianStates::options();
 @endphp
 
 <div class="space-y-6">
