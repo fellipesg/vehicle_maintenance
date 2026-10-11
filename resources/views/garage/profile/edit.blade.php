@@ -72,19 +72,21 @@
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section id="secao-endereco" title="Endereço" description="Endereço da loja, como no cadastro do CNPJ.">
+            <x-ui.form-section id="secao-endereco" title="Endereço" description="Preencha o CEP e o resto do endereço vem junto." data-cep-autofill>
                 <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
                     <x-ui.field name="cep" label="CEP" hint="8 dígitos." optional>
                         <x-ui.input :value="$garage->cep" autocomplete="postal-code" inputmode="numeric"
-                                    data-mask="digits" data-min-digits="8" data-max-digits="8" placeholder="01310100" class="tabular-nums" />
+                                    data-mask="digits" data-min-digits="8" data-max-digits="8" data-cep-input
+                                    placeholder="01310100" class="tabular-nums" />
+                        <p class="mt-1.5 text-sm text-muted-foreground" role="status" aria-live="polite" data-cep-status></p>
                     </x-ui.field>
                     <x-ui.field name="street" label="Rua" optional class="sm:col-span-2">
-                        <x-ui.input :value="$garage->street" maxlength="255" autocomplete="address-line1" />
+                        <x-ui.input :value="$garage->street" maxlength="255" autocomplete="address-line1" data-cep-target="street" />
                     </x-ui.field>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
                     <x-ui.field name="number" label="Número" optional>
-                        <x-ui.input :value="$garage->number" maxlength="255" autocomplete="off" />
+                        <x-ui.input :value="$garage->number" maxlength="255" autocomplete="off" data-cep-focus />
                     </x-ui.field>
                     <x-ui.field name="complement" label="Complemento" optional class="sm:col-span-2">
                         <x-ui.input :value="$garage->complement" maxlength="255" autocomplete="address-line2" />
@@ -92,13 +94,13 @@
                 </div>
                 <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
                     <x-ui.field name="neighborhood" label="Bairro" optional>
-                        <x-ui.input :value="$garage->neighborhood" maxlength="255" autocomplete="address-level3" />
+                        <x-ui.input :value="$garage->neighborhood" maxlength="255" autocomplete="address-level3" data-cep-target="neighborhood" />
                     </x-ui.field>
                     <x-ui.field name="city" label="Cidade" optional>
-                        <x-ui.input :value="$garage->city" maxlength="255" autocomplete="address-level2" />
+                        <x-ui.input :value="$garage->city" maxlength="255" autocomplete="address-level2" data-cep-target="city" />
                     </x-ui.field>
                     <x-ui.field name="state" label="UF" optional>
-                        <x-ui.select :options="$stateOptions" :value="$garage->state" placeholder="Selecione a UF" autocomplete="address-level1" />
+                        <x-ui.select :options="$stateOptions" :value="$garage->state" placeholder="Selecione a UF" autocomplete="address-level1" data-cep-target="state" />
                     </x-ui.field>
                 </div>
             </x-ui.form-section>

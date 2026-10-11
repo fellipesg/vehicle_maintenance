@@ -27,6 +27,7 @@ import { initAdmin } from './admin';
 import { initLanding } from './landing';
 import { initMaintenanceItems } from './maintenance-items';
 import { initGarageMaintenanceForms } from './garage-maintenance-form';
+import { initCepAutofill } from './cep-autofill';
 
 /**
  * Componentes <x-ui.*> primeiro (Preline: overlay, dropdown e remove-element; diálogos, confirmação,
@@ -73,6 +74,7 @@ function initApp() {
     initLanding();
     initMaintenanceItems();
     initGarageMaintenanceForms();
+    initCepAutofill();
 }
 
 // Módulo roda antes do DOMContentLoaded quando vem do @vite; o else cobre carregamento tardio.
