@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\GarageStatus;
+use App\Support\DocumentMask;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -51,7 +52,6 @@ class Garage extends Model
         'state',
     ];
 
-
     /**
      * @return array<string, string>
      */
@@ -94,6 +94,35 @@ class Garage extends Model
     public function isApproved(): bool
     {
         return $this->status === GarageStatus::Approved;
+    }
+
+    /**
+     * Documento como o admin precisa ver para conferir a loja: CNPJ por extenso, porque é número
+     * público de registro, e CPF mascarado (App\Support\DocumentMask), porque é dado pessoal.
+     */
+    public function displayDocument(): ?string
+    {
+        $digits = $this->normalizedDocument();
+
+        if ($digits === null) {
+            return null;
+        }
+
+        return strlen($digits) === 14
+            ? preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $digits)
+            : DocumentMask::cpfOrCnpj($digits);
+    }
+
+    /**
+     * Endereço de uma linha ("Rua X, 10 — Centro — Londrina/PR"), vazio quando não há endereço.
+     */
+    public function addressLine(): string
+    {
+        return collect([
+            collect([$this->street, $this->number])->filter(fn (mixed $part): bool => filled($part))->implode(', '),
+            $this->neighborhood,
+            collect([$this->city, $this->state])->filter(fn (mixed $part): bool => filled($part))->implode('/'),
+        ])->filter(fn (mixed $part): bool => filled($part))->implode(' — ');
     }
 
     /**
