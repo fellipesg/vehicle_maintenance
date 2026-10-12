@@ -33,7 +33,7 @@ abstract class TestCase extends BaseTestCase
      *
      * Existe porque o compose exporta DB_* para $_SERVER, que o Laravel lê antes de $_ENV: já
      * aconteceu de uma configuração do PHPUnit ser ignorada e a suíte rodar — e dar migrate:fresh —
-     * no banco de desenvolvimento. Detalhes em .ai/rules/locale.md.
+     * no banco de desenvolvimento. Detalhes em .ai/rules/ci.md.
      */
     private function guardAgainstTestingOnARealDatabase(): void
     {
@@ -53,7 +53,7 @@ abstract class TestCase extends BaseTestCase
             'Os testes iam rodar na conexão "'.$connection.'" apontando para "'.($url !== '' ? $url : $database).'", '
             .'que não é um banco de teste — o RefreshDatabase apagaria os dados. '
             .'Use sqlite :memory: (phpunit.xml) ou um banco terminado em "_test" '
-            .'(php artisan test --configuration=phpunit.pgsql.xml). '
+            .'(vendor/bin/phpunit --configuration=phpunit.pgsql.xml; `artisan test` recusa a opção). '
             .'Dentro do Docker, confira se os DB_* estão repetidos em <server> na configuração do PHPUnit.',
         );
     }

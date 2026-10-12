@@ -43,7 +43,9 @@ test: ## Test suite in the container (sqlite in-memory, phpunit.xml)
 	$(EXEC) php artisan test --compact
 
 test-pgsql: ## Test suite against the compose Postgres (phpunit.pgsql.xml)
-	$(EXEC) php artisan test --compact --configuration=phpunit.pgsql.xml
+# `artisan test` appends its own --configuration=phpunit.xml and the duplicate makes
+# PHPUnit exit 1 even when the suite passes, so this target calls PHPUnit directly.
+	$(EXEC) vendor/bin/phpunit --configuration=phpunit.pgsql.xml
 
 migrate: ## Run migrations on the compose Postgres
 	$(EXEC) php artisan migrate

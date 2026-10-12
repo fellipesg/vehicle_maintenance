@@ -63,15 +63,22 @@ class ApiPasswordTest extends TestCase
         $user = User::factory()->asUser()->create([
             'password' => Hash::make('senha-antiga-123'),
         ]);
-        $this->actingAsApiUser($user);
 
-        $this->putJson('/api/v1/me/password', [
-            'current_password' => 'senha-antiga-123',
-            'password' => 'senha-nova-456',
-            'password_confirmation' => 'senha-nova-456',
-        ])->assertOk()->assertJsonPath('success', true);
+        // Um token de verdade, e não o mock de Sanctum::actingAs: só assim a requisição
+        // percorre o caminho que decide qual token sobrevive à troca de senha.
+        $currentToken = $user->createToken('mobile-atual', SanctumMobileToken::ABILITIES);
+        $otherDeviceToken = $user->createToken('outro-aparelho', SanctumMobileToken::ABILITIES);
+
+        $this->withHeader('Authorization', 'Bearer '.$currentToken->plainTextToken)
+            ->putJson('/api/v1/me/password', [
+                'current_password' => 'senha-antiga-123',
+                'password' => 'senha-nova-456',
+                'password_confirmation' => 'senha-nova-456',
+            ])->assertOk()->assertJsonPath('success', true);
 
         $this->assertTrue(Hash::check('senha-nova-456', $user->fresh()->password));
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $currentToken->accessToken->getKey()]);
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $otherDeviceToken->accessToken->getKey()]);
     }
 
     public function test_update_rejects_a_wrong_current_password(): void
