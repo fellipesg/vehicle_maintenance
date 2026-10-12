@@ -19,6 +19,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
@@ -43,6 +44,11 @@ class AppServiceProvider extends ServiceProvider
         $this->configureLocale();
 
         Model::preventLazyLoading(! $this->app->isProduction());
+
+        // Em produção, nenhum comando que apaga dados pode rodar: o deploy usa `migrate --force`,
+        // e migrate:fresh/refresh/reset/rollback e db:wipe não fazem parte dele. Vale para quem
+        // abrir um shell na instância com o .env de produção carregado.
+        DB::prohibitDestructiveCommands($this->app->isProduction());
 
         if (! $this->app->runningInConsole() && $this->requestIsHttps()) {
             URL::forceScheme('https');
