@@ -17,6 +17,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
 | app/Http/Requests/Api/** | .ai/rules/requests-api.md |
 | app/Http/Controllers/Web/BlogController.php,app/Http/Controllers/Web/Admin/BlogPostController.php,app/Models/BlogPost.php,resources/views/blog/**,resources/views/admin/blog/** | .ai/rules/blog.md |
+| .github/workflows/**,Makefile,phpunit.xml,phpunit.pgsql.xml | .ai/rules/ci.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
 | config/legal.php, config/mail.php | .ai/rules/config.md |
 | app/Models/VehicleConsignment.php,app/Services/Vehicle/VehicleConsignmentService.php,app/Http/Controllers/Web/Concerns/HandlesVehicleConsignment.php,app/Http/Controllers/Web/ConsignmentOwnerController.php,app/Http/Controllers/Web/Admin/ConsignmentController.php,resources/views/vehicles/entry/**,resources/views/garage/vehicles/_consignment-status.blade.php | .ai/rules/consignment.md |
