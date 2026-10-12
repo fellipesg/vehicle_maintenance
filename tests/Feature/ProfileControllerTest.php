@@ -44,7 +44,35 @@ class ProfileControllerTest extends TestCase
             'id' => $user->id,
             'name' => 'Updated Name',
             'phone' => '43999998888',
+            'country' => 'Brasil',
         ]);
+    }
+
+    public function test_blank_country_is_stored_as_brasil(): void
+    {
+        $user = $this->actingAsApiUser();
+        $user->update(['country' => 'Argentina']);
+
+        $this->putJson('/api/v1/me', [
+            'name' => $user->name,
+            'country' => null,
+        ])->assertOk()
+            ->assertJsonPath('data.country', 'Brasil');
+
+        $this->assertSame('Brasil', $user->fresh()->country);
+    }
+
+    public function test_omitted_country_keeps_the_current_value(): void
+    {
+        $user = $this->actingAsApiUser();
+        $user->update(['country' => 'Argentina']);
+
+        $this->putJson('/api/v1/me', [
+            'name' => 'Só o nome',
+        ])->assertOk()
+            ->assertJsonPath('data.country', 'Argentina');
+
+        $this->assertSame('Argentina', $user->fresh()->country);
     }
 
     public function test_cannot_update_email_via_profile_endpoint(): void

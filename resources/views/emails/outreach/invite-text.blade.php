@@ -1,7 +1,7 @@
 @if($followUp)
 {!! $saudacao !!}
 
-Passando só para saber se a mensagem anterior chegou. Se a oficina quiser aparecer com o próprio nome no histórico dos carros que atende, no lançamento o RevisaLog é sem custo: {!! $link !!}
+Passando só para saber se a mensagem anterior chegou. Se a oficina quiser aparecer com o próprio nome no histórico dos carros que atende, no lançamento o RevisaLog é sem custo, e a conta se cria direto neste link: {!! $link !!}
 
 Se não for o momento, tudo bem. Não envio mais nada.
 
@@ -19,7 +19,8 @@ Quando um cliente registra um serviço feito na sua oficina, vocês podem confir
 
 No lançamento, a oficina usa o RevisaLog sem custo. Se no futuro houver planos pagos, avisamos com antecedência, e nada é cobrado sem a oficina contratar.
 
-Se fizer sentido, é só responder este e-mail ou deixar seu contato aqui: {!! $link !!}
+Se fizer sentido, a oficina pode criar a conta direto neste link, em poucos minutos: {!! $link !!}
+Ou é só responder este e-mail.
 
 Abraço,
 {!! $assinatura !!}

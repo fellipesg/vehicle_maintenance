@@ -14,3 +14,6 @@ Vehicle search and /v/: chassis and RENAVAM go through App\Support\Vehicle\Vehic
 
 ## Every surface for a non-owner masks, short chassis included
 VehicleIdentifierMask::chassis keeps 3 + 4 characters only on a 17-character VIN; a shorter (pre-1990) chassis shows at most 40% of it, at the end ("BA1234567" -> "••••••567"), so the public search (exact chassis match) is not a guessing oracle. The same Gate update rule masks the web vehicle pages (garage.vehicles.show and user.vehicles.show pass identifiersMasked to x-vehicle.detail) and the history PDF (the export and e-mail jobs decide with VehicleIdentifierVisibility::showsFullIdentifiers for the requester).
+
+## Consulta pública de OS sem proprietário
+Busca pública, /v/{código} e PDF só mostram o mínimo (data, km, tipo, itens, oficina, selo) de OS pending/declined, nunca anexos nem descrição, e nada do que o proprietário ocultou (/v/ responde 404). A consulta por chassi da oficina (GET /api/v1/workshop/vehicles/lookup, throttle workshop-chassis-lookup) devolve só {id, has_owner:true} quando o carro tem dono.

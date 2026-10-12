@@ -4,6 +4,9 @@
     (resources/js/form-ux.js); o servidor também tira pontos e traços antes de validar, então
     "01310-100" vale. UF é uma lista. Redes aceitam "@perfil" ou o link.
 
+    O CEP tem data-cep-autofill: com os 8 dígitos, resources/js/workshop-address-cep.js busca no
+    ViaCEP e preenche rua, bairro, cidade e UF. Sem o script, tudo continua sendo digitado.
+
     Variável: $workshop (na edição).
 --}}
 @php
@@ -55,21 +58,20 @@
         </x-ui.field>
     </x-ui.form-section>
 
-    <x-ui.form-section id="secao-endereco" title="Endereço" description="Preencha o CEP e o resto do endereço vem junto. Usado no diretório de oficinas e no mapa." data-cep-autofill>
+    <x-ui.form-section id="secao-endereco" title="Endereço" description="Usado no diretório de oficinas e no mapa.">
         <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
             <x-ui.field name="cep" label="CEP" hint="8 dígitos." required>
                 <x-ui.input :value="$workshop?->cep" required autocomplete="postal-code" inputmode="numeric"
-                            data-mask="digits" data-min-digits="8" data-max-digits="8" data-cep-input
+                            data-mask="digits" data-min-digits="8" data-max-digits="8" data-cep-autofill
                             placeholder="01310100" class="tabular-nums" />
-                <p class="mt-1.5 text-sm text-muted-foreground" role="status" aria-live="polite" data-cep-status></p>
             </x-ui.field>
             <x-ui.field name="street" label="Rua" required class="sm:col-span-2">
-                <x-ui.input :value="$workshop?->street" required maxlength="255" autocomplete="address-line1" data-cep-target="street" />
+                <x-ui.input :value="$workshop?->street" required maxlength="255" autocomplete="address-line1" />
             </x-ui.field>
         </div>
         <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
             <x-ui.field name="number" label="Número" required>
-                <x-ui.input :value="$workshop?->number" required maxlength="20" autocomplete="off" data-cep-focus />
+                <x-ui.input :value="$workshop?->number" required maxlength="20" autocomplete="off" />
             </x-ui.field>
             <x-ui.field name="complement" label="Complemento" optional class="sm:col-span-2">
                 <x-ui.input :value="$workshop?->complement" maxlength="255" autocomplete="address-line2" />
@@ -77,13 +79,13 @@
         </div>
         <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
             <x-ui.field name="neighborhood" label="Bairro" required>
-                <x-ui.input :value="$workshop?->neighborhood" required maxlength="255" autocomplete="address-level3" data-cep-target="neighborhood" />
+                <x-ui.input :value="$workshop?->neighborhood" required maxlength="255" autocomplete="address-level3" />
             </x-ui.field>
             <x-ui.field name="city" label="Cidade" required>
-                <x-ui.input :value="$workshop?->city" required maxlength="255" autocomplete="address-level2" data-cep-target="city" />
+                <x-ui.input :value="$workshop?->city" required maxlength="255" autocomplete="address-level2" />
             </x-ui.field>
             <x-ui.field name="state" label="UF" required>
-                <x-ui.select :options="$stateOptions" :value="$workshop?->state" placeholder="Selecione a UF" required autocomplete="address-level1" data-cep-target="state" />
+                <x-ui.select :options="$stateOptions" :value="$workshop?->state" placeholder="Selecione a UF" required autocomplete="address-level1" />
             </x-ui.field>
         </div>
     </x-ui.form-section>

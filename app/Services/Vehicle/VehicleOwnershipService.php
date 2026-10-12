@@ -8,6 +8,7 @@ use App\Models\VehicleAccessGrant;
 use App\Notifications\VehicleClaimedByAnotherAccountNotification;
 use App\Services\Crlv\CrlvExerciseValidator;
 use App\Services\Crlv\CrlvParseResult;
+use App\Services\Maintenance\WorkshopRecordsArrivalNotifier;
 use App\Support\VehiclePlateSearch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -18,6 +19,7 @@ class VehicleOwnershipService
     public function __construct(
         private readonly CrlvExerciseValidator $exerciseValidator,
         private readonly VehiclePlateHistoryService $plateHistory,
+        private readonly WorkshopRecordsArrivalNotifier $arrivalNotifier,
     ) {}
 
     /**
@@ -130,6 +132,12 @@ class VehicleOwnershipService
             $currentPlate = VehiclePlateSearch::normalize((string) $vehicle->license_plate);
 
             if ($crlvPlate !== '' && $crlvPlate !== $currentPlate) {
+                $plateTaken = VehiclePlateSearch::findByPlate($crlvPlate)?->vehicle;
+
+                if ($plateTaken !== null && $plateTaken->id !== $vehicle->id) {
+                    throw new RuntimeException('A placa do CRLV-e já está em outro veículo cadastrado. Fale com a equipe RevisaLog para vinculá-lo à sua conta.');
+                }
+
                 $this->plateHistory->changePlate($vehicle, $crlvPlate, 'crlv_import', $user);
             }
 
@@ -138,6 +146,7 @@ class VehicleOwnershipService
                 'chassis' => $crlv->chassis !== null && $crlv->chassis !== ''
                     ? Vehicle::normalizeChassis($crlv->chassis)
                     : $vehicle->chassis,
+                'renavam' => $this->renavamAfterClaim($vehicle, $crlv),
             ]);
 
             if ($existingLink !== null) {
@@ -156,7 +165,90 @@ class VehicleOwnershipService
             Notification::send($previousOwners, new VehicleClaimedByAnotherAccountNotification($vehicle));
         }
 
+        $this->arrivalNotifier->notify($user, $vehicle);
+
         return $vehicle;
+    }
+
+    /**
+     * App: o proprietário cadastra à mão um veículo cujo chassi bate com um veículo que a oficina criou
+     * só pelo chassi (sem placa, RENAVAM nem dono). O vínculo NÃO é verificado
+     * (ownership_verified_at nulo): sem o CRLV-e ele pode vincular ou recusar o registro mínimo e
+     * ocultá-lo, mas não aceitar notas e fotos. Placa e RENAVAM entram dos dados informados quando
+     * ninguém mais os usa.
+     *
+     * @param  array<string, mixed>  $vehicleData
+     */
+    public function claimUnclaimedWorkshopVehicle(User $user, Vehicle $vehicle, array $vehicleData): Vehicle
+    {
+        $vehicle = DB::transaction(function () use ($user, $vehicle, $vehicleData): Vehicle {
+            $updates = [];
+            $plate = VehiclePlateSearch::normalize((string) ($vehicleData['license_plate'] ?? ''));
+            $renavam = $this->normalizeDigits((string) ($vehicleData['renavam'] ?? ''));
+
+            if ($renavam !== '' && blank($vehicle->renavam) && Vehicle::findByRenavam($renavam) === null) {
+                $updates['renavam'] = $renavam;
+            }
+
+            foreach (['color', 'motorization', 'engine'] as $field) {
+                if (filled($vehicleData[$field] ?? null) && blank($vehicle->{$field})) {
+                    $updates[$field] = $vehicleData[$field];
+                }
+            }
+
+            if (isset($vehicleData['current_kilometers'])) {
+                $updates['current_kilometers'] = max((int) $vehicleData['current_kilometers'], (int) $vehicle->current_kilometers);
+            }
+
+            if ($updates !== []) {
+                $vehicle->update($updates);
+            }
+
+            if ($plate !== '' && blank($vehicle->license_plate) && VehiclePlateSearch::findByPlate($plate) === null) {
+                $this->plateHistory->changePlate($vehicle, $plate, 'api', $user);
+            }
+
+            $user->vehicles()->attach($vehicle->id, [
+                'purchase_date' => $vehicleData['purchase_date'] ?? now(),
+                'is_current_owner' => true,
+                'tenant_id' => $user->tenant_id,
+                'ownership_verified_at' => null,
+                'ownership_type' => 'owner',
+                'terms_accepted_at' => now(),
+                'terms_version' => config('legal.terms_version'),
+            ]);
+
+            return $vehicle->fresh();
+        });
+
+        $this->arrivalNotifier->notify($user, $vehicle);
+
+        return $vehicle;
+    }
+
+    /**
+     * RENAVAM do veículo criado pela oficina vem do CRLV-e no vínculo. Se outro veículo já usa esse
+     * número, o vínculo para: não dá para repetir um RENAVAM e a equipe precisa conferir.
+     */
+    private function renavamAfterClaim(Vehicle $vehicle, CrlvParseResult $crlv): ?string
+    {
+        if ($this->normalizeDigits((string) $vehicle->renavam) !== '') {
+            return $vehicle->renavam;
+        }
+
+        $renavam = $crlv->normalizedRenavam();
+
+        if ($renavam === '') {
+            return null;
+        }
+
+        $other = Vehicle::findByRenavam($renavam);
+
+        if ($other !== null && $other->id !== $vehicle->id) {
+            throw new RuntimeException('O RENAVAM do CRLV-e já está em outro veículo cadastrado. Fale com a equipe RevisaLog para vinculá-lo à sua conta.');
+        }
+
+        return $renavam;
     }
 
     public function requestConsignmentAccess(
@@ -326,7 +418,15 @@ class VehicleOwnershipService
             throw new RuntimeException('O chassi do CRLV-e não confere com o veículo cadastrado.');
         }
 
-        if ($crlv->normalizedRenavam() !== $this->normalizeDigits($vehicle->renavam)) {
+        $vehicleRenavam = $this->normalizeDigits((string) $vehicle->renavam);
+
+        if ($vehicleRenavam === '') {
+            // Veículo criado pela oficina sem RENAVAM: o chassi inteiro e igual é a prova, e o
+            // RENAVAM do documento passa a ser o do cadastro (renavamAfterClaim).
+            if ($crlvChassis === '' || $vehicleChassis === '' || $crlvChassis !== $vehicleChassis) {
+                throw new RuntimeException('O chassi do CRLV-e não confere com o veículo cadastrado.');
+            }
+        } elseif ($crlv->normalizedRenavam() !== $vehicleRenavam) {
             throw new RuntimeException('O RENAVAM do CRLV-e não confere com o veículo cadastrado.');
         }
 

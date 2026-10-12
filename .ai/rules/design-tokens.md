@@ -21,3 +21,6 @@ Text ≥ 4.5:1 (large text 3:1); control borders, focus indicators and state ≥
 
 ## Motion: short, functional, off with reduced motion
 Durations only from the tokens (duration-fast|base|slow; --duration-hero 500ms only in landing CSS), easing ease-smooth-out. Loops (animate-spin/pulse) and hover/active movement (hover:-translate-y-0.5, group-hover:scale, active:scale) always go behind motion-safe:, and only clickable elements lift. app.css keeps the global @media (prefers-reduced-motion: reduce) safety net and html uses motion-safe:scroll-smooth. In the portals and on credential screens motion is functional only: 1.5s check when copying (x-ui.copy-button), toast after an action, 150ms fade when a panel, tab or filtered list changes (x-ui.tab-panel, [data-provenance-filtered] cards, the admin maintenance results) and the opening of sheet, dropdown and dialog. No click-spark, liquid-metal, flip-text, text-stream, Lenis or gsap. DesignSystemGuardrailsTest and PortalMotionTest enforce it.
+
+## Telas novas de convite
+/convite/{token} e /convite/descadastrar usam só x-ui.* existentes (container, page-header, card, button) e meta noindex; não criam token novo.

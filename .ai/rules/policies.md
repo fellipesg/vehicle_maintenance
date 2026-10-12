@@ -13,3 +13,6 @@ Besides the tenant, MaintenancePolicy::update/delete require the account to be t
 
 ## API link claims an unowned vehicle with plate and RENAVAM
 VehiclePolicy::link allows the current owner, and any account when no other tenant is the current owner. POST /api/v1/vehicles/{id}/link then requires license_plate and renavam matching the vehicle (LinkVehicleRequest, VehicleOwnershipService::documentMatchesVehicle), throttled by vehicle-link. A vehicle another tenant currently owns stays 403 even with the right document. Ownership claimed this way is not verified; only a CRLV-e import verifies it. POST /api/v1/maintenances for any non-workshop account authorizes VehiclePolicy::addMaintenance, like the web stores; a consignment dealer or an admin gets 403 instead of moving the owner's odometer with a record nobody can undo.
+
+## OS sem proprietário: oculta e anexos pendentes
+MaintenancePolicy::view nega a OS oculta (hidden_from_public_at) para quem não é a oficina autora nem quem ocultou. InvoicePolicy::view nega a nota enquanto Maintenance::hidesAttachmentsFrom (OS sem dono sem aceite do proprietário), mesmo para o dono atual do veículo. Só o dono atual (VehiclePolicy::update) decide (MaintenanceOwnerDecisionService::decide).

@@ -15,6 +15,9 @@ Validation messages come from lang/pt_BR/validation.php and framework strings fr
 ## API messages are still English on purpose
 Some API messages (ApiResponse::validation, the error envelope in bootstrap/app.php, TwoFactor/Auth/Invoice controllers, RegisterRequest, UpdateProfileRequest) are English. Translate them only in an API change that first confirms the Flutter app does not compare those strings.
 
+## Mensagens de registros de oficinas
+Decisão do proprietário e convite respondem 422 com message em pt-BR no envelope da API (ApiResponse::error com a primeira mensagem); e-mail inválido ou suprimido usa a mesma frase genérica "Não foi possível enviar para este e-mail." para não revelar a supressão.
+
 ## Os DB_* dos testes precisam de <server>, não só de <env>
 No Docker o compose exporta `DB_CONNECTION`, `DB_DATABASE` e `DB_URL` para o processo, e o PHP
 recebe isso em `$_SERVER`. O repositório de env do Laravel lê `$_SERVER` **antes** de `$_ENV`, e o

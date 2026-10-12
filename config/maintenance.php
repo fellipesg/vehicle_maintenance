@@ -15,4 +15,28 @@ return [
 
     'auto_verify_linked_workshop' => (bool) env('MAINTENANCE_AUTO_VERIFY_LINKED_WORKSHOP', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Convite ao cliente pela OS (carro sem proprietário)
+    |--------------------------------------------------------------------------
+    |
+    | Máximo de e-mails de convite que uma oficina envia nas últimas 24 horas.
+    | Cada OS aceita um único e-mail de convite.
+    |
+    */
+
+    'invite_email_daily_limit' => (int) env('MAINTENANCE_INVITE_EMAIL_DAILY_LIMIT', 30),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Anexos pendentes (LGPD)
+    |--------------------------------------------------------------------------
+    |
+    | Notas fiscais e fotos de uma OS sem proprietário que ele não aceitou em
+    | tantos dias são apagadas pelo comando maintenance:purge-pending-attachments.
+    |
+    */
+
+    'pending_attachments_retention_days' => (int) env('MAINTENANCE_PENDING_ATTACHMENTS_RETENTION_DAYS', 90),
+
 ];

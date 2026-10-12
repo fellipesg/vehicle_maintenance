@@ -9,7 +9,11 @@ use App\Models\Workshop;
 
 class TenantService
 {
-    public function createForUser(User $user): Tenant
+    /**
+     * @param  array<string, mixed>  $workshopAttributes  Dados reais da oficina (cadastro próprio); sem
+     *                                                    eles, a oficina nasce com o endereço de demonstração.
+     */
+    public function createForUser(User $user, array $workshopAttributes = []): Tenant
     {
         if ($user->tenant_id) {
             return $user->tenant;
@@ -51,6 +55,7 @@ class TenantService
                 'neighborhood' => 'Centro',
                 'city' => 'Londrina',
                 'state' => 'PR',
+                ...$workshopAttributes,
             ]);
         }
 

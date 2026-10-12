@@ -28,3 +28,6 @@ The page footer ("RevisaLog · Página X de Y" plus the vehicle) is drawn by Veh
 
 ## Identifiers follow the requester
 The template receives $identifiersMasked (VehicleMaintenancePdfExporter::generate(..., maskIdentifiers:)). When true, chassis and RENAVAM go through VehicleIdentifierMask and the engine code is left out. GenerateVehicleMaintenancePdfExport and EmailVehicleMaintenancePdf compute it from the requester with VehicleIdentifierVisibility::showsFullIdentifiers (full numbers only for Gate update), so a consignment holder or an admin gets the masked PDF.
+
+## Registros de oficina no PDF seguem quem pediu
+VehicleMaintenancePdfExporter::generate(..., viewer:) passa o solicitante ao MaintenanceRedactor. No PDF do próprio proprietário, o registro que ele vinculou e ocultou da consulta pública continua aparecendo (ocultar vale só para os outros); pendentes e recusados saem na forma mínima. Sem viewer, ou com outra pessoa (admin, lojista em consignação), o ocultado não entra.

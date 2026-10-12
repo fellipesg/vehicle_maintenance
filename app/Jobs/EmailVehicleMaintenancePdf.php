@@ -33,6 +33,7 @@ class EmailVehicleMaintenancePdf implements ShouldQueue
         $file = $exporter->generate(
             $this->vehicle,
             maskIdentifiers: ! VehicleIdentifierVisibility::showsFullIdentifiers($this->user, $this->vehicle),
+            viewer: $this->user,
         );
 
         try {

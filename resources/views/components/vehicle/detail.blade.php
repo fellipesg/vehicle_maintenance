@@ -101,6 +101,10 @@
             ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)]);
     }
 
+    // OS de oficina sem proprietário: forma mínima para quem não é a oficina autora; as ocultadas
+    // pelo proprietário saem (App\Support\Maintenance\MaintenanceRedactor).
+    $detailMaintenances = \App\Support\Maintenance\MaintenanceRedactor::redactAll($detailMaintenances, auth()->user());
+
     $detailHistory = VehicleMaintenanceHistory::inTimelineOrder($detailMaintenances);
     $detailById = $detailHistory->keyBy('id');
     $detailTotal = $detailHistory->count();
@@ -152,7 +156,7 @@
         : $vehicle->plates()->orderByDesc('started_at')->orderByDesc('id')->get();
     $detailRenavam = $detailMasked ? VehicleIdentifierMask::renavam($vehicle->renavam) : $vehicle->renavam;
     $detailDocuments = array_filter([
-        'Placa atual' => $vehicle->license_plate,
+        'Placa atual' => filled($vehicle->license_plate) ? $vehicle->license_plate : ($detailMasked ? null : 'Placa não informada'),
         'RENAVAM' => $detailRenavam,
         'Número do CRV' => $detailMasked ? null : $vehicle->crv_number,
         'Motorização' => $vehicle->motorization,

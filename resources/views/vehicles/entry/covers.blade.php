@@ -9,7 +9,7 @@
     $coversVehicleName = trim($vehicle->brand.' '.$vehicle->model);
     $entryStep = \App\Support\Vehicle\VehicleEntryFlow::STEP_COVERS;
     $entryTitle = 'Adicionar capas';
-    $entryDescription = $coversVehicleName.' · '.$vehicle->license_plate.'. Opcional: a capa paisagem aparece em telas largas; a retrato, no celular, nos avatares e no PDF do histórico.';
+    $entryDescription = $coversVehicleName.(filled($vehicle->license_plate) ? ' · '.$vehicle->license_plate : '').'. Opcional: a capa paisagem aparece em telas largas; a retrato, no celular, nos avatares e no PDF do histórico.';
     $entryBreadcrumbs = [
         [$flow->listLabel(), $flow->listUrl()],
         [$coversVehicleName, $flow->vehicleUrl($vehicle)],

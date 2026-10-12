@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\Maintenance\MaintenanceRedactor;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,8 +14,13 @@ class MaintenanceResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $photos = $this->whenLoaded('photos', function () use ($request) {
-            $collection = $this->photos;
+        // OS de oficina sem proprietário: forma mínima (sem descrição, valores, garantias, notas e
+        // fotos) para quem não é a oficina autora. Cópia em memória, nada é gravado.
+        $maintenance = MaintenanceRedactor::redact($this->resource, $request->user());
+        $isOwnerless = $maintenance->isOwnerlessRecord();
+
+        $photos = $this->whenLoaded('photos', function () use ($request, $maintenance) {
+            $collection = $maintenance->photos;
 
             if ($this->shouldExposeAllPhotos($request)) {
                 return MaintenancePhotoResource::collection($collection);
@@ -31,7 +37,7 @@ class MaintenanceResource extends JsonResource
             'user_id' => $this->user_id,
             'workshop_id' => $this->workshop_id,
             'maintenance_type' => $this->maintenance_type,
-            'description' => $this->description,
+            'description' => $maintenance->description,
             'workshop_name' => $this->displayWorkshopName(),
             'maintenance_date' => $this->maintenance_date?->toDateString(),
             'kilometers' => $this->kilometers,
@@ -44,7 +50,18 @@ class MaintenanceResource extends JsonResource
             'provenance_sublabel' => $this->provenance_sublabel,
             'provenance_card_label' => $this->provenance_card_label,
             'provenance_meta' => $this->provenance_meta,
-            'invoices_count' => $this->when(isset($this->invoices_count), $this->invoices_count),
+            'invoices_count' => $this->when(isset($maintenance->invoices_count), $maintenance->invoices_count),
+            'is_ownerless_record' => $isOwnerless,
+            'owner_status' => $maintenance->owner_status,
+            'attachments_status' => $isOwnerless ? $maintenance->attachments_status : null,
+            'hidden_from_public' => $maintenance->isHiddenFromPublic(),
+            $this->mergeWhen(
+                $isOwnerless && $this->resource->isCreatedByWorkshopOf($request->user()),
+                fn () => [
+                    'whatsapp_invited_at' => $this->resource->invite?->whatsapp_invited_at?->toIso8601String(),
+                    'email_invited_at' => $this->resource->invite?->email_invited_at?->toIso8601String(),
+                ],
+            ),
             'verified_workshop' => new WorkshopResource($this->whenLoaded('verifiedWorkshop')),
             'verification_code' => $this->when($this->isVerified(), $this->verification_code),
             'verification_url' => $this->when($this->isVerified(), $this->verificationUrl()),
@@ -52,10 +69,10 @@ class MaintenanceResource extends JsonResource
             'vehicle' => new VehicleResource($this->whenLoaded('vehicle')),
             'user' => new UserResource($this->whenLoaded('user')),
             'workshop' => new WorkshopResource($this->whenLoaded('workshop')),
-            'items' => MaintenanceItemResource::collection($this->whenLoaded('items')),
-            'general_warranty' => new MaintenanceWarrantyResource($this->whenLoaded('generalWarranty')),
-            'warranties' => MaintenanceWarrantyResource::collection($this->whenLoaded('warranties')),
-            'invoices' => InvoiceResource::collection($this->whenLoaded('invoices')),
+            'items' => MaintenanceItemResource::collection($this->when($maintenance->relationLoaded('items'), fn () => $maintenance->items)),
+            'general_warranty' => new MaintenanceWarrantyResource($this->when($maintenance->relationLoaded('generalWarranty'), fn () => $maintenance->generalWarranty)),
+            'warranties' => MaintenanceWarrantyResource::collection($this->when($maintenance->relationLoaded('warranties'), fn () => $maintenance->warranties)),
+            'invoices' => InvoiceResource::collection($this->when($maintenance->relationLoaded('invoices'), fn () => $maintenance->invoices)),
             'checklists' => ChecklistResource::collection($this->whenLoaded('checklists')),
             'photos' => $photos,
             'created_at' => $this->created_at?->toIso8601String(),

@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -59,7 +60,7 @@ class AppServiceProvider extends ServiceProvider
             $request,
             fn (Request $request, array $headers) => redirect()
                 ->back()
-                ->withInput($request->only('email', 'name', 'phone', 'document'))
+                ->withInput($request->only('email', 'name', 'phone', 'document', 'trade_name', 'cnpj', 'ref'))
                 ->withErrors([
                     'email' => $this->tooManyAttemptsMessage($headers),
                 ]),
@@ -73,9 +74,27 @@ class AppServiceProvider extends ServiceProvider
             'search|'.$request->ip(),
         ));
 
+        // Mesmos limites do pedido de link pelo portal (PasswordResetController): por e-mail e
+        // aparelho a cada 15 minutos, mais um teto por aparelho para qualquer e-mail.
+        RateLimiter::for('password-forgot', fn (Request $request) => [
+            Limit::perMinutes(15, 5)->by(
+                'password-forgot|'.Str::lower((string) $request->input('email', '')).'|'.$request->ip(),
+            ),
+            Limit::perHour(20)->by('password-forgot-ip|'.$request->ip()),
+        ]);
+
         // Claiming a vehicle is guarded by plate + RENAVAM, so cap the guesses per account.
         RateLimiter::for('vehicle-link', fn (Request $request) => Limit::perMinute(10)->by(
             'vehicle-link|'.($request->user()?->id ?: $request->ip()),
+        ));
+
+        // Consulta por chassi da oficina: limitada para não virar sondagem de carros alheios.
+        RateLimiter::for('workshop-chassis-lookup', fn (Request $request) => Limit::perMinute(20)->by(
+            'workshop-chassis|'.($request->user()?->id ?: $request->ip()),
+        ));
+
+        RateLimiter::for('workshop-invites', fn (Request $request) => Limit::perMinute(20)->by(
+            'workshop-invites|'.($request->user()?->id ?: $request->ip()),
         ));
 
         RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(10)->by(
@@ -152,12 +171,12 @@ class AppServiceProvider extends ServiceProvider
 
     private function isLoginRequest(Request $request): bool
     {
-        return ! $request->is('api/v1/register', 'register', 'api/v1/auth/*/callback', 'api/v1/auth/apple');
+        return ! $request->is('api/v1/register', 'register', 'para-oficinas/cadastro', 'api/v1/auth/*/callback', 'api/v1/auth/apple');
     }
 
     private function authRateLimitKey(Request $request): string
     {
-        if ($request->is('api/v1/register', 'register')) {
+        if ($request->is('api/v1/register', 'register', 'para-oficinas/cadastro')) {
             return 'register|'.$request->ip();
         }
 

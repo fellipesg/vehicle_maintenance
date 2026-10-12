@@ -42,6 +42,13 @@ class MaintenancePhoto extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::created(function (MaintenancePhoto $photo): void {
+            $photo->maintenance?->markAttachmentsPendingIfNeeded();
+        });
+    }
+
     protected function url(): Attribute
     {
         return Attribute::get(fn (): string => AppStorage::url($this->path));

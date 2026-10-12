@@ -37,6 +37,9 @@
         'user',
     ]);
 
+    // OS de oficina sem proprietário: forma mínima para quem não é a oficina autora.
+    $maintenance = \App\Support\Maintenance\MaintenanceRedactor::redact($maintenance, auth()->user());
+
     $detailPortal = MaintenanceLinks::portal($portal ?? null);
     $detailVehicle = $maintenance->vehicle;
     $detailVehicleUrlOption = $vehicleUrl ?? null;

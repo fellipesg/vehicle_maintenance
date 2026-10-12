@@ -21,6 +21,8 @@
     $claimTotal = (int) ($vehicle->maintenances_count ?? 0);
     $claimSealed = (int) ($vehicle->verified_maintenances_count ?? 0);
     $claimDeclared = max(0, $claimTotal - $claimSealed);
+    $claimAwaiting = (int) ($vehicle->awaiting_decision_maintenances_count ?? 0);
+    $claimOrdinary = max(0, $claimTotal - $claimAwaiting);
     $claimName = trim($vehicle->brand.' '.$vehicle->model);
 @endphp
 
@@ -48,10 +50,15 @@
             <x-vehicle-cover :vehicle="$vehicle" />
             <div class="min-w-0 space-y-2">
                 <p class="font-semibold text-foreground">{{ $claimName }}@if($vehicle->year) <span class="font-normal text-muted-foreground">· {{ $vehicle->year }}</span>@endif</p>
-                <p class="text-sm text-muted-foreground">Placa atual <span class="font-mono font-semibold tracking-wider text-foreground">{{ $vehicle->license_plate }}</span></p>
+                <p class="text-sm text-muted-foreground">@if(filled($vehicle->license_plate))Placa atual <span class="font-mono font-semibold tracking-wider text-foreground">{{ $vehicle->license_plate }}</span>@else Placa não informada: ela vem do CRLV-e. @endif</p>
                 <div data-claim-history>
                     @if($claimTotal > 0)
-                        <p class="text-sm text-foreground">{{ \App\Support\Vehicle\VehicleMaintenanceHistory::countLabel($claimTotal) }} no histórico, que passa a aparecer para você:</p>
+                        @if($claimAwaiting > 0)
+                            <p class="text-sm text-foreground" data-claim-awaiting>{{ $claimAwaiting === 1 ? '1 registro de oficina aguarda' : $claimAwaiting.' registros de oficina aguardam' }} a sua decisão em <a href="{{ route('user.workshop-records.index') }}" class="link">Registros de oficinas</a>.</p>
+                        @endif
+                        @if($claimOrdinary > 0)
+                            <p class="text-sm text-foreground">{{ \App\Support\Vehicle\VehicleMaintenanceHistory::countLabel($claimOrdinary) }} no histórico, que passa a aparecer para você:</p>
+                        @endif
                         <div class="mt-2 flex flex-wrap gap-2">
                             @if($claimSealed > 0)
                                 <x-ui.badge variant="seal">{{ $claimSealed }} com Selo da oficina</x-ui.badge>

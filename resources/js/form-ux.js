@@ -245,6 +245,26 @@ function bindDocumentMask(input) {
     apply();
 }
 
+function bindCnpjMask(input) {
+    const apply = () => {
+        const digits = digitsOnly(input.value).slice(0, 14);
+        input.value = digits
+            .replace(/^(\d{2})(\d)/, '$1.$2')
+            .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+            .replace(/\.(\d{3})(\d)/, '.$1/$2')
+            .replace(/(\d{4})(\d)/, '$1-$2');
+        if (!digits) {
+            setFieldState(input, true, '');
+            return;
+        }
+        const ok = digits.length === 14;
+        setFieldState(input, ok, ok ? 'CNPJ completo' : 'O CNPJ tem 14 dígitos');
+    };
+    input.setAttribute('inputmode', 'numeric');
+    watchField(input, apply);
+    apply();
+}
+
 function bindPasswordCriteria(form) {
     const password = form.querySelector('[data-password-field]');
     const confirmation = form.querySelector('[data-password-confirmation]');
@@ -316,6 +336,7 @@ function initFormUx(root = document) {
     root.querySelectorAll('[data-mask="chassis"]').forEach(bindChassisMask);
     root.querySelectorAll('[data-mask="year"]').forEach(bindYearField);
     root.querySelectorAll('[data-mask="document"]').forEach(bindDocumentMask);
+    root.querySelectorAll('[data-mask="cnpj"]').forEach(bindCnpjMask);
     root.querySelectorAll('form[data-password-form]').forEach(bindPasswordCriteria);
 }
 

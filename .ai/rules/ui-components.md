@@ -38,3 +38,6 @@ Visible brand text is "RevisaLog" (titles, copy, alt, e-mail, og). Domain and ad
 
 ## Domain components for vehicles and maintenances
 Vehicle page, lists and maintenance detail are the same in every portal: <x-vehicle.detail> (one H1, cover, identity, timeline, history, documents; portal via App\Enums\Portal), <x-vehicle.card> (listings), <x-maintenance.list> (+ App\Support\Maintenance\MaintenanceListFilters in the controller) and @include('maintenances._detail', ['maintenance' => ..., 'portal' => Portal::X]). Provenance pieces are x-provenance-seal, x-provenance-card, x-provenance-marker (aria-hidden) and x-provenance-legend. Rules in .ai/rules/domain-components.md.
+
+## Texto livre da OS
+Campos de texto livre da OS da oficina (descrição e descrição do item) trazem a dica "Não inclua nome, CPF, telefone ou placa do cliente."

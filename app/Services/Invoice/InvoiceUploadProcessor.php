@@ -6,9 +6,12 @@ use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Support\AppStorage;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 
 class InvoiceUploadProcessor
 {
+    private const ALLOWED_EXTENSIONS = ['pdf', 'xml'];
+
     public function __construct(
         private readonly InvoiceParser $parser,
         private readonly InvoiceItemSyncer $syncer,
@@ -57,10 +60,9 @@ class InvoiceUploadProcessor
                 continue;
             }
 
-            $fileName = time().'_'.$file->getClientOriginalName();
-            $path = $file->storeAs('invoices', $fileName, AppStorage::diskName());
+            $path = $this->storeFile($file);
 
-            if (! is_string($path) || $path === '') {
+            if ($path === null) {
                 continue;
             }
 
@@ -71,6 +73,24 @@ class InvoiceUploadProcessor
         }
 
         return $stored;
+    }
+
+    /**
+     * Store an invoice under a random name; the client file name never reaches the path.
+     */
+    public function storeFile(UploadedFile $file): ?string
+    {
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+
+        if (! in_array($extension, self::ALLOWED_EXTENSIONS, true)) {
+            $extension = strtolower((string) $file->guessExtension());
+        }
+
+        $extension = preg_replace('/[^a-z0-9]/', '', $extension) ?? '';
+        $fileName = Str::random(40).($extension !== '' ? '.'.$extension : '');
+        $path = $file->storeAs('invoices', $fileName, AppStorage::diskName());
+
+        return is_string($path) && $path !== '' ? $path : null;
     }
 
     /**
