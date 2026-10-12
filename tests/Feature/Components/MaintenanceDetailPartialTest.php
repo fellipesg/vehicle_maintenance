@@ -188,9 +188,14 @@ class MaintenanceDetailPartialTest extends TestCase
 
     public function test_declared_maintenance_without_warranty_items_or_attachments(): void
     {
-        $maintenance = Maintenance::factory()->declaredByOwner()->create(['service_category' => 'unknown', 'kilometers' => null]);
+        $maintenance = Maintenance::factory()->declaredByOwner()->create(['kilometers' => null]);
 
-        $html = view('maintenances._detail', ['maintenance' => $maintenance->fresh(), 'portal' => 'user', 'vehicleUrl' => false])->render();
+        // A categoria fica só em memória: a check constraint da tabela recusa valores fora do
+        // enum, e o que se testa aqui é o rótulo de fallback da view para categoria desconhecida.
+        $detail = $maintenance->fresh();
+        $detail->service_category = 'unknown';
+
+        $html = view('maintenances._detail', ['maintenance' => $detail, 'portal' => 'user', 'vehicleUrl' => false])->render();
         $xpath = $this->parseHtml($html);
 
         $this->assertStringContainsString('Declarada pelo proprietário', $html);

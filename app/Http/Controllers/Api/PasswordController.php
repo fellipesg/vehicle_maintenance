@@ -52,7 +52,13 @@ class PasswordController extends Controller
         // Sanctum::actingAs (e o cliente web por sessão) usa um TransientToken, que não está na
         // tabela e não tem chave; só um token de verdade pode ser poupado.
         $currentToken = $user->currentAccessToken();
-        $currentTokenId = $currentToken instanceof Model ? $currentToken->getKey() : null;
+        $currentTokenKey = $currentToken instanceof Model ? $currentToken->getKey() : null;
+
+        // Um TransientToken não tem chave, e o dublê de Sanctum::actingAs devolve `false`.
+        // Postgres recusa esse valor numa coluna bigint, então só uma chave real passa.
+        $currentTokenId = is_int($currentTokenKey) || (is_string($currentTokenKey) && $currentTokenKey !== '')
+            ? $currentTokenKey
+            : null;
 
         $user->forceFill([
             'password' => Hash::make((string) $request->validated('password')),
