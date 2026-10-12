@@ -43,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'abilities' => CheckAbilities::class,
             'ability' => CheckApiAbility::class,
             'user.type' => \App\Http\Middleware\EnsureUserType::class,
+            'garage.approved' => \App\Http\Middleware\EnsureGarageApproved::class,
             'tenant' => \App\Http\Middleware\SetTenantContext::class,
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
             'etag.vehicle_list' => \App\Http\Middleware\EtagForVehicleList::class,

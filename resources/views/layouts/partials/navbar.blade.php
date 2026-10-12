@@ -22,7 +22,7 @@
     $topbarNavItems = collect($portalNavItems)->contains(fn (array $entry): bool => isset($entry['items']))
         ? []
         : array_map(fn (array $item): array => array_merge($item, ['icon' => null]), $portalNavItems);
-    $portalPrimaryAction = $shellPortal?->primaryAction();
+    $portalPrimaryAction = $shellPortal?->primaryActionFor($navbarUser);
     $portalPrimaryAction = $portalPrimaryAction !== null && \Illuminate\Support\Facades\Route::has($portalPrimaryAction['route'])
         ? $portalPrimaryAction + ['href' => route($portalPrimaryAction['route'])]
         : null;

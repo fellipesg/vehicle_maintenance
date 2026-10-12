@@ -105,6 +105,26 @@ enum Portal: string
     }
 
     /**
+     * Rota do Início para esta conta. A loja em análise cai em "Minha loja", que é a única tela
+     * que ela abre: sem isto o login a mandaria para um dashboard que o
+     * App\Http\Middleware\EnsureGarageApproved devolve, em círculo.
+     */
+    public function dashboardRouteFor(User $user): string
+    {
+        return self::dealerAwaitingApproval($user) ? 'garage.profile.show' : $this->dashboardRoute();
+    }
+
+    /**
+     * Conta de garagem cuja loja ainda não foi aprovada (ou foi recusada).
+     */
+    public static function dealerAwaitingApproval(?User $user): bool
+    {
+        return $user !== null
+            && $user->isGarage()
+            && ! ($user->garage?->isApproved() ?? false);
+    }
+
+    /**
      * Rota do Início da área (destino do logo e de "Trocar de área").
      */
     public function dashboardRoute(): string
@@ -163,6 +183,7 @@ enum Portal: string
                 self::item('Início', 'garage.dashboard', 'home', ['garage.dashboard']),
                 self::item('Estoque', 'garage.vehicles.index', 'truck', ['garage.vehicles.*']),
                 self::item('Manutenções', 'garage.maintenances.index', 'wrench-screwdriver', ['garage.maintenances.*']),
+                self::item('Minha loja', 'garage.profile.show', 'building-storefront', ['garage.profile.*']),
             ],
             self::Workshop => [
                 self::item('Início', 'workshop.dashboard', 'home', ['workshop.dashboard']),
@@ -177,6 +198,7 @@ enum Portal: string
                 // fica na própria página, e cada mapa ativa o item da lista dele.
                 ['label' => 'Cadastros', 'items' => [
                     self::item('Usuários', 'admin.users.index', 'users', ['admin.users.*', 'admin.maps.users']),
+                    self::item('Lojas', 'admin.garages.index', 'building-office-2', ['admin.garages.*']),
                     self::item('Oficinas', 'admin.workshops.index', 'building-storefront', ['admin.workshops.*', 'admin.maps.workshops']),
                     self::item('Prospecção', 'admin.outreach.index', 'envelope', ['admin.outreach.*']),
                 ]],
@@ -200,6 +222,17 @@ enum Portal: string
      *
      * @return array{label: string, route: string, icon: string}|null
      */
+    /**
+     * Ação principal para esta conta: a loja em análise não tem nenhuma, porque não pode mexer no
+     * estoque.
+     *
+     * @return array{label: string, route: string, icon: string}|null
+     */
+    public function primaryActionFor(?User $user): ?array
+    {
+        return self::dealerAwaitingApproval($user) ? null : $this->primaryAction();
+    }
+
     public function primaryAction(): ?array
     {
         return match ($this) {
@@ -221,6 +254,15 @@ enum Portal: string
     {
         $request ??= request();
         $entries = [];
+
+        if (self::dealerAwaitingApproval($request->user())) {
+            $profile = self::resolveItem(
+                self::item('Minha loja', 'garage.profile.show', 'building-storefront', ['garage.profile.*']),
+                $request,
+            );
+
+            return $profile === null ? [] : [$profile];
+        }
 
         foreach ($this->navigation() as $entry) {
             if (isset($entry['items'])) {

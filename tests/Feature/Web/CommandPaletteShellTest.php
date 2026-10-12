@@ -32,7 +32,7 @@ class CommandPaletteShellTest extends TestCase
         $palette = $this->adminElement($xpath, '//dialog[@data-ui-command][@id="comandos"]');
 
         $this->assertSame(
-            ['Visão geral', 'Usuários', 'Oficinas', 'Prospecção', 'Veículos', 'Manutenções', 'Artigos do blog', 'Categorias do blog', 'Marcas e modelos'],
+            ['Visão geral', 'Usuários', 'Lojas', 'Oficinas', 'Prospecção', 'Veículos', 'Manutenções', 'Artigos do blog', 'Categorias do blog', 'Marcas e modelos'],
             $this->optionLabels($xpath, $palette, 'destinos'),
         );
         $this->assertSame(['Novo artigo', 'Nova marca', 'Minha área de proprietário'], $this->optionLabels($xpath, $palette, 'acoes'));
@@ -88,7 +88,7 @@ class CommandPaletteShellTest extends TestCase
     {
         return [
             'proprietário' => ['asUser', 'user.dashboard', ['Início', 'Meus veículos', 'Manutenções', 'Oficinas'], 'Adicionar veículo', 'user.vehicles.create'],
-            'lojista' => ['asGarage', 'garage.dashboard', ['Início', 'Estoque', 'Manutenções'], 'Adicionar ao estoque', 'garage.vehicles.create'],
+            'lojista' => ['asGarage', 'garage.dashboard', ['Início', 'Estoque', 'Manutenções', 'Minha loja'], 'Adicionar ao estoque', 'garage.vehicles.create'],
             'oficina' => ['asWorkshop', 'workshop.dashboard', ['Início', 'Ordens de serviço', 'Validações', 'Modelos de garantia', 'Minha oficina'], 'Nova OS', 'workshop.maintenances.create'],
         ];
     }

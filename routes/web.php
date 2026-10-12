@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryCo
 use App\Http\Controllers\Web\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Web\Admin\ConsignmentController as AdminConsignmentController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Web\Admin\GarageController as AdminGarageController;
 use App\Http\Controllers\Web\Admin\MaintenanceController as AdminMaintenanceController;
 use App\Http\Controllers\Web\Admin\MapController as AdminMapController;
 use App\Http\Controllers\Web\Admin\OutreachController as AdminOutreachController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Web\ConsignmentOwnerController;
 use App\Http\Controllers\Web\ContactController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
+use App\Http\Controllers\Web\Garage\ProfileController as GarageProfileController;
 use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\LegalController;
@@ -186,8 +188,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->name('workshop-records.decide');
     });
 
-    Route::prefix('garagem')->middleware('user.type:garage')->name('garage.')->group(function () {
+    Route::prefix('garagem')->middleware(['user.type:garage', 'garage.approved'])->name('garage.')->group(function () {
         Route::get('/dashboard', [GarageDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/minha-loja', [GarageProfileController::class, 'show'])->name('profile.show');
+        Route::put('/minha-loja', [GarageProfileController::class, 'update'])->name('profile.update');
         Route::get('/estoque', [GarageVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/estoque/novo', [GarageVehicleController::class, 'create'])->name('vehicles.create');
         Route::post('/estoque/importar-crlv', [GarageVehicleController::class, 'importCrlv'])->name('vehicles.import-crlv');
@@ -283,6 +287,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/prospeccao/{prospect}/convertida', [AdminOutreachController::class, 'markConverted'])->name('outreach.converted');
         Route::post('/prospeccao/{prospect}/devolvido', [AdminOutreachController::class, 'markBounced'])->name('outreach.bounced');
         Route::post('/prospeccao/{prospect}/descadastrar', [AdminOutreachController::class, 'unsubscribe'])->name('outreach.unsubscribe');
+        Route::get('/lojas', [AdminGarageController::class, 'index'])->name('garages.index');
+        Route::post('/lojas/{garage}/aprovar', [AdminGarageController::class, 'approve'])->name('garages.approve');
+        Route::post('/lojas/{garage}/recusar', [AdminGarageController::class, 'reject'])->name('garages.reject');
         Route::get('/consignacoes', [AdminConsignmentController::class, 'index'])->name('consignments.index');
         Route::get('/consignacoes/{consignment}/procuracao', [AdminConsignmentController::class, 'downloadPowerOfAttorney'])
             ->name('consignments.power-of-attorney');

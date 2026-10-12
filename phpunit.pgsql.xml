@@ -43,6 +43,14 @@
         <env name="DB_PORT" value="5432"/>
         <env name="DB_USERNAME" value="vehicle"/>
         <env name="DB_PASSWORD" value="secret"/>
+        <!--
+            Igual ao phpunit.xml: o DB_DATABASE do compose chega em $_SERVER, que o Laravel lê
+            antes de $_ENV. Sem estas linhas a suíte roda no banco de desenvolvimento
+            (vehicle_maintenance) em vez do vehicle_maintenance_test, e o RefreshDatabase o apaga.
+        -->
+        <server name="DB_CONNECTION" value="pgsql" force="true"/>
+        <server name="DB_DATABASE" value="vehicle_maintenance_test" force="true"/>
+        <server name="DB_URL" value="" force="true"/>
         <env name="FILESYSTEM_DISK" value="local" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

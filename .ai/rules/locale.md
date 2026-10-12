@@ -17,3 +17,12 @@ Some API messages (ApiResponse::validation, the error envelope in bootstrap/app.
 
 ## Mensagens de registros de oficinas
 Decisão do proprietário e convite respondem 422 com message em pt-BR no envelope da API (ApiResponse::error com a primeira mensagem); e-mail inválido ou suprimido usa a mesma frase genérica "Não foi possível enviar para este e-mail." para não revelar a supressão.
+
+## Os DB_* dos testes precisam de <server>, não só de <env>
+No Docker o compose exporta `DB_CONNECTION`, `DB_DATABASE` e `DB_URL` para o processo, e o PHP
+recebe isso em `$_SERVER`. O repositório de env do Laravel lê `$_SERVER` **antes** de `$_ENV`, e o
+`<env force="true">` do PHPUnit só escreve `putenv()` e `$_ENV`. Resultado: com apenas as linhas
+`<env>`, `env('DB_CONNECTION')` devolve o `pgsql` do compose e `php artisan test` roda no banco de
+desenvolvimento — o `RefreshDatabase` faz `migrate:fresh` e apaga os dados locais. `phpunit.xml`
+(sqlite `:memory:`) e `phpunit.pgsql.xml` (`vehicle_maintenance_test`) repetem os três `DB_*` em
+`<server>`; mantenha os dois blocos em sincronia ao mexer em qualquer um deles.

@@ -263,7 +263,7 @@ class User extends Authenticatable
         return $this->belongsTo(Tenant::class);
     }
 
-    public function garage()
+    public function garage(): HasOne
     {
         return $this->hasOne(Garage::class);
     }
@@ -318,13 +318,23 @@ class User extends Authenticatable
         return (bool) $this->subscription_active;
     }
 
+    /**
+     * CPF/CNPJ da conta, só com dígitos. No lojista o documento é o da loja (garages.document,
+     * mantido em "Minha loja"); users.document fica como reserva para as contas de garagem que
+     * receberam o CNPJ antes de a loja existir. Ponto único de leitura: VehicleEntryFlow e
+     * VehicleOwnershipService decidem estoque próprio x consignação por aqui.
+     */
     public function normalizedDocument(): ?string
     {
-        if ($this->document === null) {
+        $document = $this->isGarage()
+            ? ($this->garage?->document ?? $this->document)
+            : $this->document;
+
+        if ($document === null) {
             return null;
         }
 
-        return preg_replace('/\D/', '', $this->document) ?: null;
+        return preg_replace('/\D/', '', $document) ?: null;
     }
 
     /**

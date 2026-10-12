@@ -117,6 +117,7 @@ class UserController extends Controller
             ->get();
 
         $workshop = $portal === Portal::Workshop ? $user->workshop()->first() : null;
+        $garage = $portal === Portal::Dealer ? $user->garage()->first() : null;
 
         return view('admin.users.show', [
             'user' => $user,
@@ -132,6 +133,7 @@ class UserController extends Controller
                 ->limit(self::RECENT_MAINTENANCES)
                 ->get(),
             'recentLimit' => self::RECENT_MAINTENANCES,
+            'garage' => $garage,
             'workshop' => $workshop,
             'workshopSealedCount' => $workshop === null
                 ? 0

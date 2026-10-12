@@ -12,7 +12,14 @@
     $vehiclesLabel = $isDealerAccount ? 'Veículos no estoque' : 'Veículos atuais';
     $currentVehicleCount = $currentVehicles->count();
     $launchedListUrl = route('admin.maintenances.index', ['usuario' => $user->id]);
+    // No lojista o contato da conta é o da loja: users.phone/city ficam vazios porque quem preenche
+    // é "Minha loja". Sem o fallback o cabeçalho dizia "Não informado" logo acima do telefone certo.
+    $userPhone = $user->phone ?: ($isDealerAccount ? $garage?->phone : null);
     $userLocation = collect([$user->city, $user->state])->filter(fn (mixed $part): bool => filled($part))->implode('/');
+
+    if ($userLocation === '' && $isDealerAccount && $garage !== null) {
+        $userLocation = collect([$garage->city, $garage->state])->filter(fn (mixed $part): bool => filled($part))->implode('/');
+    }
     $workshopAddress = $workshop
         ? collect([
             collect([$workshop->street, $workshop->number])->filter(fn (mixed $part): bool => filled($part))->implode(', '),
@@ -43,8 +50,8 @@
             <div>
                 <dt class="text-muted-foreground">Telefone</dt>
                 <dd class="text-foreground">
-                    @if(filled($user->phone))
-                        <x-ui.link :href="'tel:'.preg_replace('/\D+/', '', (string) $user->phone)" variant="inline">{{ $user->phone }}</x-ui.link>
+                    @if(filled($userPhone))
+                        <x-ui.link :href="'tel:'.preg_replace('/\D+/', '', (string) $userPhone)" variant="inline">{{ $userPhone }}</x-ui.link>
                     @else
                         Não informado
                     @endif
@@ -118,6 +125,51 @@
                     </x-ui.card>
                 @else
                     <x-ui.empty-state icon="building-storefront" title="Oficina ainda não cadastrada" description="A conta existe, mas ainda não completou o cadastro da oficina no portal Oficina." />
+                @endif
+            </x-ui.section>
+        @endif
+
+        @if($isDealerAccount)
+            <x-ui.section id="loja-vinculada" title="Loja vinculada" description="Cadastro que a loja preenche em “Minha loja”. O CNPJ é o que separa estoque próprio de consignação.">
+                @if($garage)
+                    <x-ui.card>
+                        <dl class="grid min-w-0 gap-x-6 gap-y-3 text-sm sm:grid-cols-2" data-slot="garage-details">
+                            <div class="min-w-0">
+                                <dt class="text-muted-foreground">Nome</dt>
+                                <dd class="font-semibold text-foreground">{{ $garage->name }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">Situação</dt>
+                                <dd><x-ui.badge :variant="$garage->status->badgeVariant()">{{ $garage->status->label() }}</x-ui.badge></dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="text-muted-foreground">CNPJ</dt>
+                                <dd class="text-foreground tabular-nums">{{ $garage->displayDocument() ?? 'Não informado' }}</dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="text-muted-foreground">Telefone</dt>
+                                <dd class="text-foreground">
+                                    @if(filled($garage->phone))
+                                        <x-ui.link :href="'tel:'.preg_replace('/\D+/', '', (string) $garage->phone)" variant="inline">{{ $garage->phone }}</x-ui.link>
+                                    @else
+                                        Não informado
+                                    @endif
+                                </dd>
+                            </div>
+                            <div class="min-w-0 sm:col-span-2">
+                                <dt class="text-muted-foreground">Endereço</dt>
+                                <dd class="text-foreground">{{ $garage->addressLine() !== '' ? $garage->addressLine() : 'Não informado' }}</dd>
+                            </div>
+                            @if(filled($garage->review_notes))
+                                <div class="min-w-0 sm:col-span-2">
+                                    <dt class="text-muted-foreground">Observação da análise</dt>
+                                    <dd class="text-foreground">{{ $garage->review_notes }}</dd>
+                                </div>
+                            @endif
+                        </dl>
+                    </x-ui.card>
+                @else
+                    <x-ui.empty-state icon="building-storefront" title="Loja ainda não cadastrada" description="A conta existe, mas ainda não tem registro de loja. Ele é criado na primeira visita a “Minha loja”." />
                 @endif
             </x-ui.section>
         @endif

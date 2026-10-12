@@ -109,7 +109,7 @@ class PortalAccess
      */
     public static function homeRouteName(User $user): string
     {
-        return Portal::homeFor($user)->dashboardRoute();
+        return Portal::homeFor($user)->dashboardRouteFor($user);
     }
 
     /**
