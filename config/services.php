@@ -80,4 +80,13 @@ return [
         'measurement_id' => env('GA_MEASUREMENT_ID'),
     ],
 
+    'sentry_webhook' => [
+        'client_secret' => env('SENTRY_WEBHOOK_CLIENT_SECRET'),
+    ],
+
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'alerts_chat_id' => env('TELEGRAM_ALERTS_CHAT_ID'),
+    ],
+
 ];

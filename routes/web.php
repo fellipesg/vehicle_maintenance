@@ -30,6 +30,7 @@ use App\Http\Controllers\Web\MaintenanceInviteController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OutreachController;
 use App\Http\Controllers\Web\PublicVehicleController;
+use App\Http\Controllers\Web\SentryWebhookController;
 use App\Http\Controllers\Web\SitemapController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\Web\User\MaintenanceController as UserMaintenanceController;
@@ -55,6 +56,8 @@ Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
 Route::get('/blog/feed', BlogFeedController::class)->name('blog.feed');
 Route::get('/blog/categoria/{category}', [BlogController::class, 'category'])->name('blog.category');
 Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
+// Webhook do Sentry (Internal Integration): autenticado pela assinatura HMAC, sem CSRF.
+Route::post('/webhooks/sentry', SentryWebhookController::class)->middleware('throttle:60,1')->name('webhooks.sentry');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
 Route::get('/para-oficinas', WorkshopLandingController::class)->name('workshops.landing');
