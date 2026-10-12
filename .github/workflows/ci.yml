@@ -78,8 +78,11 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      # PHPUnit directly, not `artisan test`: that command always appends its own
+      # --configuration=phpunit.xml, and the duplicate option makes PHPUnit exit 1
+      # even when every test passes.
       - name: Run tests
-        run: php artisan test --compact --configuration=${{ matrix.configuration }}
+        run: vendor/bin/phpunit --configuration=${{ matrix.configuration }}
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
