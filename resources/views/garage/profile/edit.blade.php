@@ -5,6 +5,9 @@
     O aviso do topo aparece enquanto falta o CNPJ, porque é ele que separa estoque próprio de
     consignação no assistente de veículo (App\Support\Vehicle\VehicleEntryFlow::ownershipFor).
 
+    O CEP tem data-cep-autofill: com os 8 dígitos, resources/js/workshop-address-cep.js busca no
+    ViaCEP e preenche rua, bairro, cidade e UF pelo name dos campos deste formulário.
+
     Variáveis: $garage e $stateOptions.
 --}}
 @extends('layouts.app')
@@ -72,11 +75,12 @@
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section id="secao-endereco" title="Endereço" description="Endereço da loja, como no cadastro do CNPJ.">
+            <x-ui.form-section id="secao-endereco" title="Endereço" description="Preencha o CEP e o resto do endereço vem junto.">
                 <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
                     <x-ui.field name="cep" label="CEP" hint="8 dígitos." optional>
                         <x-ui.input :value="$garage->cep" autocomplete="postal-code" inputmode="numeric"
-                                    data-mask="digits" data-min-digits="8" data-max-digits="8" placeholder="01310100" class="tabular-nums" />
+                                    data-mask="digits" data-min-digits="8" data-max-digits="8" data-cep-autofill
+                                    placeholder="01310100" class="tabular-nums" />
                     </x-ui.field>
                     <x-ui.field name="street" label="Rua" optional class="sm:col-span-2">
                         <x-ui.input :value="$garage->street" maxlength="255" autocomplete="address-line1" />
