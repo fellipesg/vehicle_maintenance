@@ -50,7 +50,7 @@ trait StoresMaintenanceInvoices
     protected function invoiceUploadErrorMessage(UploadedFile $file): string
     {
         return match ($file->getError()) {
-            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'O arquivo excede o limite de upload do PHP (2 MB no servidor local). Reinicie com: php -d upload_max_filesize=20M -d post_max_size=25M artisan serve --port=8000',
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'O arquivo excede o limite de upload do PHP (2 MB no servidor local). Rode o servidor com composer run dev, que já sobe com 20 MB.',
             UPLOAD_ERR_PARTIAL => 'O upload do arquivo foi interrompido. Tente enviar novamente.',
             UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE, UPLOAD_ERR_EXTENSION => 'Erro no servidor ao receber o arquivo. Verifique permissões da pasta temporária.',
             default => 'Falha ao enviar o arquivo. Selecione o PDF ou XML novamente e tente outra vez.',
