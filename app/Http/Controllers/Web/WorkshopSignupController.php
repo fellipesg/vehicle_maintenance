@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Web;
 use App\Enums\RegistrationSource;
 use App\Events\UserRegistered;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Web\Workshop\ProfileController;
 use App\Http\Requests\Web\StoreWorkshopSignupRequest;
 use App\Models\WorkshopProspect;
 use App\Services\Workshop\WorkshopSignupService;
+use App\Support\BrazilianStates;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,9 +34,7 @@ class WorkshopSignupController extends Controller
                 'cnpj' => $prospect?->formattedCnpj(),
                 'email' => $prospect?->email,
             ],
-            'stateOptions' => collect(ProfileController::STATES)
-                ->mapWithKeys(fn (string $name, string $uf): array => [$uf => "{$name} ({$uf})"])
-                ->all(),
+            'stateOptions' => BrazilianStates::options(),
         ]);
     }
 
