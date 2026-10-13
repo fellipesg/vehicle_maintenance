@@ -13,6 +13,18 @@
         </x-ui.page-header>
 
         <div class="space-y-6">
+            {{-- Esta tela é a mesma nos quatro portais e cuida só do acesso. Os dados da empresa
+                 (CNPJ, endereço, contato que o cliente vê) ficam na área dela, e é comum procurarem
+                 aqui primeiro. --}}
+            @if($businessProfile !== null)
+                <x-ui.alert variant="info" :title="$businessProfile['title']" data-business-profile-hint>
+                    {{ $businessProfile['description'] }}
+                    <x-slot:actions>
+                        <x-ui.button variant="secondary" size="sm" :href="$businessProfile['url']">{{ $businessProfile['action'] }}</x-ui.button>
+                    </x-slot:actions>
+                </x-ui.alert>
+            @endif
+
             <x-ui.card as="section" id="dados" title="Dados pessoais" description="Você entra com este e-mail, e é para ele que enviamos avisos e o link de redefinição de senha." heading-level="h2">
                 <form method="POST" action="{{ route('account.update') }}" class="space-y-4">
                     @csrf

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Account\DeleteAccountRequest;
 use App\Http\Requests\Web\Account\UpdateAccountPasswordRequest;
 use App\Http\Requests\Web\Account\UpdateAccountRequest;
+use App\Models\User;
 use App\Notifications\AccountEmailChangedNotification;
 use App\Services\User\DeleteUserAccount;
 use App\Support\PortalAccess;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -33,7 +35,38 @@ class AccountController extends Controller
             'user' => $user,
             'accountLabel' => PortalAccess::accountLabel($user),
             'homeUrl' => PortalAccess::homeUrl($user),
+            'businessProfile' => $this->businessProfile($user),
         ]);
+    }
+
+    /**
+     * Para conta de empresa, o aviso que leva ao cadastro dela. "Minha conta" é a mesma tela nos
+     * quatro portais e guarda só o acesso; CNPJ, endereço e o contato que o cliente vê ficam na
+     * área da loja ou da oficina, e é lá que se procura primeiro.
+     *
+     * @return array{title: string, description: string, action: string, url: string}|null
+     */
+    private function businessProfile(User $user): ?array
+    {
+        if ($user->isGarage() && Route::has('garage.profile.show')) {
+            return [
+                'title' => 'Dados da loja ficam em "Minha loja"',
+                'description' => 'CNPJ, endereço e o contato que o proprietário de um veículo em consignação vê são da loja, não da sua conta. Eles começam iguais aos daqui e podem ser trocados lá.',
+                'action' => 'Abrir Minha loja',
+                'url' => route('garage.profile.show'),
+            ];
+        }
+
+        if ($user->isWorkshop() && Route::has('workshop.profile.show')) {
+            return [
+                'title' => 'Dados da oficina ficam em "Minha oficina"',
+                'description' => 'Nome, endereço e contato que aparecem no Selo da oficina e no diretório são da oficina, não da sua conta.',
+                'action' => 'Abrir Minha oficina',
+                'url' => route('workshop.profile.show'),
+            ];
+        }
+
+        return null;
     }
 
     public function update(UpdateAccountRequest $request): RedirectResponse

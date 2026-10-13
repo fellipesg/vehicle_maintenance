@@ -63,7 +63,7 @@
                 </x-ui.field>
             </x-ui.form-section>
 
-            <x-ui.form-section id="secao-contato" title="Contato" description="Usado quando a equipe ou o proprietário de um veículo em consignação precisa falar com a loja.">
+            <x-ui.form-section id="secao-contato" title="Contato" description="Aparece para o proprietário de um veículo em consignação: no aviso por e-mail e na página que ele abre pelo link. Começa igual ao da sua conta; mude aqui se a loja tiver contato próprio.">
                 <div class="grid gap-4 sm:grid-cols-2 sm:items-start">
                     <x-ui.field name="phone" label="Telefone" hint="Com DDD, só números." optional>
                         <x-ui.input type="tel" :value="$garage->phone" autocomplete="tel-national" inputmode="numeric"

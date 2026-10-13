@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\User;
 use App\Models\VehicleConsignment;
+use App\Support\Garage\StoreContactLines;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -33,7 +34,7 @@ class VehicleConsignmentStartedNotification extends Notification implements Shou
     public function toMail(object $notifiable): MailMessage
     {
         $vehicle = $this->consignment->vehicle;
-        $garageName = $this->consignment->garageUser->name;
+        $garageName = $this->consignment->garageUser->storeName();
         $label = trim("{$vehicle->brand} {$vehicle->model}");
 
         $message = (new MailMessage)
@@ -46,6 +47,10 @@ class VehicleConsignmentStartedNotification extends Notification implements Shou
 
         if ($this->consignment->isHistoryReviewPending()) {
             $message->line('A garagem também anexou uma procuração pedindo acesso ao histórico anterior. Você pode liberar direto pelo botão acima, sem esperar a nossa análise.');
+        }
+
+        foreach (StoreContactLines::for($this->consignment->garageUser) as $contactLine) {
+            $message->line($contactLine);
         }
 
         return $message
@@ -63,11 +68,11 @@ class VehicleConsignmentStartedNotification extends Notification implements Shou
         return [
             'type' => 'consignment-started',
             'title' => 'Veículo registrado em consignação',
-            'body' => "{$this->consignment->garageUser->name} informou que está com o seu {$vehicle->brand} {$vehicle->model} para venda.",
+            'body' => "{$this->consignment->garageUser->storeName()} informou que está com o seu {$vehicle->brand} {$vehicle->model} para venda.",
             'consignment_id' => $this->consignment->id,
             'vehicle_id' => $vehicle->id,
             'license_plate' => $vehicle->license_plate,
-            'garage_name' => $this->consignment->garageUser->name,
+            'garage_name' => $this->consignment->garageUser->storeName(),
             'action_url' => $this->actionUrl(absolute: false),
         ];
     }
