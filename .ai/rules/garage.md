@@ -14,3 +14,12 @@ Coming from the vehicle page (?vehicle_id=), the maintenance form sends return_t
 
 ## Lojista não decide registros de oficinas
 A tela e o aviso de registros de oficinas são do Proprietário (/usuario/registros-de-oficinas). WorkshopRecordsArrivalNotifier ignora conta de lojista.
+
+## O portão da loja vale na web e na API
+`EnsureGarageApproved` protege os dois clientes: na web a loja em análise só abre `garage.profile.*`
+(lista de liberação, então rota nova nasce fechada) e na API, com `garage.approved:api` no grupo
+`auth:sanctum` de `routes/api.php`, ela só lê — qualquer método que não seja GET/HEAD/OPTIONS volta
+403 com a mensagem em inglês do envelope. O modo é parâmetro explícito, não `expectsJson()`: cliente
+sem `Accept: application/json` receberia o redirect da web. Só na web o portão não bastava — o app
+fala pela API e era caminho livre para criar veículo, escrever no histórico de um chassi e mandar
+convite para terceiros (`/maintenances/{id}/invites`).
