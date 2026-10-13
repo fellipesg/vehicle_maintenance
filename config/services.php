@@ -89,4 +89,12 @@ return [
         'alerts_chat_id' => env('TELEGRAM_ALERTS_CHAT_ID'),
     ],
 
+    /*
+    | Senha das contas permanentes de revisão entregues ao Google Play
+    | (PlayReviewAccountsSeeder). Fora do repositório, de propósito.
+    */
+    'play_review' => [
+        'password' => env('PLAY_REVIEW_PASSWORD'),
+    ],
+
 ];
