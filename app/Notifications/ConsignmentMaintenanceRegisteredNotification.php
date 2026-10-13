@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\VehicleConsignment;
+use App\Support\Garage\StoreContactLines;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -36,16 +37,22 @@ class ConsignmentMaintenanceRegisteredNotification extends Notification implemen
     public function toMail(object $notifiable): MailMessage
     {
         $vehicle = $this->consignment->vehicle;
-        $garageName = $this->consignment->garageUser->name;
+        $garageName = $this->consignment->garageUser->storeName();
         $label = trim("{$vehicle->brand} {$vehicle->model}");
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject("Nova manutenção registrada no seu {$label}")
             ->greeting('Olá, '.$this->firstName().'!')
             ->line("A garagem **{$garageName}** registrou uma manutenção no seu **{$label}** (placa {$vehicle->license_plate}).")
             ->line("**{$this->maintenance->maintenance_type}** — {$this->maintenance->maintenance_date->format('d/m/Y')} · {$this->formattedKilometers()} km")
             ->line('Esse registro entra no histórico do veículo e valoriza o carro na hora da venda.')
-            ->action('Ver registro', $this->actionUrl())
+            ->action('Ver registro', $this->actionUrl());
+
+        foreach (StoreContactLines::for($this->consignment->garageUser) as $contactLine) {
+            $message->line($contactLine);
+        }
+
+        return $message
             ->line('Se esse serviço não foi feito, use o mesmo link para contestar.')
             ->salutation('RevisaLog');
     }
@@ -60,12 +67,12 @@ class ConsignmentMaintenanceRegisteredNotification extends Notification implemen
         return [
             'type' => 'consignment-maintenance',
             'title' => 'Nova manutenção registrada pela garagem',
-            'body' => "{$this->consignment->garageUser->name} registrou {$this->maintenance->maintenance_type} no seu {$vehicle->brand} {$vehicle->model}.",
+            'body' => "{$this->consignment->garageUser->storeName()} registrou {$this->maintenance->maintenance_type} no seu {$vehicle->brand} {$vehicle->model}.",
             'consignment_id' => $this->consignment->id,
             'maintenance_id' => $this->maintenance->id,
             'vehicle_id' => $vehicle->id,
             'license_plate' => $vehicle->license_plate,
-            'garage_name' => $this->consignment->garageUser->name,
+            'garage_name' => $this->consignment->garageUser->storeName(),
             'action_url' => $this->actionUrl(absolute: false),
         ];
     }
