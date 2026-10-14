@@ -12,14 +12,19 @@
     $vehiclesLabel = $isDealerAccount ? 'Veículos no estoque' : 'Veículos atuais';
     $currentVehicleCount = $currentVehicles->count();
     $launchedListUrl = route('admin.maintenances.index', ['usuario' => $user->id]);
-    // No lojista o contato da conta é o da loja: users.phone/city ficam vazios porque quem preenche
-    // é "Minha loja". Sem o fallback o cabeçalho dizia "Não informado" logo acima do telefone certo.
-    $userPhone = $user->phone ?: ($isDealerAccount ? $garage?->phone : null);
-    $userLocation = collect([$user->city, $user->state])->filter(fn (mixed $part): bool => filled($part))->implode('/');
+    // Em conta de garagem o dado de referência é o da loja, e o da conta é só reserva: é a loja que
+    // a fila de análise confere e que o proprietário de um veículo em consignação vê. O app ainda
+    // grava endereço e telefone em users (.ai/rules/api.md), e sem esta ordem aquele dado pessoal
+    // sombreava o da loja aqui, fazendo esta tela discordar das outras duas.
+    $locationOf = fn (mixed $city, mixed $state): string => collect([$city, $state])
+        ->filter(fn (mixed $part): bool => filled($part))
+        ->implode('/');
 
-    if ($userLocation === '' && $isDealerAccount && $garage !== null) {
-        $userLocation = collect([$garage->city, $garage->state])->filter(fn (mixed $part): bool => filled($part))->implode('/');
-    }
+    $garagePhone = $isDealerAccount ? $garage?->phone : null;
+    $garageLocation = $isDealerAccount && $garage !== null ? $locationOf($garage->city, $garage->state) : '';
+
+    $userPhone = $garagePhone ?: $user->phone;
+    $userLocation = $garageLocation !== '' ? $garageLocation : $locationOf($user->city, $user->state);
     $workshopAddress = $workshop
         ? collect([
             collect([$workshop->street, $workshop->number])->filter(fn (mixed $part): bool => filled($part))->implode(', '),

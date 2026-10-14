@@ -85,23 +85,66 @@ class AdminGarageVisibilityTest extends TestCase
             ->assertSee('Loja ainda não cadastrada');
     }
 
-    public function test_header_falls_back_to_the_store_contact(): void
+    /**
+     * @return string o cabeçalho da ficha, onde "Não informado" noutros campos vazios da página não
+     *                deve interferir na asserção.
+     */
+    private function accountHeader(User $user): string
+    {
+        $html = (string) $this->actingAs($this->admin())
+            ->get(route('admin.users.show', $user))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertSame(1, preg_match('/data-slot="user-account-details".*?<\/dl>/s', $html, $header));
+
+        return $header[0];
+    }
+
+    public function test_header_uses_the_store_contact_when_the_account_has_none(): void
     {
         $dealer = User::factory()->asGarage()->create(['phone' => null, 'city' => null, 'state' => null]);
         $dealer->garage->update(['phone' => '11999998888', 'city' => 'São Paulo', 'state' => 'SP']);
 
-        $html = $this->actingAs($this->admin())
-            ->get(route('admin.users.show', $dealer))
-            ->assertOk()
-            ->getContent();
+        $header = $this->accountHeader($dealer);
 
-        // Só o cabeçalho: "Não informado" ainda é legítimo noutros campos vazios da página.
-        $this->assertSame(1, preg_match('/data-slot="user-account-details".*?<\/dl>/s', (string) $html, $header));
+        $this->assertStringContainsString('11999998888', $header);
+        $this->assertStringContainsString('São Paulo/SP', $header);
+        $this->assertStringNotContainsString('Não informado', $header);
+        $this->assertStringNotContainsString('Não informada', $header);
+    }
 
-        $this->assertStringContainsString('11999998888', $header[0]);
-        $this->assertStringContainsString('São Paulo/SP', $header[0]);
-        $this->assertStringNotContainsString('Não informado', $header[0]);
-        $this->assertStringNotContainsString('Não informada', $header[0]);
+    public function test_the_store_wins_over_the_account_when_both_are_filled(): void
+    {
+        // O app ainda grava endereço e telefone pessoais em users; eles não podem sombrear a loja
+        // aqui, senão esta tela discorda da fila de análise e do e-mail ao proprietário.
+        $dealer = User::factory()->asGarage()->create([
+            'phone' => '11988887777',
+            'city' => 'São Paulo',
+            'state' => 'SP',
+        ]);
+        $dealer->garage->update(['phone' => '6733334444', 'city' => 'Campo Grande', 'state' => 'MS']);
+
+        $header = $this->accountHeader($dealer);
+
+        $this->assertStringContainsString('6733334444', $header);
+        $this->assertStringContainsString('Campo Grande/MS', $header);
+        $this->assertStringNotContainsString('11988887777', $header);
+        $this->assertStringNotContainsString('São Paulo/SP', $header);
+    }
+
+    public function test_owner_header_keeps_using_the_account(): void
+    {
+        $owner = User::factory()->asUser()->create([
+            'phone' => '11988887777',
+            'city' => 'São Paulo',
+            'state' => 'SP',
+        ]);
+
+        $header = $this->accountHeader($owner);
+
+        $this->assertStringContainsString('11988887777', $header);
+        $this->assertStringContainsString('São Paulo/SP', $header);
     }
 
     public function test_owner_account_has_no_store_panel(): void

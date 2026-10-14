@@ -16,3 +16,12 @@ Row actions in admin tables go only through <x-admin.row-actions> (the ⋯ menu)
 
 ## Collapsible sidebar and one command palette per page
 From md the admin sidebar collapses with <x-ui.sidebar-toggle> (resources/js/ui/sidebar.js, state in localStorage with try/catch): the head script of layouts.admin puts data-sidebar="collapsed" on <html> before first paint, and the sidebar styles itself with md:in-data-[sidebar=collapsed]:* classes (icons keep tooltips). layouts.admin and layouts.partials.navbar render <x-ui.command> once per page (Ctrl K, ⌘K on Mac): the portal destinations from Portal::navigation(), the primary action and "Buscar veículo por placa, chassi ou RENAVAM", which opens admin.vehicles.index?search= (admin) or vehicle.search?identifier= (portals). No new route and no <form>: without JS the triggers stay plain links.
+
+## Na ficha do usuário, a loja tem precedência sobre a conta
+No cabeçalho de `admin/users/show`, conta de garagem mostra telefone e cidade da **loja**
+(`garages`), com os de `users` só como reserva quando a loja não tem. A loja é o que a fila de
+análise confere e o que o proprietário de um veículo em consignação recebe
+(`User::storeIdentity()`), então inverter essa ordem faz esta tela discordar das outras duas. A
+inversão é fácil de cometer: o app ainda grava endereço e telefone pessoais em `users`
+(.ai/rules/api.md), e esse dado chega preenchido mesmo em loja que nunca o usou. Proprietário segue
+com os dados da própria conta.
