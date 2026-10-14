@@ -51,7 +51,10 @@ Route::prefix('v1')->group(function () {
     Route::get('/workshops/{id}', [WorkshopController::class, 'show'])->middleware('throttle:api');
 
     // Protected routes (require authentication)
-    Route::middleware(['auth:sanctum', 'tenant', 'throttle:api'])->group(function () {
+    // garage.approved:api — loja em análise só lê pela API. Sem isto o portão existiria apenas
+    // na web, e o app seria o caminho livre para escrever no histórico de um chassi e mandar
+    // convite para terceiros (App\Http\Middleware\EnsureGarageApproved).
+    Route::middleware(['auth:sanctum', 'tenant', 'throttle:api', 'garage.approved:api'])->group(function () {
         // Auth routes
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me'])->middleware('ability:profile:read');
