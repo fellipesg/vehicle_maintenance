@@ -21,3 +21,20 @@ GET /api/v1/auth/{provider}/redirect responde 200 com success=false e error_code
 
 ## Registros de oficinas (contrato com o app)
 GET /api/v1/me/workshop-records?status=pending|all, POST /api/v1/maintenances/{id}/owner-decision {link, attach_files, hide_from_public}, GET /api/v1/workshop/vehicles/lookup?chassis=, POST /api/v1/workshop/vehicles, POST /api/v1/maintenances/{id}/invites/email|whatsapp, e pending_workshop_records_count em GET /api/v1/me. MaintenanceResource ganhou is_ownerless_record, owner_status (null em OS comum), attachments_status (null em OS comum) e hidden_from_public. Erros de decisão e convite voltam 422 com message em pt-BR.
+
+## Endereço é da empresa, não da conta (contrato com o app)
+A conta não tem endereço na web: `/conta` edita só nome, e-mail, senha e telefone, nos quatro
+portais. Quem tem endereço é a loja (`garages`, em "Minha loja") e a oficina (`workshops`, em "Minha
+oficina"), e é de lá que sai o que o proprietário de um veículo em consignação vê
+(`User::storeIdentity()`). Não faça `storeIdentity()` cair no endereço da conta quando o da loja
+está vazio: o e-mail fala em nome da loja e mostraria o endereço de outro lugar.
+
+As colunas de endereço em `users` continuam existindo para o **proprietário**: `GET /api/v1/me` e
+`PUT /api/v1/me` as expõem, o app as edita em "Meus Dados", `geo:geocode-addresses` as geocodifica e
+o mapa `admin.maps.users` as mostra — filtrando `user_type = 'user'`. Em conta de garagem ou de
+oficina o mesmo dado é escrito, geocodificado e exibido em lugar nenhum: a decisão é que a seção
+Endereço de "Meus Dados" sai do app para essas duas, e esse tipo de edição acontece só na web.
+
+Ordem obrigatória ao executar: **app primeiro, backend depois**. Tirar os campos de
+`UpdateProfileRequest` ou de `UserResource` antes de o app parar de enviá-los faz a tela "salvar" sem
+gravar nada, em silêncio. Enquanto o app não soltar a versão sem a seção, a API continua aceitando.
