@@ -194,6 +194,12 @@
                     </ul>
                 @endif
                 @if ($expandPhotos->isNotEmpty())
+                    {{--
+                        Só a busca por placa abre este bloco, e lá x-vehicle.detail carrega apenas
+                        as fotos do depois do veículo (as públicas) de quem não é dono. Por isso
+                        aqui é AppStorage::url e não route('maintenance-photos.show'): a rota segue
+                        a MaintenancePhotoPolicy::view e responderia 403 para quem só buscou a placa.
+                    --}}
                     <ul role="list" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Fotos do serviço">
                         @foreach ($expandPhotos as $expandPhoto)
                             <li>

@@ -21,6 +21,22 @@ Timestamps are stored in UTC (config app.timezone). A time (or a date next to a 
 ## Placa nula
 Nunca imprima license_plate direto: use filled() e, nas telas privadas, "Placa não informada". Telas públicas não mostram nada no lugar.
 
+## Foto de manutenção nunca pelo caminho do storage
+A miniatura, o link "abre em nova aba" e os itens da <x-ui.lightbox> em maintenances/_detail e
+partials/maintenance-photos-form apontam para route('maintenance-photos.show', $photo) —
+MaintenancePhotoController, atrás de auth e da MaintenancePhotoPolicy::view (nega enquanto
+Maintenance::hidesAttachmentsFrom, como a nota). Não use $photo->url (AppStorage::url) numa tela de
+portal: no disco público a foto abre sem login e, no S3/R2, a URL assinada é compartilhável — e a
+foto de OS sem proprietário continuaria legível por quem tiver o link, mesmo com o
+MaintenanceRedactor tirando-a da tela. A rota abre jpg/jpeg/png/webp inline (o resto baixa), com
+nosniff, CSP sandbox e Cache-Control privado e curto; `private` tem de ser marcado no objeto de
+resposta (`setPrivate()`), porque o BinaryFileResponse de response()->download() nasce público e
+descarta um 'Cache-Control' do array de cabeçalhos. Exceção registrada: x-provenance-card ainda usa
+$photo->url, porque só a busca por placa abre aquele bloco e lá x-vehicle.detail carrega apenas as
+fotos públicas (veículo/depois); a rota responderia 403 a quem só buscou a placa. O contrato da API
+(MaintenancePhotoResource, PublicVehicleSearchResource) segue com a URL do storage: mudá-lo exige
+olhar o app Flutter.
+
 ## Nota fiscal nunca pelo caminho do storage
 O link "Abrir" de uma nota fiscal (maintenances/_detail e partials/workshop-maintenance-form) aponta
 para route('invoices.show', $invoice) — InvoiceDownloadController, atrás de auth e da

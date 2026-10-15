@@ -74,9 +74,9 @@
                     <ul role="list" class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2" aria-label="Fotos salvas: {{ $group['title'] }}">
                         @foreach($groupPhotos as $photo)
                             <li class="group/photo relative min-w-0" data-photo-item>
-                                <a href="{{ $photo->url }}" target="_blank" rel="noopener"
+                                <a href="{{ route('maintenance-photos.show', $photo) }}" target="_blank" rel="noopener"
                                    class="block overflow-hidden rounded-control border border-border bg-surface-muted transition-opacity duration-fast ease-smooth-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none group-has-[:checked]/photo:border-dashed group-has-[:checked]/photo:border-danger group-has-[:checked]/photo:opacity-40 group-has-[:checked]/photo:grayscale">
-                                    <img src="{{ $photo->url }}" alt="{{ $group['title'] }}, foto {{ $loop->iteration }} de {{ $groupPhotos->count() }}" loading="lazy" class="aspect-[4/3] w-full object-contain">
+                                    <img src="{{ route('maintenance-photos.show', $photo) }}" alt="{{ $group['title'] }}, foto {{ $loop->iteration }} de {{ $groupPhotos->count() }}" loading="lazy" class="aspect-[4/3] w-full object-contain">
                                     <span class="sr-only">(abre em nova aba)</span>
                                 </a>
                                 <span class="mt-1 hidden items-center gap-1 text-xs font-medium text-danger group-has-[:checked]/photo:flex" aria-hidden="true">

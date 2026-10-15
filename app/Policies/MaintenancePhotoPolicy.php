@@ -7,11 +7,28 @@ use App\Models\MaintenancePhoto;
 use App\Models\User;
 
 /**
- * Enviar ou apagar foto altera a manutenção: segue a MaintenancePolicy::update (dono atual na
- * declarada, oficina na OS com o selo dela).
+ * Ver a foto segue quem pode ver a manutenção, como a InvoicePolicy::view. Enviar ou apagar foto
+ * altera a manutenção: segue a MaintenancePolicy::update (dono atual na declarada, oficina na OS
+ * com o selo dela).
  */
 class MaintenancePhotoPolicy
 {
+    public function view(User $user, MaintenancePhoto $photo): bool
+    {
+        $maintenance = $photo->maintenance;
+
+        if (! $maintenance) {
+            return false;
+        }
+
+        // Foto de OS sem proprietário: só a oficina autora até o aceite do proprietário.
+        if ($maintenance->hidesAttachmentsFrom($user)) {
+            return false;
+        }
+
+        return app(MaintenancePolicy::class)->view($user, $maintenance);
+    }
+
     public function create(User $user, Maintenance $maintenance): bool
     {
         return app(MaintenancePolicy::class)->update($user, $maintenance)->allowed();

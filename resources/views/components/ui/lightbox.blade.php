@@ -24,9 +24,9 @@
       'caption' => legenda visível opcional]. Use o mesmo alt na miniatura.
     - label: nome do carrossel (o padrão é o title).
 
-    Ex.:
-    <a href="{{ $photo->url }}" target="_blank" rel="noopener" data-lightbox-open="fotos-os-12" data-lightbox-index="0">
-        <img src="{{ $photo->url }}" alt="Foto 1 de 4 — Troca de óleo, 12/03/2025. Carro antes do serviço" class="aspect-[4/3] w-full object-contain">
+    Ex.: (a foto de uma OS vem sempre da rota autorizada, nunca de $photo->url)
+    <a href="{{ route('maintenance-photos.show', $photo) }}" target="_blank" rel="noopener" data-lightbox-open="fotos-os-12" data-lightbox-index="0">
+        <img src="{{ route('maintenance-photos.show', $photo) }}" alt="Foto 1 de 4 — Troca de óleo, 12/03/2025. Carro antes do serviço" class="aspect-[4/3] w-full object-contain">
         <span class="sr-only" data-lightbox-new-tab-hint>(abre em nova aba)</span>
     </a>
     <x-ui.lightbox id="fotos-os-12" title="Fotos do serviço" :items="$photoItems" />

@@ -116,7 +116,7 @@ class MaintenanceDetailPartialTest extends TestCase
             'path' => $path,
         ]);
         $photo(MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_AFTER, 'maintenance-photos/carro-depois.jpg');
-        $photo(MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_BEFORE, 'maintenance-photos/carro-antes.jpg');
+        $carBefore = $photo(MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_BEFORE, 'maintenance-photos/carro-antes.jpg');
         $photo(MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_DURING, 'maintenance-photos/carro-durante.jpg');
         $photo(MaintenancePhoto::SUBJECT_PART, MaintenancePhoto::STAGE_BEFORE, 'maintenance-photos/peca-antes-1.jpg');
         $photo(MaintenancePhoto::SUBJECT_PART, MaintenancePhoto::STAGE_BEFORE, 'maintenance-photos/peca-antes-2.jpg');
@@ -139,11 +139,14 @@ class MaintenanceDetailPartialTest extends TestCase
         $this->assertSame($viewerId, $items->item(0)->getAttribute('data-lightbox-open'));
         $this->assertSame(['0', '1', '2', '3', '4'], array_map(fn ($item) => $item->getAttribute('data-lightbox-index'), iterator_to_array($items)));
         $this->assertSame('_blank', $items->item(0)->getAttribute('target'));
-        $this->assertStringContainsString('carro-antes.jpg', $items->item(0)->getAttribute('href'));
+        // A foto sai pela rota autorizada (.ai/rules/views.md), nunca pelo caminho no storage.
+        $this->assertSame(route('maintenance-photos.show', $carBefore), $items->item(0)->getAttribute('href'));
+        $this->assertStringNotContainsString('carro-antes.jpg', $items->item(0)->getAttribute('href'));
         $this->assertSame('(abre em nova aba)', $this->uiText($this->uiElement($xpath, '//a[@data-lightbox-index="0"]//*[@data-lightbox-new-tab-hint]')));
 
         $thumbnail = $this->uiElement($xpath, '//a[@data-lightbox-index="0"]//img');
         $this->assertSame('Foto 1 de 5 — Troca de pastilhas, 12/03/2026. Carro antes do serviço', $thumbnail->getAttribute('alt'));
+        $this->assertSame(route('maintenance-photos.show', $carBefore), $thumbnail->getAttribute('src'));
         $this->assertSame('lazy', $thumbnail->getAttribute('loading'));
         $this->assertStringContainsString('object-contain', $thumbnail->getAttribute('class'));
         $this->assertStringNotContainsString('object-cover', $thumbnail->getAttribute('class'), 'A miniatura não corta a foto.');
