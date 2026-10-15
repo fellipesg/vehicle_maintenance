@@ -25,6 +25,7 @@ use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceCo
 use App\Http\Controllers\Web\Garage\ProfileController as GarageProfileController;
 use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
+use App\Http\Controllers\Web\InvoiceDownloadController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\MaintenanceInviteController;
 use App\Http\Controllers\Web\NotificationController;
@@ -126,6 +127,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         ->name('vehicle.search');
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    // Nota fiscal de uma manutenção: mesma rota para Proprietário, Lojista e Oficina; quem pode
+    // abrir é a InvoicePolicy::view, não quem tiver o link do arquivo.
+    Route::get('/notas-fiscais/{invoice}', InvoiceDownloadController::class)
+        ->whereNumber('invoice')
+        ->name('invoices.show');
 
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notificacoes/{notification}/lida', [NotificationController::class, 'markAsRead'])->name('notifications.read');

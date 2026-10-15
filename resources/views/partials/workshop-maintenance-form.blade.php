@@ -13,7 +13,6 @@
 --}}
 @php
     use App\Enums\ServiceCategory;
-    use App\Support\AppStorage;
 
     $maintenance = $maintenance ?? null;
     $orderTemplates = $orderTemplates ?? collect();
@@ -96,7 +95,7 @@
                                 <span class="truncate text-foreground">{{ $invoice->file_name }}</span>
                                 <x-ui.badge size="sm">{{ $invoiceType($invoice) }}</x-ui.badge>
                             </span>
-                            <a href="{{ AppStorage::url($invoice->file_path) }}" target="_blank" rel="noopener" class="link shrink-0">Abrir<span class="sr-only"> {{ $invoice->file_name }} (abre em nova aba)</span></a>
+                            <a href="{{ route('invoices.show', $invoice) }}" target="_blank" rel="noopener" class="link shrink-0">Abrir<span class="sr-only"> {{ $invoice->file_name }} (abre em nova aba)</span></a>
                         </li>
                     @endforeach
                 </ul>

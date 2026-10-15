@@ -23,7 +23,6 @@
 @php
     use App\Enums\ServiceCategory;
     use App\Models\MaintenancePhoto;
-    use App\Support\AppStorage;
     use App\Support\Maintenance\MaintenanceLinks;
 
     $maintenance->loadMissing([
@@ -272,7 +271,7 @@
             <ul role="list" class="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
                 @foreach ($maintenance->invoices as $invoice)
                     <li>
-                        <a href="{{ AppStorage::url($invoice->file_path) }}" target="_blank" rel="noopener" class="flex min-h-12 items-center justify-between gap-3 px-4 py-3 text-sm transition-colors duration-fast ease-smooth-out hover:bg-surface-muted/60 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring motion-reduce:transition-none">
+                        <a href="{{ route('invoices.show', $invoice) }}" target="_blank" rel="noopener" class="flex min-h-12 items-center justify-between gap-3 px-4 py-3 text-sm transition-colors duration-fast ease-smooth-out hover:bg-surface-muted/60 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring motion-reduce:transition-none">
                             <span class="flex min-w-0 items-center gap-2 font-medium text-foreground">
                                 <x-ui.icon name="document-text" class="size-5 text-muted-foreground" />
                                 <span class="truncate">{{ $invoice->file_name }}</span>
