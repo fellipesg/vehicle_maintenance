@@ -38,3 +38,23 @@ Endereço de "Meus Dados" sai do app para essas duas, e esse tipo de edição ac
 Ordem obrigatória ao executar: **app primeiro, backend depois**. Tirar os campos de
 `UpdateProfileRequest` ou de `UserResource` antes de o app parar de enviá-los faz a tela "salvar" sem
 gravar nada, em silêncio. Enquanto o app não soltar a versão sem a seção, a API continua aceitando.
+
+## Foto de manutenção nunca pelo caminho do storage
+`MaintenancePhotoResource` devolve em `url` a rota `api.maintenance-photos.show`
+(`GET /api/v1/maintenance-photos/{photo}`, `ability:maintenances:read`, `Gate::authorize('view', $photo)`
+pela `MaintenancePhotoPolicy::view`) e não devolve mais `path`. Não volte a expor
+`AppStorage::url($photo->path)` nem o `path`: no disco público o arquivo abre sem token e, no S3/R2, a
+URL assinada é compartilhável até expirar — a foto de uma OS sem proprietário continuaria legível por
+quem tiver o link, mesmo com o `MaintenanceRedactor` tirando-a do resource. `url` só aparece para
+requisição autenticada (como `download_url` da `InvoiceResource`), e o arquivo sai pelo
+`MaintenancePhotoFileResponse`, o mesmo da rota web `maintenance-photos.show`: jpg/jpeg/png/webp
+inline, o resto baixa, com nosniff, CSP sandbox e `Cache-Control` privado e curto. O app Flutter não lia
+`photos` nem `path` quando isto mudou (nenhum `.dart` cita as chaves), então o contrato pôde mudar sem
+mexer no app.
+
+**Exceção: a busca pública segue com a URL do storage.** `PublicVehicleSearchResource` (de
+`GET /api/v1/vehicles/search/{identifier}`, sem middleware de autenticação) mantém `photos[].url` em
+`$photo->url`. A busca por placa é aberta, lá só entram as fotos públicas (`isPublicVisible()`, veículo
++ depois) e a rota autorizada responderia 403 a quem só buscou a placa. É a mesma exceção que o
+`x-provenance-card` tem na web (registrada em `.ai/rules/views.md`). Se um dia essa lista precisar de
+foto não pública, a rota não serve: o caminho é uma URL assinada de vida curta só para ela.
