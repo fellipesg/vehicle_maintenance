@@ -24,6 +24,8 @@ install: up node-install ## First run: .env, composer/npm deps, APP_KEY, migrati
 	@test -f .env || cp .env.example .env
 	$(EXEC) composer install --no-interaction
 	@grep -qE '^APP_KEY=.+' .env || $(EXEC) php artisan key:generate
+# Relativo: o mesmo link funciona no container (/var/www/html) e no host.
+	$(EXEC) php artisan storage:link --relative
 	$(EXEC) php artisan migrate --force
 	$(EXEC) php artisan db:seed --force
 	$(NODE) npm run build

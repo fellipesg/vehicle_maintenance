@@ -20,3 +20,11 @@ Timestamps are stored in UTC (config app.timezone). A time (or a date next to a 
 
 ## Placa nula
 Nunca imprima license_plate direto: use filled() e, nas telas privadas, "Placa não informada". Telas públicas não mostram nada no lugar.
+
+## Nota fiscal nunca pelo caminho do storage
+O link "Abrir" de uma nota fiscal (maintenances/_detail e partials/workshop-maintenance-form) aponta
+para route('invoices.show', $invoice) — InvoiceDownloadController, atrás de auth e da
+InvoicePolicy::view. Não volte a usar AppStorage::url($invoice->file_path): no disco público o
+arquivo abre sem login e, no S3/R2, a URL assinada é compartilhável. A rota serve só PDF na aba
+(Content-Disposition inline); XML e o resto baixam, com nosniff e CSP sandbox, porque o arquivo é do
+cliente.
