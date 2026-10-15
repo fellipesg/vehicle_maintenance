@@ -33,9 +33,10 @@ nosniff, CSP sandbox e Cache-Control privado e curto; `private` tem de ser marca
 resposta (`setPrivate()`), porque o BinaryFileResponse de response()->download() nasce público e
 descarta um 'Cache-Control' do array de cabeçalhos. Exceção registrada: x-provenance-card ainda usa
 $photo->url, porque só a busca por placa abre aquele bloco e lá x-vehicle.detail carrega apenas as
-fotos públicas (veículo/depois); a rota responderia 403 a quem só buscou a placa. O contrato da API
-(MaintenancePhotoResource, PublicVehicleSearchResource) segue com a URL do storage: mudá-lo exige
-olhar o app Flutter.
+fotos públicas (veículo/depois); a rota responderia 403 a quem só buscou a placa. O arquivo sai pelo
+MaintenancePhotoFileResponse, compartilhado com a rota da API. Do lado da API a foto também passou a
+sair por rota autorizada (api.maintenance-photos.show), e a busca pública mantém a mesma exceção:
+ver .ai/rules/api.md.
 
 ## Nota fiscal nunca pelo caminho do storage
 O link "Abrir" de uma nota fiscal (maintenances/_detail e partials/workshop-maintenance-form) aponta

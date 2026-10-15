@@ -125,6 +125,7 @@ Listagens paginadas: `page` (default 1) e `per_page` (default 15, máx. 100).
 | Listar manutenções | GET | `/maintenances?page=1&per_page=15` | Sim |
 | Detalhe manutenção | GET | `/maintenances/{id}` | Sim |
 | Fotos da manutenção | POST/DELETE | `/maintenances/{id}/photos[/{photo}]` | Sim |
+| Arquivo da foto | GET | `/maintenance-photos/{photo}` | Sim |
 | Oficinas | GET | `/workshops?search=curitiba` | Não |
 | Busca veículo | GET | `/vehicles/search/{placa_renavam_ou_chassi}` | Não |
 | Termos de uso | GET | `/legal/terms-of-use` | Não |

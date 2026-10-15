@@ -107,6 +107,13 @@ Route::prefix('v1')->group(function () {
         Route::delete('/maintenances/{maintenance}/photos/{photo}', [MaintenancePhotoController::class, 'destroy'])
             ->middleware('ability:maintenances:write');
 
+        // Foto de uma manutenção: quem pode abrir é a MaintenancePhotoPolicy::view, não quem
+        // tiver o link do arquivo no storage. É o que o MaintenancePhotoResource devolve.
+        Route::get('/maintenance-photos/{photo}', [MaintenancePhotoController::class, 'show'])
+            ->middleware('ability:maintenances:read')
+            ->whereNumber('photo')
+            ->name('api.maintenance-photos.show');
+
         // Export maintenance history to PDF (async)
         Route::post('/vehicles/{id}/export-pdf', [VehicleController::class, 'requestExportPdf'])->middleware('ability:vehicles:read');
         Route::get('/vehicle-pdf-exports/{exportId}', [VehiclePdfExportController::class, 'show'])->middleware('ability:vehicles:read');
