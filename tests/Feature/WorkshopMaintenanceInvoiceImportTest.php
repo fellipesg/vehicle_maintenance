@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -141,6 +142,44 @@ class WorkshopMaintenanceInvoiceImportTest extends TestCase
         $this->assertSame([$item->id], $maintenance->items()->pluck('id')->all());
     }
 
+    public function test_store_rejects_a_file_renamed_to_pdf(): void
+    {
+        $this->actingAs($this->workshopUser)
+            ->post(route('workshop.maintenances.store'), $this->osPayload([
+                'invoices' => [$this->uploadWithContent("#!/bin/sh\necho pwned\n", 'nota.pdf')],
+            ]))
+            ->assertSessionHasErrors(['invoices.0']);
+
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+    }
+
+    /**
+     * O caminho web de atualização gravava o arquivo antes da linha e não o apagava
+     * quando o insert falhava, deixando nota órfã no S3/R2.
+     */
+    public function test_update_leaves_no_file_in_storage_when_the_invoice_insert_fails(): void
+    {
+        $maintenance = $this->createMaintenance();
+
+        Invoice::creating(function (): void {
+            throw new \RuntimeException('insert failed');
+        });
+
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            $this->withoutExceptionHandling()
+                ->actingAs($this->workshopUser)
+                ->put(route('workshop.maintenances.update', $maintenance), $this->osPayload([
+                    'invoices' => [$this->fixture('troia_nfe_4250.xml', 'application/xml')],
+                ], withPlate: false));
+        } finally {
+            $this->assertDatabaseCount('invoices', 0);
+            $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $extra
      */
@@ -172,6 +211,14 @@ class WorkshopMaintenanceInvoiceImportTest extends TestCase
         }
 
         return $payload;
+    }
+
+    private function uploadWithContent(string $content, string $clientName): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'invoice-web-');
+        file_put_contents($path, $content);
+
+        return new UploadedFile($path, $clientName, null, null, true);
     }
 
     private function fixture(string $fileName, string $mimeType): UploadedFile
