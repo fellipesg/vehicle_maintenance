@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\VehicleConsignment;
+use App\Models\WorkshopMessageOptOut;
 use Database\Seeders\DevPortalUsersSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -12,8 +14,12 @@ use Tests\TestCase;
 
 /**
  * Limpeza das contas do DevPortalUsersSeeder que vazaram para produção: a senha está no
- * repositório e uma delas é admin. O comando fecha a credencial sempre, remove a conta vazia e
- * anonimiza a que já tem histórico — apagar a linha cascatearia em maintenances.user_id.
+ * repositório e uma delas é admin.
+ *
+ * O comando fecha a credencial e anonimiza, mas **nunca apaga a linha**. Dez tabelas apontam para
+ * `users` em cascata, e duas delas doem de verdade: a declaração da consignação, que guarda a
+ * trilha de autorização do proprietário, e o opt-out de mensagens, cuja remoção faria a pessoa
+ * voltar a receber contato.
  */
 class PurgeDevAccountsCommandTest extends TestCase
 {
@@ -27,20 +33,9 @@ class PurgeDevAccountsCommandTest extends TestCase
         ], $attributes));
     }
 
-    public function test_it_removes_a_dev_account_with_nothing_attached(): void
-    {
-        $user = $this->devUser('owner@vehicle-maintenance.test');
-
-        $this->artisan('users:purge-dev-accounts')->assertSuccessful();
-
-        $this->assertDatabaseMissing('users', ['id' => $user->id]);
-    }
-
     public function test_it_strips_the_admin_flag_and_the_known_password(): void
     {
         $admin = $this->devUser('admin@vehicle-maintenance.test', ['is_admin' => true]);
-        $vehicle = Vehicle::factory()->create();
-        $this->attachVehicleToUser($admin, $vehicle);
 
         $this->artisan('users:purge-dev-accounts')->assertSuccessful();
 
@@ -48,21 +43,30 @@ class PurgeDevAccountsCommandTest extends TestCase
 
         $this->assertFalse($admin->isAdmin());
         $this->assertFalse(Hash::check(DevPortalUsersSeeder::PASSWORD, $admin->password));
+        $this->assertStringEndsWith('@deleted.revisalog.invalid', $admin->email);
     }
 
-    public function test_it_revokes_tokens_of_a_dev_account(): void
+    public function test_it_revokes_tokens(): void
     {
         $user = $this->devUser('loja@vehicle-maintenance.test');
         $user->createToken('dev');
-
-        $this->assertSame(1, $user->tokens()->count());
 
         $this->artisan('users:purge-dev-accounts')->assertSuccessful();
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
-    public function test_it_anonymizes_instead_of_deleting_when_there_is_history(): void
+    public function test_it_never_deletes_the_row_even_when_nothing_is_attached(): void
+    {
+        $user = $this->devUser('owner@vehicle-maintenance.test');
+
+        $this->artisan('users:purge-dev-accounts')->assertSuccessful();
+
+        $this->assertDatabaseHas('users', ['id' => $user->id]);
+        $this->assertSame('Conta excluída', $user->fresh()->name);
+    }
+
+    public function test_it_keeps_the_maintenance_history(): void
     {
         $user = $this->devUser('oficina@vehicle-maintenance.test');
         $vehicle = Vehicle::factory()->create();
@@ -76,14 +80,42 @@ class PurgeDevAccountsCommandTest extends TestCase
 
         $this->artisan('users:purge-dev-accounts')->assertSuccessful();
 
-        // A linha fica, anonimizada: apagá-la levaria a manutenção junto.
-        $this->assertDatabaseHas('users', ['id' => $user->id]);
         $this->assertModelExists($maintenance->fresh());
+        $this->assertModelExists($vehicle->fresh());
+    }
 
-        $user->refresh();
-        $this->assertSame('Conta excluída', $user->name);
-        $this->assertStringEndsWith('@deleted.revisalog.invalid', $user->email);
-        $this->assertFalse(Hash::check(DevPortalUsersSeeder::PASSWORD, $user->password));
+    public function test_it_keeps_a_consignment_declared_by_the_dev_garage(): void
+    {
+        $garage = $this->devUser('loja@vehicle-maintenance.test', ['user_type' => 'garage']);
+
+        $consignment = VehicleConsignment::query()->create([
+            'vehicle_id' => Vehicle::factory()->create()->id,
+            'garage_user_id' => $garage->id,
+            'owner_name' => 'Dono de verdade',
+            'declaration_accepted_at' => now(),
+            'declaration_ip' => '203.0.113.10',
+            'status' => VehicleConsignment::STATUS_ACTIVE,
+            'started_at' => now(),
+        ]);
+
+        $this->artisan('users:purge-dev-accounts')->assertSuccessful();
+
+        // vehicle_consignments.garage_user_id é cascadeOnDelete: um delete() apagaria a
+        // declaração inteira, com a trilha de autorização do proprietário.
+        $this->assertModelExists($consignment->fresh());
+        $this->assertSame('203.0.113.10', $consignment->fresh()->declaration_ip);
+    }
+
+    public function test_it_keeps_a_message_opt_out(): void
+    {
+        $user = $this->devUser('owner@vehicle-maintenance.test');
+
+        $optOut = WorkshopMessageOptOut::query()->create(['user_id' => $user->id]);
+
+        $this->artisan('users:purge-dev-accounts')->assertSuccessful();
+
+        // Apagar um opt-out devolveria a pessoa à lista de contato.
+        $this->assertModelExists($optOut->fresh());
     }
 
     public function test_dry_run_changes_nothing(): void
@@ -94,8 +126,8 @@ class PurgeDevAccountsCommandTest extends TestCase
 
         $user->refresh();
 
-        $this->assertDatabaseHas('users', ['id' => $user->id]);
         $this->assertTrue($user->isAdmin());
+        $this->assertSame('owner@vehicle-maintenance.test', $user->email);
         $this->assertTrue(Hash::check(DevPortalUsersSeeder::PASSWORD, $user->password));
     }
 
@@ -114,6 +146,15 @@ class PurgeDevAccountsCommandTest extends TestCase
         $this->assertSame('cliente@gmail.com', $real->email);
     }
 
+    public function test_it_does_not_match_a_lookalike_domain(): void
+    {
+        $lookalike = User::factory()->create(['email' => 'alguem@vehicle-maintenance.test.br']);
+
+        $this->artisan('users:purge-dev-accounts')->assertSuccessful();
+
+        $this->assertSame('alguem@vehicle-maintenance.test.br', $lookalike->fresh()->email);
+    }
+
     public function test_it_is_safe_to_run_when_there_is_nothing_to_purge(): void
     {
         User::factory()->create(['email' => 'cliente@gmail.com']);
@@ -121,8 +162,6 @@ class PurgeDevAccountsCommandTest extends TestCase
         $this->artisan('users:purge-dev-accounts')
             ->expectsOutputToContain('Nenhuma conta de desenvolvimento encontrada.')
             ->assertSuccessful();
-
-        $this->assertDatabaseCount('users', 1);
     }
 
     public function test_it_handles_every_account_the_dev_seeder_creates(): void

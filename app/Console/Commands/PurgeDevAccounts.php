@@ -18,16 +18,18 @@ use Illuminate\Support\Str;
  * O domínio .test é reservado por RFC 2606: nenhum usuário real tem e-mail assim, então o filtro
  * é seguro.
  *
- * Toda conta encontrada perde a senha, o selo de admin e as sessões. Depois disso, a que não tem
- * nada vinculado é removida; a que já gerou histórico é anonimizada pelo mesmo DeleteUserAccount
- * da exclusão de conta, porque apagar a linha cascatearia em maintenances.user_id e levaria junto
- * registros do chassi.
+ * Nunca usa User::delete(), nem para conta que parece vazia. Dez tabelas apontam para `users` em
+ * cascata — manutenções, vínculos de veículo, oficina, loja, a declaração da consignação
+ * (`vehicle_consignments.garage_user_id`, com a trilha de autorização do proprietário) e até o
+ * opt-out de mensagens, cuja remoção faria a pessoa voltar a receber contato. Conferir uma a uma
+ * seria frágil: a próxima migration com cascade reabriria o buraco em silêncio. Então a conta é
+ * neutralizada e anonimizada pelo mesmo DeleteUserAccount da exclusão de conta, e a linha fica.
  */
 class PurgeDevAccounts extends Command
 {
     protected $signature = 'users:purge-dev-accounts {--dry-run : Só mostra o que seria feito}';
 
-    protected $description = 'Remove de produção as contas de desenvolvimento (@vehicle-maintenance.test)';
+    protected $description = 'Neutraliza e anonimiza em produção as contas de desenvolvimento (@vehicle-maintenance.test)';
 
     public const EMAIL_PATTERN = '%@vehicle-maintenance.test';
 
@@ -48,33 +50,23 @@ class PurgeDevAccounts extends Command
         $rows = [];
 
         foreach ($accounts as $account) {
-            $belongings = $this->belongingsOf($account);
-            $action = $belongings === [] ? 'remover' : 'anonimizar';
-
             $rows[] = [
                 $account->email,
                 $account->isAdmin() ? 'sim' : 'não',
-                $belongings === [] ? '—' : implode(', ', $belongings),
-                $dryRun ? "{$action} (simulação)" : $action,
+                $this->belongingsOf($account),
             ];
 
             if ($dryRun) {
                 continue;
             }
 
-            // Primeiro a credencial: mesmo que o resto falhe, a porta já está fechada.
+            // A credencial primeiro: mesmo que a anonimização falhe, a porta já está fechada.
             $this->revokeAccess($account);
-
-            if ($belongings === []) {
-                $account->delete();
-
-                continue;
-            }
 
             $deleteUserAccount->handle($account);
         }
 
-        $this->table(['E-mail', 'Era admin', 'Vinculado', 'Ação'], $rows);
+        $this->table(['E-mail', 'Era admin', 'Mantido vinculado'], $rows);
 
         if ($dryRun) {
             $this->warn('Simulação: nada foi alterado. Rode sem --dry-run para aplicar.');
@@ -82,26 +74,20 @@ class PurgeDevAccounts extends Command
             return self::SUCCESS;
         }
 
-        $this->info($accounts->count().' conta(s) de desenvolvimento tratada(s).');
+        $this->info($accounts->count().' conta(s) neutralizada(s) e anonimizada(s). Nenhuma linha foi apagada.');
 
         return self::SUCCESS;
     }
 
     /**
-     * O que impede a remoção da linha.
-     *
-     * @return list<string>
+     * Só para o relatório: o que continua no banco depois da anonimização.
      */
-    private function belongingsOf(User $user): array
+    private function belongingsOf(User $user): string
     {
         $belongings = [];
 
         if (($count = Maintenance::query()->where('user_id', $user->id)->count()) > 0) {
             $belongings[] = "{$count} manutenção(ões)";
-        }
-
-        if (($count = $user->vehicles()->count()) > 0) {
-            $belongings[] = "{$count} veículo(s)";
         }
 
         if ($user->workshop()->exists()) {
@@ -112,7 +98,7 @@ class PurgeDevAccounts extends Command
             $belongings[] = 'loja';
         }
 
-        return $belongings;
+        return $belongings === [] ? '—' : implode(', ', $belongings);
     }
 
     private function revokeAccess(User $user): void
