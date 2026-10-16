@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Invoice;
 use App\Models\Maintenance;
+use App\Models\MaintenanceItem;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -352,5 +353,146 @@ class InvoiceControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/invoices/{$invoice->id}")
             ->assertForbidden();
+    }
+
+    public function test_cannot_upload_a_file_renamed_to_pdf(): void
+    {
+        $maintenance = $this->ownedMaintenance();
+
+        $this->postJson('/api/v1/invoices/upload', [
+            'file' => $this->uploadWithContent("#!/bin/sh\necho pwned\n", 'nota.pdf'),
+            'maintenance_id' => $maintenance->id,
+            'invoice_type' => 'general',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['file']);
+
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+    }
+
+    public function test_cannot_upload_a_file_renamed_to_xml(): void
+    {
+        $maintenance = $this->ownedMaintenance();
+
+        $this->postJson('/api/v1/invoices/upload', [
+            'file' => $this->uploadWithContent("MZ\x90\x00binário", 'nota.xml'),
+            'maintenance_id' => $maintenance->id,
+            'invoice_type' => 'general',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['file']);
+
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+    }
+
+    /**
+     * Uma NF-e sem a declaração `<?xml ?>` chega como text/plain; o PDF e o XML de verdade
+     * continuam aceitos (ver também test_accepts_xml_with_text_plain_mime).
+     */
+    public function test_accepts_the_real_nfe_fixtures(): void
+    {
+        $maintenance = $this->ownedMaintenance();
+
+        foreach (['divesa_nfe_80000.pdf' => 'nota.pdf', 'troia_nfe_4250.xml' => 'nota.xml'] as $fixture => $clientName) {
+            $this->postJson('/api/v1/invoices/upload', [
+                'file' => new UploadedFile(base_path('tests/fixtures/invoices/'.$fixture), $clientName, null, null, true),
+                'maintenance_id' => $maintenance->id,
+                'invoice_type' => 'general',
+            ])->assertCreated();
+        }
+
+        $this->assertDatabaseCount('invoices', 2);
+    }
+
+    public function test_failed_invoice_insert_leaves_no_file_in_storage(): void
+    {
+        $maintenance = $this->ownedMaintenance();
+
+        Invoice::creating(function (): void {
+            throw new \RuntimeException('insert failed');
+        });
+
+        $this->postJson('/api/v1/invoices/upload', [
+            'file' => UploadedFile::fake()->create('nota.pdf', 100, 'application/pdf'),
+            'maintenance_id' => $maintenance->id,
+            'invoice_type' => 'general',
+        ])->assertStatus(500);
+
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+    }
+
+    public function test_cannot_attach_an_invoice_to_an_item_of_another_maintenance(): void
+    {
+        $maintenance = $this->ownedMaintenance();
+        $otherMaintenance = $this->ownedMaintenance();
+        $otherItem = MaintenanceItem::factory()->create(['maintenance_id' => $otherMaintenance->id]);
+
+        $this->postJson('/api/v1/invoices/upload', [
+            'file' => UploadedFile::fake()->create('nota.pdf', 100, 'application/pdf'),
+            'maintenance_id' => $maintenance->id,
+            'maintenance_item_id' => $otherItem->id,
+            'invoice_type' => 'item',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['maintenance_item_id']);
+
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+    }
+
+    public function test_rejects_a_maintenance_item_id_that_is_not_a_number(): void
+    {
+        $maintenance = $this->ownedMaintenance();
+
+        $this->postJson('/api/v1/invoices/upload', [
+            'file' => UploadedFile::fake()->create('nota.pdf', 100, 'application/pdf'),
+            'maintenance_id' => $maintenance->id,
+            'maintenance_item_id' => 'abc',
+            'invoice_type' => 'item',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['maintenance_item_id']);
+    }
+
+    /**
+     * A manutenção de outro tenant responde 403 antes de qualquer 422, mesmo quando o
+     * arquivo enviado também é inválido.
+     */
+    public function test_other_tenant_maintenance_is_forbidden_before_validation(): void
+    {
+        $this->actingAsApiUser();
+        $otherUser = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create();
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $otherUser->id,
+            'tenant_id' => $otherUser->tenant_id,
+        ]);
+
+        $this->postJson('/api/v1/invoices/upload', [
+            'file' => UploadedFile::fake()->create('nota.txt', 100),
+            'maintenance_id' => $maintenance->id,
+            'invoice_type' => 'general',
+        ])->assertForbidden();
+    }
+
+    private function ownedMaintenance(): Maintenance
+    {
+        $user = $this->app->make('auth')->user() ?? $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        return Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+        ]);
+    }
+
+    private function uploadWithContent(string $content, string $clientName): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'invoice-upload-');
+        file_put_contents($path, $content);
+
+        return new UploadedFile($path, $clientName, null, null, true);
     }
 }
