@@ -20,7 +20,9 @@ class CrlvImportFailureMail extends Mailable implements ShouldQueue
 
     /**
      * Chave do contexto => rótulo da tabela. Chave nova sem rótulo aqui aparece com a primeira letra
-     * maiúscula e sem o "_".
+     * maiúscula e sem o "_". Não há rótulo para o e-mail de quem enviou: o aviso identifica a conta
+     * pelo id (App\Services\Crlv\CrlvImportFailureReporter), e o que falta ao suporte é o layout do
+     * documento, não o contato.
      *
      * @var array<string, string>
      */
@@ -29,7 +31,6 @@ class CrlvImportFailureMail extends Mailable implements ShouldQueue
         'arquivo' => 'Arquivo',
         'tamanho_kb' => 'Tamanho (KB)',
         'usuario_id' => 'ID do usuário',
-        'usuario_email' => 'E-mail do usuário',
     ];
 
     /**
