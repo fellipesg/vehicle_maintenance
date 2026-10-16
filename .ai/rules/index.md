@@ -49,7 +49,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Services/User/** | .ai/rules/user.md |
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |
 | app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
-| resources/views/vehicles/entry/**,app/Http/Controllers/Web/Concerns/*Vehicle*,app/Support/Vehicle/VehicleEntryFlow.php,app/Services/Vehicle/VehicleOwnershipService.php | .ai/rules/vehicles-entry.md |
+| resources/views/vehicles/entry/**,app/Http/Controllers/Web/Concerns/*Vehicle*,app/Support/Vehicle/VehicleEntryFlow.php,app/Services/Vehicle/VehicleOwnershipService.php,app/Services/Crlv/** | .ai/rules/vehicles-entry.md |
 | resources/views/vendor/mail/** | .ai/rules/vendor-mail.md |
 | resources/views/layouts/**,resources/views/admin/** | .ai/rules/views-admin.md |
 | resources/views/**, resources/views/home.blade.php | .ai/rules/views.md |

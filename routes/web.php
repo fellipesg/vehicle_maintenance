@@ -160,10 +160,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');
         Route::get('/veiculos', [UserVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/novo', [UserVehicleController::class, 'create'])->name('vehicles.create');
-        Route::post('/veiculos/importar-crlv', [UserVehicleController::class, 'importCrlv'])->name('vehicles.import-crlv');
+        Route::post('/veiculos/importar-crlv', [UserVehicleController::class, 'importCrlv'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.import-crlv');
         Route::get('/veiculos/importar-crlv/preview', [UserVehicleController::class, 'previewCrlvImport'])->name('vehicles.import.preview');
         Route::get('/veiculos/vincular', [UserVehicleController::class, 'showClaimForm'])->name('vehicles.claim');
-        Route::post('/veiculos/vincular/crlv', [UserVehicleController::class, 'importCrlvForClaim'])->name('vehicles.claim.import-crlv');
+        Route::post('/veiculos/vincular/crlv', [UserVehicleController::class, 'importCrlvForClaim'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.claim.import-crlv');
         Route::get('/veiculos/vincular/preview', [UserVehicleController::class, 'previewCrlvClaim'])->name('vehicles.claim.preview');
         Route::post('/veiculos/vincular', [UserVehicleController::class, 'claim'])->name('vehicles.claim.store');
         Route::get('/veiculos/consignacao', [UserVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
@@ -172,7 +176,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/veiculos', [UserVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/veiculos/{vehicle}', [UserVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/veiculos/{vehicle}/editar', [UserVehicleController::class, 'edit'])->name('vehicles.edit');
-        Route::post('/veiculos/{vehicle}/importar-crlv', [UserVehicleController::class, 'importCrlvForEdit'])->name('vehicles.import-crlv.edit');
+        Route::post('/veiculos/{vehicle}/importar-crlv', [UserVehicleController::class, 'importCrlvForEdit'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.import-crlv.edit');
         Route::put('/veiculos/{vehicle}', [UserVehicleController::class, 'update'])->name('vehicles.update');
         Route::get('/veiculos/{vehicle}/capas', [UserVehicleController::class, 'editCovers'])->name('vehicles.covers');
         Route::put('/veiculos/{vehicle}/capas', [UserVehicleController::class, 'updateCovers'])->name('vehicles.covers.update');
@@ -211,10 +217,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::put('/minha-loja', [GarageProfileController::class, 'update'])->name('profile.update');
         Route::get('/estoque', [GarageVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/estoque/novo', [GarageVehicleController::class, 'create'])->name('vehicles.create');
-        Route::post('/estoque/importar-crlv', [GarageVehicleController::class, 'importCrlv'])->name('vehicles.import-crlv');
+        Route::post('/estoque/importar-crlv', [GarageVehicleController::class, 'importCrlv'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.import-crlv');
         Route::get('/estoque/importar-crlv/preview', [GarageVehicleController::class, 'previewCrlvImport'])->name('vehicles.import.preview');
         Route::get('/estoque/vincular', [GarageVehicleController::class, 'showClaimForm'])->name('vehicles.claim');
-        Route::post('/estoque/vincular/crlv', [GarageVehicleController::class, 'importCrlvForClaim'])->name('vehicles.claim.import-crlv');
+        Route::post('/estoque/vincular/crlv', [GarageVehicleController::class, 'importCrlvForClaim'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.claim.import-crlv');
         Route::get('/estoque/vincular/preview', [GarageVehicleController::class, 'previewCrlvClaim'])->name('vehicles.claim.preview');
         Route::post('/estoque/vincular', [GarageVehicleController::class, 'claim'])->name('vehicles.claim.store');
         Route::get('/estoque/consignacao', [GarageVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');

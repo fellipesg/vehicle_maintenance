@@ -35,13 +35,13 @@ class CrlvImportFailureMailTest extends TestCase
     {
         $html = (new CrlvImportFailureMail('Estrutura do CRLV-e não reconhecida.', [
             'arquivo' => 'CRLV-e.pdf',
-            'usuario_email' => 'ana@example.com',
+            'usuario_id' => 7,
         ]))->render();
 
         $this->assertMatchesRegularExpression('/<th[^>]*>Campo<\/th>\s*<th[^>]*>Valor<\/th>/', $html);
         $this->assertMatchesRegularExpression('/<td[^>]*>Arquivo<\/td>\s*<td[^>]*>CRLV-e\.pdf<\/td>/', $html);
-        $this->assertMatchesRegularExpression('/<td[^>]*>E-mail do usuário<\/td>\s*<td[^>]*>ana@example\.com<\/td>/u', $html);
-        $this->assertStringNotContainsString('Usuario email', $html);
+        $this->assertMatchesRegularExpression('/<td[^>]*>ID do usuário<\/td>\s*<td[^>]*>7<\/td>/u', $html);
+        $this->assertStringNotContainsString('Usuario id', $html);
         $this->assertStringNotContainsString('Tamanho (KB)', $html);
     }
 

@@ -4,6 +4,7 @@ paths:
   - 'app/Http/Controllers/Web/Concerns/*Vehicle*'
   - 'app/Support/Vehicle/VehicleEntryFlow.php'
   - 'app/Services/Vehicle/VehicleOwnershipService.php'
+  - 'app/Services/Crlv/**'
 ---
 
 # Vehicles Entry
@@ -19,3 +20,16 @@ The CRLV-e reader only reads the PDF text (no signature or QR check), so Vehicle
 
 ## Chegada do proprietário a um carro da oficina
 Sem dono, placa e RENAVAM, o veículo é assumido na web só pelo CRLV-e: o chassi inteiro precisa bater, e placa e RENAVAM passam a vir do documento (claimExisting falha se outro veículo já tem esse RENAVAM ou placa). No app, o cadastro manual com o mesmo chassi chama claimUnclaimedWorkshopVehicle: vínculo sem verificação (ownership_verified_at nulo). Não existe auto-adoção: claimExisting e o cadastro nunca mudam o tenant das OS pendentes; quem decide é o proprietário em "Registros de oficinas". Ao chegar, WorkshopRecordsArrivalNotifier avisa (database + e-mail + FCM, type workshop_records_pending, vehicle_id e count) e a web leva à tela de registros.
+
+## Falha de leitura do CRLV-e tem limite
+As rotas POST de upload de CRLV-e (importar, vincular e importar na edição, nos dois portais) usam
+`throttle:uploads` (10/min por conta, App\Providers\AppServiceProvider). As telas de conferência são
+GET, só leem `crlv_verification` da sessão e não reprocessam o PDF: ficam fora do balde para não
+gastar a cota de quem recarrega a página.
+
+`CrlvImportFailureReporter` só avisa a primeira ocorrência de cada falha por conta por hora
+(`Cache::add('crlv-failure:'.sha1(classe + mensagem normalizada + id da conta))`): sem isso um loop de
+PDFs inválidos enchia a caixa do suporte e a cota do Sentry. O balde ignora o nome do arquivo e a rota
+de origem de propósito — renomear o PDF ou trocar de tela não é falha nova. O e-mail vai pela fila
+(`Mail::to()->queue`) e o contexto não leva o e-mail de quem enviou, só o id da conta: o que falta ao
+suporte é o layout do DETRAN, não o contato.
