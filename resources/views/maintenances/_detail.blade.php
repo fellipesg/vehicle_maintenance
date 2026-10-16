@@ -95,7 +95,7 @@
         foreach ($detailPhotos->get($photoGroupKey, collect()) as $photo) {
             $detailPhotoPositions[$photo->id] = count($detailPhotoItems);
             $detailPhotoItems[] = [
-                'src' => $photo->url,
+                'src' => route('maintenance-photos.show', $photo),
                 'caption' => $detailPhotoGroups[$photoGroupKey],
                 'alt' => 'Foto '.(count($detailPhotoItems) + 1).' de '.$detailPhotoTotal.' — '.$detailPhotoContext.'. '.$detailPhotoGroups[$photoGroupKey],
             ];
@@ -313,14 +313,14 @@
                                     @php($photoPosition = $detailPhotoPositions[$photo->id])
                                     <li>
                                         <a
-                                            href="{{ $photo->url }}"
+                                            href="{{ route('maintenance-photos.show', $photo) }}"
                                             target="_blank"
                                             rel="noopener"
                                             class="block overflow-hidden rounded-control border border-border bg-surface-muted transition-colors duration-fast ease-smooth-out hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
                                             data-lightbox-open="{{ $detailPhotoViewerId }}"
                                             data-lightbox-index="{{ $photoPosition }}"
                                         >
-                                            <img src="{{ $photo->url }}" alt="{{ $detailPhotoItems[$photoPosition]['alt'] }}" loading="lazy" decoding="async" class="aspect-[4/3] w-full object-contain">
+                                            <img src="{{ route('maintenance-photos.show', $photo) }}" alt="{{ $detailPhotoItems[$photoPosition]['alt'] }}" loading="lazy" decoding="async" class="aspect-[4/3] w-full object-contain">
                                             <span class="sr-only" data-lightbox-new-tab-hint>(abre em nova aba)</span>
                                         </a>
                                     </li>

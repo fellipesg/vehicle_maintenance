@@ -68,6 +68,10 @@ class PublicVehicleSearchResource extends JsonResource
                     'kilometers' => $maintenance->kilometers,
                     'service_category' => $maintenance->service_category,
                     'is_manufacturer_required' => (bool) $maintenance->is_manufacturer_required,
+                    // Exceção registrada em .ai/rules/api.md: aqui a URL do storage é intencional.
+                    // A busca por placa não tem login, e só as fotos públicas (veículo/depois)
+                    // chegam nesta lista; a rota api.maintenance-photos.show responderia 403 a
+                    // quem só buscou a placa. É a mesma exceção do x-provenance-card na web.
                     'photos' => $maintenance->relationLoaded('photos')
                         ? $maintenance->photos
                             ->filter(fn ($photo) => $photo->isPublicVisible())

@@ -29,6 +29,7 @@ use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\InvoiceDownloadController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\MaintenanceInviteController;
+use App\Http\Controllers\Web\MaintenancePhotoController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OutreachController;
 use App\Http\Controllers\Web\PublicVehicleController;
@@ -146,6 +147,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/notas-fiscais/{invoice}', InvoiceDownloadController::class)
         ->whereNumber('invoice')
         ->name('invoices.show');
+
+    // Foto de uma manutenção: mesma rota para Proprietário, Lojista e Oficina; quem pode abrir é a
+    // MaintenancePhotoPolicy::view, não quem tiver o link do arquivo.
+    Route::get('/fotos-manutencao/{photo}', MaintenancePhotoController::class)
+        ->whereNumber('photo')
+        ->name('maintenance-photos.show');
 
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notificacoes/{notification}/lida', [NotificationController::class, 'markAsRead'])->name('notifications.read');
