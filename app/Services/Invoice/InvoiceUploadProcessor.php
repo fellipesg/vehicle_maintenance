@@ -32,7 +32,7 @@ class InvoiceUploadProcessor
             ];
         }
 
-        $this->createInvoiceRecords($maintenance, $stored);
+        $this->createInvoiceRecordsOrDiscard($maintenance, $stored);
 
         return $this->parseStoredUploads($maintenance, $stored);
     }
@@ -121,6 +121,24 @@ class InvoiceUploadProcessor
     }
 
     /**
+     * Persist the invoice rows and, when that fails, delete the files already
+     * uploaded, so a failed insert never leaves an orphan object in storage.
+     *
+     * @param  list<array{path: string, original_name: string}>  $stored
+     * @return list<Invoice>
+     */
+    public function createInvoiceRecordsOrDiscard(Maintenance $maintenance, array $stored): array
+    {
+        try {
+            return $this->createInvoiceRecords($maintenance, $stored);
+        } catch (\Throwable $e) {
+            $this->discardUploads($stored);
+
+            throw $e;
+        }
+    }
+
+    /**
      * Parse uploaded invoice files and sync line items. Runs after commit.
      *
      * @param  list<array{path: string, original_name: string}>  $stored
@@ -164,11 +182,20 @@ class InvoiceUploadProcessor
     public function discardUploads(array $stored): void
     {
         foreach ($stored as $file) {
-            try {
-                AppStorage::disk()->delete($file['path']);
-            } catch (\Throwable $e) {
-                report($e);
-            }
+            $this->discardUpload($file['path']);
+        }
+    }
+
+    /**
+     * Best-effort cleanup of a single uploaded file. Without it, a failed insert
+     * leaves the object in S3/R2 orphaned: paid for and referenced by no row.
+     */
+    public function discardUpload(string $path): void
+    {
+        try {
+            AppStorage::disk()->delete($path);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 
@@ -186,7 +213,7 @@ class InvoiceUploadProcessor
             ];
         }
 
-        $this->createInvoiceRecords($maintenance, $stored);
+        $this->createInvoiceRecordsOrDiscard($maintenance, $stored);
 
         return $this->parseStoredUploads($maintenance, $stored);
     }
