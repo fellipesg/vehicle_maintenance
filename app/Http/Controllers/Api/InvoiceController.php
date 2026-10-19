@@ -36,8 +36,6 @@ class InvoiceController extends Controller
 
         $processor = app(InvoiceUploadProcessor::class);
         $file = $request->file('file');
-        $filePath = null;
-        $invoice = null;
 
         try {
             $filePath = $processor->storeFile($file);
@@ -46,16 +44,25 @@ class InvoiceController extends Controller
                 throw new \RuntimeException('Invoice file could not be stored.');
             }
 
-            $invoice = Invoice::create([
-                'maintenance_id' => $request->maintenance_id,
-                'maintenance_item_id' => $request->maintenance_item_id,
-                'invoice_type' => $request->invoice_type,
-                'file_path' => $filePath,
-                'file_name' => $file->getClientOriginalName(),
-                'invoice_number' => $request->invoice_number ?? null,
-                'invoice_date' => $request->invoice_date ?? null,
-                'total_amount' => $request->total_amount ?? null,
-            ]);
+            try {
+                $invoice = Invoice::create([
+                    'maintenance_id' => $request->maintenance_id,
+                    'maintenance_item_id' => $request->maintenance_item_id,
+                    'invoice_type' => $request->invoice_type,
+                    'file_path' => $filePath,
+                    'file_name' => $file->getClientOriginalName(),
+                    'invoice_number' => $request->invoice_number ?? null,
+                    'invoice_date' => $request->invoice_date ?? null,
+                    'total_amount' => $request->total_amount ?? null,
+                ]);
+            } catch (\Throwable $e) {
+                // Sem a linha no banco, o arquivo já gravado no S3/R2 fica órfão: pago e
+                // sem referência. \Throwable, e não \Exception, porque um Error aqui
+                // escaparia do catch de baixo e deixaria o mesmo órfão.
+                $processor->discardUpload($filePath);
+
+                throw $e;
+            }
 
             $result = $processor->processStoredPath(
                 $maintenance,
@@ -81,12 +88,6 @@ class InvoiceController extends Controller
 
             return response()->json($payload, 201);
         } catch (\Exception $e) {
-            // Sem a linha no banco, o arquivo já gravado no S3/R2 fica órfão: pago e
-            // sem referência. Só apaga quando nenhuma nota passou a apontar para ele.
-            if ($invoice === null && $filePath !== null) {
-                $processor->discardUpload($filePath);
-            }
-
             Log::error('Error uploading invoice', ['exception' => $e->getMessage()]);
 
             return ApiResponse::error(

@@ -30,6 +30,36 @@ class InvoiceFileTest extends TestCase
         $this->assertSame([], $this->failures($file));
     }
 
+    /**
+     * NF-e sem a declaração de XML e gravada em ISO-8859-1: o fileinfo devolve text/plain
+     * e o libxml, sem declaração, assume UTF-8 e tromba no acento. Recusar isso barraria
+     * uma nota legítima, e a OS que exige nota fiscal nem poderia ser salva.
+     */
+    public function test_accepts_a_declaration_less_nfe_xml_in_iso_8859_1(): void
+    {
+        $latin1 = "<nfeProc><NFe><infNFe><xProd>LUBRIFICA\xC7\xC3O</xProd></infNFe></NFe></nfeProc>";
+
+        $file = $this->upload($latin1, 'nota.xml');
+
+        $this->assertSame('text/plain', $file->getMimeType());
+        $this->assertFalse(mb_check_encoding($latin1, 'UTF-8'));
+        $this->assertSame([], $this->failures($file));
+    }
+
+    public function test_accepts_an_nfe_xml_that_declares_iso_8859_1(): void
+    {
+        $declared = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><nfeProc><xProd>A\xC7\xC3O</xProd></nfeProc>";
+
+        $this->assertSame([], $this->failures($this->upload($declared, 'nota.xml')));
+    }
+
+    public function test_accepts_an_nfe_xml_with_a_utf8_bom(): void
+    {
+        $withBom = "\xEF\xBB\xBF<?xml version=\"1.0\"?><nfeProc><xProd>FILTRO</xProd></nfeProc>";
+
+        $this->assertSame([], $this->failures($this->upload($withBom, 'nota.xml')));
+    }
+
     public function test_rejects_a_shell_script_renamed_to_pdf(): void
     {
         $failures = $this->failures($this->upload("#!/bin/sh\necho pwned\n", 'nota.pdf'));

@@ -48,7 +48,7 @@ class StoreMaintenanceRequest extends ApiFormRequest
                     isWorkshopPortal: (bool) $this->user()?->isWorkshop(),
                 ),
             ],
-            'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
+            'invoices.*' => ['bail', 'file', 'max:10240', new InvoiceFile],
             'checklists' => 'nullable|array',
             'checklists.*.checklist_type' => 'required_with:checklists|in:initial,final',
             'checklists.*.items' => 'required_with:checklists|array',

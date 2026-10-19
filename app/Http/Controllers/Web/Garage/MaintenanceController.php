@@ -133,7 +133,7 @@ class MaintenanceController extends Controller
             'service_category' => ['required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => ['nullable', 'boolean'],
             'invoices' => ['nullable', 'array'],
-            'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
+            'invoices.*' => ['bail', 'file', 'max:10240', new InvoiceFile],
             'return_to' => ['nullable', 'in:vehicle'],
         ]);
 

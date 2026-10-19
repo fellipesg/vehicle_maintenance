@@ -475,6 +475,55 @@ class InvoiceControllerTest extends TestCase
         ])->assertForbidden();
     }
 
+    /**
+     * O limite de tamanho vem antes da checagem de conteúdo, com `bail`, então o arquivo
+     * grande é recusado sem ser lido nem percorrido pelo parser.
+     */
+    public function test_the_size_limit_rejects_a_big_file_before_the_content_check(): void
+    {
+        $maintenance = $this->ownedMaintenance();
+
+        $response = $this->postJson('/api/v1/invoices/upload', [
+            'file' => $this->uploadWithContent(str_repeat('lixo binario ', 900000), 'nota.xml'),
+            'maintenance_id' => $maintenance->id,
+            'invoice_type' => 'general',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['file']);
+
+        $messages = $response->json('errors.file');
+        $this->assertNotEmpty($messages);
+
+        foreach ($messages as $message) {
+            $this->assertStringNotContainsString('não é um XML', $message);
+        }
+    }
+
+    /**
+     * Um Error (e não Exception) vindo do insert escapava do catch e deixava o órfão.
+     */
+    public function test_an_error_from_the_insert_still_removes_the_file(): void
+    {
+        $maintenance = $this->ownedMaintenance();
+
+        Invoice::creating(function (): void {
+            throw new \TypeError('insert quebrou');
+        });
+
+        $this->expectException(\TypeError::class);
+
+        try {
+            $this->withoutExceptionHandling()
+                ->postJson('/api/v1/invoices/upload', [
+                    'file' => UploadedFile::fake()->create('nota.pdf', 100, 'application/pdf'),
+                    'maintenance_id' => $maintenance->id,
+                    'invoice_type' => 'general',
+                ]);
+        } finally {
+            $this->assertDatabaseCount('invoices', 0);
+            $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+        }
+    }
+
     private function ownedMaintenance(): Maintenance
     {
         $user = $this->app->make('auth')->user() ?? $this->actingAsApiUser();

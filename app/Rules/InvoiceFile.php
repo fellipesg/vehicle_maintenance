@@ -5,6 +5,7 @@ namespace App\Rules;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Http\UploadedFile;
+use XMLReader;
 
 /**
  * A nota fiscal só é aceita quando o conteúdo do arquivo corresponde ao tipo declarado.
@@ -63,7 +64,7 @@ class InvoiceFile implements ValidationRule
     private function isXml(UploadedFile $file, string $path): bool
     {
         return in_array($this->mimeType($file), self::XML_MIME_TYPES, true)
-            || $this->isWellFormedXml($path);
+            || $this->isXmlDocument($path);
     }
 
     /**
@@ -90,7 +91,11 @@ class InvoiceFile implements ValidationRule
         return is_string($header) && str_starts_with($header, '%PDF-');
     }
 
-    private function isWellFormedXml(string $path): bool
+    /**
+     * Documento XML de verdade. Os chamadores põem `max:10240` antes desta regra, com
+     * `bail`, então o arquivo que chega aqui já está dentro do limite de tamanho.
+     */
+    private function isXmlDocument(string $path): bool
     {
         if (! is_readable($path)) {
             return false;
@@ -102,11 +107,62 @@ class InvoiceFile implements ValidationRule
             return false;
         }
 
+        if ($this->parsesAsXml($content)) {
+            return true;
+        }
+
+        /*
+         * Sem a declaração de XML o libxml assume UTF-8 e recusa a NF-e gravada em
+         * ISO-8859-1, onde o acento é um byte inválido. Converte e tenta de novo, senão
+         * uma nota legítima (o layout sem declaração existe: divesa_nfe_33893.xml) seria
+         * recusada e a OS que exige nota fiscal não poderia ser salva.
+         */
+        if (! mb_check_encoding($content, 'UTF-8')) {
+            $asUtf8 = @mb_convert_encoding($content, 'UTF-8', 'ISO-8859-1');
+
+            return is_string($asUtf8) && $this->parsesAsXml($asUtf8);
+        }
+
+        return false;
+    }
+
+    /**
+     * Percorre o documento em fluxo, sem montar a árvore inteira: uma NF-e de 10 MB
+     * custaria mais de 100 MB de memória de libxml, que não entra no memory_limit.
+     */
+    private function parsesAsXml(string $content): bool
+    {
         $useInternalErrors = libxml_use_internal_errors(true);
+        $reader = new XMLReader;
+        $opened = false;
 
         try {
-            return simplexml_load_string($content, options: LIBXML_NONET) !== false;
+            $opened = $reader->XML($content, null, LIBXML_NONET);
+
+            if ($opened !== true) {
+                return false;
+            }
+
+            $sawElement = false;
+
+            while ($reader->read()) {
+                $sawElement = $sawElement || $reader->nodeType === XMLReader::ELEMENT;
+            }
+
+            foreach (libxml_get_errors() as $error) {
+                if ($error->level >= LIBXML_ERR_ERROR) {
+                    return false;
+                }
+            }
+
+            return $sawElement;
+        } catch (\Throwable) {
+            return false;
         } finally {
+            if ($opened === true) {
+                $reader->close();
+            }
+
             libxml_clear_errors();
             libxml_use_internal_errors($useInternalErrors);
         }

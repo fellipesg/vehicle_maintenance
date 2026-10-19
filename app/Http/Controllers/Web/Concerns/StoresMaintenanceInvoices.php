@@ -73,12 +73,14 @@ trait StoresMaintenanceInvoices
 
         try {
             $maintenance = $createMaintenance();
-            $processor->createInvoiceRecords($maintenance, $stored);
         } catch (\Throwable $e) {
+            // Nenhuma nota foi gravada ainda, então todos os arquivos podem ir embora.
             $processor->discardUploads($stored);
 
             throw $e;
         }
+
+        $processor->createInvoiceRecordsOrDiscard($maintenance, $stored);
 
         return [
             'maintenance' => $maintenance,

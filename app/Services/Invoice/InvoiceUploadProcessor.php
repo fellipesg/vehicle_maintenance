@@ -97,6 +97,11 @@ class InvoiceUploadProcessor
      * Persist invoice rows for already-uploaded files. Call inside the same
      * DB transaction that creates the maintenance, so the FK always holds.
      *
+     * In a transaction the rollback removes every row, so the caller discards every
+     * uploaded file (Api/MaintenanceController::store does that). Outside one, use
+     * createInvoiceRecordsOrDiscard instead: there the rows before the failure are
+     * already committed and their files must stay.
+     *
      * @param  list<array{path: string, original_name: string}>  $stored
      * @return list<Invoice>
      */
@@ -105,37 +110,57 @@ class InvoiceUploadProcessor
         $invoices = [];
 
         foreach ($stored as $file) {
-            $invoices[] = Invoice::create([
-                'maintenance_id' => $maintenance->id,
-                'maintenance_item_id' => null,
-                'invoice_type' => 'general',
-                'file_path' => $file['path'],
-                'file_name' => $file['original_name'],
-                'invoice_number' => null,
-                'invoice_date' => null,
-                'total_amount' => null,
-            ]);
+            $invoices[] = $this->createInvoiceRecord($maintenance, $file);
         }
 
         return $invoices;
     }
 
     /**
-     * Persist the invoice rows and, when that fails, delete the files already
-     * uploaded, so a failed insert never leaves an orphan object in storage.
+     * Persist the invoice rows and, when one of them fails, delete only the files
+     * that were left without a row.
+     *
+     * There is no transaction around these inserts (see the note in
+     * StoresMaintenanceInvoices about the Neon pooler), so the rows created before
+     * the failure are already committed. Deleting their files too would leave a nota
+     * pointing at nothing — worse than the orphan object this guards against, because
+     * the download route can only answer "Invoice file not found" from then on.
      *
      * @param  list<array{path: string, original_name: string}>  $stored
      * @return list<Invoice>
      */
     public function createInvoiceRecordsOrDiscard(Maintenance $maintenance, array $stored): array
     {
-        try {
-            return $this->createInvoiceRecords($maintenance, $stored);
-        } catch (\Throwable $e) {
-            $this->discardUploads($stored);
+        $invoices = [];
 
-            throw $e;
+        foreach ($stored as $index => $file) {
+            try {
+                $invoices[] = $this->createInvoiceRecord($maintenance, $file);
+            } catch (\Throwable $e) {
+                $this->discardUploads(array_slice($stored, $index));
+
+                throw $e;
+            }
         }
+
+        return $invoices;
+    }
+
+    /**
+     * @param  array{path: string, original_name: string}  $file
+     */
+    private function createInvoiceRecord(Maintenance $maintenance, array $file): Invoice
+    {
+        return Invoice::create([
+            'maintenance_id' => $maintenance->id,
+            'maintenance_item_id' => null,
+            'invoice_type' => 'general',
+            'file_path' => $file['path'],
+            'file_name' => $file['original_name'],
+            'invoice_number' => null,
+            'invoice_date' => null,
+            'total_amount' => null,
+        ]);
     }
 
     /**

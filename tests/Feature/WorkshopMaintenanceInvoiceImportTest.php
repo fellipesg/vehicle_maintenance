@@ -181,6 +181,101 @@ class WorkshopMaintenanceInvoiceImportTest extends TestCase
     }
 
     /**
+     * Os inserts das notas não estão numa transação (pooler do Neon), então a primeira
+     * nota já está gravada quando a segunda falha. Apagar o arquivo dela deixaria a nota
+     * apontando para o vazio, e a rota de download só poderia responder 404.
+     */
+    public function test_update_keeps_the_first_invoices_file_when_the_second_insert_fails(): void
+    {
+        $maintenance = $this->createMaintenance();
+
+        $this->failOnInvoiceNumber(2);
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            $this->withoutExceptionHandling()
+                ->actingAs($this->workshopUser)
+                ->put(route('workshop.maintenances.update', $maintenance), $this->osPayload([
+                    'invoices' => [
+                        $this->fixture('troia_nfe_4250.xml', 'application/xml'),
+                        $this->fixture('divesa_nfe_33893.xml', 'text/plain'),
+                    ],
+                ], withPlate: false));
+        } finally {
+            $this->assertEveryInvoiceStillHasItsFile(expectedCount: 1);
+        }
+    }
+
+    public function test_store_keeps_the_first_invoices_file_when_the_second_insert_fails(): void
+    {
+        $this->failOnInvoiceNumber(2);
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            $this->withoutExceptionHandling()
+                ->actingAs($this->workshopUser)
+                ->post(route('workshop.maintenances.store'), $this->osPayload([
+                    'invoices' => [
+                        $this->fixture('troia_nfe_4250.xml', 'application/xml'),
+                        $this->fixture('divesa_nfe_33893.xml', 'text/plain'),
+                    ],
+                ]));
+        } finally {
+            $this->assertEveryInvoiceStillHasItsFile(expectedCount: 1);
+        }
+    }
+
+    /**
+     * Se a OS não nasce, nenhuma nota foi gravada e todos os arquivos vão embora.
+     */
+    public function test_store_discards_every_upload_when_the_maintenance_is_not_created(): void
+    {
+        Maintenance::creating(function (): void {
+            throw new \RuntimeException('OS não foi criada');
+        });
+
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            $this->withoutExceptionHandling()
+                ->actingAs($this->workshopUser)
+                ->post(route('workshop.maintenances.store'), $this->osPayload([
+                    'invoices' => [$this->fixture('troia_nfe_4250.xml', 'application/xml')],
+                ]));
+        } finally {
+            $this->assertDatabaseCount('invoices', 0);
+            $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+        }
+    }
+
+    private function failOnInvoiceNumber(int $position): void
+    {
+        $created = 0;
+
+        Invoice::creating(function () use (&$created, $position): void {
+            $created++;
+
+            if ($created === $position) {
+                throw new \RuntimeException('insert da nota falhou');
+            }
+        });
+    }
+
+    private function assertEveryInvoiceStillHasItsFile(int $expectedCount): void
+    {
+        $invoices = Invoice::all();
+
+        $this->assertCount($expectedCount, $invoices);
+
+        foreach ($invoices as $invoice) {
+            $this->assertTrue(
+                Storage::disk('public')->exists($invoice->file_path),
+                "A nota #{$invoice->id} ficou apontando para um arquivo apagado.",
+            );
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $extra
      */
     private function createMaintenance(array $extra = []): Maintenance

@@ -301,7 +301,7 @@ class MaintenanceController extends Controller
                     existingInvoiceCount: $existingInvoices,
                 ),
             ],
-            'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
+            'invoices.*' => ['bail', 'file', 'max:10240', new InvoiceFile],
         ];
 
         if ($maintenance === null) {

@@ -33,7 +33,7 @@ class UploadInvoiceRequest extends ApiFormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', new InvoiceFile, 'max:10240'],
+            'file' => ['bail', 'required', 'file', 'max:10240', new InvoiceFile],
             'maintenance_id' => ['bail', 'required', 'integer', 'exists:maintenances,id'],
             // O item tem de ser da própria manutenção: sem o escopo, uma nota se anexa
             // ao item de outra OS. `bail` evita que o exists receba um id não numérico,
