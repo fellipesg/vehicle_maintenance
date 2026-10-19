@@ -412,6 +412,33 @@ class CrlvVehicleImportTest extends TestCase
     }
 
     /**
+     * O log local fica fora da janela: ele é o que diz ao suporte se a pessoa tentou uma vez ou
+     * vinte, e não custa cota nem caixa de entrada.
+     */
+    public function test_every_attempt_is_logged_even_when_the_alert_is_deduplicated(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+        Log::spy();
+        $this->failingCrlvParser();
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $this->actingAs($this->user)
+                ->from(route('user.vehicles.create'))
+                ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv()])
+                ->assertSessionHasErrors('crlv');
+        }
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === 'CRLV-e não lido.'
+                && $context['usuario_id'] === $this->user->id)
+            ->times(3);
+
+        Mail::assertQueuedCount(1);
+        Exceptions::assertReportedCount(1);
+    }
+
+    /**
      * A janela de silêncio é por conta: outro usuário com a mesma falha ainda avisa, senão o
      * primeiro a tropeçar no layout novo esconderia todos os outros.
      */

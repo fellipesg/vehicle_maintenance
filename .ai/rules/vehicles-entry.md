@@ -27,9 +27,16 @@ As rotas POST de upload de CRLV-e (importar, vincular e importar na edição, no
 GET, só leem `crlv_verification` da sessão e não reprocessam o PDF: ficam fora do balde para não
 gastar a cota de quem recarrega a página.
 
-`CrlvImportFailureReporter` só avisa a primeira ocorrência de cada falha por conta por hora
-(`Cache::add('crlv-failure:'.sha1(classe + mensagem normalizada + id da conta))`): sem isso um loop de
-PDFs inválidos enchia a caixa do suporte e a cota do Sentry. O balde ignora o nome do arquivo e a rota
-de origem de propósito — renomear o PDF ou trocar de tela não é falha nova. O e-mail vai pela fila
-(`Mail::to()->queue`) e o contexto não leva o e-mail de quem enviou, só o id da conta: o que falta ao
-suporte é o layout do DETRAN, não o contato.
+`CrlvImportFailureReporter` limita o aviso por duas portas: `Cache::add('crlv-failure:'.sha1(classe +
+mensagem normalizada + id da conta))` deixa passar a primeira ocorrência de cada falha por conta por
+hora, e `RateLimiter::attempt('crlv-failure-global:'...)` põe um teto de `GLOBAL_ALERTS_PER_WINDOW`
+avisos da mesma falha na hora somando todas as contas. Sem a primeira, um loop de PDFs inválidos
+enchia a caixa do suporte; sem a segunda, um layout novo de DETRAN que chega a centenas de pessoas
+fazia o mesmo, porque a conta entra na chave. O balde por conta ignora o nome do arquivo e a rota de
+origem de propósito — renomear o PDF ou trocar de tela não é falha nova.
+
+Duas coisas ficam **fora** da janela de propósito: o `Log::warning('CRLV-e não lido.')`, que é local,
+barato e é o que mostra quantas vezes a pessoa tentou; e a janela da conta quando o despacho do
+e-mail falha (`reopenWindow`), senão um tropeço da fila na primeira ocorrência calava o aviso por uma
+hora. O e-mail vai pela fila (`Mail::to()->queue`) e o contexto não leva o e-mail de quem enviou, só
+o id da conta: o que falta ao suporte é o layout do DETRAN, não o contato.
