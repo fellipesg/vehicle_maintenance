@@ -96,7 +96,7 @@ trait StoresMaintenanceInvoices
     {
         $processor = app(InvoiceUploadProcessor::class);
         $stored = $processor->storeUploads($request->file('invoices'));
-        $processor->createInvoiceRecords($maintenance, $stored);
+        $processor->createInvoiceRecordsOrDiscard($maintenance, $stored);
 
         return $this->parseMaintenanceInvoices($maintenance, $stored);
     }

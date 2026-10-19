@@ -34,9 +34,13 @@ class InvoiceController extends Controller
 
         Gate::authorize('update', $maintenance);
 
+        $processor = app(InvoiceUploadProcessor::class);
+        $file = $request->file('file');
+        $filePath = null;
+        $invoice = null;
+
         try {
-            $file = $request->file('file');
-            $filePath = app(InvoiceUploadProcessor::class)->storeFile($file);
+            $filePath = $processor->storeFile($file);
 
             if ($filePath === null) {
                 throw new \RuntimeException('Invoice file could not be stored.');
@@ -53,7 +57,7 @@ class InvoiceController extends Controller
                 'total_amount' => $request->total_amount ?? null,
             ]);
 
-            $result = app(InvoiceUploadProcessor::class)->processStoredPath(
+            $result = $processor->processStoredPath(
                 $maintenance,
                 $invoice,
                 $filePath,
@@ -77,6 +81,12 @@ class InvoiceController extends Controller
 
             return response()->json($payload, 201);
         } catch (\Exception $e) {
+            // Sem a linha no banco, o arquivo já gravado no S3/R2 fica órfão: pago e
+            // sem referência. Só apaga quando nenhuma nota passou a apontar para ele.
+            if ($invoice === null && $filePath !== null) {
+                $processor->discardUpload($filePath);
+            }
+
             Log::error('Error uploading invoice', ['exception' => $e->getMessage()]);
 
             return ApiResponse::error(

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\AccountController;
+use App\Http\Controllers\Web\AccountDeletionController;
 use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryController;
 use App\Http\Controllers\Web\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Web\Admin\ConsignmentController as AdminConsignmentController;
@@ -79,6 +80,18 @@ Route::get('/convite/{token}', [MaintenanceInviteController::class, 'show'])
 Route::post('/contato', [ContactController::class, 'store'])
     ->middleware('throttle:contact')
     ->name('contact.store');
+// Exclusão de conta pedida de fora do app: o Google Play exige o link na ficha da loja, acessível
+// a quem não tem (ou já desinstalou) o aplicativo. Quem confirma é a caixa de e-mail da conta.
+Route::get('/excluir-conta', [AccountDeletionController::class, 'show'])->name('account-deletion.show');
+Route::post('/excluir-conta', [AccountDeletionController::class, 'request'])
+    ->middleware('throttle:contact')
+    ->name('account-deletion.request');
+Route::middleware('signed')->group(function () {
+    Route::get('/excluir-conta/confirmar/{user}', [AccountDeletionController::class, 'confirm'])
+        ->name('account-deletion.confirm');
+    Route::delete('/excluir-conta/confirmar/{user}', [AccountDeletionController::class, 'destroy'])
+        ->name('account-deletion.destroy');
+});
 // Resposta do proprietário de um veículo em consignação, pelo link do e-mail: liberar o histórico
 // anterior ou contestar. Sem login de propósito — o dono do carro consignado quase nunca tem conta.
 Route::prefix('consignacao')->name('consignments.owner.')->middleware('throttle:search')->group(function () {
