@@ -11,6 +11,7 @@ use Database\Seeders\VehicleCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -383,6 +384,234 @@ class CrlvVehicleImportTest extends TestCase
                 && $mail->context['arquivo'] === 'CRLV-e.pdf'
                 && $mail->context['usuario_id'] === $this->user->id
         );
+
+        // Nada de esperar o provedor de e-mail dentro da requisição de quem cadastra.
+        Mail::assertNotSent(CrlvImportFailureMail::class);
+    }
+
+    /**
+     * Mesma falha, mesma conta: o suporte recebe um aviso e o Sentry um evento. Reenviar o
+     * documento recusado em sequência não multiplica nem um nem outro.
+     */
+    public function test_repeated_identical_failure_alerts_support_only_once(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+        $this->failingCrlvParser();
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $this->actingAs($this->user)
+                ->from(route('user.vehicles.create'))
+                ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv()])
+                ->assertRedirect(route('user.vehicles.create'))
+                ->assertSessionHasErrors('crlv');
+        }
+
+        Mail::assertQueuedCount(1);
+        Exceptions::assertReportedCount(1);
+    }
+
+    /**
+     * O log local fica fora da janela: ele é o que diz ao suporte se a pessoa tentou uma vez ou
+     * vinte, e não custa cota nem caixa de entrada.
+     */
+    public function test_every_attempt_is_logged_even_when_the_alert_is_deduplicated(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+        Log::spy();
+        $this->failingCrlvParser();
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $this->actingAs($this->user)
+                ->from(route('user.vehicles.create'))
+                ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv()])
+                ->assertSessionHasErrors('crlv');
+        }
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === 'CRLV-e não lido.'
+                && $context['usuario_id'] === $this->user->id)
+            ->times(3);
+
+        Mail::assertQueuedCount(1);
+        Exceptions::assertReportedCount(1);
+    }
+
+    /**
+     * A janela de silêncio é por conta: outro usuário com a mesma falha ainda avisa, senão o
+     * primeiro a tropeçar no layout novo esconderia todos os outros.
+     */
+    public function test_window_is_per_account(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+        $this->failingCrlvParser();
+
+        $other = User::factory()->asUser()->create();
+
+        foreach ([$this->user, $other] as $actor) {
+            $this->actingAs($actor)
+                ->from(route('user.vehicles.create'))
+                ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv()])
+                ->assertSessionHasErrors('crlv');
+        }
+
+        Mail::assertQueuedCount(2);
+        Exceptions::assertReportedCount(2);
+    }
+
+    /**
+     * Renomear o PDF não é falha nova: o balde ignora o nome do arquivo.
+     */
+    public function test_renaming_the_file_does_not_reopen_the_window(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+        $this->failingCrlvParser();
+
+        foreach (['CRLV-e.pdf', 'crlv-2.pdf'] as $name) {
+            $this->actingAs($this->user)
+                ->from(route('user.vehicles.create'))
+                ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv($name)])
+                ->assertSessionHasErrors('crlv');
+        }
+
+        Mail::assertQueuedCount(1);
+        Exceptions::assertReportedCount(1);
+    }
+
+    /**
+     * O aviso vai para o log da aplicação e para fora dela: o e-mail de quem enviou o documento
+     * não entra no contexto, só o id da conta.
+     */
+    public function test_failure_log_does_not_carry_the_user_email(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+        Log::spy();
+        $this->failingCrlvParser();
+
+        $this->actingAs($this->user)
+            ->from(route('user.vehicles.create'))
+            ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv()])
+            ->assertSessionHasErrors('crlv');
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === 'CRLV-e não lido.'
+                && $context['usuario_id'] === $this->user->id
+                && ! array_key_exists('usuario_email', $context)
+                && ! in_array($this->user->email, $context, true))
+            ->once();
+
+        Mail::assertQueued(
+            CrlvImportFailureMail::class,
+            fn (CrlvImportFailureMail $mail) => ! array_key_exists('usuario_email', $mail->context)
+                && ! in_array($this->user->email, $mail->context, true)
+        );
+    }
+
+    /**
+     * Upload de CRLV-e passa pelo balde 'uploads' (10/min por conta): PDF inválido em loop para
+     * no limite da rota, antes de chegar ao leitor.
+     */
+    public function test_crlv_upload_is_throttled(): void
+    {
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
+            $this->actingAs($this->user)
+                ->from(route('user.vehicles.create'))
+                ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv()])
+                ->assertRedirect(route('user.vehicles.create'));
+        }
+
+        $this->actingAs($this->user)
+            ->from(route('user.vehicles.create'))
+            ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv()])
+            ->assertStatus(429);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function crlvUploadRouteProvider(): array
+    {
+        return [
+            'importar (proprietário)' => ['/usuario/veiculos/importar-crlv'],
+            'vincular (proprietário)' => ['/usuario/veiculos/vincular/crlv'],
+        ];
+    }
+
+    #[DataProvider('crlvUploadRouteProvider')]
+    public function test_every_crlv_upload_route_is_throttled(string $path): void
+    {
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
+            $this->actingAs($this->user)
+                ->from(route('user.vehicles.create'))
+                ->post($path, ['crlv' => $this->unreadableCrlv()]);
+        }
+
+        $this->actingAs($this->user)
+            ->from(route('user.vehicles.create'))
+            ->post($path, ['crlv' => $this->unreadableCrlv()])
+            ->assertStatus(429);
+    }
+
+    /**
+     * O limite é do grupo 'uploads', compartilhado entre as rotas de upload da conta: gastar a
+     * cota numa delas fecha as outras.
+     */
+    public function test_upload_routes_share_the_same_bucket(): void
+    {
+        for ($attempt = 1; $attempt <= 10; $attempt++) {
+            $this->actingAs($this->user)
+                ->from(route('user.vehicles.create'))
+                ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv()]);
+        }
+
+        $this->actingAs($this->user)
+            ->from(route('user.vehicles.create'))
+            ->post('/usuario/veiculos/vincular/crlv', ['crlv' => $this->unreadableCrlv()])
+            ->assertStatus(429);
+    }
+
+    /**
+     * A tela Conferir só lê a sessão (nada de reprocessar o PDF), então fica fora do balde de
+     * upload: quem recarrega a conferência não perde a cota de envio.
+     */
+    public function test_preview_is_not_throttled(): void
+    {
+        $file = new UploadedFile(
+            base_path('tests/fixtures/crlv/honda_civic_ms.pdf'),
+            'CRLV-e.pdf',
+            'application/pdf',
+            null,
+            true
+        );
+
+        $this->actingAs($this->user)->post('/usuario/veiculos/importar-crlv', ['crlv' => $file]);
+
+        for ($attempt = 1; $attempt <= 12; $attempt++) {
+            $this->actingAs($this->user)
+                ->get('/usuario/veiculos/importar-crlv/preview')
+                ->assertOk();
+        }
+    }
+
+    /**
+     * Leitor que recusa qualquer documento, para exercitar o caminho de falha.
+     */
+    private function failingCrlvParser(): void
+    {
+        $this->mock(CrlvPdfParser::class, function ($parser): void {
+            $parser->shouldReceive('isCrlvDocument')->andReturn(true);
+            $parser->shouldReceive('parseUpload')
+                ->andThrow(new CrlvParseException('Estrutura do CRLV-e não reconhecida.'));
+        });
+    }
+
+    private function unreadableCrlv(string $name = 'CRLV-e.pdf'): UploadedFile
+    {
+        return UploadedFile::fake()->create($name, 120, 'application/pdf');
     }
 
     /**
@@ -426,7 +655,6 @@ class CrlvVehicleImportTest extends TestCase
                 'arquivo' => 'CRLV-e.pdf',
                 'tamanho_kb' => 120,
                 'usuario_id' => 7,
-                'usuario_email' => null,
             ],
         ))->render();
 
