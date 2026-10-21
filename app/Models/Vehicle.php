@@ -150,6 +150,10 @@ class Vehicle extends Model
      * Consulta do histórico limitada ao que o usuário pode ler: tudo para o dono atual, e só o que a
      * própria loja registrou para o lojista em consignação sem liberação do proprietário.
      *
+     * Maintenance::isVisibleInHistoryTo é esta mesma regra resolvida em memória, para um registro
+     * só; é por ela que as policies autorizam a manutenção, a foto e a nota, para que a rota de
+     * detalhe não abra o que esta consulta esconde. Mudar uma pede mudar a outra.
+     *
      * @return HasMany<Maintenance, Vehicle>
      */
     public function maintenancesVisibleTo(User $viewer): HasMany

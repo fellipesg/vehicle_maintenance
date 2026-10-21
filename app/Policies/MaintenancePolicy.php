@@ -21,24 +21,19 @@ class MaintenancePolicy
     }
 
     /**
-     * Anyone who may view the vehicle may view its full history, including records from previous owners.
+     * Ver um registro é ver o que a listagem daquele veículo mostraria a esta conta
+     * (Maintenance::isVisibleInHistoryTo, o par em memória de Vehicle::maintenancesVisibleTo):
+     * ocultada pelo proprietário fica com a oficina autora e com quem ocultou, o resto do histórico
+     * anterior só sai com viewFullHistory. A oficina é o caso à parte: ela vê a OS que registrou,
+     * em qualquer veículo e mesmo oculta, e nada além dela.
      */
     public function view(User $user, Maintenance $maintenance): bool
     {
-        // Ocultada pelo proprietário (direito de oposição): só a oficina autora e quem ocultou.
-        if ($maintenance->hiddenFrom($user)) {
-            return false;
-        }
-
         if ($user->isWorkshop() && $user->workshop) {
-            return $maintenance->workshop_id === $user->workshop->id;
+            return (int) $maintenance->workshop_id === (int) $user->workshop->id;
         }
 
-        if ($user->tenant_id !== null && $maintenance->tenant_id === $user->tenant_id) {
-            return true;
-        }
-
-        return $maintenance->vehicle !== null && $user->can('view', $maintenance->vehicle);
+        return $maintenance->isVisibleInHistoryTo($user);
     }
 
     public function create(User $user): bool

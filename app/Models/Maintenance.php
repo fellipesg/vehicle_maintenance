@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Gate;
 
 class Maintenance extends Model
 {
@@ -201,6 +202,37 @@ class Maintenance extends Model
                 $query->orWhere($table.'.workshop_id', $viewer->workshop->id);
             }
         });
+    }
+
+    /**
+     * Este registro aparece no histórico que este leitor vê deste veículo?
+     *
+     * É a forma em memória, para um registro só, da consulta que Vehicle::maintenancesVisibleTo
+     * monta: o scope acima mais a restrição de tenant de quem não passa em viewFullHistory. As duas
+     * precisam responder a mesma coisa — autorizar a manutenção, a foto ou a nota pela rota de
+     * detalhe tem de deixar entrar exatamente quem veria aquele registro na listagem do veículo,
+     * senão o lojista em consignação enumera ids e abre o que a listagem esconde dele (anexo de dono
+     * anterior). Use isto em toda autorização de registro individual, nunca VehiclePolicy::view: ver
+     * o veículo não é ver o histórico que ele trazia.
+     */
+    public function isVisibleInHistoryTo(User $viewer): bool
+    {
+        if ($this->hiddenFrom($viewer)) {
+            return false;
+        }
+
+        if ($viewer->tenant_id !== null && $this->tenant_id === $viewer->tenant_id) {
+            return true;
+        }
+
+        // loadMissing, não $this->vehicle: a policy roda com o que o controller carregou, e o
+        // preventLazyLoading fora de produção quebraria a autorização em vez de respondê-la.
+        $this->loadMissing('vehicle');
+
+        $vehicle = $this->getRelationValue('vehicle');
+
+        return $vehicle instanceof Vehicle
+            && Gate::forUser($viewer)->allows('viewFullHistory', $vehicle);
     }
 
     /**
