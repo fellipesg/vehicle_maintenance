@@ -24,6 +24,7 @@ must agree on the same contract; they are listed in a separate table below.
 | resources/css/**,resources/views/**,resources/js/** | .ai/rules/design-tokens.md |
 | resources/views/components/{vehicle,maintenance}/**,resources/views/maintenances/**,resources/views/components/provenance-*.blade.php | .ai/rules/domain-components.md |
 | resources/views/garage/**,app/Http/Controllers/Web/Garage/** | .ai/rules/garage.md |
+| app/Services/Invoice/**,app/Http/Controllers/Web/Concerns/StoresMaintenanceInvoices.php,app/Http/Controllers/Api/InvoiceController.php,app/Rules/InvoiceFile.php | .ai/rules/invoices.md |
 | app/Jobs/**,app/Console/Commands/PurgePendingMaintenanceAttachments.php | .ai/rules/jobs.md |
 | resources/js/user-portal.js,resources/js/owner-maintenance-form.js,resources/js/maintenance-kilometer-range.js,resources/js/utils/maintenance-kilometers.js | .ai/rules/js.md |
 | resources/views/components/landing/**,resources/views/home.blade.php | .ai/rules/landing-views.md |

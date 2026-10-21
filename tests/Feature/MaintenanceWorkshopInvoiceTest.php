@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Workshop;
+use App\Services\Invoice\InvoiceParseFeedback;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -67,6 +69,47 @@ class MaintenanceWorkshopInvoiceTest extends TestCase
             'vehicle_id' => $vehicle->id,
             'workshop_id' => $workshop->id,
         ]);
+    }
+
+    /**
+     * O portal do proprietário exige a nota quando a oficina é da rede
+     * (RequiresInvoiceWhenWorkshopAssigned), então a falha ao gravar a nota deixava a OS
+     * salva e sem o anexo que a validação acabara de exigir — com 500 na tela. A OS
+     * continua salva, mas agora o usuário lê qual nota não entrou e a reenvia.
+     */
+    public function test_user_store_keeps_the_os_and_reports_the_invoice_when_the_insert_fails(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 10000,
+            'odometer_at_registration' => 10000,
+        ]);
+        $this->attachVehicleToUser($user, $vehicle);
+        $workshop = Workshop::factory()->create();
+
+        Invoice::creating(function (): void {
+            throw new \RuntimeException('insert failed');
+        });
+
+        $this->actingAs($user)
+            ->post(route('user.maintenances.store'), [
+                'vehicle_id' => $vehicle->id,
+                'workshop_id' => $workshop->id,
+                'maintenance_type' => 'Revisão',
+                'maintenance_date' => '2026-01-01',
+                'kilometers' => 10000,
+                'service_category' => 'mechanical',
+                'invoices' => [UploadedFile::fake()->create('nota.pdf', 100, 'application/pdf')],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success')
+            ->assertSessionHas('error', InvoiceParseFeedback::notAttachedMessage(['nota.pdf']));
+
+        $this->assertSame(1, Maintenance::query()->count());
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
     }
 
     public function test_user_store_without_workshop_id_does_not_require_invoice(): void
