@@ -18,6 +18,15 @@ class InvoiceFile implements ValidationRule
     public const ALLOWED_EXTENSIONS = ['pdf', 'xml'];
 
     /**
+     * Teto de notas por requisição, igual em toda superfície que aceita o array `invoices`
+     * (API e web, nos três portais). Uma OS real traz a nota das peças e a da mão de obra,
+     * cada uma podendo vir como PDF e XML: cinco NF-e nos dois formatos já é folga. Sem o
+     * teto, uma requisição com dezenas de arquivos força esta regra a ler todos (MIME por
+     * conteúdo, cabeçalho do PDF e uma passada de XMLReader) antes de qualquer resposta.
+     */
+    public const MAX_FILES_PER_REQUEST = 10;
+
+    /**
      * MIME aceitos de imediato para XML. Uma NF-e sem a declaração `<?xml ?>` é detectada
      * como text/plain (tests/fixtures/invoices/divesa_nfe_33893.xml), por isso o XML também
      * é aceito quando o conteúdo é um documento XML bem formado.

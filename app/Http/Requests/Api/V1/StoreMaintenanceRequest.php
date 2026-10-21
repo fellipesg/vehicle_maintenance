@@ -43,6 +43,7 @@ class StoreMaintenanceRequest extends ApiFormRequest
                 'required_with:workshop_id',
                 'nullable',
                 'array',
+                'max:'.InvoiceFile::MAX_FILES_PER_REQUEST,
                 new RequiresInvoiceWhenWorkshopAssigned(
                     workshopId: $this->filled('workshop_id') ? (int) $this->input('workshop_id') : null,
                     isWorkshopPortal: (bool) $this->user()?->isWorkshop(),

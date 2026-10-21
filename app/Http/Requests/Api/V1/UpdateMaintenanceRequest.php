@@ -58,6 +58,7 @@ class UpdateMaintenanceRequest extends ApiFormRequest
             'invoices' => [
                 'nullable',
                 'array',
+                'max:'.InvoiceFile::MAX_FILES_PER_REQUEST,
                 new RequiresInvoiceWhenWorkshopAssigned(
                     workshopId: $workshopId,
                     isWorkshopPortal: (bool) $this->user()?->isWorkshop(),

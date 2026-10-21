@@ -99,9 +99,11 @@ Route::prefix('v1')->group(function () {
 
         // Maintenance routes
         Route::get('/maintenances', [MaintenanceController::class, 'index'])->middleware('ability:maintenances:read');
-        Route::post('/maintenances', [MaintenanceController::class, 'store'])->middleware('ability:maintenances:write');
+        // Store e update recebem `invoices` (InvoiceFile lê o arquivo inteiro), como /invoices/upload:
+        // o balde 'uploads' fica por cima do 'throttle:api' do grupo.
+        Route::post('/maintenances', [MaintenanceController::class, 'store'])->middleware(['ability:maintenances:write', 'throttle:uploads']);
         Route::get('/maintenances/{id}', [MaintenanceController::class, 'show'])->middleware('ability:maintenances:read');
-        Route::put('/maintenances/{id}', [MaintenanceController::class, 'update'])->middleware('ability:maintenances:write');
+        Route::put('/maintenances/{id}', [MaintenanceController::class, 'update'])->middleware(['ability:maintenances:write', 'throttle:uploads']);
         Route::delete('/maintenances/{id}', [MaintenanceController::class, 'destroy'])->middleware('ability:maintenances:write');
 
         // OS de oficina em carro sem proprietário: decisão do proprietário e convite do cliente.
