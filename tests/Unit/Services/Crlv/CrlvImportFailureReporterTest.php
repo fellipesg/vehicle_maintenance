@@ -12,6 +12,7 @@ use Illuminate\Mail\MailManager;
 use Illuminate\Mail\PendingMail;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
 use RuntimeException;
@@ -135,6 +136,95 @@ class CrlvImportFailureReporterTest extends TestCase
         }
 
         Mail::assertQueuedCount(2);
+    }
+
+    /**
+     * Aviso que o teto global engoliu não pode sumir sem rastro: o log é o que mostra que o suporte
+     * parou de receber e-mail porque o teto encheu, não porque as falhas acabaram.
+     */
+    public function test_global_cap_suppression_is_logged(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+
+        $this->exhaustGlobalCap();
+
+        Log::spy();
+
+        $suppressed = User::factory()->asUser()->create();
+        $this->reportFailure($suppressed);
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === CrlvImportFailureReporter::GLOBAL_CAP_LOG_MESSAGE
+                && $context['usuario_id'] === $suppressed->id
+                && $context['motivo'] === self::REASON
+                && $context['teto_por_janela'] === CrlvImportFailureReporter::GLOBAL_ALERTS_PER_WINDOW)
+            ->once();
+
+        Mail::assertQueuedCount(CrlvImportFailureReporter::GLOBAL_ALERTS_PER_WINDOW);
+    }
+
+    /**
+     * Teto cheio cala o aviso do momento, não o resto da hora da conta: a janela da conta é
+     * devolvida, então a falha seguinte dela chega ao suporte assim que o teto libera. Era aqui que
+     * uma falha real de CRLV-e sumia — a conta suprimida ficava calada com crédito global de sobra.
+     */
+    public function test_account_suppressed_by_the_global_cap_alerts_when_the_cap_frees(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+
+        $this->exhaustGlobalCap();
+
+        // A conta tropeça no layout novo com o teto já cheio: nenhum e-mail sai.
+        $this->travel(50)->minutes();
+
+        $late = User::factory()->asUser()->create();
+        $this->reportFailure($late);
+
+        Mail::assertQueuedCount(CrlvImportFailureReporter::GLOBAL_ALERTS_PER_WINDOW);
+
+        // Vencida a janela global (60 minutos do primeiro aviso), a janela da conta ainda teria 49
+        // minutos de silêncio pela frente: a falha nova dela não pode se perder.
+        $this->travel(11)->minutes();
+
+        $this->reportFailure($late);
+
+        Mail::assertQueuedCount(CrlvImportFailureReporter::GLOBAL_ALERTS_PER_WINDOW + 1);
+        Exceptions::assertReportedCount(CrlvImportFailureReporter::GLOBAL_ALERTS_PER_WINDOW + 1);
+    }
+
+    /**
+     * A ordem das duas portas importa: a janela da conta é consultada primeiro, então quem reenvia
+     * o mesmo PDF em loop gasta um crédito global, não um por tentativa — senão uma conta sozinha
+     * fecharia o aviso de todas as outras.
+     */
+    public function test_repeat_inside_the_account_window_does_not_spend_global_credits(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+
+        $noisy = User::factory()->asUser()->create();
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $this->reportFailure($noisy);
+        }
+
+        for ($account = 1; $account < CrlvImportFailureReporter::GLOBAL_ALERTS_PER_WINDOW; $account++) {
+            $this->reportFailure(User::factory()->asUser()->create());
+        }
+
+        Mail::assertQueuedCount(CrlvImportFailureReporter::GLOBAL_ALERTS_PER_WINDOW);
+    }
+
+    /**
+     * Gasta os créditos da janela global com a mesma falha em contas diferentes.
+     */
+    private function exhaustGlobalCap(): void
+    {
+        for ($account = 1; $account <= CrlvImportFailureReporter::GLOBAL_ALERTS_PER_WINDOW; $account++) {
+            $this->reportFailure(User::factory()->asUser()->create());
+        }
     }
 
     private function reportFailure(User $user, string $reason = self::REASON): void

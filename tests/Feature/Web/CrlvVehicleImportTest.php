@@ -381,7 +381,7 @@ class CrlvVehicleImportTest extends TestCase
             CrlvImportFailureMail::class,
             fn (CrlvImportFailureMail $mail) => $mail->hasTo((string) config('legal.support_email'))
                 && $mail->reason === 'Estrutura do CRLV-e não reconhecida.'
-                && $mail->context['arquivo'] === 'CRLV-e.pdf'
+                && $mail->context['extensao'] === 'pdf'
                 && $mail->context['usuario_id'] === $this->user->id
         );
 
@@ -509,6 +509,47 @@ class CrlvVehicleImportTest extends TestCase
             fn (CrlvImportFailureMail $mail) => ! array_key_exists('usuario_email', $mail->context)
                 && ! in_array($this->user->email, $mail->context, true)
         );
+    }
+
+    /**
+     * O nome que quem envia dá ao PDF pode trazer nome ou CPF da pessoa (LGPD, .ai/rules/models.md):
+     * ele não entra no log nem no aviso ao suporte. O que vai no lugar descreve o documento, não a
+     * pessoa — extensão, tamanho e um hash curto do conteúdo.
+     */
+    public function test_alert_does_not_carry_the_original_file_name(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+        Log::spy();
+        $this->failingCrlvParser();
+
+        $name = 'CRLV-e Joao da Silva 000.000.000-00.pdf';
+
+        $this->actingAs($this->user)
+            ->from(route('user.vehicles.create'))
+            ->post('/usuario/veiculos/importar-crlv', ['crlv' => $this->unreadableCrlv($name)])
+            ->assertSessionHasErrors('crlv');
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === 'CRLV-e não lido.'
+                && ! array_key_exists('arquivo', $context)
+                && ! in_array($name, $context, true)
+                && $context['extensao'] === 'pdf'
+                && $context['tamanho_kb'] === 120
+                && is_string($context['hash_arquivo'])
+                && $context['hash_arquivo'] !== '')
+            ->once();
+
+        Mail::assertQueued(CrlvImportFailureMail::class, function (CrlvImportFailureMail $mail) use ($name): bool {
+            $html = $mail->render();
+
+            return ! array_key_exists('arquivo', $mail->context)
+                && ! in_array($name, $mail->context, true)
+                && ! str_contains($html, $name)
+                && ! str_contains($html, 'Joao da Silva')
+                && ! str_contains($html, '000.000.000-00')
+                && str_contains($html, 'Hash do arquivo');
+        });
     }
 
     /**
@@ -652,14 +693,16 @@ class CrlvVehicleImportTest extends TestCase
             reason: 'Estrutura do CRLV-e não reconhecida.',
             context: [
                 'origem' => 'user.vehicles.create',
-                'arquivo' => 'CRLV-e.pdf',
+                'extensao' => 'pdf',
                 'tamanho_kb' => 120,
+                'hash_arquivo' => 'e3b0c44298fc',
                 'usuario_id' => 7,
             ],
         ))->render();
 
         $this->assertStringContainsString('Estrutura do CRLV-e não reconhecida.', $html);
-        $this->assertStringContainsString('CRLV-e.pdf', $html);
+        $this->assertStringContainsString('Hash do arquivo', $html);
+        $this->assertStringContainsString('e3b0c44298fc', $html);
         $this->assertStringContainsString('ID do usuário', $html);
         $this->assertStringNotContainsString('Usuario id', $html);
     }
