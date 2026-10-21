@@ -64,7 +64,7 @@ class UpdateMaintenanceRequest extends ApiFormRequest
                     existingInvoiceCount: $maintenance?->invoices()->count() ?? 0,
                 ),
             ],
-            'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
+            'invoices.*' => ['bail', 'file', 'max:10240', new InvoiceFile],
         ];
     }
 }
