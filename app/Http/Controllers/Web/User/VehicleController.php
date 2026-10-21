@@ -140,10 +140,7 @@ class VehicleController extends Controller
                 ->withErrors(['crlv' => $exception->getMessage()]);
         }
 
-        $vehicleRenavam = preg_replace('/\D/', '', (string) $vehicle->renavam) ?? '';
-        $crlvRenavam = $parsed->normalizedRenavam();
-
-        if ($vehicleRenavam !== $crlvRenavam) {
+        if (! Vehicle::renavamsMatch((string) $vehicle->renavam, $parsed->normalizedRenavam())) {
             return redirect()->route('user.vehicles.edit', $vehicle)
                 ->withErrors([
                     'crlv' => 'O RENAVAM do CRLV-e ('.$parsed->renavam.') não confere com este veículo ('.$vehicle->renavam.').',

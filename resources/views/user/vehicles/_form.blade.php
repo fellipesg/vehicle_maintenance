@@ -38,8 +38,8 @@
     </x-ui.field>
 
     <x-ui.field name="renavam" label="RENAVAM" required>
-        <x-ui.input :value="$vehicle->renavam ?? ''" required class="font-mono" data-mask="digits" data-min-digits="11" data-max-digits="11" maxlength="11" inputmode="numeric" autocomplete="off" aria-describedby="renavam-hint" />
-        <p id="renavam-hint" class="text-sm text-muted-foreground" data-field-hint data-default-hint="11 dígitos" data-idle-class="text-sm text-muted-foreground" data-ok-class="text-sm text-success" data-error-class="text-sm text-danger">11 dígitos</p>
+        <x-ui.input :value="$vehicle->renavam ?? ''" required class="font-mono" data-mask="digits" data-min-digits="9" data-max-digits="11" maxlength="11" inputmode="numeric" autocomplete="off" aria-describedby="renavam-hint" />
+        <p id="renavam-hint" class="text-sm text-muted-foreground" data-field-hint data-default-hint="9 a 11 dígitos" data-idle-class="text-sm text-muted-foreground" data-ok-class="text-sm text-success" data-error-class="text-sm text-danger">9 a 11 dígitos</p>
     </x-ui.field>
 
     <x-ui.field name="crv_number" label="Número do CRV" required>
