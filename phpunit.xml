@@ -25,12 +25,13 @@
         <env name="SENTRY_DSN" value="" force="true"/>
         <env name="APP_ENV" value="testing" force="true"/>
         <!--
-            APP_DEBUG=true é o valor com que a suíte é verde (o .env local e o .env.example que o
-            CI copia usam true). Com debug desligado o renderer de API de bootstrap/app.php engole
-            o HttpResponseException dos limites com response() custom e devolve 500 em vez do 429
-            — bug de produção ainda não corrigido; não troque este valor antes de corrigi-lo.
+            APP_DEBUG=false é o valor de produção, e era o único em que o renderer de API de
+            bootstrap/app.php engolia o 429 dos limiters com response() custom e devolvia 500. O
+            renderer agora trata HttpResponseException, então fixar false aqui é o que mantém a
+            suíte rodando no mesmo modo que produção e impede a regressão voltar sem ninguém ver.
+            Os testes de rate limit também fixam app.debug=false por conta própria.
         -->
-        <env name="APP_DEBUG" value="true" force="true"/>
+        <env name="APP_DEBUG" value="false" force="true"/>
         <env name="APP_LOCALE" value="pt_BR" force="true"/>
         <env name="APP_FALLBACK_LOCALE" value="pt_BR" force="true"/>
         <env name="APP_FAKER_LOCALE" value="pt_BR" force="true"/>
@@ -62,7 +63,7 @@
         <server name="SENTRY_LARAVEL_DSN" value="" force="true"/>
         <server name="SENTRY_DSN" value="" force="true"/>
         <server name="APP_ENV" value="testing" force="true"/>
-        <server name="APP_DEBUG" value="true" force="true"/>
+        <server name="APP_DEBUG" value="false" force="true"/>
         <server name="APP_LOCALE" value="pt_BR" force="true"/>
         <server name="APP_FALLBACK_LOCALE" value="pt_BR" force="true"/>
         <server name="APP_FAKER_LOCALE" value="pt_BR" force="true"/>
