@@ -37,7 +37,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
 | app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
-| resources/views/pdfs/vehicle_maintenance_export.blade.php | .ai/rules/pdfs.md |
+| resources/views/pdfs/vehicle_maintenance_export.blade.php,app/Services/Vehicle/VehiclePdfMaintenancePhotos.php | .ai/rules/pdfs.md |
 | app/Policies/** | .ai/rules/policies.md |
 | bootstrap/app.php,app/Support/PortalAccess.php,app/Support/FriendlyHttpErrors.php,app/Http/Controllers/Web/Auth/**,app/Http/Controllers/Web/AuthController.php | .ai/rules/portal-access.md |
 | resources/views/layouts/**,app/Enums/Portal.php | .ai/rules/portal-shell.md |
@@ -48,9 +48,9 @@ must agree on the same contract; they are listed in a separate table below.
 | resources/views/components/ui/**,resources/views/** | .ai/rules/ui-components.md |
 | resources/js/** | .ai/rules/ui-scripts.md |
 | resources/views/user/vehicles/** | .ai/rules/user-vehicles.md |
-| app/Services/User/** | .ai/rules/user.md |
+| app/Services/User/**,app/Models/User.php | .ai/rules/user.md |
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |
-| app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
+| app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php, app/Services/Vehicle/VehiclePdfMaintenancePhotos.php | .ai/rules/vehicle.md |
 | resources/views/vehicles/entry/**,app/Http/Controllers/Web/Concerns/*Vehicle*,app/Support/Vehicle/VehicleEntryFlow.php,app/Services/Vehicle/VehicleOwnershipService.php,app/Services/Crlv/** | .ai/rules/vehicles-entry.md |
 | resources/views/vendor/mail/** | .ai/rules/vendor-mail.md |
 | resources/views/layouts/**,resources/views/admin/** | .ai/rules/views-admin.md |

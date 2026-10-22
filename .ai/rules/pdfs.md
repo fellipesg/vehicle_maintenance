@@ -1,6 +1,7 @@
 ---
 paths:
   - resources/views/pdfs/vehicle_maintenance_export.blade.php
+  - app/Services/Vehicle/VehiclePdfMaintenancePhotos.php
 ---
 
 # Pdfs
@@ -31,3 +32,8 @@ The template receives $identifiersMasked (VehicleMaintenancePdfExporter::generat
 
 ## Registros de oficina no PDF seguem quem pediu
 VehicleMaintenancePdfExporter::generate(..., viewer:) passa o solicitante ao MaintenanceRedactor. No PDF do próprio proprietário, o registro que ele vinculou e ocultou da consulta pública continua aparecendo (ocultar vale só para os outros); pendentes e recusados saem na forma mínima. Sem viewer, ou com outra pessoa (admin, lojista em consignação), o ocultado não entra.
+
+## Fotos das OS no PDF: só com o aceite do dono atual
+VehiclePdfMaintenancePhotos decide. Só entram fotos quando o proprietário ATUAL do veículo tem `users.export_include_photos = true` (nulo = nunca perguntado e falso = não, os dois sem foto; capa não muda). Quem pediu sendo esse dono leva, por OS, o primeiro antes + o primeiro depois do veículo (por `sort`), ou os dois primeiros "depois" se faltar o par; qualquer outra pessoa que exporta (lojista em consignação, admin, sem viewer) leva só as públicas (`MaintenancePhoto::isPublicVisible`), no máximo 2. As OS que o MaintenanceRedactor esvaziou continuam sem foto: o serviço só lê a relação `photos` que sobrou, nunca recarrega nem contorna. Teto de MAX_PER_PDF (16) fotos por arquivo, as OS mais recentes primeiro, para o PDF ficar bem abaixo de ~8 MB (o e-mail anexa o arquivo e o merge ainda cola as notas em PDF); o excedente vira "+N fotos no RevisaLog" com o link do selo.
+
+Cada foto sai JPEG de até 900px no maior lado, qualidade 75, sobre fundo branco (o Dompdf não lida bem com WebP), convertida uma por vez e embutida como data URI (mesma regra da capa: nada de caminho em /tmp no src). Prefere `display_path` (variante de exibição) quando a coluna existe e está preenchida, lida por `getAttributes()`, senão `path`. No Blade: `.photo-grid` de 2 colunas abaixo da tabela de itens, `<img>` com width/height explícitos (caixa 300×225) e legenda "Antes"/"Depois"; tr com page-break-inside:avoid, sem tabela aninhada no letterhead nem na faixa.

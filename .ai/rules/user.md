@@ -1,6 +1,7 @@
 ---
 paths:
   - 'app/Services/User/**'
+  - 'app/Models/User.php'
 ---
 
 # User
@@ -19,3 +20,6 @@ apagar só a linha de `users` deixa a cópia intacta e a exclusão passa a prome
 A consignação **não** é encerrada: o carro segue no pátio da loja, que continua registrando serviço
 (é o histórico que valoriza o veículo). A loja recebe `ConsignmentOwnerAccountDeletedNotification`,
 que fala só do veículo — nunca repete o contato recém-apagado.
+
+## Preferência do PDF mora em users.export_include_photos
+Coluna booleana nullable (null = nunca perguntado), no cast `boolean` e em `$fillable`. Quem lê é o VehiclePdfMaintenancePhotos, sobre o proprietário atual do veículo, e não sobre quem pediu o PDF. Não é PII: a exclusão de conta não precisa limpá-la.

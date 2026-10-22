@@ -162,6 +162,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::put('/conta', [AccountController::class, 'update'])
         ->middleware('throttle:6,1,account-update')
         ->name('account.update');
+    Route::put('/conta/preferencias', [AccountController::class, 'updatePreferences'])
+        ->middleware('user.type:user')
+        ->name('account.preferences');
     Route::put('/conta/senha', [AccountController::class, 'updatePassword'])
         ->middleware('throttle:6,1')
         ->name('account.password');

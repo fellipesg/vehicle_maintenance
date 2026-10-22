@@ -58,3 +58,6 @@ mexer no app.
 + depois) e a rota autorizada responderia 403 a quem só buscou a placa. É a mesma exceção que o
 `x-provenance-card` tem na web (registrada em `.ai/rules/views.md`). Se um dia essa lista precisar de
 foto não pública, a rota não serve: o caminho é uma URL assinada de vida curta só para ela.
+
+## Preferência de fotos no PDF: GET/PUT /api/v1/me
+`export_include_photos` (true | false | null) vem em UserResource, logo em GET /api/v1/me, login e PUT /api/v1/me. Nulo = o proprietário nunca respondeu (o app pergunta uma vez). O PUT aceita só esse campo (`sometimes|boolean`, `name` também é `sometimes`, então atualização parcial funciona) e recusa null e texto com 422. Só vale para a conta de proprietário; o PDF consulta a preferência do dono ATUAL do veículo (.ai/rules/pdfs.md). Na web é o cartão "PDF do histórico" em /conta (PUT /conta/preferencias, só `user.type:user`).

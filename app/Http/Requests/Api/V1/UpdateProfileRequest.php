@@ -47,6 +47,7 @@ class UpdateProfileRequest extends ApiFormRequest
             'city' => 'nullable|string|max:100',
             'state' => 'nullable|string|max:2',
             'country' => 'nullable|string|max:100',
+            'export_include_photos' => 'sometimes|boolean',
         ];
     }
 
