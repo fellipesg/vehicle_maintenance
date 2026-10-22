@@ -62,6 +62,10 @@ class ExportPhotosPreferenceTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('export_include_photos');
 
+        $message = $this->putJson('/api/v1/me', ['export_include_photos' => 'talvez'])->json('errors.export_include_photos.0');
+        $this->assertStringContainsString('fotos no PDF do histórico', (string) $message);
+        $this->assertStringNotContainsString('export include photos', (string) $message);
+
         $this->putJson('/api/v1/me', ['export_include_photos' => null])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('export_include_photos');
@@ -86,6 +90,20 @@ class ExportPhotosPreferenceTest extends TestCase
             ->put(route('account.preferences'), ['export_include_photos' => '0'])
             ->assertRedirect(route('account.edit'));
         $this->assertFalse($user->fresh()->export_include_photos);
+    }
+
+    public function test_web_preference_rejects_invalid_values_with_the_pt_br_attribute_name(): void
+    {
+        $user = User::factory()->asUser()->create();
+
+        $this->actingAs($user)
+            ->put(route('account.preferences'), ['export_include_photos' => 'talvez'])
+            ->assertSessionHasErrors('export_include_photos');
+
+        $this->assertStringContainsString(
+            'fotos no PDF do histórico',
+            session('errors')->first('export_include_photos'),
+        );
     }
 
     public function test_web_account_page_hides_the_preference_from_company_accounts(): void
