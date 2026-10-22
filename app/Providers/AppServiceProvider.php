@@ -13,6 +13,7 @@ use App\Policies\MaintenancePhotoPolicy;
 use App\Policies\MaintenancePolicy;
 use App\Policies\VehiclePolicy;
 use App\Policies\WorkshopPolicy;
+use App\Support\Maintenance\MaintenancePhotoUrls;
 use App\Support\StorageEndpointResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Connection;
@@ -42,6 +43,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureLocale();
+
+        MaintenancePhotoUrls::registerLocalTemporaryUrls(Storage::disk('public'));
 
         Model::preventLazyLoading(! $this->app->isProduction());
 

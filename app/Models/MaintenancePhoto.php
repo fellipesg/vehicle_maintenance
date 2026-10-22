@@ -30,6 +30,13 @@ class MaintenancePhoto extends Model
         'subject',
         'stage',
         'path',
+        'thumb_path',
+        'display_path',
+        'width',
+        'height',
+        'bytes',
+        'dominant_color',
+        'processed_at',
         'original_name',
         'sort',
         'created_by',
@@ -39,6 +46,10 @@ class MaintenancePhoto extends Model
     {
         return [
             'sort' => 'integer',
+            'width' => 'integer',
+            'height' => 'integer',
+            'bytes' => 'integer',
+            'processed_at' => 'datetime',
         ];
     }
 
@@ -47,11 +58,60 @@ class MaintenancePhoto extends Model
         static::created(function (MaintenancePhoto $photo): void {
             $photo->maintenance?->markAttachmentsPendingIfNeeded();
         });
+
+        // Apagar a foto apaga todos os arquivos dela (master, thumb e display), qualquer que seja o
+        // caminho que a apague: serviço, controller ou a exclusão da manutenção.
+        static::deleting(function (MaintenancePhoto $photo): void {
+            $photo->deleteStoredFiles();
+        });
     }
 
     protected function url(): Attribute
     {
         return Attribute::get(fn (): string => AppStorage::url($this->path));
+    }
+
+    public function isProcessed(): bool
+    {
+        return $this->processed_at !== null;
+    }
+
+    /**
+     * Diretório `maintenance-photos/{maintenance_id}/{uuid}` das fotos novas, que guarda master,
+     * thumb e display juntos. Nulo nas fotos antigas, cujo `path` é um arquivo solto
+     * (`maintenance-photos/{id}_{uniqid}.ext`) até o backfill (`photos:generate-variants`).
+     */
+    public function storageDirectory(): ?string
+    {
+        $path = (string) $this->path;
+
+        if (preg_match('#^('.preg_quote(AppStorage::MAINTENANCE_PHOTOS_PREFIX, '#').'\d+/[0-9a-f-]{36})/master\.jpg$#', $path, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * Apaga os arquivos no storage: o diretório inteiro no layout novo, o arquivo solto (mais as
+     * variantes, se existirem) no antigo. Não mexe na linha.
+     */
+    public function deleteStoredFiles(): void
+    {
+        $disk = AppStorage::disk();
+        $directory = $this->storageDirectory();
+
+        if ($directory !== null) {
+            $disk->deleteDirectory($directory);
+
+            return;
+        }
+
+        foreach (array_filter([$this->path, $this->thumb_path, $this->display_path]) as $path) {
+            if ($disk->exists($path)) {
+                $disk->delete($path);
+            }
+        }
     }
 
     public function maintenance(): BelongsTo

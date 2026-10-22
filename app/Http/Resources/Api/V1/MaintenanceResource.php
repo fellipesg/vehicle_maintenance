@@ -20,9 +20,11 @@ class MaintenanceResource extends JsonResource
         $isOwnerless = $maintenance->isOwnerlessRecord();
 
         $photos = $this->whenLoaded('photos', function () use ($request, $maintenance) {
-            $collection = $maintenance->photos;
+            $collection = $maintenance->photos->each(
+                fn ($photo) => $photo->setRelation('maintenance', $this->resource),
+            );
 
-            if ($this->shouldExposeAllPhotos($request)) {
+            if ($this->resource->exposesAllPhotosTo($request->user())) {
                 return MaintenancePhotoResource::collection($collection);
             }
 
@@ -75,23 +77,45 @@ class MaintenanceResource extends JsonResource
             'invoices' => InvoiceResource::collection($this->when($maintenance->relationLoaded('invoices'), fn () => $maintenance->invoices)),
             'checklists' => ChecklistResource::collection($this->whenLoaded('checklists')),
             'photos' => $photos,
+            'photos_count' => $this->when($this->photosCount($request) !== null, fn () => $this->photosCount($request)),
+            'photos_locked' => $this->when($this->photosCount($request) !== null, fn () => $this->photosLocked($request)),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
     }
 
-    private function shouldExposeAllPhotos(Request $request): bool
+    /**
+     * Quantas fotos existem para quem vê: o total quando elas estão bloqueadas (o app mostra "N
+     * fotos" com cadeado) e, fora isso, só as que este leitor enxerga (fora do tenant e da oficina
+     * autora, veículo + depois). Nulo quando a OS veio sem as fotos nem o withCount('photos').
+     */
+    private function photosCount(Request $request): ?int
     {
-        $user = $request->user();
+        $total = $this->totalPhotos();
 
-        if ($user === null) {
-            return false;
+        if ($total === null || $this->photosLocked($request) || $this->resource->exposesAllPhotosTo($request->user())) {
+            return $total;
         }
 
-        if ($user->isWorkshop() && $user->workshop) {
-            return $this->workshop_id === $user->workshop->id;
+        return $this->resource->relationLoaded('photos')
+            ? $this->resource->photos->filter(fn ($photo) => $photo->isPublicVisible())->count()
+            : $total;
+    }
+
+    /**
+     * Há fotos e o leitor não pode vê-las (OS sem proprietário esperando o aceite).
+     */
+    private function photosLocked(Request $request): bool
+    {
+        return ($this->totalPhotos() ?? 0) > 0 && $this->resource->hidesAttachmentsFrom($request->user());
+    }
+
+    private function totalPhotos(): ?int
+    {
+        if ($this->resource->relationLoaded('photos')) {
+            return $this->resource->photos->count();
         }
 
-        return $this->tenant_id === $user->tenant_id;
+        return isset($this->resource->photos_count) ? (int) $this->resource->photos_count : null;
     }
 }

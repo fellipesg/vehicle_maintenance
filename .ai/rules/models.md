@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php'
+  - 'app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php'
 ---
 
 # Models
@@ -19,3 +19,25 @@ MaintenanceRedactor::redact/redactAll devolve um clone sem descrição, valores,
 
 ## Arquivos enviados nunca usam o nome original no caminho
 O nome que o cliente envia pode conter nome de pessoa ou CPF (LGPD). O caminho guardado no storage é aleatório (`invoices/<Str::random(40)>.pdf`, via InvoiceUploadProcessor::storeFile), só com extensão minúscula da lista permitida (pdf, xml) ou a extensão deduzida. O nome original fica apenas nas colunas `file_name`/`original_name` para exibir a quem tem acesso. Nunca monte caminho com getClientOriginalName().
+
+## Prévia do proprietário: dono atual com posse comprovada vê os anexos antes de aceitar
+`Maintenance::hidesAttachmentsFrom` não esconde mais notas e fotos de uma OS sem dono do dono atual do
+veículo com a posse comprovada (`isVerifiedCurrentOwner`: `user_vehicles.is_current_owner` e
+`ownership_verified_at` não nulo, no tenant dele; é a mesma noção de "comprovou a posse" do
+`MaintenanceOwnerDecisionService::ownershipVerified`). Assim ele decide vincular/aceitar informado.
+Continua sem ver: dono sem comprovação, ex-dono, comprador, outro tenant e visitante. Só os anexos abrem:
+descrição, valores e garantias seguem na forma mínima (`hidesDetailsFrom`). `exposesAllPhotosTo` também
+libera antes/durante/peça a esse dono; fora do tenant e da oficina autora só veículo + depois.
+MaintenancePhotoPolicy e InvoicePolicy::view herdam a regra.
+
+## Foto: master sem EXIF, variantes por job, arquivos juntos
+Upload guarda só o **master** (lado maior até 2048px, JPEG q85, orientação do EXIF aplicada, EXIF/GPS
+removidos) em `maintenance-photos/{maintenance_id}/{uuid}/master.jpg`; o original nunca é guardado. O
+`ProcessMaintenancePhoto` (afterCommit) cria `thumb` (320px, WebP q70) e `display` (1280px, WebP q80) ao
+lado, e preenche thumb_path, display_path, processed_at (width/height/bytes/dominant_color já vêm do
+master). `MaintenancePhotoImageProcessor` usa Imagick quando a extensão existe e GD caso contrário (os
+dois têm teste); sem `imagewebp` as variantes saem em JPEG. Foto antiga (arquivo solto) ganha master novo
+no backfill `photos:generate-variants` e o arquivo velho é apagado. Apagar a foto (evento `deleting` do
+model) apaga o diretório inteiro; a exclusão da OS apaga as fotos uma a uma no evento `deleting` da
+`Maintenance`, porque o cascade do banco não dispara eventos. Não monte caminho de foto com o nome
+enviado.

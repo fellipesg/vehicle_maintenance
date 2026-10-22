@@ -36,7 +36,8 @@ $photo->url, porque só a busca por placa abre aquele bloco e lá x-vehicle.deta
 fotos públicas (veículo/depois); a rota responderia 403 a quem só buscou a placa. O arquivo sai pelo
 MaintenancePhotoFileResponse, compartilhado com a rota da API. Do lado da API a foto também passou a
 sair por rota autorizada (api.maintenance-photos.show), e a busca pública mantém a mesma exceção:
-ver .ai/rules/api.md.
+ver .ai/rules/api.md (agora com variantes em URL temporária, só depois da policy). As telas web seguem
+apontando para a rota autorizada, que serve o master.
 
 ## Nota fiscal nunca pelo caminho do storage
 O link "Abrir" de uma nota fiscal (maintenances/_detail e partials/workshop-maintenance-form) aponta
