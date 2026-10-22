@@ -163,17 +163,29 @@ class CrlvImportFailureReporter
      * por conta sozinha não segura isso, porque a conta entra na chave. Teto estourado não gasta
      * crédito (RateLimiter::attempt não incrementa), então reavaliar a próxima falha é barato e
      * não empurra a janela global para frente.
+     *
+     * O limitador mora no cache (sem `cache.limiter`, no store padrão): store fora do ar não cala o
+     * aviso nem derruba quem está cadastrando — o `report()` é chamado de dentro do `catch` do
+     * controller, e uma exceção aqui trocaria o erro na tela por um 500.
      */
     private function withinGlobalCap(Throwable $exception): bool
     {
         $key = self::GLOBAL_KEY_PREFIX.sha1($exception::class.'|'.$this->normalizedMessage($exception));
 
-        return (bool) RateLimiter::attempt(
-            $key,
-            self::GLOBAL_ALERTS_PER_WINDOW,
-            static fn (): bool => true,
-            self::DEDUPE_WINDOW_MINUTES * 60,
-        );
+        try {
+            return (bool) RateLimiter::attempt(
+                $key,
+                self::GLOBAL_ALERTS_PER_WINDOW,
+                static fn (): bool => true,
+                self::DEDUPE_WINDOW_MINUTES * 60,
+            );
+        } catch (Throwable $limiterFailure) {
+            Log::warning('Falha ao aplicar o teto global do aviso de CRLV-e.', [
+                'erro' => $limiterFailure->getMessage(),
+            ]);
+
+            return true;
+        }
     }
 
     private function normalizedMessage(Throwable $exception): string

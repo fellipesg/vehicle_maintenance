@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
@@ -136,6 +137,30 @@ class CrlvImportFailureReporterTest extends TestCase
         }
 
         Mail::assertQueuedCount(2);
+    }
+
+    /**
+     * O teto global mora no cache, então ele cai junto com o store. Nem calar o aviso, nem derrubar
+     * quem está cadastrando: report() roda dentro do catch do controller (ImportsVehicleFromCrlv),
+     * e uma exceção aqui trocava o erro na tela por um 500.
+     */
+    public function test_global_cap_failure_lets_the_alert_through(): void
+    {
+        Mail::fake();
+        Exceptions::fake();
+        Log::spy();
+
+        RateLimiter::shouldReceive('attempt')->andThrow(new RuntimeException('cache fora do ar'));
+
+        $this->reportFailure(User::factory()->asUser()->create());
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === 'Falha ao aplicar o teto global do aviso de CRLV-e.'
+                && $context['erro'] === 'cache fora do ar')
+            ->once();
+
+        Mail::assertQueuedCount(1);
+        Exceptions::assertReportedCount(1);
     }
 
     /**
