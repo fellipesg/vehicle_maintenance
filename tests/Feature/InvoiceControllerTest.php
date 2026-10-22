@@ -7,6 +7,9 @@ use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Services\Invoice\InvoiceItemSyncer;
+use App\Services\Invoice\InvoiceParser;
+use App\Services\Invoice\InvoiceUploadProcessor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Http\UploadedFile;
@@ -522,6 +525,84 @@ class InvoiceControllerTest extends TestCase
             $this->assertDatabaseCount('invoices', 0);
             $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
         }
+    }
+
+    /**
+     * POST /api/v1/maintenances grava a OS dentro de uma transação, então uma nota que
+     * falha desfaz tudo — não existe OS pela metade aqui. O que faltava era a gravação
+     * recusada pelo storage: o arquivo era descartado em silêncio e a OS nascia sem a
+     * nota, com 201 na resposta.
+     */
+    public function test_api_store_does_not_create_a_maintenance_when_the_storage_refuses_the_invoice(): void
+    {
+        $vehicle = $this->ownedVehicle();
+        $this->failToStoreEveryUpload();
+
+        $this->postJson('/api/v1/maintenances', $this->maintenancePayload($vehicle, [
+            UploadedFile::fake()->create('nota.pdf', 100, 'application/pdf'),
+        ]))->assertStatus(500);
+
+        $this->assertDatabaseCount('maintenances', 0);
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+    }
+
+    public function test_api_store_rolls_back_the_whole_maintenance_when_an_invoice_insert_fails(): void
+    {
+        $vehicle = $this->ownedVehicle();
+
+        Invoice::creating(function (): void {
+            throw new \RuntimeException('insert failed');
+        });
+
+        $this->postJson('/api/v1/maintenances', $this->maintenancePayload($vehicle, [
+            UploadedFile::fake()->create('nota-1.pdf', 100, 'application/pdf'),
+            UploadedFile::fake()->create('nota-2.pdf', 100, 'application/pdf'),
+        ]))->assertStatus(500);
+
+        $this->assertDatabaseCount('maintenances', 0);
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('invoices'));
+    }
+
+    /**
+     * Storage que recusa toda gravação, como o S3/R2 fora do ar: storeFile devolve null.
+     */
+    private function failToStoreEveryUpload(): void
+    {
+        $this->app->instance(InvoiceUploadProcessor::class, new class($this->app->make(InvoiceParser::class), $this->app->make(InvoiceItemSyncer::class)) extends InvoiceUploadProcessor
+        {
+            public function storeFile(UploadedFile $file): ?string
+            {
+                return null;
+            }
+        });
+    }
+
+    /**
+     * @param  list<UploadedFile>  $invoices
+     * @return array<string, mixed>
+     */
+    private function maintenancePayload(Vehicle $vehicle, array $invoices): array
+    {
+        return [
+            'vehicle_id' => $vehicle->id,
+            'maintenance_type' => 'Revisão',
+            'workshop_name' => 'Oficina Teste',
+            'maintenance_date' => now()->toDateString(),
+            'kilometers' => ($vehicle->current_kilometers ?? 0) + 1000,
+            'service_category' => 'mechanical',
+            'invoices' => $invoices,
+        ];
+    }
+
+    private function ownedVehicle(): Vehicle
+    {
+        $user = $this->app->make('auth')->user() ?? $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+
+        return $vehicle;
     }
 
     private function ownedMaintenance(): Maintenance

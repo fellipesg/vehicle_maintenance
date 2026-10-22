@@ -267,13 +267,66 @@ class Vehicle extends Model
             ->latestOfMany();
     }
 
+    /**
+     * RENAVAM canônico: só dígitos, completado com zeros à esquerda até 11. O DETRAN trata o RENAVAM
+     * antigo de 9 dígitos como o de 11 com "00" na frente. Vazio continua vazio.
+     */
+    public static function canonicalRenavam(?string $renavam): string
+    {
+        $digits = preg_replace('/\D/', '', (string) $renavam) ?? '';
+
+        if ($digits === '') {
+            return '';
+        }
+
+        return str_pad($digits, 11, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Mesmo RENAVAM, ignorando pontuação e zeros à esquerda (9 dígitos e 11 com "00" são iguais).
+     */
+    public static function renavamsMatch(?string $first, ?string $second): bool
+    {
+        $canonicalFirst = self::canonicalRenavam($first);
+
+        return $canonicalFirst !== '' && $canonicalFirst === self::canonicalRenavam($second);
+    }
+
+    /**
+     * Formas gravadas possíveis do mesmo RENAVAM (de 9 a 11 dígitos), para consultar sem migrar dados.
+     *
+     * @return list<string>
+     */
+    public static function renavamVariants(?string $renavam): array
+    {
+        $canonical = self::canonicalRenavam($renavam);
+
+        if ($canonical === '') {
+            return [];
+        }
+
+        $significant = ltrim($canonical, '0');
+        $variants = [];
+
+        foreach ([9, 10, 11] as $length) {
+            if (strlen($significant) <= $length) {
+                $variants[] = str_pad($significant, $length, '0', STR_PAD_LEFT);
+            }
+        }
+
+        $variants[] = (string) $renavam;
+
+        return array_values(array_unique($variants));
+    }
+
     public static function findByRenavam(string $renavam): ?self
     {
-        $normalized = preg_replace('/\D/', '', $renavam);
+        $variants = self::renavamVariants($renavam);
 
-        return static::query()
-            ->where('renavam', $normalized)
-            ->orWhere('renavam', $renavam)
-            ->first();
+        if ($variants === []) {
+            return null;
+        }
+
+        return static::query()->whereIn('renavam', $variants)->first();
     }
 }

@@ -24,6 +24,7 @@ must agree on the same contract; they are listed in a separate table below.
 | resources/css/**,resources/views/**,resources/js/** | .ai/rules/design-tokens.md |
 | resources/views/components/{vehicle,maintenance}/**,resources/views/maintenances/**,resources/views/components/provenance-*.blade.php | .ai/rules/domain-components.md |
 | resources/views/garage/**,app/Http/Controllers/Web/Garage/** | .ai/rules/garage.md |
+| app/Services/Invoice/**,app/Http/Controllers/Web/Concerns/StoresMaintenanceInvoices.php,app/Http/Controllers/Api/InvoiceController.php,app/Rules/InvoiceFile.php | .ai/rules/invoices.md |
 | app/Jobs/**,app/Console/Commands/PurgePendingMaintenanceAttachments.php | .ai/rules/jobs.md |
 | resources/js/user-portal.js,resources/js/owner-maintenance-form.js,resources/js/maintenance-kilometer-range.js,resources/js/utils/maintenance-kilometers.js | .ai/rules/js.md |
 | resources/views/components/landing/**,resources/views/home.blade.php | .ai/rules/landing-views.md |
@@ -32,6 +33,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Listeners/** | .ai/rules/listeners.md |
 | lang/**,app/Http/**,config/app.php,phpunit.xml,phpunit.pgsql.xml | .ai/rules/locale.md |
 | app/Mail/** | .ai/rules/mail.md |
+| config/queue.php,config/cache.php,config/session.php,app/Jobs/**,docker-compose.yml | .ai/rules/messaging.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
 | app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |

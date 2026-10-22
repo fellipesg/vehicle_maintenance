@@ -19,7 +19,7 @@
         <div class="space-y-4 lg:sticky lg:top-24" data-slot="vehicle-search-panel">
             <x-ui.card>
                 <form method="GET" action="{{ route('vehicle.search') }}" role="search" aria-label="Buscar veículo" class="space-y-4" data-vehicle-search-form>
-                    <x-ui.field name="identifier" label="Placa, chassi ou RENAVAM" hint="Ex.: ABC1D23 · chassi com 17 caracteres · RENAVAM com 11 dígitos">
+                    <x-ui.field name="identifier" label="Placa, chassi ou RENAVAM" hint="Ex.: ABC1D23 · chassi com 17 caracteres · RENAVAM com 9 a 11 dígitos">
                         <x-ui.input
                             id="vehicle-search-identifier"
                             leading-icon="magnifying-glass"
@@ -114,7 +114,7 @@
                     <ul role="list" class="list-disc space-y-1 pl-5 text-left">
                         <li>Confira letras e números: O e 0, I e 1 se confundem.</li>
                         <li>Placas antigas do veículo também são pesquisadas.</li>
-                        <li>O chassi tem 17 caracteres e o RENAVAM, 11 dígitos.</li>
+                        <li>O chassi tem 17 caracteres e o RENAVAM, de 9 a 11 dígitos.</li>
                         <li>Se o veículo ainda não está no RevisaLog, o histórico começa quando o dono o cadastrar.</li>
                     </ul>
                     <x-slot:actions>

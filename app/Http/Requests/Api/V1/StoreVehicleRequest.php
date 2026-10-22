@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Rules\Chassis;
+use App\Rules\UniqueRenavam;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
@@ -36,7 +37,7 @@ class StoreVehicleRequest extends ApiFormRequest
 
         return [
             'license_plate' => 'required|string|max:10|unique:vehicles,license_plate',
-            'renavam' => 'required|string|max:20|unique:vehicles,renavam',
+            'renavam' => ['required', 'string', 'max:20', new UniqueRenavam],
             'brand' => 'required|string|max:100',
             'model' => 'required|string|max:100',
             'year' => 'required|integer|min:1900|max:'.(date('Y') + 1),
