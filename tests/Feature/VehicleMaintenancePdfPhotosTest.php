@@ -56,6 +56,20 @@ class VehicleMaintenancePdfPhotosTest extends TestCase
         $this->assertSame(3, $selection[$maintenance->id]['eligible']);
     }
 
+    public function test_owner_sees_a_lone_before_photo_when_there_is_no_after(): void
+    {
+        [$owner, $vehicle] = $this->ownerWithVehicle(true);
+        $maintenance = $this->maintenanceFor($vehicle, $owner);
+        $before = $this->photo($maintenance, MaintenancePhoto::STAGE_BEFORE, sort: 0);
+        $this->photo($maintenance, MaintenancePhoto::STAGE_BEFORE, sort: 1);
+
+        $selection = $this->selectFor($vehicle, $owner, requesterIsOwner: true);
+
+        $this->assertSame([$before->id], array_map(fn (MaintenancePhoto $photo): int => $photo->id, $selection[$maintenance->id]['photos']));
+        $this->assertSame(2, $selection[$maintenance->id]['eligible']);
+        $this->assertSame(1, $this->embeddedPhotos($vehicle, $owner));
+    }
+
     public function test_pair_uses_the_first_before_and_the_first_after_by_sort(): void
     {
         [$owner, $vehicle] = $this->ownerWithVehicle(true);

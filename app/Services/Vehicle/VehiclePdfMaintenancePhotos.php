@@ -14,7 +14,7 @@ use Illuminate\Support\Collection;
  *
  * Regra: só entram fotos quando o proprietário ATUAL do veículo marcou export_include_photos = true
  * (nulo = nunca perguntado e falso = não querem, ambos sem foto). Quando quem pede o PDF é esse
- * proprietário, cada OS mostra o "antes" e o "depois" (a primeira foto de cada); para qualquer outra
+ * proprietário, cada OS mostra o "antes" e o "depois" (a primeira foto de cada; sem "depois", o "antes" avulso; sem "antes", os dois primeiros "depois"); para qualquer outra
  * pessoa autorizada a exportar (lojista em consignação, admin) entram só as fotos públicas
  * (MaintenancePhoto::isPublicVisible). A forma mínima do MaintenanceRedactor já esvazia as fotos das
  * OS sem dono, e este serviço só lê o que sobrou na relação `photos`: nunca recarrega nem contorna.
@@ -194,6 +194,11 @@ class VehiclePdfMaintenancePhotos
 
         if ($before !== null && $after !== null) {
             return [$before, $after];
+        }
+
+        // Só "antes", sem nenhum "depois": mostra o "antes" avulso em vez de nada.
+        if ($before !== null) {
+            return [$before];
         }
 
         return $this->firstAfters($photos);
