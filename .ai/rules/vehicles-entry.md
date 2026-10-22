@@ -35,8 +35,19 @@ enchia a caixa do suporte; sem a segunda, um layout novo de DETRAN que chega a c
 fazia o mesmo, porque a conta entra na chave. O balde por conta ignora o nome do arquivo e a rota de
 origem de propósito — renomear o PDF ou trocar de tela não é falha nova.
 
-Duas coisas ficam **fora** da janela de propósito: o `Log::warning('CRLV-e não lido.')`, que é local,
-barato e é o que mostra quantas vezes a pessoa tentou; e a janela da conta quando o despacho do
-e-mail falha (`reopenWindow`), senão um tropeço da fila na primeira ocorrência calava o aviso por uma
-hora. O e-mail vai pela fila (`Mail::to()->queue`) e o contexto não leva o e-mail de quem enviou, só
-o id da conta: o que falta ao suporte é o layout do DETRAN, não o contato.
+A ordem das duas portas é essa de propósito: a janela da conta primeiro, o teto global depois e só
+para quem passou por ela — assim a conta que reenvia o mesmo PDF em loop gasta um crédito global, não
+um por tentativa, e não fecha o aviso das outras. Aviso barrado pelo teto **devolve** a janela da
+conta (`reopenWindow`) e sai no log com `GLOBAL_CAP_LOG_MESSAGE`: sem isso, a conta suprimida no
+minuto em que o teto encheu ficava calada o resto da hora, mesmo depois de o teto liberar, e uma
+falha real de CRLV-e sumia sem aviso nenhum. Despacho de e-mail que falha devolve a janela pelo mesmo
+motivo, senão um tropeço da fila na primeira ocorrência calava o aviso por uma hora. O teto global
+nunca é devolvido — é um crédito em dez, e a rota já está limitada.
+
+Fora da janela de propósito fica o `Log::warning('CRLV-e não lido.')`, que é local, barato e é o que
+mostra quantas vezes a pessoa tentou. O e-mail vai pela fila (`Mail::to()->queue`) e o contexto não
+leva o e-mail de quem enviou nem o nome que o cliente deu ao arquivo (pode trazer nome ou CPF —
+LGPD, `.ai/rules/models.md`): vão o id da conta, a extensão, o tamanho e um hash curto do conteúdo
+(`hash_arquivo`), que junta envios do mesmo PDF. `CrlvImportFailureMail::BLOCKED_CONTEXT_KEYS` corta
+`arquivo` e `usuario_email` na borda que manda o aviso para fora, mesmo que alguém volte a pô-los no
+contexto. O que falta ao suporte é o layout do DETRAN, não a pessoa.
