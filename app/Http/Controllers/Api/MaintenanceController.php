@@ -107,7 +107,18 @@ class MaintenanceController extends Controller
         }
 
         $processor = app(InvoiceUploadProcessor::class);
-        $storedInvoices = $processor->storeUploads($request->file('invoices'));
+        $uploads = $processor->storeUploads($request->file('invoices'));
+        $storedInvoices = $uploads['stored'];
+
+        // Um arquivo que o storage recusou não virava erro nenhum: a OS nascia sem a nota
+        // e o cliente recebia 201. Aqui nada foi gravado ainda, então a requisição falha
+        // inteira e o app pode repetir o envio.
+        if ($uploads['failed'] !== []) {
+            $processor->discardUploads($storedInvoices);
+            Log::error('Error storing maintenance invoices', ['files' => $uploads['failed']]);
+
+            return ApiResponse::error('Unable to store the invoice files. No maintenance was created.', 500);
+        }
 
         try {
             DB::beginTransaction();
@@ -245,6 +256,13 @@ class MaintenanceController extends Controller
                     : 'Unable to create maintenance.',
                 500,
             );
+        } catch (\Throwable $e) {
+            // Um Error escapava deste bloco sem rollback e sem limpeza, deixando no S3/R2 o
+            // arquivo da nota de uma OS que a transação desfez.
+            DB::rollBack();
+            $processor->discardUploads($storedInvoices);
+
+            throw $e;
         }
     }
 

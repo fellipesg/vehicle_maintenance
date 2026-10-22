@@ -193,6 +193,7 @@ class MaintenanceController extends Controller
             $redirect,
             $result['items_created'],
             $result['warnings'],
+            failedInvoices: $result['invoice_failures'],
         );
     }
 
