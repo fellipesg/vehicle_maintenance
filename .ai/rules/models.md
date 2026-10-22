@@ -37,7 +37,7 @@ removidos) em `maintenance-photos/{maintenance_id}/{uuid}/master.jpg`; o origina
 lado, e preenche thumb_path, display_path, processed_at (width/height/bytes/dominant_color já vêm do
 master). `MaintenancePhotoImageProcessor` usa Imagick quando a extensão existe e GD caso contrário (os
 dois têm teste); sem `imagewebp` as variantes saem em JPEG. Foto antiga (arquivo solto) ganha master novo
-no backfill `photos:generate-variants` e o arquivo velho é apagado. Apagar a foto (evento `deleting` do
-model) apaga o diretório inteiro; a exclusão da OS apaga as fotos uma a uma no evento `deleting` da
+no backfill `photos:generate-variants`; o arquivo velho **nunca é apagado** pelo backfill (decisão do dono): fica em `legacy_path`, rastreável, e qualquer limpeza futura é decisão separada e explícita (não existe comando para isso). Apagar a foto (evento `deleting` do
+model) apaga o diretório inteiro e o `legacy_path`, se houver (é a vontade do usuário, não limpeza); a exclusão da OS apaga as fotos uma a uma no evento `deleting` da
 `Maintenance`, porque o cascade do banco não dispara eventos. Não monte caminho de foto com o nome
 enviado.

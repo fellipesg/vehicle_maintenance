@@ -30,6 +30,7 @@ class MaintenancePhoto extends Model
         'subject',
         'stage',
         'path',
+        'legacy_path',
         'thumb_path',
         'display_path',
         'width',
@@ -94,7 +95,9 @@ class MaintenancePhoto extends Model
 
     /**
      * Apaga os arquivos no storage: o diretório inteiro no layout novo, o arquivo solto (mais as
-     * variantes, se existirem) no antigo. Não mexe na linha.
+     * variantes, se existirem) no antigo e, se o backfill migrou a foto, o arquivo antigo guardado em
+     * `legacy_path` (apagar a foto é a vontade do usuário; o backfill nunca apaga o legado). Não mexe
+     * na linha.
      */
     public function deleteStoredFiles(): void
     {
@@ -103,11 +106,13 @@ class MaintenancePhoto extends Model
 
         if ($directory !== null) {
             $disk->deleteDirectory($directory);
-
-            return;
         }
 
-        foreach (array_filter([$this->path, $this->thumb_path, $this->display_path]) as $path) {
+        $paths = $directory !== null
+            ? [$this->legacy_path]
+            : [$this->path, $this->thumb_path, $this->display_path, $this->legacy_path];
+
+        foreach (array_filter($paths) as $path) {
             if ($disk->exists($path)) {
                 $disk->delete($path);
             }

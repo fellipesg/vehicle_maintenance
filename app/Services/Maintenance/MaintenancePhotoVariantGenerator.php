@@ -16,7 +16,8 @@ use RuntimeException;
  * Foto nova já tem master no layout `maintenance-photos/{maintenance_id}/{uuid}/master.jpg`: só as
  * variantes são criadas ao lado dele. Foto antiga (arquivo solto, original com EXIF) ganha também um
  * master novo, sem metadados, no layout novo; a linha passa a apontar para ele e o arquivo antigo
- * é apagado por último, depois que a linha já está gravada.
+ * fica intacto: a linha guarda o caminho antigo em `legacy_path` e nenhum comando o apaga (a limpeza
+ * do legado é uma decisão separada e explícita). Só apagar a foto remove o `legacy_path`.
  */
 class MaintenancePhotoVariantGenerator
 {
@@ -52,6 +53,7 @@ class MaintenancePhotoVariantGenerator
             $disk->put($directory.'/master.jpg', $bytes);
             $attributes = [
                 'path' => $directory.'/master.jpg',
+                'legacy_path' => $legacyPath,
                 'width' => $master['width'],
                 'height' => $master['height'],
                 'bytes' => $master['bytes'],
@@ -77,10 +79,6 @@ class MaintenancePhotoVariantGenerator
             'display_path' => $directory.'/display.'.$display['extension'],
             'processed_at' => now(),
         ])->save();
-
-        if ($legacyPath !== null && $disk->exists($legacyPath)) {
-            $disk->delete($legacyPath);
-        }
     }
 
     private function read(Filesystem $disk, string $path): ?string

@@ -9,7 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('maintenance_photos', function (Blueprint $table) {
-            $table->string('thumb_path')->nullable()->after('path');
+            $table->string('legacy_path')->nullable()->after('path');
+            $table->string('thumb_path')->nullable()->after('legacy_path');
             $table->string('display_path')->nullable()->after('thumb_path');
             $table->unsignedInteger('width')->nullable()->after('display_path');
             $table->unsignedInteger('height')->nullable()->after('width');
@@ -28,6 +29,7 @@ return new class extends Migration
             $table->dropIndex('maintenance_photos_group_sort_index');
             $table->dropIndex(['processed_at']);
             $table->dropColumn([
+                'legacy_path',
                 'thumb_path',
                 'display_path',
                 'width',

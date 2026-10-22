@@ -138,7 +138,7 @@ class MaintenancePhotoVariantsTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_job_migrates_a_legacy_photo_to_the_new_layout_and_strips_exif(): void
+    public function test_job_migrates_a_legacy_photo_to_the_new_layout_keeping_the_legacy_file(): void
     {
         Storage::disk('public')->put('maintenance-photos/7_abc.jpg', $this->jpegWithExif(800, 600, 1));
         $photo = MaintenancePhoto::factory()->create([
@@ -152,7 +152,8 @@ class MaintenancePhotoVariantsTest extends TestCase
         $this->assertNotNull($photo->storageDirectory());
         $this->assertStringStartsWith('maintenance-photos/'.$this->maintenance->id.'/', $photo->path);
         $this->assertStringNotContainsString('Exif', Storage::disk('public')->get($photo->path));
-        $this->assertFalse(Storage::disk('public')->exists('maintenance-photos/7_abc.jpg'));
+        $this->assertSame('maintenance-photos/7_abc.jpg', $photo->legacy_path);
+        Storage::disk('public')->assertExists('maintenance-photos/7_abc.jpg');
         $this->assertTrue(Storage::disk('public')->exists($photo->thumb_path));
         $this->assertSame([800, 600], [$photo->width, $photo->height]);
     }
@@ -169,6 +170,67 @@ class MaintenancePhotoVariantsTest extends TestCase
         $this->assertSame(0, MaintenancePhoto::count());
         $this->assertSame([], Storage::disk('public')->allFiles($directory));
         Storage::disk('public')->assertMissing($photo->path);
+    }
+
+    public function test_deleting_a_migrated_photo_removes_the_legacy_file_too(): void
+    {
+        Storage::disk('public')->put('maintenance-photos/7_abc.jpg', $this->plainJpeg());
+        $photo = MaintenancePhoto::factory()->create([
+            'maintenance_id' => $this->maintenance->id,
+            'path' => 'maintenance-photos/7_abc.jpg',
+        ]);
+        app(MaintenancePhotoVariantGenerator::class)->generate($photo);
+        $photo->refresh();
+
+        $photo->delete();
+
+        Storage::disk('public')->assertMissing('maintenance-photos/7_abc.jpg');
+        $this->assertSame([], Storage::disk('public')->allFiles(dirname($photo->path)));
+    }
+
+    public function test_deleting_the_maintenance_removes_the_legacy_file_of_a_migrated_photo(): void
+    {
+        Storage::disk('public')->put('maintenance-photos/8_abc.jpg', $this->plainJpeg());
+        $photo = MaintenancePhoto::factory()->create([
+            'maintenance_id' => $this->maintenance->id,
+            'path' => 'maintenance-photos/8_abc.jpg',
+        ]);
+        app(MaintenancePhotoVariantGenerator::class)->generate($photo);
+
+        app(MaintenanceAttachmentPurger::class)->purge($this->maintenance);
+
+        Storage::disk('public')->assertMissing('maintenance-photos/8_abc.jpg');
+    }
+
+    public function test_backfill_is_idempotent_and_never_deletes_legacy_files(): void
+    {
+        Storage::disk('public')->put('maintenance-photos/1_ok.jpg', $this->plainJpeg());
+        $photo = MaintenancePhoto::factory()->create(['maintenance_id' => $this->maintenance->id, 'path' => 'maintenance-photos/1_ok.jpg']);
+
+        $this->artisan('photos:generate-variants', ['--sync' => true])->assertSuccessful();
+        $firstPath = $photo->fresh()->path;
+        $this->artisan('photos:generate-variants', ['--sync' => true])
+            ->expectsOutputToContain('Fotos processadas: 0.')
+            ->assertSuccessful();
+
+        $this->assertSame($firstPath, $photo->fresh()->path);
+        Storage::disk('public')->assertExists('maintenance-photos/1_ok.jpg');
+    }
+
+    public function test_backfill_dry_run_changes_nothing_and_limit_caps_the_run(): void
+    {
+        Queue::fake();
+        MaintenancePhoto::factory()->count(3)->create(['maintenance_id' => $this->maintenance->id]);
+
+        $this->artisan('photos:generate-variants', ['--dry-run' => true, '--limit' => 2])
+            ->expectsOutputToContain('Fotos a processar: 2 de 3 pendentes')
+            ->assertSuccessful();
+        Queue::assertNothingPushed();
+
+        $this->artisan('photos:generate-variants', ['--limit' => 2])
+            ->expectsOutputToContain('Fotos enfileiradas: 2.')
+            ->assertSuccessful();
+        Queue::assertPushed(ProcessMaintenancePhoto::class, 2);
     }
 
     public function test_model_delete_removes_files_of_a_legacy_photo(): void
