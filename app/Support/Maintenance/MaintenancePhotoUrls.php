@@ -3,6 +3,7 @@
 namespace App\Support\Maintenance;
 
 use App\Models\MaintenancePhoto;
+use App\Models\User;
 use App\Support\AppStorage;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -10,8 +11,10 @@ use DateTimeInterface;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use RuntimeException;
+use Throwable;
 
 /**
  * URLs temporárias das fotos de manutenção. Só chame depois da MaintenancePhotoPolicy::view: quem
@@ -87,6 +90,34 @@ final class MaintenancePhotoUrls
                 self::VARIANT_MASTER => $urls[self::VARIANT_MASTER],
             ];
         });
+    }
+
+    /**
+     * URLs para as telas do portal: autoriza pela MaintenancePhotoPolicy::view e só então assina.
+     * Nulo quando o usuário não pode ver a foto (a tela a omite). Se a assinatura falhar, cai na
+     * rota autorizada maintenance-photos.show, que serve o master pelo PHP.
+     *
+     * @return array{thumb: string, display: string, master: string}|null
+     */
+    public static function forViewer(MaintenancePhoto $photo, ?User $viewer): ?array
+    {
+        if ($viewer === null || ! Gate::forUser($viewer)->allows('view', $photo)) {
+            return null;
+        }
+
+        try {
+            return self::variants($photo);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $fallback = route('maintenance-photos.show', $photo);
+
+            return [
+                self::VARIANT_THUMB => $fallback,
+                self::VARIANT_DISPLAY => $fallback,
+                self::VARIANT_MASTER => $fallback,
+            ];
+        }
     }
 
     /**

@@ -36,8 +36,13 @@ $photo->url, porque só a busca por placa abre aquele bloco e lá x-vehicle.deta
 fotos públicas (veículo/depois); a rota responderia 403 a quem só buscou a placa. O arquivo sai pelo
 MaintenancePhotoFileResponse, compartilhado com a rota da API. Do lado da API a foto também passou a
 sair por rota autorizada (api.maintenance-photos.show), e a busca pública mantém a mesma exceção:
-ver .ai/rules/api.md (agora com variantes em URL temporária, só depois da policy). As telas web seguem
-apontando para a rota autorizada, que serve o master.
+ver .ai/rules/api.md (agora com variantes em URL temporária, só depois da policy). As telas web
+(maintenances/_detail e partials/maintenance-photos-form) usam MaintenancePhotoUrls::forViewer($photo,
+auth()->user()): policy primeiro, depois as variantes em URL temporária. Miniatura = `thumb`; item da
+<x-ui.lightbox> = `display` (chave `original` = `master`, que o "Abrir original" usa); link da miniatura
+= `master`. Foto negada (null) some da tela. A rota maintenance-photos.show virou só o fallback, quando
+a assinatura falha. Defina `$photo->setRelation('maintenance', ...)` antes para a policy não consultar
+por foto.
 
 ## Nota fiscal nunca pelo caminho do storage
 O link "Abrir" de uma nota fiscal (maintenances/_detail e partials/workshop-maintenance-form) aponta
