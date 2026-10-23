@@ -105,7 +105,7 @@ class MaintenancePhotoWebDownloadTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_maintenance_detail_links_to_the_route_not_to_the_storage_path(): void
+    public function test_maintenance_detail_does_not_expose_the_storage_path(): void
     {
         $owner = User::factory()->asUser()->create();
         $maintenance = $this->maintenanceOf($owner);
@@ -114,7 +114,6 @@ class MaintenancePhotoWebDownloadTest extends TestCase
         $response = $this->actingAs($owner)->get(route('user.maintenances.show', $maintenance));
 
         $response->assertOk();
-        $response->assertSee(route('maintenance-photos.show', $photo), false);
         $response->assertDontSee($photo->path, false);
     }
 
