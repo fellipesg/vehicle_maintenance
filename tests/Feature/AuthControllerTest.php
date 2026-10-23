@@ -308,6 +308,8 @@ class AuthControllerTest extends TestCase
 
     public function test_sixth_login_in_a_minute_returns_429(): void
     {
+        $this->disableDebugMode();
+
         User::factory()->asUser()->create([
             'email' => 'ratelimit@example.com',
             'password' => bcrypt('password123'),
@@ -330,6 +332,8 @@ class AuthControllerTest extends TestCase
 
     public function test_login_is_limited_per_ip_across_different_emails(): void
     {
+        $this->disableDebugMode();
+
         for ($attempt = 1; $attempt <= 30; $attempt++) {
             $this->postJson('/api/v1/login', [
                 'email' => "spray-{$attempt}@example.com",
@@ -347,6 +351,8 @@ class AuthControllerTest extends TestCase
 
     public function test_two_factor_challenge_is_limited_per_ip_across_tokens(): void
     {
+        $this->disableDebugMode();
+
         for ($attempt = 1; $attempt <= 10; $attempt++) {
             $response = $this->postJson('/api/v1/two-factor/challenge', [
                 'challenge_token' => "token-{$attempt}",
@@ -355,14 +361,22 @@ class AuthControllerTest extends TestCase
             $this->assertNotSame(429, $response->status());
         }
 
-        $this->postJson('/api/v1/two-factor/challenge', [
+        $response = $this->postJson('/api/v1/two-factor/challenge', [
             'challenge_token' => 'token-11',
             'code' => '123456',
         ])->assertStatus(429);
+
+        // This limiter has no response() of its own, so the answer is the API envelope built in
+        // bootstrap/app.php; it must still carry the Retry-After of the exception it came from.
+        $this->assertGreaterThan(0, (int) $response->headers->get('Retry-After'));
+        $response->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Too many requests.');
     }
 
     public function test_sixth_register_in_a_minute_returns_429(): void
     {
+        $this->disableDebugMode();
+
         for ($attempt = 1; $attempt <= 5; $attempt++) {
             $this->postJson('/api/v1/register', [
                 'name' => 'User '.$attempt,
@@ -384,6 +398,8 @@ class AuthControllerTest extends TestCase
 
     public function test_oauth_callback_rate_limit_is_segmented_by_provider(): void
     {
+        $this->disableDebugMode();
+
         for ($attempt = 1; $attempt <= 5; $attempt++) {
             $response = $this->getJson('/api/v1/auth/google/callback');
             $this->assertNotSame(429, $response->status());
@@ -453,6 +469,16 @@ class AuthControllerTest extends TestCase
         ])->assertOk();
 
         $this->assertGuest('web');
+    }
+
+    /**
+     * Production runs with APP_DEBUG=false, and that is the only mode in which the API error
+     * renderer in bootstrap/app.php used to swallow a limiter's 429 and answer 500 instead.
+     * Pin debug off so these tests keep covering the production path whatever phpunit.xml says.
+     */
+    private function disableDebugMode(): void
+    {
+        config(['app.debug' => false]);
     }
 
     /**

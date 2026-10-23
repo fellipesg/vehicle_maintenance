@@ -13,11 +13,13 @@ use App\Policies\MaintenancePhotoPolicy;
 use App\Policies\MaintenancePolicy;
 use App\Policies\VehiclePolicy;
 use App\Policies\WorkshopPolicy;
+use App\Support\ApiResponse;
 use App\Support\Maintenance\MaintenancePhotoUrls;
 use App\Support\StorageEndpointResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -59,20 +61,21 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('auth', fn (Request $request) => $this->buildAuthRateLimit(
             $request,
-            fn (Request $request, array $headers) => response()->json([
-                'success' => false,
-                'message' => $this->tooManyAttemptsMessage($headers),
-            ], 429, $headers),
+            fn (Request $request, array $headers) => $this->tooManyAttemptsJson($headers),
         ));
 
+        // O formulário web volta com aviso, mas um cliente que pede JSON (um XHR no mesmo
+        // formulário) não lê o erro do flash: para ele o redirect esconderia o 429 e o Retry-After.
         RateLimiter::for('auth-web', fn (Request $request) => $this->buildAuthRateLimit(
             $request,
-            fn (Request $request, array $headers) => redirect()
-                ->back()
-                ->withInput($request->only('email', 'name', 'phone', 'document', 'trade_name', 'cnpj', 'ref'))
-                ->withErrors([
-                    'email' => $this->tooManyAttemptsMessage($headers),
-                ]),
+            fn (Request $request, array $headers) => $request->expectsJson()
+                ? $this->tooManyAttemptsJson($headers)
+                : redirect()
+                    ->back()
+                    ->withInput($request->only('email', 'name', 'phone', 'document', 'trade_name', 'cnpj', 'ref'))
+                    ->withErrors([
+                        'email' => $this->tooManyAttemptsMessage($headers),
+                    ]),
         ));
 
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by(
@@ -143,6 +146,17 @@ class AppServiceProvider extends ServiceProvider
 
         Carbon::setLocale($locale);
         Number::useLocale($locale);
+    }
+
+    /**
+     * Mesma resposta para a API e para um cliente JSON na rota web: envelope com a mensagem em
+     * pt-BR e os cabeçalhos do limiter, Retry-After incluído.
+     *
+     * @param  array<string, mixed>  $headers  Rate limiter headers, including Retry-After.
+     */
+    private function tooManyAttemptsJson(array $headers): JsonResponse
+    {
+        return ApiResponse::error($this->tooManyAttemptsMessage($headers), 429)->withHeaders($headers);
     }
 
     /**

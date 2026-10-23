@@ -23,33 +23,63 @@
         <env name="FIREBASE_CREDENTIALS_JSON" value="" force="true"/>
         <env name="SENTRY_LARAVEL_DSN" value="" force="true"/>
         <env name="SENTRY_DSN" value="" force="true"/>
-        <env name="APP_ENV" value="testing"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <!--
+            APP_DEBUG=false é o valor de produção, e era o único em que o renderer de API de
+            bootstrap/app.php engolia o 429 dos limiters com response() custom e devolvia 500. O
+            renderer agora trata HttpResponseException, então fixar false aqui é o que mantém a
+            suíte rodando no mesmo modo que produção e impede a regressão voltar sem ninguém ver.
+            Os testes de rate limit também fixam app.debug=false por conta própria.
+        -->
+        <env name="APP_DEBUG" value="false" force="true"/>
         <env name="APP_LOCALE" value="pt_BR" force="true"/>
         <env name="APP_FALLBACK_LOCALE" value="pt_BR" force="true"/>
         <env name="APP_FAKER_LOCALE" value="pt_BR" force="true"/>
-        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="null"/>
-        <env name="CACHE_STORE" value="array"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
         <env name="DB_CONNECTION" value="sqlite" force="true"/>
         <env name="DB_DATABASE" value=":memory:" force="true"/>
         <env name="DB_URL" value="" force="true"/>
+        <env name="FILESYSTEM_DISK" value="local" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
         <!--
-            Dentro do Docker o compose exporta DB_* para o processo, e isso chega ao PHP em
-            $_SERVER. O repositório de env do Laravel lê $_SERVER antes de $_ENV, e <env force>
-            só escreve putenv() e $_ENV: sem as linhas <server> abaixo, env('DB_CONNECTION')
-            devolve o 'pgsql' do compose e a suíte roda (e dá migrate:fresh) no banco de
-            desenvolvimento. Mantenha os dois blocos em sincronia.
+            Toda variável exportada no processo (compose, `set -a; source .env`, CI) chega ao PHP
+            em $_SERVER. O repositório de env do Laravel lê $_SERVER antes de $_ENV, e o
+            <env force> acima só escreve putenv() e $_ENV: sem as linhas <server> abaixo o
+            ambiente do shell vence a configuração de teste. Sintomas já vistos: DB_CONNECTION
+            manda o RefreshDatabase fazer migrate:fresh no banco de desenvolvimento, e APP_ENV
+            fora de 'testing' liga o CSRF e todo POST web vira 419. Toda variável fixada acima
+            tem a gêmea aqui; mantenha os dois blocos em sincronia.
         -->
+        <server name="FIREBASE_CREDENTIALS_BASE64" value="" force="true"/>
+        <server name="FIREBASE_CREDENTIALS_JSON" value="" force="true"/>
+        <server name="SENTRY_LARAVEL_DSN" value="" force="true"/>
+        <server name="SENTRY_DSN" value="" force="true"/>
+        <server name="APP_ENV" value="testing" force="true"/>
+        <server name="APP_DEBUG" value="false" force="true"/>
+        <server name="APP_LOCALE" value="pt_BR" force="true"/>
+        <server name="APP_FALLBACK_LOCALE" value="pt_BR" force="true"/>
+        <server name="APP_FAKER_LOCALE" value="pt_BR" force="true"/>
+        <server name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <server name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <server name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <server name="CACHE_STORE" value="array" force="true"/>
         <server name="DB_CONNECTION" value="sqlite" force="true"/>
         <server name="DB_DATABASE" value=":memory:" force="true"/>
         <server name="DB_URL" value="" force="true"/>
-        <env name="FILESYSTEM_DISK" value="local" force="true"/>
-        <env name="MAIL_MAILER" value="array"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
-        <env name="PULSE_ENABLED" value="false"/>
-        <env name="TELESCOPE_ENABLED" value="false"/>
-        <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <server name="FILESYSTEM_DISK" value="local" force="true"/>
+        <server name="MAIL_MAILER" value="array" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <server name="SESSION_DRIVER" value="array" force="true"/>
+        <server name="PULSE_ENABLED" value="false" force="true"/>
+        <server name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <server name="NIGHTWATCH_ENABLED" value="false" force="true"/>
     </php>
 </phpunit>
