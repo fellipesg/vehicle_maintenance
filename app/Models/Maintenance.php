@@ -62,6 +62,23 @@ class Maintenance extends Model
     }
 
     /**
+     * Resultado de isVerifiedCurrentOwner por usuário, para as telas e resources que perguntam
+     * várias vezes sobre a mesma OS.
+     *
+     * @var array<int, bool>
+     */
+    private array $verifiedCurrentOwnerCache = [];
+
+    protected static function booted(): void
+    {
+        // Os anexos saem do storage junto com a OS: a exclusão em cascata do banco não dispara os
+        // eventos do model, então as fotos (e as variantes) são apagadas uma a uma aqui.
+        static::deleting(function (Maintenance $maintenance): void {
+            $maintenance->photos()->get()->each->delete();
+        });
+    }
+
+    /**
      * A OS nasceu num carro sem proprietário e depende da decisão dele (owner_status não nulo).
      */
     public function isOwnerlessRecord(): bool
@@ -98,12 +115,59 @@ class Maintenance extends Model
 
     /**
      * Notas e fotos de uma OS sem dono só aparecem para outros depois do aceite do proprietário.
+     * Exceção (prévia do proprietário): o dono atual do veículo com a posse comprovada
+     * (ownership_verified_at, via CRLV-e) vê as notas e fotos antes de aceitar, porque é ele quem
+     * decide e precisa decidir informado. Comprador, outro tenant, dono sem comprovação e visitante
+     * continuam sem ver nada.
      */
     public function hidesAttachmentsFrom(?User $viewer): bool
     {
         return $this->isOwnerlessRecord()
             && $this->attachments_status !== self::ATTACHMENTS_ACCEPTED
-            && ! $this->isCreatedByWorkshopOf($viewer);
+            && ! $this->isCreatedByWorkshopOf($viewer)
+            && ! $this->isVerifiedCurrentOwner($viewer);
+    }
+
+    /**
+     * Dono atual do veículo, no tenant dele, com a posse comprovada pelo CRLV-e: é a mesma noção
+     * de "comprovou a posse" que o MaintenanceOwnerDecisionService::ownershipVerified usa para
+     * deixar decidir sobre o registro.
+     */
+    public function isVerifiedCurrentOwner(?User $viewer): bool
+    {
+        if ($viewer === null || $viewer->tenant_id === null || $this->vehicle_id === null) {
+            return false;
+        }
+
+        return $this->verifiedCurrentOwnerCache[$viewer->id] ??= UserVehicle::query()
+            ->where('vehicle_id', $this->vehicle_id)
+            ->where('user_id', $viewer->id)
+            ->where('tenant_id', $viewer->tenant_id)
+            ->where('is_current_owner', true)
+            ->whereNotNull('ownership_verified_at')
+            ->exists();
+    }
+
+    /**
+     * Quem vê todas as fotos da OS (antes, durante, peça): a oficina autora, o tenant dono do
+     * registro e, numa OS sem proprietário, o dono atual com posse comprovada. Os demais veem só
+     * veículo + depois (as públicas).
+     */
+    public function exposesAllPhotosTo(?User $viewer): bool
+    {
+        if ($viewer === null) {
+            return false;
+        }
+
+        if ($viewer->isWorkshop() && $viewer->workshop) {
+            return $this->workshop_id === $viewer->workshop->id;
+        }
+
+        if ($this->tenant_id !== null && $this->tenant_id === $viewer->tenant_id) {
+            return true;
+        }
+
+        return $this->isOwnerlessRecord() && $this->isVerifiedCurrentOwner($viewer);
     }
 
     /**

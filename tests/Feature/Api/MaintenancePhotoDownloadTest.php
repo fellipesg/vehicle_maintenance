@@ -59,13 +59,13 @@ class MaintenancePhotoDownloadTest extends TestCase
         $this->getJson(route('api.maintenance-photos.show', $photo))->assertForbidden();
     }
 
-    public function test_owner_cannot_download_pending_attachment_of_ownerless_record(): void
+    public function test_unverified_owner_cannot_download_pending_attachment_of_ownerless_record(): void
     {
         $workshopUser = $this->workshopAccount();
         $vehicle = $this->ownerlessVehicle();
         $maintenance = $this->ownerlessRecord($workshopUser, $vehicle);
         $photo = $this->photoFor($maintenance);
-        $owner = $this->ownerOf($vehicle);
+        $owner = $this->ownerOf($vehicle, verified: false);
 
         $this->actingAsApiUser($owner);
         $this->getJson(route('api.maintenance-photos.show', $photo))->assertForbidden();

@@ -271,7 +271,7 @@ class VehicleController extends Controller
 
         $maintenances = $vehicle->maintenancesVisibleTo($request->user())
             ->with(['items.warranty', 'generalWarranty', 'invoices', 'checklists', 'user', 'workshop', 'verifiedWorkshop'])
-            ->withCount('invoices')
+            ->withCount(['invoices', 'photos'])
             ->when($request->has('verified'), function ($query) use ($request) {
                 $verified = filter_var($request->query('verified'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
                 if ($verified === true) {
