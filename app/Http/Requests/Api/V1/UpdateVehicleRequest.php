@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api\V1;
 
 use App\Models\Vehicle;
 use App\Rules\Chassis;
+use App\Rules\UniqueRenavam;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
@@ -42,7 +43,7 @@ class UpdateVehicleRequest extends ApiFormRequest
 
         return [
             'license_plate' => 'sometimes|required|string|max:10|unique:vehicles,license_plate,'.$id,
-            'renavam' => 'sometimes|required|string|max:20|unique:vehicles,renavam,'.$id,
+            'renavam' => ['sometimes', 'required', 'string', 'max:20', new UniqueRenavam($id === null ? null : (int) $id)],
             'brand' => 'sometimes|required|string|max:100',
             'model' => 'sometimes|required|string|max:100',
             'year' => 'sometimes|required|integer|min:1900|max:'.(date('Y') + 1),

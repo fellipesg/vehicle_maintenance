@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Concerns;
 
 use App\Models\Vehicle;
 use App\Rules\Chassis;
+use App\Rules\UniqueRenavam;
 use App\Services\Crlv\CrlvParseResult;
 use App\Services\Maintenance\OwnerlessMaintenanceService;
 use App\Services\Vehicle\VehicleOwnershipService;
@@ -29,12 +30,12 @@ trait RegistersVehicleWithOwnership
     protected function vehicleValidationRules(?int $vehicleId = null): array
     {
         $plateRule = 'unique:vehicles,license_plate';
-        $renavamRule = 'unique:vehicles,renavam';
 
         if ($vehicleId) {
             $plateRule .= ','.$vehicleId;
-            $renavamRule .= ','.$vehicleId;
         }
+
+        $renavamRule = new UniqueRenavam($vehicleId, $this->vehicleEntryFlow()->vehicleExistsMessage('este RENAVAM'));
 
         $year = (int) request()->input('year', date('Y'));
         $chassisRule = Rule::unique('vehicles', 'chassis');
@@ -44,7 +45,7 @@ trait RegistersVehicleWithOwnership
 
         return [
             'license_plate' => ['required', 'string', 'max:10', 'regex:/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/', $plateRule],
-            'renavam' => ['required', 'digits:11', $renavamRule],
+            'renavam' => ['required', 'digits_between:9,11', $renavamRule],
             'crv_number' => ['required', 'digits_between:10,12'],
             'brand' => ['required', 'string', 'max:100'],
             'model' => ['required', 'string', 'max:100'],
@@ -70,8 +71,7 @@ trait RegistersVehicleWithOwnership
         return [
             'license_plate.regex' => 'Informe a placa no formato ABC1D23 ou ABC1234.',
             'license_plate.unique' => $flow->vehicleExistsMessage('esta placa'),
-            'renavam.digits' => 'O RENAVAM deve ter exatamente 11 dígitos.',
-            'renavam.unique' => $flow->vehicleExistsMessage('este RENAVAM'),
+            'renavam.digits_between' => 'O RENAVAM deve ter de 9 a 11 dígitos.',
             'crv_number.digits_between' => 'O número do CRV deve ter entre 10 e 12 dígitos.',
             'year.min' => 'O ano do modelo deve ser no mínimo 1900.',
             'terms_accepted.required' => $termsMessage,

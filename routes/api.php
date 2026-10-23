@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\LegalController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\MaintenanceInviteController;
 use App\Http\Controllers\Api\MaintenancePhotoController;
+use App\Http\Controllers\Api\MaintenancePhotoSignedFileController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProfileController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Api\WorkshopController;
 use App\Http\Controllers\Api\WorkshopMessageTemplateController;
 use App\Http\Controllers\Api\WorkshopRecordController;
 use App\Http\Controllers\Api\WorkshopVehicleController;
+use App\Support\Maintenance\MaintenancePhotoUrls;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -45,6 +47,16 @@ Route::prefix('v1')->group(function () {
     // Recuperação de senha: o link do e-mail abre a página do portal, que é quem troca a senha.
     Route::post('/password/forgot', [PasswordController::class, 'forgot'])
         ->middleware('throttle:password-forgot');
+
+    // Arquivo de uma foto de manutenção por URL assinada de vida curta. Quem recebe a URL já passou
+    // pela MaintenancePhotoPolicy::view ao montar o MaintenancePhotoResource; a assinatura vale por
+    // uma foto e uma variante. Sem auth:sanctum porque o carregador de imagem do app e o <img> não
+    // mandam Authorization. Só o disco local usa esta rota (S3/R2 assina no próprio storage).
+    Route::get('/maintenance-photo-files/{photo}/{variant}', MaintenancePhotoSignedFileController::class)
+        ->whereNumber('photo')
+        ->whereIn('variant', MaintenancePhotoUrls::VARIANTS)
+        ->middleware(['signed', 'throttle:api'])
+        ->name('api.maintenance-photos.signed');
 
     // Workshop routes (public - visible to all users)
     Route::get('/workshops', [WorkshopController::class, 'index'])->middleware('throttle:api');

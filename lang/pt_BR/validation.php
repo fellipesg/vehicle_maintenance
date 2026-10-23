@@ -218,6 +218,7 @@ return [
         'password_confirmation' => 'confirmação da senha',
         'current_password' => 'senha atual',
         'phone' => 'telefone',
+        'export_include_photos' => 'fotos no PDF do histórico',
         'whatsapp' => 'WhatsApp',
         'document' => 'CPF ou CNPJ',
         'cnpj' => 'CNPJ',

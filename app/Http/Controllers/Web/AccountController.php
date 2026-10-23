@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Account\DeleteAccountRequest;
 use App\Http\Requests\Web\Account\UpdateAccountPasswordRequest;
+use App\Http\Requests\Web\Account\UpdateAccountPreferencesRequest;
 use App\Http\Requests\Web\Account\UpdateAccountRequest;
 use App\Models\User;
 use App\Notifications\AccountEmailChangedNotification;
@@ -96,6 +97,13 @@ class AccountController extends Controller
         }
 
         return redirect()->route('account.edit')->with('success', 'Dados da conta atualizados.');
+    }
+
+    public function updatePreferences(UpdateAccountPreferencesRequest $request): RedirectResponse
+    {
+        $request->user()->update(['export_include_photos' => $request->boolean('export_include_photos')]);
+
+        return redirect()->route('account.edit')->with('success', 'Preferência do PDF atualizada.');
     }
 
     public function updatePassword(UpdateAccountPasswordRequest $request): RedirectResponse

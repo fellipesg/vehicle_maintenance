@@ -278,6 +278,7 @@ class MaintenanceController extends Controller
             $result['warnings'],
             $result['items_skipped'],
             self::createdMessage($maintenance),
+            $result['invoice_failures'],
         );
     }
 
@@ -411,6 +412,7 @@ class MaintenanceController extends Controller
             $invoiceResult['warnings'],
             $invoiceResult['items_skipped'],
             'OS atualizada.',
+            $invoiceResult['invoice_failures'],
         );
     }
 
