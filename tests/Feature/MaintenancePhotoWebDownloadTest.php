@@ -73,13 +73,13 @@ class MaintenancePhotoWebDownloadTest extends TestCase
         $this->get(route('maintenance-photos.show', $photo))->assertRedirect(route('login'));
     }
 
-    public function test_owner_cannot_open_pending_attachment_of_ownerless_record(): void
+    public function test_unverified_owner_cannot_open_pending_attachment_of_ownerless_record(): void
     {
         $workshopUser = $this->workshopAccount();
         $vehicle = $this->ownerlessVehicle();
         $maintenance = $this->ownerlessRecord($workshopUser, $vehicle);
         $photo = $this->photoFor($maintenance);
-        $owner = $this->ownerOf($vehicle);
+        $owner = $this->ownerOf($vehicle, verified: false);
 
         $this->actingAs($owner)
             ->get(route('maintenance-photos.show', $photo))

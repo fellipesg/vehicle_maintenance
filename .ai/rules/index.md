@@ -14,7 +14,7 @@ must agree on the same contract; they are listed in a separate table below.
 | resources/views/admin/maintenances/**,resources/views/admin/vehicles/show.blade.php | .ai/rules/admin-vehicles.md |
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
 | config/outreach.php,app/Mail/WorkshopProspectInviteMail.php,app/Jobs/SendWorkshopProspectInvite.php,app/Services/Outreach/**,app/Console/Commands/*Prospect*,app/Console/Commands/ExtractReceitaProspects.php,app/Http/Controllers/Web/OutreachController.php,app/Http/Controllers/Web/Admin/OutreachController.php,app/Models/WorkshopProspect.php,app/Models/EmailSuppression.php,resources/views/emails/outreach/**,resources/views/outreach/**,resources/views/admin/outreach/** | .ai/rules/outreach.md |
-| app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
+| app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php, app/Support/Maintenance/MaintenancePhotoUrls.php, app/Http/Resources/Api/V1/MaintenancePhotoResource.php | .ai/rules/api.md |
 | app/Http/Requests/Api/** | .ai/rules/requests-api.md |
 | app/Http/Controllers/Web/BlogController.php,app/Http/Controllers/Web/Admin/BlogPostController.php,app/Models/BlogPost.php,resources/views/blog/**,resources/views/admin/blog/** | .ai/rules/blog.md |
 | .github/workflows/**,Makefile,phpunit.xml,phpunit.pgsql.xml | .ai/rules/ci.md |
@@ -35,7 +35,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Mail/** | .ai/rules/mail.md |
 | config/queue.php,config/cache.php,config/session.php,app/Jobs/**,docker-compose.yml | .ai/rules/messaging.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
-| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
+| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
 | resources/views/pdfs/vehicle_maintenance_export.blade.php | .ai/rules/pdfs.md |
 | app/Policies/** | .ai/rules/policies.md |

@@ -39,9 +39,9 @@ class MaintenancePhotoFileResponse
     /**
      * Responde 404 (abort) quando a foto não tem caminho ou o arquivo não está mais no storage.
      */
-    public static function for(MaintenancePhoto $photo): BinaryFileResponse
+    public static function for(MaintenancePhoto $photo, string $variant = MaintenancePhotoUrls::VARIANT_MASTER): BinaryFileResponse
     {
-        $path = (string) $photo->path;
+        $path = (string) MaintenancePhotoUrls::variantPath($photo, MaintenancePhotoUrls::effectiveVariant($photo, $variant));
 
         if ($path === '') {
             abort(404);
@@ -54,11 +54,12 @@ class MaintenancePhotoFileResponse
         }
 
         $extension = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
+        $isMaster = $path === $photo->path;
         $inline = array_key_exists($extension, self::INLINE_TYPES);
 
         $response = response()->download(
             $copy['path'],
-            self::downloadName($photo, $path),
+            $isMaster ? self::downloadName($photo, $path) : basename($path),
             [
                 'Content-Type' => self::INLINE_TYPES[$extension] ?? 'application/octet-stream',
                 'X-Content-Type-Options' => 'nosniff',
