@@ -194,6 +194,48 @@ class VehicleMaintenancePdfPhotosTest extends TestCase
         $this->assertSame('maintenance-photos/original.jpg', $photos->pathFor($emptyVariant));
     }
 
+    public function test_processed_photo_uses_the_real_display_path_column(): void
+    {
+        [$owner, $vehicle] = $this->ownerWithVehicle(true);
+        $maintenance = $this->maintenanceFor($vehicle, $owner);
+        $processed = MaintenancePhoto::factory()->processed()->create([
+            'maintenance_id' => $maintenance->id,
+            'stage' => MaintenancePhoto::STAGE_AFTER,
+            'created_by' => $owner->id,
+        ]);
+        $legacy = MaintenancePhoto::factory()->create(['maintenance_id' => $maintenance->id, 'created_by' => $owner->id]);
+
+        $photos = app(VehiclePdfMaintenancePhotos::class);
+
+        $this->assertNotNull($processed->display_path);
+        $this->assertSame($processed->display_path, $photos->pathFor($processed->fresh()));
+        $this->assertSame($legacy->path, $photos->pathFor($legacy->fresh()));
+    }
+
+    public function test_webp_display_variant_is_converted_to_jpeg_and_embedded(): void
+    {
+        if (! (gd_info()['WebP Support'] ?? false)) {
+            $this->markTestSkipped('GD sem suporte a WebP.');
+        }
+
+        [$owner, $vehicle] = $this->ownerWithVehicle(true);
+        $maintenance = $this->maintenanceFor($vehicle, $owner);
+        $photo = MaintenancePhoto::factory()->processed()->create([
+            'maintenance_id' => $maintenance->id,
+            'stage' => MaintenancePhoto::STAGE_AFTER,
+            'created_by' => $owner->id,
+        ]);
+        $image = imagecreatetruecolor(1200, 800);
+        imagefilledrectangle($image, 0, 0, 1199, 799, (int) imagecolorallocate($image, 200, 30, 90));
+        ob_start();
+        imagewebp($image, null, 80);
+        imagedestroy($image);
+        // Só a variante WebP existe no storage: o PDF precisa lê-la, não o original.
+        Storage::disk('public')->put($photo->display_path, (string) ob_get_clean());
+
+        $this->assertSame(1, $this->embeddedPhotos($vehicle, $owner));
+    }
+
     public function test_template_renders_captions_and_the_extra_photos_line_with_the_seal_link(): void
     {
         [$owner, $vehicle] = $this->ownerWithVehicle(true);
