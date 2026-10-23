@@ -36,6 +36,8 @@ class UserResource extends JsonResource
             'avatar' => $this->avatar,
             'avatar_url' => $this->avatar_url,
             'subscription_active' => (bool) $this->subscription_active,
+            // null = o proprietário ainda não respondeu se o PDF do histórico leva fotos das OS.
+            'export_include_photos' => $this->export_include_photos,
             'has_two_factor_enabled' => $this->hasTwoFactorEnabled(),
             'vehicles' => $this->whenLoaded('currentVehicles', fn (): Collection => $this->currentVehiclesFor($request)),
             'created_at' => $this->created_at?->toIso8601String(),
