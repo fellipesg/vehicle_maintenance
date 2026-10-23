@@ -2,6 +2,7 @@
 paths:
   - resources/views/pdfs/vehicle_maintenance_export.blade.php
   - app/Services/Vehicle/VehiclePdfMaintenancePhotos.php
+  - app/Services/Vehicle/VehicleMaintenancePdfExporter.php
 ---
 
 # Pdfs
@@ -37,3 +38,6 @@ VehicleMaintenancePdfExporter::generate(..., viewer:) passa o solicitante ao Mai
 VehiclePdfMaintenancePhotos decide. Só entram fotos quando o proprietário ATUAL do veículo tem `users.export_include_photos = true` (nulo = nunca perguntado e falso = não, os dois sem foto; capa não muda). Quem pediu sendo esse dono leva, por OS, o primeiro antes + o primeiro depois do veículo (por `sort`), ou, se faltar o par, o "antes" avulso (OS com "antes" e nenhum "depois") ou os dois primeiros "depois" (OS sem "antes"); qualquer outra pessoa que exporta (lojista em consignação, admin, sem viewer) leva só as públicas (`MaintenancePhoto::isPublicVisible`), no máximo 2. As OS que o MaintenanceRedactor esvaziou continuam sem foto: o serviço só lê a relação `photos` que sobrou, nunca recarrega nem contorna. Teto de MAX_PER_PDF (16) fotos por arquivo, as OS mais recentes primeiro, para o PDF ficar bem abaixo de ~8 MB (o e-mail anexa o arquivo e o merge ainda cola as notas em PDF); o excedente vira "+N fotos no RevisaLog" com o link do selo.
 
 Cada foto sai JPEG de até 900px no maior lado, qualidade 75, sobre fundo branco (o Dompdf não lida bem com WebP), convertida uma por vez e embutida como data URI (mesma regra da capa: nada de caminho em /tmp no src). Prefere `display_path` (variante de exibição) quando a coluna existe e está preenchida, lida por `getAttributes()`, senão `path`. No Blade: `.photo-grid` de 2 colunas abaixo da tabela de itens, `<img>` com width/height explícitos (caixa 300×225) e legenda "Antes"/"Depois"; tr com page-break-inside:avoid, sem tabela aninhada no letterhead nem na faixa.
+
+## Fotos no PDF também pedem o recurso por conta
+Antes do aceite do dono, quem pediu o PDF (`viewer`) precisa ter as fotos das manutenções ligadas (MaintenancePhotoAccess; features.md): sem isso o exportador nem consulta o dono e o PDF sai sem foto de OS. Sem viewer (null) conta como sem recurso. O cartão "PDF do histórico" em /conta e a preferência no PUT /api/v1/me só existem para a conta com o recurso.

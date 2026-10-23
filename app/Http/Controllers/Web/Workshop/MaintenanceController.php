@@ -22,6 +22,7 @@ use App\Services\Maintenance\OwnerlessMaintenanceService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\WorkshopVehicleRegistrar;
 use App\Support\AppStorage;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\WorkshopMaintenanceFilters;
 use App\Support\VehiclePlateSearch;
 use Illuminate\Http\RedirectResponse;
@@ -149,6 +150,8 @@ class MaintenanceController extends Controller
             return redirect()->route('workshop.profile.create')
                 ->with('error', 'Cadastre sua oficina antes de registrar OS.');
         }
+
+        $this->abortUnlessMayUploadPhotos($request);
 
         if ($redirect = $this->prepareInvoiceUploads($request)) {
             return $redirect;
@@ -336,6 +339,8 @@ class MaintenanceController extends Controller
         }
 
         Gate::authorize('update', $maintenance);
+
+        $this->abortUnlessMayUploadPhotos($request);
 
         if ($redirect = $this->prepareInvoiceUploads($request)) {
             return $redirect;
@@ -586,6 +591,25 @@ class MaintenanceController extends Controller
             'itemTemplates' => $templates->where('scope', WarrantyScope::Item)->where('is_active', true)->values(),
             'hasActiveTemplates' => $templates->where('is_active', true)->isNotEmpty(),
         ];
+    }
+
+    /**
+     * Conta sem as fotos das manutenções ligadas (MaintenancePhotoAccess) não envia foto: o
+     * formulário nem mostra a etapa, e quem forjar o envio recebe 403 antes de qualquer gravação.
+     */
+    private function abortUnlessMayUploadPhotos(Request $request): void
+    {
+        if (MaintenancePhotoAccess::allows($request->user())) {
+            return;
+        }
+
+        foreach (array_keys(self::PHOTO_GROUPS) as $field) {
+            $files = $request->file("photos.{$field}", []);
+
+            if (is_array($files) ? array_filter($files) !== [] : $files !== null) {
+                abort(403, 'As fotos das manutenções não estão ativas nesta conta.');
+            }
+        }
     }
 
     private function storePhotosFromRequest(Request $request, Maintenance $maintenance, User $user): void

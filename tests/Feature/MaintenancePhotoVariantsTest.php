@@ -27,6 +27,7 @@ class MaintenancePhotoVariantsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
 
         Storage::fake('public');
 

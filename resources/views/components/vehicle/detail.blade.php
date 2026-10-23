@@ -102,8 +102,9 @@
     }
 
     // OS de oficina sem proprietário: forma mínima para quem não é a oficina autora; as ocultadas
-    // pelo proprietário saem (App\Support\Maintenance\MaintenanceRedactor).
-    $detailMaintenances = \App\Support\Maintenance\MaintenanceRedactor::redactAll($detailMaintenances, auth()->user());
+    // pelo proprietário saem (App\Support\Maintenance\MaintenanceRedactor). Nos portais, quem não tem as
+    // fotos das manutenções ligadas não as recebe; a busca pública (sem portal) segue com as públicas.
+    $detailMaintenances = \App\Support\Maintenance\MaintenanceRedactor::redactAll($detailMaintenances, auth()->user(), publicLookup: $detailPortal === null);
 
     $detailHistory = VehicleMaintenanceHistory::inTimelineOrder($detailMaintenances);
     $detailById = $detailHistory->keyBy('id');

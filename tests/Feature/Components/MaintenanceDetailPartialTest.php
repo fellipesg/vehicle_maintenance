@@ -25,6 +25,12 @@ class MaintenanceDetailPartialTest extends TestCase
     use InspectsUiMarkup;
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
+
     public function test_detail_shows_seal_service_data_warranty_items_invoices_and_photos(): void
     {
         $vehicle = Vehicle::factory()->create(['brand' => 'Toyota', 'model' => 'Corolla', 'license_plate' => 'COR0L23']);

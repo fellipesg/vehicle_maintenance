@@ -16,3 +16,6 @@ VehiclePolicy::link allows the current owner, and any account when no other tena
 
 ## OS sem proprietário: oculta e anexos pendentes
 MaintenancePolicy::view nega a OS oculta (hidden_from_public_at) para quem não é a oficina autora nem quem ocultou. InvoicePolicy::view nega a nota enquanto Maintenance::hidesAttachmentsFrom (OS sem dono sem aceite do proprietário), exceto para a oficina autora e para o dono atual com posse comprovada (prévia, ver models.md); o dono sem comprovação continua de fora. Só o dono atual (VehiclePolicy::update) decide (MaintenanceOwnerDecisionService::decide).
+
+## Fotos: o recurso por conta vem antes de tudo
+MaintenancePhotoPolicy::view/create/delete negam primeiro quando a conta não tem as fotos das manutenções (App\Support\Maintenance\MaintenancePhotoAccess, flag Pennant ligada pelo admin; ver features.md) e só depois seguem a MaintenancePolicy. O envio pela API passa por `create` (StoreMaintenancePhotoRequest). Foto negada nunca ganha URL assinada, e as rotas autorizadas (API e web) respondem 403.

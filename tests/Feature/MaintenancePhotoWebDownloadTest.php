@@ -22,6 +22,7 @@ class MaintenancePhotoWebDownloadTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
         Storage::fake('public');
     }
 

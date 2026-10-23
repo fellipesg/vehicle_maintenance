@@ -51,3 +51,6 @@ InvoicePolicy::view. Não volte a usar AppStorage::url($invoice->file_path): no 
 arquivo abre sem login e, no S3/R2, a URL assinada é compartilhável. A rota serve só PDF na aba
 (Content-Disposition inline); XML e o resto baixam, com nosniff e CSP sandbox, porque o arquivo é do
 cliente.
+
+## Fotos só aparecem para quem tem o recurso ligado
+Telas de portal não mostram foto, contagem de fotos nem etapa de envio quando a conta não tem as fotos das manutenções (MaintenancePhotoAccess, features.md): MaintenanceRedactor tira `photos` e zera `photos_count` (parâmetro `publicLookup` só na busca pública), `x-provenance-card` esconde a contagem de quem está logado sem o recurso (a consulta pública, `expandable`, não muda), o formulário da oficina não inclui `partials.maintenance-photos-form` e o servidor responde 403 a um envio forjado. A busca pública por placa continua com as fotos públicas.

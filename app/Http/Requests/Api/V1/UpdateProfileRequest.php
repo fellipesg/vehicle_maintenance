@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use Illuminate\Validation\Validator;
 
 class UpdateProfileRequest extends ApiFormRequest
@@ -54,6 +55,11 @@ class UpdateProfileRequest extends ApiFormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            // A preferência do PDF só existe para a conta com as fotos das manutenções ligadas.
+            if ($this->has('export_include_photos') && ! MaintenancePhotoAccess::allows($this->user())) {
+                $validator->errors()->add('export_include_photos', 'The export_include_photos field is not available for this account.');
+            }
+
             foreach (self::FORBIDDEN_FIELDS as $field) {
                 if ($this->has($field)) {
                     $validator->errors()->add($field, "The {$field} field cannot be updated here.");

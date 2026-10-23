@@ -27,6 +27,7 @@ class MaintenancePhotoWebVariantsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
 
         Storage::fake('public');
         $this->travelTo(now()->startOfHour()->addMinutes(3));

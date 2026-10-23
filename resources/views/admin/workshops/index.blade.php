@@ -81,6 +81,7 @@
                 <th class="min-w-60" data-sort="cidade">Endereço</th>
                 <th class="text-right" data-sort="selos" data-sort-default="desc">Manutenções com selo</th>
                 <th>Localização</th>
+                <th>Fotos das manutenções</th>
                 <th class="text-right"><span class="sr-only">Ações</span></th>
             </tr>
         </x-slot:head>
@@ -110,6 +111,13 @@
                         <x-ui.badge variant="success" icon="map-pin">No mapa</x-ui.badge>
                     @else
                         <x-ui.badge variant="warning" icon="exclamation-triangle">Sem coordenadas</x-ui.badge>
+                    @endif
+                </td>
+                <td data-slot="maintenance-photos-status">
+                    @if(\App\Support\Maintenance\MaintenancePhotoAccess::isActiveFor($workshop))
+                        <x-ui.badge variant="success" icon="photo">Ligadas</x-ui.badge>
+                    @else
+                        <x-ui.badge variant="neutral">Desligadas</x-ui.badge>
                     @endif
                 </td>
                 <td class="py-2 text-right">

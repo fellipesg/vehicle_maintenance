@@ -2,6 +2,7 @@
 paths:
   - 'app/Services/User/**'
   - 'app/Models/User.php'
+  - 'app/Http/Requests/Web/Account/UpdateAccountPreferencesRequest.php'
 ---
 
 # User
@@ -23,3 +24,6 @@ que fala só do veículo — nunca repete o contato recém-apagado.
 
 ## Preferência do PDF mora em users.export_include_photos
 Coluna booleana nullable (null = nunca perguntado), no cast `boolean` e em `$fillable`. Quem lê é o VehiclePdfMaintenancePhotos, sobre o proprietário atual do veículo, e não sobre quem pediu o PDF. Não é PII: a exclusão de conta não precisa limpá-la.
+
+## Preferência do PDF só para quem tem as fotos ligadas
+O cartão "PDF do histórico" em /conta e o PUT /conta/preferencias exigem as fotos das manutenções ligadas na conta (UpdateAccountPreferencesRequest::authorize; MaintenancePhotoAccess, features.md). Sem o recurso o cartão some e o PUT responde 403.

@@ -56,6 +56,13 @@
                     <x-ui.alert variant="info" class="mt-3" title="Observação da análise">{{ $garage->review_notes }}</x-ui.alert>
                 @endif
 
+                <x-admin.maintenance-photos-toggle
+                    class="mt-4 border-t border-border pt-4"
+                    :action="route('admin.garages.maintenance-photos', $garage)"
+                    :enabled="\App\Support\Maintenance\MaintenancePhotoAccess::isActiveFor($garage)"
+                    subject="a loja"
+                />
+
                 <div class="mt-4 flex flex-wrap items-center gap-2">
                     @if($garage->status !== GarageStatus::Approved)
                         <form method="POST" action="{{ route('admin.garages.approve', $garage) }}">

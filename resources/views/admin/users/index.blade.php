@@ -115,6 +115,9 @@
                         @if($account->is_admin)
                             <x-ui.badge variant="info" size="sm" icon="shield-check">Administrador</x-ui.badge>
                         @endif
+                        @if(\App\Support\Maintenance\MaintenancePhotoAccess::allows($account))
+                            <x-ui.badge variant="success" size="sm" icon="photo" data-slot="maintenance-photos-badge">Fotos</x-ui.badge>
+                        @endif
                     </span>
                 </td>
                 <td class="text-right">{{ $formatCount((int) $account->current_vehicles_count) }}</td>

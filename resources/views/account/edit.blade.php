@@ -57,7 +57,7 @@
                 </form>
             </x-ui.card>
 
-            @if($user->isUser())
+            @if($user->isUser() && \App\Support\Maintenance\MaintenancePhotoAccess::allows($user))
                 <x-ui.card as="section" id="preferencias" title="PDF do histórico" description="Vale para o PDF do histórico dos veículos que estão na sua conta." heading-level="h2">
                     <form method="POST" action="{{ route('account.preferences') }}" class="space-y-4">
                         @csrf

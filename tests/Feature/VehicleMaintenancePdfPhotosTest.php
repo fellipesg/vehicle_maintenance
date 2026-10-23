@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Features\MaintenancePhotos;
 use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Services\Vehicle\VehiclePdfMaintenancePhotos;
 use App\Support\DemoWarrantyPdfValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Pennant\Feature;
 use Tests\TestCase;
 
 /**
@@ -26,6 +28,7 @@ class VehicleMaintenancePdfPhotosTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
 
         Storage::fake('public');
         $this->fakeCoversDisk('r2');
@@ -104,14 +107,28 @@ class VehicleMaintenancePdfPhotosTest extends TestCase
         $this->assertSame(1, $selection[$maintenance->id]['eligible']);
     }
 
-    public function test_requester_without_a_user_gets_only_public_photos(): void
+    public function test_requester_without_a_user_gets_no_photos_because_they_lack_the_feature(): void
     {
         [$owner, $vehicle] = $this->ownerWithVehicle(true);
         $maintenance = $this->maintenanceFor($vehicle, $owner);
         $this->photo($maintenance, MaintenancePhoto::STAGE_BEFORE, sort: 0);
         $this->photo($maintenance, MaintenancePhoto::STAGE_AFTER, sort: 1);
 
-        $this->assertSame(1, $this->embeddedPhotos($vehicle, null, masked: true));
+        $this->assertSame(0, $this->embeddedPhotos($vehicle, null, masked: true));
+    }
+
+    public function test_no_photos_when_the_requester_lacks_the_feature_even_if_the_owner_opted_in(): void
+    {
+        [$owner, $vehicle] = $this->ownerWithVehicle(true);
+        $maintenance = $this->maintenanceFor($vehicle, $owner);
+        $this->photo($maintenance, MaintenancePhoto::STAGE_BEFORE, sort: 0);
+        $this->photo($maintenance, MaintenancePhoto::STAGE_AFTER, sort: 1);
+
+        $this->assertSame(2, $this->embeddedPhotos($vehicle, $owner));
+
+        Feature::for($owner)->deactivate(MaintenancePhotos::class);
+
+        $this->assertSame(0, $this->embeddedPhotos($vehicle, $owner->fresh()));
     }
 
     public function test_no_maintenance_photos_when_the_preference_is_false_or_null(): void
