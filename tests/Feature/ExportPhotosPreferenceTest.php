@@ -14,6 +14,12 @@ class ExportPhotosPreferenceTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
+
     public function test_preference_is_null_until_the_owner_answers(): void
     {
         $user = User::factory()->asUser()->create()->refresh();

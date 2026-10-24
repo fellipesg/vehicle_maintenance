@@ -7,6 +7,7 @@ use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\MaintenancePhotoPreview;
 use App\Support\Maintenance\MaintenanceRedactor;
 use Illuminate\Support\Collection;
@@ -43,7 +44,7 @@ class VehicleTimelineBuilder
         $viewer ??= auth()->user();
         $maintenances = MaintenanceRedactor::redactAll($vehicle->maintenances, $viewer);
         $maintenances->each(fn ($maintenance) => $maintenance->setRelation('vehicle', $vehicle));
-        $photosByMaintenance = $this->photosByMaintenance($maintenances);
+        $photosByMaintenance = MaintenancePhotoAccess::allows($viewer) ? $this->photosByMaintenance($maintenances) : new Collection;
 
         $events = [];
         $currentKm = (int) ($vehicle->current_kilometers ?? 0);
@@ -210,7 +211,8 @@ class VehicleTimelineBuilder
      */
     private function photoSummary(Maintenance $maintenance, Collection $photos, ?User $viewer): array
     {
-        if ($photos->isEmpty()) {
+        // Sem as fotos das manutenções ligadas na conta: nada de contagem, cadeado nem prévia.
+        if ($photos->isEmpty() || ! MaintenancePhotoAccess::allows($viewer)) {
             return ['photos_count' => 0, 'photos_locked' => false, 'photo_preview' => []];
         }
 

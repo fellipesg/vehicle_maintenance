@@ -7,6 +7,7 @@ use App\Models\MaintenancePhoto;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Support\AppStorage;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\MaintenanceRedactor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Adapter\CPDF;
@@ -64,8 +65,11 @@ class VehicleMaintenancePdfExporter
      */
     public function generate(Vehicle $vehicle, bool $maskIdentifiers = false, ?User $viewer = null): array
     {
-        // Fotos das OS só quando o proprietário atual autorizou (VehiclePdfMaintenancePhotos).
-        $photoOwner = $this->maintenancePhotos->ownerAllowingPhotos($vehicle);
+        // Fotos das OS só quando quem pediu o PDF tem as fotos das manutenções ligadas na conta
+        // (MaintenancePhotoAccess) e o proprietário atual autorizou (VehiclePdfMaintenancePhotos).
+        $photoOwner = MaintenancePhotoAccess::allows($viewer)
+            ? $this->maintenancePhotos->ownerAllowingPhotos($vehicle)
+            : null;
 
         $relations = [
             'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),

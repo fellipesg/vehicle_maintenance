@@ -16,6 +16,12 @@ class MaintenancePhotoTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
+
     public function test_workshop_can_upload_before_and_after_vehicle_and_part_photos(): void
     {
         Storage::fake('public');

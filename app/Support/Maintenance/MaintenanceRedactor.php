@@ -12,21 +12,23 @@ use Illuminate\Support\Collection;
  * categoria/tipo, nomes dos itens, oficina e selo: sem descrição livre, valores nem garantias.
  * Notas e fotos só aparecem depois do aceite. Só a oficina autora vê tudo.
  *
+ * Também tira as fotos de quem não tem as fotos das manutenções ligadas (MaintenancePhotoAccess),
+ * em qualquer OS. A única exceção é a consulta pública por placa ($publicLookup), que mostra as
+ * fotos públicas (veículo, depois) a qualquer visitante, com ou sem o recurso.
+ *
  * Trabalha numa cópia em memória (clone): nunca grava, e as telas e resources continuam lendo as
  * relações de sempre.
  */
 final class MaintenanceRedactor
 {
-    public static function redact(Maintenance $maintenance, ?User $viewer): Maintenance
+    public static function redact(Maintenance $maintenance, ?User $viewer, bool $publicLookup = false): Maintenance
     {
-        if (! $maintenance->isOwnerlessRecord()) {
-            return $maintenance;
-        }
+        $isOwnerless = $maintenance->isOwnerlessRecord();
+        $hideDetails = $isOwnerless && $maintenance->hidesDetailsFrom($viewer);
+        $hideAttachments = $isOwnerless && $maintenance->hidesAttachmentsFrom($viewer);
+        $hidePhotos = ! $publicLookup && ! MaintenancePhotoAccess::allows($viewer);
 
-        $hideDetails = $maintenance->hidesDetailsFrom($viewer);
-        $hideAttachments = $maintenance->hidesAttachmentsFrom($viewer);
-
-        if (! $hideDetails && ! $hideAttachments) {
+        if (! $hideDetails && ! $hideAttachments && ! $hidePhotos) {
             return $maintenance;
         }
 
@@ -54,8 +56,11 @@ final class MaintenanceRedactor
 
         if ($hideAttachments) {
             $copy->setRelation('invoices', new Collection);
-            $copy->setRelation('photos', new Collection);
             $copy->setAttribute('invoices_count', 0);
+        }
+
+        if ($hideAttachments || $hidePhotos) {
+            $copy->setRelation('photos', new Collection);
             $copy->setAttribute('photos_count', 0);
         }
 
@@ -66,11 +71,11 @@ final class MaintenanceRedactor
      * @param  iterable<int, Maintenance>  $maintenances
      * @return Collection<int, Maintenance>
      */
-    public static function redactAll(iterable $maintenances, ?User $viewer): Collection
+    public static function redactAll(iterable $maintenances, ?User $viewer, bool $publicLookup = false): Collection
     {
         return Collection::make($maintenances)
             ->reject(fn (Maintenance $maintenance): bool => $maintenance->hiddenFrom($viewer))
-            ->map(fn (Maintenance $maintenance): Maintenance => self::redact($maintenance, $viewer))
+            ->map(fn (Maintenance $maintenance): Maintenance => self::redact($maintenance, $viewer, $publicLookup))
             ->values();
     }
 }

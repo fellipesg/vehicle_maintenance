@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\MaintenanceRedactor;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -15,7 +16,8 @@ class MaintenanceResource extends JsonResource
     public function toArray(Request $request): array
     {
         // OS de oficina sem proprietário: forma mínima (sem descrição, valores, garantias, notas e
-        // fotos) para quem não é a oficina autora. Cópia em memória, nada é gravado.
+        // fotos) para quem não é a oficina autora. Quem não tem as fotos das manutenções ligadas
+        // (MaintenancePhotoAccess) também não recebe fotos. Cópia em memória, nada é gravado.
         $maintenance = MaintenanceRedactor::redact($this->resource, $request->user());
         $isOwnerless = $maintenance->isOwnerlessRecord();
 
@@ -93,6 +95,11 @@ class MaintenanceResource extends JsonResource
     {
         $total = $this->totalPhotos();
 
+        // Conta sem as fotos das manutenções ligadas: o campo existe (o app não quebra) e vale 0.
+        if ($total !== null && ! MaintenancePhotoAccess::allows($request->user())) {
+            return 0;
+        }
+
         if ($total === null || $this->photosLocked($request) || $this->resource->exposesAllPhotosTo($request->user())) {
             return $total;
         }
@@ -107,7 +114,9 @@ class MaintenanceResource extends JsonResource
      */
     private function photosLocked(Request $request): bool
     {
-        return ($this->totalPhotos() ?? 0) > 0 && $this->resource->hidesAttachmentsFrom($request->user());
+        return ($this->totalPhotos() ?? 0) > 0
+            && MaintenancePhotoAccess::allows($request->user())
+            && $this->resource->hidesAttachmentsFrom($request->user());
     }
 
     private function totalPhotos(): ?int

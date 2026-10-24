@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\Admin\ConsignmentController as AdminConsignmentCont
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Web\Admin\GarageController as AdminGarageController;
 use App\Http\Controllers\Web\Admin\MaintenanceController as AdminMaintenanceController;
+use App\Http\Controllers\Web\Admin\MaintenancePhotosFeatureController as AdminMaintenancePhotosFeatureController;
 use App\Http\Controllers\Web\Admin\MapController as AdminMapController;
 use App\Http\Controllers\Web\Admin\OutreachController as AdminOutreachController;
 use App\Http\Controllers\Web\Admin\UserController as AdminUserController;
@@ -318,10 +319,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('/usuarios', [AdminUserController::class, 'index'])->name('users.index');
         Route::get('/usuarios/{user}', [AdminUserController::class, 'show'])->name('users.show');
+        Route::put('/usuarios/{user}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'user'])->name('users.maintenance-photos');
         Route::get('/veiculos', [AdminVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
+        Route::put('/oficinas/{workshop}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'workshop'])->name('workshops.maintenance-photos');
         Route::get('/prospeccao', [AdminOutreachController::class, 'index'])->name('outreach.index');
         Route::post('/prospeccao/importar', [AdminOutreachController::class, 'import'])->name('outreach.import');
         Route::post('/prospeccao/pausar', [AdminOutreachController::class, 'pause'])->name('outreach.pause');
@@ -331,6 +334,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/prospeccao/{prospect}/devolvido', [AdminOutreachController::class, 'markBounced'])->name('outreach.bounced');
         Route::post('/prospeccao/{prospect}/descadastrar', [AdminOutreachController::class, 'unsubscribe'])->name('outreach.unsubscribe');
         Route::get('/lojas', [AdminGarageController::class, 'index'])->name('garages.index');
+        Route::put('/lojas/{garage}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'garage'])->name('garages.maintenance-photos');
         Route::post('/lojas/{garage}/aprovar', [AdminGarageController::class, 'approve'])->name('garages.approve');
         Route::post('/lojas/{garage}/recusar', [AdminGarageController::class, 'reject'])->name('garages.reject');
         Route::get('/consignacoes', [AdminConsignmentController::class, 'index'])->name('consignments.index');

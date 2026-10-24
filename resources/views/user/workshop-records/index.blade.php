@@ -59,7 +59,7 @@
                         @endif
                         @if ($hasFiles)
                             <p class="text-sm text-muted-foreground" data-record-attachments>
-                                A oficina anexou {{ $record->invoices->count() }} {{ $record->invoices->count() === 1 ? 'nota fiscal' : 'notas fiscais' }} e {{ $record->photos->count() }} {{ $record->photos->count() === 1 ? 'foto' : 'fotos' }}.
+                                A oficina anexou {{ $record->invoices->count() }} {{ $record->invoices->count() === 1 ? 'nota fiscal' : 'notas fiscais' }}@if(\App\Support\Maintenance\MaintenancePhotoAccess::allows(auth()->user())) e {{ $record->photos->count() }} {{ $record->photos->count() === 1 ? 'foto' : 'fotos' }}@endif.
                                 Eles podem conter dados pessoais, por isso só entram no seu histórico se você aceitar.
                                 Sem aceite em {{ config('maintenance.pending_attachments_retention_days', 90) }} dias, são apagados.
                             </p>

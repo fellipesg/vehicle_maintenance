@@ -22,6 +22,12 @@ class WorkshopMaintenanceFormPageTest extends TestCase
     use InspectsWorkshopPages;
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
+
     public function test_first_visit_shows_only_the_plate_step_in_its_own_get_form(): void
     {
         $user = $this->workshopUser();

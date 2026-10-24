@@ -4,6 +4,7 @@ namespace App\Http\Resources\Api\V1;
 
 use App\Models\Maintenance;
 use App\Services\Maintenance\MaintenanceOwnerDecisionService;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Vehicle\VehicleIdentifierMask;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -50,7 +51,7 @@ class WorkshopRecordResource extends JsonResource
             'verification_code' => $this->verification_code,
             'attachments' => [
                 'invoices' => $pendingAttachments ? $this->invoices->count() : 0,
-                'photos' => $pendingAttachments ? $this->photos->count() : 0,
+                'photos' => $pendingAttachments && MaintenancePhotoAccess::allows($request->user()) ? $this->photos->count() : 0,
             ],
             'owner_status' => $this->owner_status,
             'attachments_status' => $this->attachments_status,

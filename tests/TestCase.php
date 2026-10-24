@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Features\MaintenancePhotos;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Support\SanctumMobileToken;
@@ -9,6 +10,7 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Pennant\Feature;
 use Laravel\Sanctum\Sanctum;
 use RuntimeException;
 
@@ -56,6 +58,17 @@ abstract class TestCase extends BaseTestCase
             .'(vendor/bin/phpunit --configuration=phpunit.pgsql.xml; `artisan test` recusa a opção). '
             .'Dentro do Docker, confira se os DB_* estão repetidos em <server> na configuração do PHPUnit.',
         );
+    }
+
+    /**
+     * Liga as fotos das manutenções para todas as contas do teste. As fotos são uma funcionalidade
+     * desligada por padrão (App\Features\MaintenancePhotos); os testes que exercitam a foto em si,
+     * e não a liberação por conta, chamam isto no setUp. Quem testa a liberação usa
+     * Feature::for($conta)->activate(MaintenancePhotos::class).
+     */
+    protected function enableMaintenancePhotosForEveryone(): void
+    {
+        Feature::define((new MaintenancePhotos)->name, fn (): bool => true);
     }
 
     protected function fakeCoversDisk(string $disk = 'covers'): void

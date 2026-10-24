@@ -6,6 +6,7 @@ use App\Enums\GarageStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Garage;
 use App\Services\Garage\GarageReview;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,8 @@ class GarageController extends Controller
             ->orderByDesc('updated_at')
             ->paginate(self::PER_PAGE)
             ->withQueryString();
+
+        MaintenancePhotoAccess::preload($garages->getCollection());
 
         return view('admin.garages.index', [
             'garages' => $garages,

@@ -3,6 +3,8 @@ paths:
   - 'app/Http/Controllers/Api/**'
   - app/Http/Controllers/Api/VehicleController.php
   - app/Http/Controllers/Api/AuthController.php
+  - app/Http/Resources/Api/V1/MaintenanceResource.php
+  - app/Http/Resources/Api/V1/UserResource.php
   - app/Support/Maintenance/MaintenancePhotoUrls.php
   - app/Http/Resources/Api/V1/MaintenancePhotoResource.php
 ---
@@ -83,3 +85,8 @@ foto não pública, a rota não serve: o caminho é uma URL assinada de vida cur
 
 ## Preferência de fotos no PDF: GET/PUT /api/v1/me
 `export_include_photos` (true | false | null) vem em UserResource, logo em GET /api/v1/me, login e PUT /api/v1/me. Nulo = o proprietário nunca respondeu (o app pergunta uma vez). O PUT aceita só esse campo (`sometimes|boolean`, `name` também é `sometimes`, então atualização parcial funciona) e recusa null e texto com 422. Só vale para a conta de proprietário; o PDF consulta a preferência do dono ATUAL do veículo (.ai/rules/pdfs.md). Na web é o cartão "PDF do histórico" em /conta (PUT /conta/preferencias, só `user.type:user`).
+
+## Fotos só para quem tem o recurso ligado
+Sem as fotos das manutenções na conta (flag por conta, features.md): POST /maintenances/{m}/photos responde 403; MaintenanceResource devolve `photos` vazio, `photos_count` 0 e `photos_locked` false (o campo continua existindo); a linha do tempo devolve `photos_count` 0, `photos_locked` false e `photo_preview` vazio; as rotas autorizadas respondem 403 e nenhuma URL assinada é emitida (uma URL já emitida vale até expirar, no máximo 20 minutos, porque a rota assinada não tem usuário). `attachments.photos` dos registros de oficina vira 0. A busca pública por placa (GET /vehicles/search/{identifier}) é a exceção documentada: segue com as fotos públicas, com ou sem o recurso.
+
+`GET /api/v1/me`, login e cadastro trazem `features: {"maintenance_photos": true|false}` em UserResource (só na própria conta, nunca no autor de uma OS aninhada), para o app esconder a interface. `export_include_photos` continua no payload, mas o PUT /me o recusa com 422 quando a conta não tem o recurso.

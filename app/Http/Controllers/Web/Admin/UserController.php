@@ -6,6 +6,7 @@ use App\Enums\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -78,6 +79,12 @@ class UserController extends Controller
             ->paginate(25)
             ->withQueryString();
 
+        // Selo "Fotos" da lista: o valor de conta, oficina e loja da página, sem uma consulta por linha.
+        $users->getCollection()->load(['workshop', 'garage']);
+        MaintenancePhotoAccess::preload($users->getCollection()->flatMap(
+            fn (User $account): array => MaintenancePhotoAccess::scopesOf($account),
+        ));
+
         return view('admin.users.index', [
             'users' => $users,
             'search' => $search,
@@ -119,7 +126,16 @@ class UserController extends Controller
         $workshop = $portal === Portal::Workshop ? $user->workshop()->first() : null;
         $garage = $portal === Portal::Dealer ? $user->garage()->first() : null;
 
+        // Fotos das manutenções: o valor de cada escopo (conta, oficina, loja) e o efetivo da conta.
+        $user->setRelation('workshop', $workshop)->setRelation('garage', $garage);
+
         return view('admin.users.show', [
+            'photosFeature' => [
+                'user' => MaintenancePhotoAccess::isActiveFor($user),
+                'workshop' => $workshop === null ? null : MaintenancePhotoAccess::isActiveFor($workshop),
+                'garage' => $garage === null ? null : MaintenancePhotoAccess::isActiveFor($garage),
+                'effective' => MaintenancePhotoAccess::allows($user),
+            ],
             'user' => $user,
             'portal' => $portal,
             'currentVehicles' => $currentVehicles,
