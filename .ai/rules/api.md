@@ -35,9 +35,10 @@ está vazio: o e-mail fala em nome da loja e mostraria o endereço de outro luga
 
 As colunas de endereço em `users` continuam existindo para o **proprietário**: `GET /api/v1/me` e
 `PUT /api/v1/me` as expõem, o app as edita em "Meus Dados", `geo:geocode-addresses` as geocodifica e
-o mapa `admin.maps.users` as mostra — filtrando `user_type = 'user'`. Em conta de garagem ou de
-oficina o mesmo dado é escrito, geocodificado e exibido em lugar nenhum: a decisão é que a seção
-Endereço de "Meus Dados" sai do app para essas duas, e esse tipo de edição acontece só na web.
+o mapa `admin.maps.users` as mostra. As duas últimas filtram `user_type = 'user'`: em conta de
+garagem ou de oficina o mesmo dado é escrito e exibido em lugar nenhum, e geocodificá-lo só gastaria
+chamada do Nominatim. A decisão é que a seção Endereço de "Meus Dados" sai do app para essas duas, e
+esse tipo de edição acontece só na web.
 
 Ordem obrigatória ao executar: **app primeiro, backend depois**. Tirar os campos de
 `UpdateProfileRequest` ou de `UserResource` antes de o app parar de enviá-los faz a tela "salvar" sem
