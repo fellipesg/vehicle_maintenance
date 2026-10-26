@@ -13,6 +13,12 @@ class VehiclePolicy
         return $user->tenant_id !== null;
     }
 
+    /**
+     * Abrir a ficha do veículo. O lojista em consignação entra aqui desde a declaração, então isto
+     * **não** autoriza registro nenhum do histórico: para manutenção, foto e nota vale
+     * Maintenance::isVisibleInHistoryTo (quem vê na listagem), e para o histórico anterior,
+     * viewFullHistory.
+     */
     public function view(User $user, Vehicle $vehicle): bool
     {
         if ($user->isAdmin()) {
