@@ -18,8 +18,10 @@ use Throwable;
  *
  * O log local fica fora de qualquer janela — é barato e é ele que mostra quantas vezes a pessoa
  * tentou. Só o evento no Sentry e o e-mail ao suporte são limitados, por duas portas: uma janela
- * por falha e por conta (shouldAlert) e um teto global por falha (withinGlobalCap). O contexto não
- * leva o e-mail de quem enviou — o id da conta basta para achar o documento.
+ * por falha e por conta (isFirstFailureInWindow) e um teto global por falha (withinGlobalCap).
+ * Aviso que o teto global engoliu devolve a janela da conta e sai no log: nenhuma falha real fica
+ * invisível. O contexto não leva o e-mail de quem enviou nem o nome do arquivo escolhido pelo
+ * cliente — só o id da conta, a extensão, o tamanho e um hash curto do conteúdo.
  */
 class CrlvImportFailureReporter
 {
@@ -51,6 +53,22 @@ class CrlvImportFailureReporter
      */
     public const GLOBAL_ALERTS_PER_WINDOW = 10;
 
+    /**
+     * Mensagem do log quando o teto global cala o aviso. O suporte conta por ela quantas falhas
+     * ficaram sem e-mail na janela.
+     *
+     * @var string
+     */
+    public const GLOBAL_CAP_LOG_MESSAGE = 'Aviso de CRLV-e não enviado: teto global da janela atingido.';
+
+    /**
+     * Caracteres do hash do conteúdo que vão no contexto: o bastante para juntar envios do mesmo
+     * PDF sem virar um identificador do documento.
+     *
+     * @var int
+     */
+    private const FILE_HASH_LENGTH = 12;
+
     public function report(
         Throwable $exception,
         ?UploadedFile $file,
@@ -59,8 +77,9 @@ class CrlvImportFailureReporter
     ): void {
         $context = [
             'origem' => $origin,
-            'arquivo' => $file?->getClientOriginalName(),
+            'extensao' => $this->fileExtension($file),
             'tamanho_kb' => $file ? (int) round($file->getSize() / 1024) : null,
+            'hash_arquivo' => $this->fileHash($file),
             'usuario_id' => $user?->getAuthIdentifier(),
         ];
 
@@ -68,7 +87,14 @@ class CrlvImportFailureReporter
 
         $fingerprint = $this->accountFingerprint($exception, $user);
 
-        if (! $this->shouldAlert($fingerprint, $exception)) {
+        if (! $this->isFirstFailureInWindow($fingerprint)) {
+            return;
+        }
+
+        if (! $this->withinGlobalCap($exception)) {
+            $this->reopenWindow($fingerprint);
+            $this->logGlobalCapSuppression($exception, $context);
+
             return;
         }
 
@@ -81,7 +107,7 @@ class CrlvImportFailureReporter
 
     /**
      * Fora da janela de propósito: o log é local, não custa cota nem caixa de entrada, e é o que
-     * diz ao suporte se a pessoa tentou uma vez ou vinte, e com quais arquivos.
+     * diz ao suporte se a pessoa tentou uma vez ou vinte.
      *
      * @param  array<string, mixed>  $context
      */
@@ -109,19 +135,19 @@ class CrlvImportFailureReporter
     }
 
     /**
-     * Primeira ocorrência da falha nesta conta e ainda dentro do teto global. Cache fora do ar
-     * não pode calar o aviso: a rota já está limitada por throttle:uploads.
+     * Primeira ocorrência da falha nesta conta, e é esta chamada que fecha a janela. O teto global
+     * é consultado depois, só para quem passou por aqui: assim uma conta que reenvia o mesmo PDF
+     * em loop não gasta os créditos globais de outras contas. Cache fora do ar não pode calar o
+     * aviso: a rota já está limitada por throttle:uploads.
      */
-    private function shouldAlert(string $fingerprint, Throwable $exception): bool
+    private function isFirstFailureInWindow(string $fingerprint): bool
     {
         try {
-            $firstForAccount = Cache::add(
+            return (bool) Cache::add(
                 self::DEDUPE_KEY_PREFIX.$fingerprint,
                 true,
                 now()->addMinutes(self::DEDUPE_WINDOW_MINUTES),
             );
-
-            return $firstForAccount && $this->withinGlobalCap($exception);
         } catch (Throwable $cacheFailure) {
             Log::warning('Falha ao deduplicar aviso de CRLV-e.', [
                 'erro' => $cacheFailure->getMessage(),
@@ -134,18 +160,32 @@ class CrlvImportFailureReporter
     /**
      * Teto por falha somando todas as contas: um layout novo de DETRAN que chega a centenas de
      * pessoas no mesmo dia rende os primeiros avisos, não uma caixa de entrada inteira. A janela
-     * por conta sozinha não segura isso, porque a conta entra na chave.
+     * por conta sozinha não segura isso, porque a conta entra na chave. Teto estourado não gasta
+     * crédito (RateLimiter::attempt não incrementa), então reavaliar a próxima falha é barato e
+     * não empurra a janela global para frente.
+     *
+     * O limitador mora no cache (sem `cache.limiter`, no store padrão): store fora do ar não cala o
+     * aviso nem derruba quem está cadastrando — o `report()` é chamado de dentro do `catch` do
+     * controller, e uma exceção aqui trocaria o erro na tela por um 500.
      */
     private function withinGlobalCap(Throwable $exception): bool
     {
         $key = self::GLOBAL_KEY_PREFIX.sha1($exception::class.'|'.$this->normalizedMessage($exception));
 
-        return (bool) RateLimiter::attempt(
-            $key,
-            self::GLOBAL_ALERTS_PER_WINDOW,
-            static fn (): bool => true,
-            self::DEDUPE_WINDOW_MINUTES * 60,
-        );
+        try {
+            return (bool) RateLimiter::attempt(
+                $key,
+                self::GLOBAL_ALERTS_PER_WINDOW,
+                static fn (): bool => true,
+                self::DEDUPE_WINDOW_MINUTES * 60,
+            );
+        } catch (Throwable $limiterFailure) {
+            Log::warning('Falha ao aplicar o teto global do aviso de CRLV-e.', [
+                'erro' => $limiterFailure->getMessage(),
+            ]);
+
+            return true;
+        }
     }
 
     private function normalizedMessage(Throwable $exception): string
@@ -154,9 +194,31 @@ class CrlvImportFailureReporter
     }
 
     /**
-     * Despacho que falhou não gasta a janela: sem isso, um tropeço da fila na primeira ocorrência
-     * de um layout novo calava o aviso por uma hora e o suporte nunca ficava sabendo. O teto
-     * global não é devolvido — é um crédito em dez, e a rota já está limitada.
+     * Aviso que o teto global engoliu fica no log com a falha inteira: é por ele que se vê que o
+     * suporte parou de receber e-mail porque o teto encheu, e não porque as falhas acabaram.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function logGlobalCapSuppression(Throwable $exception, array $context): void
+    {
+        try {
+            Log::warning(self::GLOBAL_CAP_LOG_MESSAGE, $context + [
+                'falha' => $exception::class,
+                'motivo' => $exception->getMessage(),
+                'teto_por_janela' => self::GLOBAL_ALERTS_PER_WINDOW,
+            ]);
+        } catch (Throwable $logFailure) {
+            // Sem log não há onde registrar a supressão; a falha em si já foi registrada acima.
+        }
+    }
+
+    /**
+     * Devolve a janela da conta quando o aviso não saiu: despacho que falhou (sem isso, um tropeço
+     * da fila na primeira ocorrência de um layout novo calava o aviso por uma hora e o suporte
+     * nunca ficava sabendo) e aviso barrado pelo teto global (sem isso, a conta suprimida no
+     * minuto em que o teto encheu ficava calada o resto da hora, mesmo depois de o teto liberar, e
+     * uma falha real de CRLV-e sumia). O teto global não é devolvido — é um crédito em dez, e a
+     * rota já está limitada.
      */
     private function reopenWindow(string $fingerprint): void
     {
@@ -166,6 +228,54 @@ class CrlvImportFailureReporter
             Log::warning('Falha ao reabrir a janela de aviso de CRLV-e.', [
                 'erro' => $cacheFailure->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Extensão minúscula e sem pontuação, deduzida do conteúdo quando dá, senão a do nome enviado.
+     * O nome que o cliente escolheu nunca entra no contexto: pode trazer nome ou CPF da pessoa
+     * (LGPD, .ai/rules/models.md), e o que falta ao suporte é o layout do DETRAN.
+     */
+    private function fileExtension(?UploadedFile $file): ?string
+    {
+        if (! $file instanceof UploadedFile) {
+            return null;
+        }
+
+        try {
+            $extension = (string) ($file->guessExtension() ?: $file->getClientOriginalExtension());
+        } catch (Throwable $extensionFailure) {
+            $extension = (string) $file->getClientOriginalExtension();
+        }
+
+        $extension = preg_replace('/[^a-z0-9]/', '', Str::lower($extension)) ?? '';
+
+        return $extension !== '' ? $extension : null;
+    }
+
+    /**
+     * Hash curto do conteúdo em vez do nome do arquivo: dois envios do mesmo PDF têm a mesma
+     * impressão, o suporte junta os avisos e pede o documento a quem enviou, e nada no aviso
+     * identifica a pessoa.
+     */
+    private function fileHash(?UploadedFile $file): ?string
+    {
+        if (! $file instanceof UploadedFile) {
+            return null;
+        }
+
+        try {
+            $path = $file->getRealPath() ?: $file->path();
+
+            if (! is_string($path) || ! is_file($path)) {
+                return null;
+            }
+
+            $hash = hash_file('sha256', $path);
+
+            return is_string($hash) ? substr($hash, 0, self::FILE_HASH_LENGTH) : null;
+        } catch (Throwable $hashFailure) {
+            return null;
         }
     }
 
