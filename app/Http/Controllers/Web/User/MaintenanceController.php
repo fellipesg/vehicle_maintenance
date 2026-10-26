@@ -298,6 +298,7 @@ class MaintenanceController extends Controller
                 $existingInvoices === 0 ? 'required_with:workshop_id' : 'nullable',
                 'nullable',
                 'array',
+                'max:'.InvoiceFile::MAX_FILES_PER_REQUEST,
                 new RequiresInvoiceWhenWorkshopAssigned(
                     workshopId: $request->filled('workshop_id') ? (int) $request->input('workshop_id') : null,
                     existingInvoiceCount: $existingInvoices,

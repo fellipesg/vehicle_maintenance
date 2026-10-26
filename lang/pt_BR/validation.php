@@ -196,6 +196,7 @@ return [
         ],
         'invoices' => [
             'required_with' => 'Informe ao menos uma nota fiscal (PDF ou XML) ao vincular uma oficina cadastrada.',
+            'max' => 'Envie no máximo :max notas fiscais por vez. Se precisar anexar mais, salve e envie o resto depois.',
         ],
     ],
 
