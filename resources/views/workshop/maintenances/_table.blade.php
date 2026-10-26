@@ -37,7 +37,7 @@
             $rowItems = (int) ($maintenance->items_count ?? 0);
             $rowTotal = (float) ($maintenance->items_total ?? 0);
             $rowInvoices = (int) ($maintenance->invoices_count ?? 0);
-            $rowPhotos = (int) ($maintenance->photos_count ?? 0);
+            $rowPhotos = \App\Support\Maintenance\MaintenancePhotoAccess::allows(auth()->user()) ? (int) ($maintenance->photos_count ?? 0) : 0;
             $rowCategory = \App\Enums\ServiceCategory::labelFor($maintenance->service_category);
         @endphp
         <tr data-maintenance-row="{{ $maintenance->id }}" data-verified="{{ $maintenance->isVerified() ? '1' : '0' }}">

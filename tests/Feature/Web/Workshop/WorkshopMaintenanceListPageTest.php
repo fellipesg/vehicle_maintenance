@@ -22,6 +22,12 @@ class WorkshopMaintenanceListPageTest extends TestCase
     use InspectsWorkshopPages;
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
+
     public function test_table_shows_the_columns_with_counts_totals_and_seal_code(): void
     {
         $user = $this->workshopUser();

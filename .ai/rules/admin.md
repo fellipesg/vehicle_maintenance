@@ -10,3 +10,6 @@ Admin web list endpoints (vehicles, maintenances, workshops) must not scope by t
 
 ## One error bag per form on pages with dialogs
 When a page has more than one form for the same fields (Nova marca/Editar marca, categories, models), validate with $request->validateWithBag(self::CREATE_BAG | updateBag($model), ...) so the error and old input come back only in the dialog that was sent (see views-admin.md).
+
+## Recursos por conta: interruptores no admin
+Liga/desliga de recurso por conta (hoje, as fotos das manutenções) é `MaintenancePhotosFeatureController`: um PUT por escopo (usuário, oficina, loja) com `UpdateMaintenancePhotosFeatureRequest`, log de quem mudou e `back()` com aviso. Valores lidos por MaintenancePhotoAccess::isActiveFor / preload (nada de uma consulta por linha); ver features.md.

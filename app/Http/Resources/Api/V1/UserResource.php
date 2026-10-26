@@ -4,6 +4,7 @@ namespace App\Http\Resources\Api\V1;
 
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Vehicle\VehicleIdentifierVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -36,11 +37,30 @@ class UserResource extends JsonResource
             'avatar' => $this->avatar,
             'avatar_url' => $this->avatar_url,
             'subscription_active' => (bool) $this->subscription_active,
+            // null = o proprietário ainda não respondeu se o PDF do histórico leva fotos das OS.
+            'export_include_photos' => $this->export_include_photos,
+            // Funcionalidades ligadas pelo admin nesta conta (Pennant). O app esconde a interface
+            // quando false; a API também nega. Só na própria conta (/me, login, cadastro), nunca no
+            // autor de uma OS aninhada. Quando entrar outra funcionalidade, ela ganha a chave aqui.
+            'features' => $this->when($this->isOwnAccount($request), fn (): array => [
+                'maintenance_photos' => MaintenancePhotoAccess::allows($this->resource),
+            ]),
             'has_two_factor_enabled' => $this->hasTwoFactorEnabled(),
             'vehicles' => $this->whenLoaded('currentVehicles', fn (): Collection => $this->currentVehiclesFor($request)),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * A conta que o resource mostra é a de quem pediu; no login e no cadastro (requisição ainda sem
+     * usuário) é a que acabou de entrar.
+     */
+    private function isOwnAccount(Request $request): bool
+    {
+        $viewer = $request->user();
+
+        return $viewer === null || $viewer->is($this->resource);
     }
 
     /**

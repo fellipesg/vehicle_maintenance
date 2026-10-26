@@ -71,6 +71,11 @@
     }
     $photoCount = $maintenance->photos_count
         ?? ($maintenance->relationLoaded('photos') ? $maintenance->photos->count() : null);
+    // Quem está logado sem as fotos das manutenções ligadas não vê a contagem. A consulta pública
+    // (expandable, sem login) segue como sempre mostrou as fotos públicas.
+    if (! $expandable && auth()->check() && ! \App\Support\Maintenance\MaintenancePhotoAccess::allows(auth()->user())) {
+        $photoCount = 0;
+    }
 
     $evidence = [];
     if ($verified && filled($maintenance->verification_code)) {

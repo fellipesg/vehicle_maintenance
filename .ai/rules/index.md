@@ -13,8 +13,9 @@ must agree on the same contract; they are listed in a separate table below.
 | --- | --- |
 | resources/views/admin/maintenances/**,resources/views/admin/vehicles/show.blade.php | .ai/rules/admin-vehicles.md |
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
+| app/Features/**,app/Support/Maintenance/MaintenancePhotoAccess.php,app/Http/Controllers/Web/Admin/MaintenancePhotosFeatureController.php,app/Http/Requests/Web/Admin/**,resources/views/components/admin/maintenance-photos-toggle.blade.php,config/pennant.php | .ai/rules/features.md |
 | config/outreach.php,app/Mail/WorkshopProspectInviteMail.php,app/Jobs/SendWorkshopProspectInvite.php,app/Services/Outreach/**,app/Console/Commands/*Prospect*,app/Console/Commands/ExtractReceitaProspects.php,app/Http/Controllers/Web/OutreachController.php,app/Http/Controllers/Web/Admin/OutreachController.php,app/Models/WorkshopProspect.php,app/Models/EmailSuppression.php,resources/views/emails/outreach/**,resources/views/outreach/**,resources/views/admin/outreach/** | .ai/rules/outreach.md |
-| app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php | .ai/rules/api.md |
+| app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php, app/Support/Maintenance/MaintenancePhotoUrls.php, app/Http/Resources/Api/V1/MaintenancePhotoResource.php, app/Http/Resources/Api/V1/MaintenanceResource.php, app/Http/Resources/Api/V1/UserResource.php | .ai/rules/api.md |
 | app/Http/Requests/Api/** | .ai/rules/requests-api.md |
 | app/Http/Controllers/Web/BlogController.php,app/Http/Controllers/Web/Admin/BlogPostController.php,app/Models/BlogPost.php,resources/views/blog/**,resources/views/admin/blog/** | .ai/rules/blog.md |
 | .github/workflows/**,Makefile,phpunit.xml,phpunit.pgsql.xml | .ai/rules/ci.md |
@@ -35,9 +36,9 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Mail/** | .ai/rules/mail.md |
 | config/queue.php,config/cache.php,config/session.php,app/Jobs/**,docker-compose.yml | .ai/rules/messaging.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
-| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
+| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
-| resources/views/pdfs/vehicle_maintenance_export.blade.php | .ai/rules/pdfs.md |
+| resources/views/pdfs/vehicle_maintenance_export.blade.php,app/Services/Vehicle/VehiclePdfMaintenancePhotos.php,app/Services/Vehicle/VehicleMaintenancePdfExporter.php | .ai/rules/pdfs.md |
 | app/Policies/** | .ai/rules/policies.md |
 | bootstrap/app.php,app/Support/PortalAccess.php,app/Support/FriendlyHttpErrors.php,app/Http/Controllers/Web/Auth/**,app/Http/Controllers/Web/AuthController.php | .ai/rules/portal-access.md |
 | resources/views/layouts/**,app/Enums/Portal.php | .ai/rules/portal-shell.md |
@@ -48,9 +49,9 @@ must agree on the same contract; they are listed in a separate table below.
 | resources/views/components/ui/**,resources/views/** | .ai/rules/ui-components.md |
 | resources/js/** | .ai/rules/ui-scripts.md |
 | resources/views/user/vehicles/** | .ai/rules/user-vehicles.md |
-| app/Services/User/** | .ai/rules/user.md |
+| app/Services/User/**,app/Models/User.php,app/Http/Requests/Web/Account/UpdateAccountPreferencesRequest.php | .ai/rules/user.md |
 | resources/views/{user,garage,public}/**/*.blade.php | .ai/rules/usergaragepublic.md |
-| app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php | .ai/rules/vehicle.md |
+| app/Services/Vehicle/VehicleMaintenancePdfExporter.php, app/Services/Vehicle/VehicleCoverService.php, app/Services/Vehicle/VehiclePdfMaintenancePhotos.php | .ai/rules/vehicle.md |
 | resources/views/vehicles/entry/**,app/Http/Controllers/Web/Concerns/*Vehicle*,app/Support/Vehicle/VehicleEntryFlow.php,app/Services/Vehicle/VehicleOwnershipService.php,app/Services/Crlv/** | .ai/rules/vehicles-entry.md |
 | resources/views/vendor/mail/** | .ai/rules/vendor-mail.md |
 | resources/views/layouts/**,resources/views/admin/** | .ai/rules/views-admin.md |

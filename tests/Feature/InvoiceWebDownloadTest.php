@@ -68,13 +68,13 @@ class InvoiceWebDownloadTest extends TestCase
         $this->get(route('invoices.show', $invoice))->assertRedirect(route('login'));
     }
 
-    public function test_owner_cannot_open_pending_attachment_of_ownerless_record(): void
+    public function test_unverified_owner_cannot_open_pending_attachment_of_ownerless_record(): void
     {
         $workshopUser = $this->workshopAccount();
         $vehicle = $this->ownerlessVehicle();
         $maintenance = $this->ownerlessRecord($workshopUser, $vehicle);
         $invoice = $this->invoiceFor($maintenance);
-        $owner = $this->ownerOf($vehicle);
+        $owner = $this->ownerOf($vehicle, verified: false);
 
         $this->actingAs($owner)
             ->get(route('invoices.show', $invoice))

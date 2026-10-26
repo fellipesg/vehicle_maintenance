@@ -3,6 +3,7 @@
 @section('title', 'Editar OS')
 
 @php
+    $maintenance->photos->each(fn ($photo) => $photo->setRelation('maintenance', $maintenance));
     $existingPhotos = $maintenance->photos->groupBy(fn ($photo) => $photo->subject.'_'.$photo->stage);
     $vehicle = $maintenance->vehicle;
     $orderLabel = $maintenance->maintenance_type.($vehicle?->license_plate ? ' · '.$vehicle->license_plate : '');

@@ -26,3 +26,8 @@ recebe isso em `$_SERVER`. O repositório de env do Laravel lê `$_SERVER` **ant
 desenvolvimento — o `RefreshDatabase` faz `migrate:fresh` e apaga os dados locais. `phpunit.xml`
 (sqlite `:memory:`) e `phpunit.pgsql.xml` (`vehicle_maintenance_test`) repetem os três `DB_*` em
 `<server>`; mantenha os dois blocos em sincronia ao mexer em qualquer um deles.
+
+Isso vale para toda variável que molda o ambiente de teste, não só os `DB_*`: `APP_ENV`,
+`APP_LOCALE`, `CACHE_STORE`, `SESSION_DRIVER`, `QUEUE_CONNECTION` e companhia têm `<env force>`
+**e** `<server>` nos dois arquivos. Ver `.ai/rules/ci.md` ("An exported environment variable beats
+`<env>` without `force`").

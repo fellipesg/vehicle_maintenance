@@ -2,6 +2,7 @@
 paths:
   - app/Services/Vehicle/VehicleMaintenancePdfExporter.php
   - app/Services/Vehicle/VehicleCoverService.php
+  - app/Services/Vehicle/VehiclePdfMaintenancePhotos.php
 ---
 
 # Vehicle
@@ -14,3 +15,6 @@ coverPathForPdf() prefers cover_photo_path (landscape), then portrait. Center-cr
 
 ## Thumbnails obrigatórios para capas
 Todo upload de capa (paisagem/retrato) deve gerar `cover_photo_thumb_path` 192×192 via `VehicleCoverCropper::cropToThumb`. Listagens e avatares devem preferir `cover_photo_thumb_url`.
+
+## Fotos das OS no PDF: busca em lote, conversão uma a uma
+As fotos escolhidas por VehiclePdfMaintenancePhotos entram no mesmo AppStorage::localCopies da capa e dos logos. A conversão para JPEG roda em sequência e solta os bytes de cada cópia assim que sai (memória), e os temporários vão para o `temps` que quem chama limpa com cleanupTemps. A regra de quem recebe foto está em .ai/rules/pdfs.md; VehicleMaintenancePdfExporter só consulta a preferência do dono atual, os jobs não mudam.

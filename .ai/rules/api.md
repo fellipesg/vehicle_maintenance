@@ -3,6 +3,10 @@ paths:
   - 'app/Http/Controllers/Api/**'
   - app/Http/Controllers/Api/VehicleController.php
   - app/Http/Controllers/Api/AuthController.php
+  - app/Http/Resources/Api/V1/MaintenanceResource.php
+  - app/Http/Resources/Api/V1/UserResource.php
+  - app/Support/Maintenance/MaintenancePhotoUrls.php
+  - app/Http/Resources/Api/V1/MaintenancePhotoResource.php
 ---
 
 # Api
@@ -39,18 +43,38 @@ Ordem obrigatória ao executar: **app primeiro, backend depois**. Tirar os campo
 `UpdateProfileRequest` ou de `UserResource` antes de o app parar de enviá-los faz a tela "salvar" sem
 gravar nada, em silêncio. Enquanto o app não soltar a versão sem a seção, a API continua aceitando.
 
-## Foto de manutenção nunca pelo caminho do storage
-`MaintenancePhotoResource` devolve em `url` a rota `api.maintenance-photos.show`
-(`GET /api/v1/maintenance-photos/{photo}`, `ability:maintenances:read`, `Gate::authorize('view', $photo)`
-pela `MaintenancePhotoPolicy::view`) e não devolve mais `path`. Não volte a expor
-`AppStorage::url($photo->path)` nem o `path`: no disco público o arquivo abre sem token e, no S3/R2, a
-URL assinada é compartilhável até expirar — a foto de uma OS sem proprietário continuaria legível por
-quem tiver o link, mesmo com o `MaintenanceRedactor` tirando-a do resource. `url` só aparece para
-requisição autenticada (como `download_url` da `InvoiceResource`), e o arquivo sai pelo
-`MaintenancePhotoFileResponse`, o mesmo da rota web `maintenance-photos.show`: jpg/jpeg/png/webp
-inline, o resto baixa, com nosniff, CSP sandbox e `Cache-Control` privado e curto. O app Flutter não lia
-`photos` nem `path` quando isto mudou (nenhum `.dart` cita as chaves), então o contrato pôde mudar sem
-mexer no app.
+## Foto de manutenção: URL temporária só depois da policy, nunca o caminho do storage
+`MaintenancePhotoResource` não devolve `path`, `thumb_path` nem `display_path`. Devolve `url` (a rota
+autorizada `api.maintenance-photos.show`, `ability:maintenances:read`, `Gate::authorize('view', $photo)`,
+mantida por compatibilidade) e `variants` {thumb, display, master}: URLs temporárias geradas por
+`MaintenancePhotoUrls` **somente** quando o leitor passa a `MaintenancePhotoPolicy::view` (o resource
+checa com o Gate, uma vez por OS e requisição; só a linha do tempo, que já aplicou viewFullHistory,
+MaintenanceRedactor e `hidesAttachmentsFrom`, passa `forViewer($viewer, authorized: true)`). Não volte a
+expor `AppStorage::url($photo->path)` nem o caminho: no disco público o arquivo abre sem token e a URL
+assinada do S3/R2 é compartilhável até expirar.
+
+- **Vida e janelas.** TTL de 10 minutos com a expiração arredondada para janelas fixas:
+  `floor(agora/600)*600 + 1200` (`MaintenancePhotoUrls::expiresAt`). Requisições na mesma janela recebem
+  a mesma URL, então a resposta da linha do tempo não muda a cada chamada (cache/ETag do app seguem
+  devolvendo 304). O S3/R2 grava o horário da assinatura (X-Amz-Date) na URL, que mudaria a cada chamada;
+  por isso as URLs de cada foto e janela ficam no cache da aplicação (uma leitura por foto). `expires_at`
+  (ISO 8601) acompanha as variantes. Foto ainda sem processar (ou antiga) devolve a URL do original em
+  `thumb` e `display`, com `processed: false`.
+- **Disco local** (desenvolvimento e testes): `Storage::disk('public')->buildTemporaryUrlsUsing()`
+  (AppServiceProvider, e de novo em `MaintenancePhotoUrls` porque `Storage::fake` troca a instância)
+  aponta para `GET /api/v1/maintenance-photo-files/{photo}/{variant}` (`signed`, sem auth:sanctum),
+  que vale por uma foto e uma variante e serve pelo `MaintenancePhotoFileResponse`.
+- **Nada de redirect 302** do endpoint autorizado para a URL do storage: o HttpClient do Dart pode
+  reenviar o `Authorization` no redirect e o S3/R2 recusa dois mecanismos de autenticação.
+- Também saem `width`, `height` (do master), `dominant_color` (hex, para o placeholder) e `processed`.
+- Linha do tempo (`GET /vehicles/{id}/timeline`) e detalhe/lista da OS trazem `photos_count`,
+  `photos_locked` e, na linha do tempo, `photo_preview` (até 2, no formato do resource). Bloqueada
+  (anexos de OS sem dono que o leitor não vê): `photos_count` é o total, `photos_locked` true e a prévia
+  vazia. Liberada: a contagem é só do que o leitor enxerga (fora do tenant e da oficina autora, veículo
+  + depois). As fotos vêm numa query por linha do tempo (sem N+1; há teste que compara a contagem de
+  queries).
+- A URL assinada de uma foto continua abrindo até expirar (no máximo 20 minutos) mesmo se a OS for
+  oculta ou o aceite revogado depois; é o preço da janela estável.
 
 **Exceção: a busca pública segue com a URL do storage.** `PublicVehicleSearchResource` (de
 `GET /api/v1/vehicles/search/{identifier}`, sem middleware de autenticação) mantém `photos[].url` em
@@ -58,3 +82,11 @@ mexer no app.
 + depois) e a rota autorizada responderia 403 a quem só buscou a placa. É a mesma exceção que o
 `x-provenance-card` tem na web (registrada em `.ai/rules/views.md`). Se um dia essa lista precisar de
 foto não pública, a rota não serve: o caminho é uma URL assinada de vida curta só para ela.
+
+## Preferência de fotos no PDF: GET/PUT /api/v1/me
+`export_include_photos` (true | false | null) vem em UserResource, logo em GET /api/v1/me, login e PUT /api/v1/me. Nulo = o proprietário nunca respondeu (o app pergunta uma vez). O PUT aceita só esse campo (`sometimes|boolean`, `name` também é `sometimes`, então atualização parcial funciona) e recusa null e texto com 422. Só vale para a conta de proprietário; o PDF consulta a preferência do dono ATUAL do veículo (.ai/rules/pdfs.md). Na web é o cartão "PDF do histórico" em /conta (PUT /conta/preferencias, só `user.type:user`).
+
+## Fotos só para quem tem o recurso ligado
+Sem as fotos das manutenções na conta (flag por conta, features.md): POST /maintenances/{m}/photos responde 403; MaintenanceResource devolve `photos` vazio, `photos_count` 0 e `photos_locked` false (o campo continua existindo); a linha do tempo devolve `photos_count` 0, `photos_locked` false e `photo_preview` vazio; as rotas autorizadas respondem 403 e nenhuma URL assinada é emitida (uma URL já emitida vale até expirar, no máximo 20 minutos, porque a rota assinada não tem usuário). `attachments.photos` dos registros de oficina vira 0. A busca pública por placa (GET /vehicles/search/{identifier}) é a exceção documentada: segue com as fotos públicas, com ou sem o recurso.
+
+`GET /api/v1/me`, login e cadastro trazem `features: {"maintenance_photos": true|false}` em UserResource (só na própria conta, nunca no autor de uma OS aninhada), para o app esconder a interface. `export_include_photos` continua no payload, mas o PUT /me o recusa com 422 quando a conta não tem o recurso.

@@ -152,9 +152,12 @@
         @endif
     </x-ui.form-section>
 
-    @include('partials.maintenance-photos-form', [
-        'existingPhotos' => $existingPhotos ?? collect(),
-        'editable' => $editable ?? false,
-        'sectionNumber' => 6,
-    ])
+    {{-- Fotos só nas contas com o recurso ligado pelo admin (MaintenancePhotoAccess); o servidor também confere. --}}
+    @if(\App\Support\Maintenance\MaintenancePhotoAccess::allows(auth()->user()))
+        @include('partials.maintenance-photos-form', [
+            'existingPhotos' => $existingPhotos ?? collect(),
+            'editable' => $editable ?? false,
+            'sectionNumber' => 6,
+        ])
+    @endif
 </div>

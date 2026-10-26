@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Maintenance;
 use App\Models\Workshop;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -73,6 +74,8 @@ class WorkshopController extends Controller
             ->orderBy('id')
             ->paginate(25)
             ->withQueryString();
+
+        MaintenancePhotoAccess::preload($workshops->getCollection());
 
         return view('admin.workshops.index', [
             'workshops' => $workshops,

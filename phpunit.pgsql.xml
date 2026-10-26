@@ -28,35 +28,74 @@
         <env name="FIREBASE_CREDENTIALS_JSON" value="" force="true"/>
         <env name="SENTRY_LARAVEL_DSN" value="" force="true"/>
         <env name="SENTRY_DSN" value="" force="true"/>
-        <env name="APP_ENV" value="testing"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <!--
+            APP_DEBUG=false é o valor de produção, e era o único em que o renderer de API de
+            bootstrap/app.php engolia o 429 dos limiters com response() custom e devolvia 500. O
+            renderer agora trata HttpResponseException, então fixar false aqui é o que mantém a
+            suíte rodando no mesmo modo que produção e impede a regressão voltar sem ninguém ver.
+            Os testes de rate limit também fixam app.debug=false por conta própria.
+        -->
+        <env name="APP_DEBUG" value="false" force="true"/>
         <env name="APP_LOCALE" value="pt_BR" force="true"/>
         <env name="APP_FALLBACK_LOCALE" value="pt_BR" force="true"/>
         <env name="APP_FAKER_LOCALE" value="pt_BR" force="true"/>
-        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="null"/>
-        <env name="CACHE_STORE" value="array"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
         <env name="DB_CONNECTION" value="pgsql" force="true"/>
         <env name="DB_DATABASE" value="vehicle_maintenance_test" force="true"/>
         <env name="DB_URL" value="" force="true"/>
+        <!--
+            DB_HOST/DB_PORT/DB_USERNAME/DB_PASSWORD ficam sem force (e sem <server>) de propósito:
+            são as coordenadas do servidor, e quem roda a suíte precisa poder trocá-las. O compose
+            usa o host 'db'; o CI passa DB_HOST=127.0.0.1 DB_PORT=5432 e fora do Docker o Postgres
+            do compose atende em 127.0.0.1:5433.
+        -->
         <env name="DB_HOST" value="db"/>
         <env name="DB_PORT" value="5432"/>
         <env name="DB_USERNAME" value="vehicle"/>
         <env name="DB_PASSWORD" value="secret"/>
+        <env name="FILESYSTEM_DISK" value="local" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
         <!--
-            Igual ao phpunit.xml: o DB_DATABASE do compose chega em $_SERVER, que o Laravel lê
-            antes de $_ENV. Sem estas linhas a suíte roda no banco de desenvolvimento
-            (vehicle_maintenance) em vez do vehicle_maintenance_test, e o RefreshDatabase o apaga.
+            Igual ao phpunit.xml: toda variável exportada no processo (compose, `set -a; source
+            .env`, CI) chega ao PHP em $_SERVER, que o repositório de env do Laravel lê antes de
+            $_ENV — o <env force> acima só escreve putenv() e $_ENV, então perde. Sem as linhas
+            <server> abaixo o DB_DATABASE do compose faz a suíte rodar no banco de desenvolvimento
+            (vehicle_maintenance) em vez do vehicle_maintenance_test, e o RefreshDatabase o apaga;
+            um APP_ENV=local exportado liga o CSRF e todo POST web vira 419. Toda variável fixada
+            acima tem a gêmea aqui — exceto as coordenadas do servidor, que seguem sobrescritíveis.
+            Mantenha os dois blocos em sincronia.
         -->
+        <server name="FIREBASE_CREDENTIALS_BASE64" value="" force="true"/>
+        <server name="FIREBASE_CREDENTIALS_JSON" value="" force="true"/>
+        <server name="SENTRY_LARAVEL_DSN" value="" force="true"/>
+        <server name="SENTRY_DSN" value="" force="true"/>
+        <server name="APP_ENV" value="testing" force="true"/>
+        <server name="APP_DEBUG" value="false" force="true"/>
+        <server name="APP_LOCALE" value="pt_BR" force="true"/>
+        <server name="APP_FALLBACK_LOCALE" value="pt_BR" force="true"/>
+        <server name="APP_FAKER_LOCALE" value="pt_BR" force="true"/>
+        <server name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <server name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <server name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <server name="CACHE_STORE" value="array" force="true"/>
         <server name="DB_CONNECTION" value="pgsql" force="true"/>
         <server name="DB_DATABASE" value="vehicle_maintenance_test" force="true"/>
         <server name="DB_URL" value="" force="true"/>
-        <env name="FILESYSTEM_DISK" value="local" force="true"/>
-        <env name="MAIL_MAILER" value="array"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
-        <env name="PULSE_ENABLED" value="false"/>
-        <env name="TELESCOPE_ENABLED" value="false"/>
-        <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <server name="FILESYSTEM_DISK" value="local" force="true"/>
+        <server name="MAIL_MAILER" value="array" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <server name="SESSION_DRIVER" value="array" force="true"/>
+        <server name="PULSE_ENABLED" value="false" force="true"/>
+        <server name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <server name="NIGHTWATCH_ENABLED" value="false" force="true"/>
     </php>
 </phpunit>

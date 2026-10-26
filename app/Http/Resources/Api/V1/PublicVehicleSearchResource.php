@@ -59,7 +59,7 @@ class PublicVehicleSearchResource extends JsonResource
                 // Forma mínima das OS de oficina sem proprietário; as ocultadas saem.
                 $viewer = VehicleIdentifierVisibility::viewerOf($request);
 
-                return MaintenanceRedactor::redactAll($this->maintenances, $viewer)->map(fn ($maintenance) => [
+                return MaintenanceRedactor::redactAll($this->maintenances, $viewer, publicLookup: true)->map(fn ($maintenance) => [
                     'id' => $maintenance->id,
                     'maintenance_type' => $maintenance->maintenance_type,
                     'description' => $maintenance->description,

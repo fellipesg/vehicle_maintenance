@@ -364,12 +364,7 @@ class MaintenanceController extends Controller
         $maintenance = Maintenance::findOrFail($id);
         Gate::authorize('delete', $maintenance);
 
-        foreach ($maintenance->photos as $photo) {
-            if (AppStorage::disk()->exists($photo->path)) {
-                AppStorage::disk()->delete($photo->path);
-            }
-        }
-
+        // As fotos (e as variantes) saem do storage no evento deleting da própria OS.
         foreach ($maintenance->invoices as $invoice) {
             if (AppStorage::disk()->exists($invoice->file_path)) {
                 AppStorage::disk()->delete($invoice->file_path);

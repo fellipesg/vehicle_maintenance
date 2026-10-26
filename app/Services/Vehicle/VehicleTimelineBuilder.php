@@ -2,9 +2,15 @@
 
 namespace App\Services\Vehicle;
 
+use App\Http\Resources\Api\V1\MaintenancePhotoResource;
+use App\Models\Maintenance;
+use App\Models\MaintenancePhoto;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Support\Maintenance\MaintenancePhotoAccess;
+use App\Support\Maintenance\MaintenancePhotoPreview;
 use App\Support\Maintenance\MaintenanceRedactor;
+use Illuminate\Support\Collection;
 
 class VehicleTimelineBuilder
 {
@@ -37,6 +43,8 @@ class VehicleTimelineBuilder
         // ocultadas pelo proprietário saem (MaintenanceRedactor).
         $viewer ??= auth()->user();
         $maintenances = MaintenanceRedactor::redactAll($vehicle->maintenances, $viewer);
+        $maintenances->each(fn ($maintenance) => $maintenance->setRelation('vehicle', $vehicle));
+        $photosByMaintenance = MaintenancePhotoAccess::allows($viewer) ? $this->photosByMaintenance($maintenances) : new Collection;
 
         $events = [];
         $currentKm = (int) ($vehicle->current_kilometers ?? 0);
@@ -107,6 +115,7 @@ class VehicleTimelineBuilder
                 'is_verified' => $maintenance->isVerified(),
                 'registered_by_type' => $maintenance->registered_by_type,
                 'provenance_label' => $maintenance->provenance_label,
+                ...$this->photoSummary($maintenance, $photosByMaintenance->get($maintenance->id, new Collection), $viewer),
             ];
         }
 
@@ -169,6 +178,61 @@ class VehicleTimelineBuilder
                 'usage_period_start_date' => $usage['period_start_date'] ?? null,
                 'usage_period_end_date' => $usage['period_end_date'] ?? null,
             ],
+        ];
+    }
+
+    /**
+     * Fotos de todas as OS da linha do tempo numa query só (no máximo 24 por OS), na ordem do grupo.
+     *
+     * @param  Collection<int, Maintenance>  $maintenances
+     * @return Collection<int, Collection<int, MaintenancePhoto>>
+     */
+    private function photosByMaintenance(Collection $maintenances): Collection
+    {
+        if ($maintenances->isEmpty()) {
+            return new Collection;
+        }
+
+        return MaintenancePhoto::query()
+            ->whereIn('maintenance_id', $maintenances->pluck('id'))
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('maintenance_id');
+    }
+
+    /**
+     * photos_count, photos_locked e photo_preview de uma OS. Bloqueada (anexos de OS sem dono que o
+     * leitor não pode ver): conta o total para o app mostrar o cadeado, sem prévia. Liberada: conta e
+     * mostra só o que o leitor enxerga (fora do tenant e da oficina autora, veículo + depois).
+     *
+     * @param  Collection<int, MaintenancePhoto>  $photos
+     * @return array{photos_count: int, photos_locked: bool, photo_preview: list<array<string, mixed>>}
+     */
+    private function photoSummary(Maintenance $maintenance, Collection $photos, ?User $viewer): array
+    {
+        // Sem as fotos das manutenções ligadas na conta: nada de contagem, cadeado nem prévia.
+        if ($photos->isEmpty() || ! MaintenancePhotoAccess::allows($viewer)) {
+            return ['photos_count' => 0, 'photos_locked' => false, 'photo_preview' => []];
+        }
+
+        if ($maintenance->hidesAttachmentsFrom($viewer)) {
+            return ['photos_count' => $photos->count(), 'photos_locked' => true, 'photo_preview' => []];
+        }
+
+        $visible = $maintenance->exposesAllPhotosTo($viewer)
+            ? $photos
+            : $photos->filter(fn (MaintenancePhoto $photo): bool => $photo->isPublicVisible())->values();
+
+        return [
+            'photos_count' => $visible->count(),
+            'photos_locked' => false,
+            'photo_preview' => MaintenancePhotoPreview::pick($visible)
+                ->map(fn (MaintenancePhoto $photo): array => (new MaintenancePhotoResource($photo->setRelation('maintenance', $maintenance)))
+                    ->forViewer($viewer, authorized: true)
+                    ->resolve(request()))
+                ->values()
+                ->all(),
         ];
     }
 

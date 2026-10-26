@@ -23,6 +23,12 @@ class MaintenancePolicyTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
+
     public function test_workshop_changes_only_the_order_it_sealed(): void
     {
         $workshopUser = User::factory()->asWorkshop()->create();
