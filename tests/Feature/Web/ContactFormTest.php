@@ -3,9 +3,12 @@
 namespace Tests\Feature\Web;
 
 use App\Mail\ContactMessageMail;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use RuntimeException;
 use Tests\TestCase;
 
 class ContactFormTest extends TestCase
@@ -135,6 +138,114 @@ class ContactFormTest extends TestCase
             ->assertSessionHasInput('message');
 
         Mail::assertNothingOutgoing();
+    }
+
+    /**
+     * O defeito que isto cobre: a regra do captcha só entrava quando a chave existia, então
+     * TURNSTILE_SECRET_KEY faltando em produção desligava a proteção sem nenhum sinal. Agora
+     * produção exige sempre: o envio é recusado e a falta da chave vira exceção reportada.
+     */
+    public function test_production_without_the_turnstile_key_refuses_and_reports(): void
+    {
+        Mail::fake();
+        Exceptions::fake(RuntimeException::class);
+        Http::preventStrayRequests();
+        config(['services.turnstile.secret_key' => null]);
+        $this->actAsProduction();
+
+        $this->from(route('contact.show'))
+            ->post(route('contact.store'), $this->validPayload(['cf-turnstile-response' => 'token']))
+            ->assertRedirect(route('contact.show'))
+            ->assertSessionHasErrors('cf-turnstile-response');
+
+        Mail::assertNothingOutgoing();
+        Exceptions::assertReported(
+            fn (RuntimeException $exception): bool => str_contains($exception->getMessage(), 'TURNSTILE_SECRET_KEY'),
+        );
+    }
+
+    /** Sem a chave, produção nem chega a consultar a Cloudflare: o campo já é obrigatório. */
+    public function test_production_requires_the_captcha_field_even_without_the_key(): void
+    {
+        Mail::fake();
+        Http::preventStrayRequests();
+        config(['services.turnstile.secret_key' => null]);
+        $this->actAsProduction();
+
+        $this->post(route('contact.store'), $this->validPayload())
+            ->assertSessionHasErrors(['cf-turnstile-response' => 'Confirme que você não é um robô.']);
+
+        Mail::assertNothingOutgoing();
+    }
+
+    /** Em local e testing, sem a chave, nada muda: o captcha segue desligado. */
+    public function test_outside_production_the_missing_key_keeps_the_captcha_off(): void
+    {
+        Mail::fake();
+        Http::preventStrayRequests();
+        config(['services.turnstile.secret_key' => null]);
+
+        $this->post(route('contact.store'), $this->validPayload())
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        Mail::assertQueued(ContactMessageMail::class);
+    }
+
+    /** Com a chave no lugar, produção verifica o token como em qualquer ambiente. */
+    public function test_production_with_the_key_verifies_the_token(): void
+    {
+        Mail::fake();
+        config(['services.turnstile.secret_key' => 'secret']);
+        Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => true])]);
+        $this->actAsProduction();
+
+        $this->post(route('contact.store'), $this->validPayload(['cf-turnstile-response' => 'token']))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        Mail::assertQueued(ContactMessageMail::class);
+    }
+
+    public function test_sixth_message_from_the_same_ip_in_a_minute_returns_429(): void
+    {
+        Mail::fake();
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->post(route('contact.store'), $this->validPayload())
+                ->assertRedirect(route('contact.show'));
+        }
+
+        $this->post(route('contact.store'), $this->validPayload())->assertStatus(429);
+
+        Mail::assertQueued(ContactMessageMail::class, 5);
+    }
+
+    /**
+     * A chave do captcha vem do ambiente e pode sumir sem avisar, então `php artisan about` diz se
+     * ela está lá — o sinal visível que faltava quando a proteção se desligava em silêncio.
+     */
+    public function test_about_command_reports_whether_the_captcha_key_is_configured(): void
+    {
+        config(['services.turnstile.secret_key' => 'secret']);
+        $this->artisan('about --only=revisalog')
+            ->expectsOutputToContain('configurado')
+            ->assertExitCode(0);
+
+        config(['services.turnstile.secret_key' => null]);
+        $this->artisan('about --only=revisalog')
+            ->expectsOutputToContain('SEM CHAVE')
+            ->assertExitCode(0);
+    }
+
+    /**
+     * Produção dentro do teste. Trocar o ambiente também religa a verificação de CSRF, porque
+     * Application::runningUnitTests() olha justamente o env — e CSRF não é o assunto destes testes.
+     */
+    private function actAsProduction(): void
+    {
+        $this->app->detectEnvironment(fn (): string => 'production');
+        $this->withoutMiddleware(ValidateCsrfToken::class);
     }
 
     /**
