@@ -17,6 +17,15 @@ class SentryTelegramAlertFormatter
     public const FALLBACK_FRAMES = 5;
 
     /**
+     * A partir de quantos caracteres um segmento de caminho é tratado como token e não como rota.
+     * O maior segmento de rota do projeto tem 17 caracteres (`liberar-historico`) e o menor token
+     * tem 40 (`Str::random(40)` do convite e da prospect; a consignação usa 48), então 32 separa os
+     * dois sem ambiguidade — a placa, o chassi (17) e o código do selo (`RVL-AB12-CD`) continuam
+     * legíveis.
+     */
+    private const OPAQUE_SEGMENT_LENGTH = 32;
+
+    /**
      * @param  array<string, mixed>  $data
      * @return array{message: string, fullTrace: ?string, filename: string}
      */
@@ -55,9 +64,9 @@ class SentryTelegramAlertFormatter
         $this->addDetail($details, 'Release', $this->text($event['release'] ?? null));
 
         $method = $this->text(data_get($event, 'request.method'));
-        $url = $this->withoutQueryString($this->text(data_get($event, 'request.url')));
+        $url = $this->withoutSecrets($this->text(data_get($event, 'request.url')));
         $this->addDetail($details, 'Requisição', trim($method.' '.Str::limit($url, 200, '…')));
-        $this->addDetail($details, 'Culprit', $this->withoutQueryString($this->text($event['culprit'] ?? null)));
+        $this->addDetail($details, 'Culprit', $this->withoutSecrets($this->text($event['culprit'] ?? null)));
 
         $footer = [];
         $webUrl = $this->text($event['web_url'] ?? null);
@@ -147,7 +156,7 @@ class SentryTelegramAlertFormatter
 
             $result[] = [
                 'type' => $this->text($value['type'] ?? null),
-                'value' => $this->withoutQueryString($this->text($value['value'] ?? null)),
+                'value' => $this->withoutSecrets($this->text($value['value'] ?? null)),
                 'frames' => array_values(array_filter(is_array($frames) ? $frames : [], 'is_array')),
             ];
         }
@@ -164,7 +173,7 @@ class SentryTelegramAlertFormatter
         $title = $primary !== null ? $this->exceptionTitle($primary) : '';
 
         if ($title === '') {
-            $title = $this->withoutQueryString(
+            $title = $this->withoutSecrets(
                 $this->text(data_get($event, 'logentry.formatted'))
                     ?: $this->text($event['message'] ?? null)
                     ?: $this->text($event['title'] ?? null)
@@ -256,6 +265,29 @@ class SentryTelegramAlertFormatter
     private function withoutQueryString(string $value): string
     {
         return preg_replace('~((?:https?://|/)[^\s?#]*)[?#]\S*~i', '$1', $value) ?? $value;
+    }
+
+    /**
+     * Tudo o que o detalhe "Requisição" e os textos livres do payload podem publicar sem entregar um
+     * link acionável: fora a query string, fora o token que vem no próprio caminho.
+     */
+    private function withoutSecrets(string $value): string
+    {
+        return $this->withoutOpaqueSegments($this->withoutQueryString($value));
+    }
+
+    /**
+     * Troca por `•••` o segmento de caminho longo e opaco o bastante para ser um token. Nem todo
+     * segredo vem na query: /consignacao/{token} (e os POST /liberar-historico e /contestar em cima
+     * dele), /convite/{token}, /descadastrar/{token} e /o/{token} levam o token no caminho, e o
+     * primeiro deixa quem lê o grupo liberar ou contestar o histórico em nome do proprietário. O
+     * host fica de fora do corte — `(?<!://)` — porque identifica o ambiente e não é segredo.
+     */
+    private function withoutOpaqueSegments(string $value): string
+    {
+        $pattern = '~(?<!://)(?<=/)[A-Za-z0-9\-_.%=+]{'.self::OPAQUE_SEGMENT_LENGTH.',}~';
+
+        return preg_replace($pattern, '•••', $value) ?? $value;
     }
 
     private function text(mixed $value): string

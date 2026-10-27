@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\Monitoring\SentryTelegramAlertFormatter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SentryTelegramAlertFormatterTest extends TestCase
@@ -314,5 +315,93 @@ class SentryTelegramAlertFormatterTest extends TestCase
         }
 
         $this->assertStringContainsString('app/Http/Controllers/Web/AccountDeletionController.php:61 in destroy', $result['message']);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function tokenInThePathProvider(): array
+    {
+        $prospect = str_repeat('aB3', 13).'x';          // Str::random(40) da WorkshopProspect
+        $invite = str_repeat('cD4', 13).'y';            // Str::random(40) do MaintenanceInvite
+        $consignment = str_repeat('eF5', 16);           // Str::random(48) da consignação
+
+        return [
+            'consignação' => ['/consignacao/'.$consignment, $consignment],
+            'consignação liberar histórico' => ['/consignacao/'.$consignment.'/liberar-historico', $consignment],
+            'consignação contestar' => ['/consignacao/'.$consignment.'/contestar', $consignment],
+            'convite' => ['/convite/'.$invite, $invite],
+            'descadastro da prospect' => ['/descadastrar/'.$prospect, $prospect],
+            'clique rastreado' => ['/o/'.$prospect, $prospect],
+        ];
+    }
+
+    #[DataProvider('tokenInThePathProvider')]
+    public function test_token_in_the_path_is_masked_in_the_request_detail(string $path, string $token): void
+    {
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/ConsignmentOwnerController.php', 44, 'show', true),
+        ], 'Falha na ação do proprietário', ['request' => [
+            'url' => 'https://revisalog.com.br'.$path,
+            'method' => 'POST',
+        ]]);
+
+        $message = (new SentryTelegramAlertFormatter)->format($data)['message'];
+
+        $this->assertStringNotContainsString($token, $message);
+        $this->assertStringContainsString('•••', $message);
+        $this->assertStringContainsString('<b>Requisição:</b> POST https://revisalog.com.br/'.explode('/', ltrim($path, '/'))[0].'/•••', $message);
+    }
+
+    public function test_masking_the_token_keeps_the_action_segment_of_the_consignment_route(): void
+    {
+        $token = str_repeat('eF5', 16);
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/ConsignmentOwnerController.php', 71, 'approveHistory', true),
+        ], 'Falha ao liberar histórico', ['request' => [
+            'url' => 'https://revisalog.com.br/consignacao/'.$token.'/liberar-historico',
+            'method' => 'POST',
+        ]]);
+
+        $message = (new SentryTelegramAlertFormatter)->format($data)['message'];
+
+        $this->assertStringContainsString('<b>Requisição:</b> POST https://revisalog.com.br/consignacao/•••/liberar-historico', $message);
+        $this->assertStringNotContainsString($token, $message);
+    }
+
+    public function test_token_in_the_path_is_masked_in_the_exception_message_and_in_the_full_trace(): void
+    {
+        $token = str_repeat('eF5', 16);
+
+        $result = (new SentryTelegramAlertFormatter)->format($this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/ConsignmentOwnerController.php', 44, 'show', true),
+        ], 'Nenhuma consignação em /consignacao/'.$token.'/contestar'));
+
+        foreach ([$result['message'], (string) $result['fullTrace']] as $output) {
+            $this->assertStringNotContainsString($token, $output);
+            $this->assertStringContainsString('/consignacao/•••/contestar', $output);
+        }
+    }
+
+    public function test_readable_path_segments_and_the_host_survive_the_masking(): void
+    {
+        $formatter = new SentryTelegramAlertFormatter;
+
+        $kept = [
+            'https://revisalog.com.br/garagem',
+            'https://revisalog.com.br/excluir-conta/confirmar/42',
+            'https://revisalog.com.br/v/RVL-AB12-CD',
+            'https://revisalog.com.br/consignacao/eF5eF5/liberar-historico',
+            'https://revisalog.com.br/api/v1/vehicles/9WBAB1234567890AB/maintenances',
+        ];
+
+        foreach ($kept as $url) {
+            $message = $formatter->format($this->exceptionData([
+                $this->frame('/app/Http/Controllers/Foo.php', 10, 'bar', true),
+            ], 'Falha', ['request' => ['url' => $url, 'method' => 'GET']]))['message'];
+
+            $this->assertStringContainsString('<b>Requisição:</b> GET '.$url, $message);
+            $this->assertStringNotContainsString('•••', $message);
+        }
     }
 }
