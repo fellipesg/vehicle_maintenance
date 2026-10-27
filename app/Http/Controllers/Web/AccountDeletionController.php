@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Http\Controllers\Concerns\EndsDeletedAccountSession;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreAccountDeletionRequest;
 use App\Mail\AccountDeletionRequestMail;
@@ -24,9 +25,14 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  *
  * A exclusão em si é a mesma do app: App\Services\User\DeleteUserAccount anonimiza os dados
  * pessoais e preserva veículos, placas e manutenções, que pertencem ao chassi.
+ *
+ * O link pode ser aberto no mesmo navegador em que a pessoa está logada, então a sessão dela
+ * também sai daqui (EndsDeletedAccountSession).
  */
 class AccountDeletionController extends Controller
 {
+    use EndsDeletedAccountSession;
+
     private const LINK_MINUTES = 60;
 
     public function show(): View
@@ -70,6 +76,7 @@ class AccountDeletionController extends Controller
         $this->assertLinkMatchesAccount($request, $user);
 
         $deleteUserAccount->handle($user);
+        $this->endWebSessionOf($request, $user);
 
         return redirect()
             ->route('account-deletion.show')

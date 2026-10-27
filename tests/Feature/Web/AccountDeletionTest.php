@@ -6,9 +6,14 @@ use App\Mail\AccountDeletionRequestMail;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\VehiclePdfExport;
+use App\Notifications\ConsignmentOwnerAccountDeletedNotification;
+use App\Support\AppStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -198,5 +203,127 @@ class AccountDeletionTest extends TestCase
 
         // A exclusão troca o e-mail, então o hash do link deixa de bater.
         $this->delete($url)->assertForbidden();
+    }
+
+    /**
+     * O link pode chegar no mesmo navegador em que a pessoa está logada. Sem o logout explícito,
+     * a sessão sobrevive à exclusão: o framework regrava a linha de `sessions` ao fim da resposta
+     * e o AuthenticateWebSession guarda o hash da senha nova logo em seguida.
+     */
+    public function test_the_signed_link_signs_out_the_browser_that_used_it(): void
+    {
+        User::factory()->asUser()->create(['email' => 'dono@example.com']);
+
+        $this->post(route('login.submit', 'usuario'), ['email' => 'dono@example.com', 'password' => 'password'])
+            ->assertRedirect(route('user.dashboard'));
+
+        $user = User::query()->where('email', 'dono@example.com')->firstOrFail();
+
+        $this->delete($this->confirmationUrlFor($user))
+            ->assertRedirect(route('account-deletion.show'));
+
+        $this->assertGuest();
+
+        $sessionAfterDeletion = session()->all();
+        $this->leaveDevice();
+
+        $this->withSession($sessionAfterDeletion)
+            ->get(route('user.dashboard'))
+            ->assertRedirect(route('login.usuario'));
+
+        $this->assertGuest();
+    }
+
+    /**
+     * Outro aparelho da mesma conta também perde a autenticação: a sessão está presa ao hash da
+     * senha, que a exclusão troca.
+     */
+    public function test_the_other_devices_stop_being_authenticated(): void
+    {
+        User::factory()->asUser()->create(['email' => 'dono@example.com']);
+
+        $this->post(route('login.submit', 'usuario'), ['email' => 'dono@example.com', 'password' => 'password'])
+            ->assertRedirect(route('user.dashboard'));
+
+        $otherDevice = session()->all();
+        $this->leaveDevice();
+
+        $user = User::query()->where('email', 'dono@example.com')->firstOrFail();
+
+        $this->delete($this->confirmationUrlFor($user))
+            ->assertRedirect(route('account-deletion.show'));
+        $this->leaveDevice();
+
+        $this->withSession($otherDevice)
+            ->get(route('user.dashboard'))
+            ->assertRedirect(route('login.usuario'));
+
+        $this->assertGuest();
+    }
+
+    public function test_confirming_erases_notifications_and_generated_pdf_exports(): void
+    {
+        Storage::fake(AppStorage::diskName());
+
+        $user = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser($user, $vehicle);
+        $user->refresh();
+
+        $user->notifications()->create([
+            'id' => (string) Str::uuid(),
+            'type' => ConsignmentOwnerAccountDeletedNotification::class,
+            'data' => ['vehicle' => 'Gol ABC1D23'],
+        ]);
+
+        $exportPath = 'exports/vehicle-pdfs/'.$user->id.'-historico.pdf';
+        Storage::disk(AppStorage::diskName())->put($exportPath, '%PDF-1.4');
+
+        $export = VehiclePdfExport::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'status' => VehiclePdfExport::STATUS_COMPLETED,
+            'file_path' => $exportPath,
+            'expires_at' => now()->addDay(),
+        ]);
+
+        $this->delete($this->confirmationUrlFor($user))
+            ->assertRedirect(route('account-deletion.show'));
+
+        $this->assertSame(0, $user->fresh()->notifications()->count());
+        $this->assertDatabaseMissing('vehicle_pdf_exports', ['id' => $export->id]);
+        Storage::disk(AppStorage::diskName())->assertMissing($exportPath);
+    }
+
+    /**
+     * Notas fiscais e fotos continuarem é decisão, não esquecimento: o histórico é do chassi. A
+     * página pública e a política de privacidade têm de dizer isso, e é por elas que o Google Play
+     * e o titular do dado conferem o que a exclusão faz.
+     */
+    public function test_the_page_and_the_privacy_policy_say_what_deletion_keeps_and_erases(): void
+    {
+        $this->get(route('account-deletion.show'))
+            ->assertOk()
+            ->assertSee('As notificações que você recebeu na plataforma.')
+            ->assertSee('Os relatórios em PDF que você gerou, registro e arquivo.')
+            ->assertSee('Notas fiscais e fotos das manutenções também ficam');
+
+        $this->get(route('legal.privacy'))
+            ->assertOk()
+            ->assertSee('as suas sessões abertas em qualquer aparelho')
+            ->assertSee('os relatórios em PDF que você gerou (registro e arquivo)')
+            ->assertSee('inclusive as notas fiscais e as fotos do serviço')
+            ->assertSee('pede a sua senha atual');
+
+        $this->assertSame('2026-10-27', config('legal.privacy_version'));
+    }
+
+    /**
+     * Limpa guarda e sessão, como se a próxima requisição viesse de outro navegador.
+     */
+    private function leaveDevice(): void
+    {
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
     }
 }

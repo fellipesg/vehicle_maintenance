@@ -58,3 +58,10 @@ mexer no app.
 + depois) e a rota autorizada responderia 403 a quem só buscou a placa. É a mesma exceção que o
 `x-provenance-card` tem na web (registrada em `.ai/rules/views.md`). Se um dia essa lista precisar de
 foto não pública, a rota não serve: o caminho é uma URL assinada de vida curta só para ela.
+
+## DELETE /api/v1/me pede a senha atual (contrato com o app)
+O endpoint passou a exigir `current_password` no corpo e responde 422 sem ele. Isso **quebra o app
+Flutter atual**, que manda o DELETE vazio: implante junto com a versão do app que pede a senha, na
+ordem app primeiro, backend depois. Conta que entra só por Google/Apple não tem senha para digitar
+e usa o link assinado de `/excluir-conta`; a mensagem do 422 traz essa URL. Os detalhes da decisão,
+o que a exclusão apaga e o que fica estão em `.ai/rules/user.md`.
