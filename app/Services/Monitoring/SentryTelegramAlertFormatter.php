@@ -55,9 +55,9 @@ class SentryTelegramAlertFormatter
         $this->addDetail($details, 'Release', $this->text($event['release'] ?? null));
 
         $method = $this->text(data_get($event, 'request.method'));
-        $url = $this->text(data_get($event, 'request.url'));
+        $url = $this->withoutQueryString($this->text(data_get($event, 'request.url')));
         $this->addDetail($details, 'Requisição', trim($method.' '.Str::limit($url, 200, '…')));
-        $this->addDetail($details, 'Culprit', $this->text($event['culprit'] ?? null));
+        $this->addDetail($details, 'Culprit', $this->withoutQueryString($this->text($event['culprit'] ?? null)));
 
         $footer = [];
         $webUrl = $this->text($event['web_url'] ?? null);
@@ -147,7 +147,7 @@ class SentryTelegramAlertFormatter
 
             $result[] = [
                 'type' => $this->text($value['type'] ?? null),
-                'value' => $this->text($value['value'] ?? null),
+                'value' => $this->withoutQueryString($this->text($value['value'] ?? null)),
                 'frames' => array_values(array_filter(is_array($frames) ? $frames : [], 'is_array')),
             ];
         }
@@ -164,10 +164,11 @@ class SentryTelegramAlertFormatter
         $title = $primary !== null ? $this->exceptionTitle($primary) : '';
 
         if ($title === '') {
-            $title = $this->text(data_get($event, 'logentry.formatted'))
-                ?: $this->text($event['message'] ?? null)
-                ?: $this->text($event['title'] ?? null)
-                ?: 'Erro sem título';
+            $title = $this->withoutQueryString(
+                $this->text(data_get($event, 'logentry.formatted'))
+                    ?: $this->text($event['message'] ?? null)
+                    ?: $this->text($event['title'] ?? null)
+            ) ?: 'Erro sem título';
         }
 
         return Str::limit($title, 300, '…');
@@ -242,6 +243,19 @@ class SentryTelegramAlertFormatter
         if ($value !== '') {
             $details[] = "<b>{$label}:</b> ".$this->escape(Str::limit($value, 300, '…'));
         }
+    }
+
+    /**
+     * Tira a query string (e o fragmento) de toda URL ou caminho dentro do texto, deixando só o
+     * caminho. As rotas assinadas do projeto levam o segredo ali — /excluir-conta/confirmar/{user}
+     * com ?hash=&signature=, /convite/descadastrar com o e-mail criptografado — e o grupo do
+     * Telegram é lido por gente que não deveria poder executar a ação em nome do usuário. Vale para
+     * qualquer token que venha a aparecer numa query, inclusive dentro da mensagem da exceção
+     * (o texto de erro do Guzzle traz a URL chamada por inteiro).
+     */
+    private function withoutQueryString(string $value): string
+    {
+        return preg_replace('~((?:https?://|/)[^\s?#]*)[?#]\S*~i', '$1', $value) ?? $value;
     }
 
     private function text(mixed $value): string
