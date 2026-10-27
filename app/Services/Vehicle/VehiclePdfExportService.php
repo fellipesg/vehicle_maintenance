@@ -30,9 +30,28 @@ class VehiclePdfExportService
         return $export;
     }
 
+    /**
+     * Quem pediu a exportação (ou um admin) e que AINDA pode ver o histórico daquele veículo.
+     *
+     * Guardar o arquivo não guarda o direito: quem vendeu o carro perde a exportação junto com a
+     * posse, e o lojista só segue baixando enquanto a consignação dele libera o histórico — a mesma
+     * `viewFullHistory` que autorizou o pedido em createExport.
+     */
     public function userCanViewExport(User $user, VehiclePdfExport $export): bool
     {
-        return $export->user_id === $user->id || $user->isAdmin();
+        if ($export->user_id !== $user->id && ! $user->isAdmin()) {
+            return false;
+        }
+
+        // loadMissing, não $export->vehicle: com preventLazyLoading fora de produção a autorização
+        // quebraria em vez de responder.
+        $vehicle = $export->loadMissing('vehicle')->vehicle;
+
+        if ($vehicle === null) {
+            return false;
+        }
+
+        return Gate::forUser($user)->allows('viewFullHistory', $vehicle);
     }
 
     /**

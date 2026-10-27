@@ -3,6 +3,10 @@ paths:
   - resources/views/pdfs/vehicle_maintenance_export.blade.php
   - app/Services/Vehicle/VehiclePdfMaintenancePhotos.php
   - app/Services/Vehicle/VehicleMaintenancePdfExporter.php
+  - app/Services/Vehicle/VehiclePdfExportService.php
+  - app/Http/Controllers/Api/VehiclePdfExportController.php
+  - app/Http/Controllers/Web/User/VehiclePdfExportDownloadController.php
+  - app/Console/Commands/CleanupVehiclePdfExports.php
 ---
 
 # Pdfs
@@ -41,3 +45,23 @@ Cada foto sai JPEG de até 900px no maior lado, qualidade 75, sobre fundo branco
 
 ## Fotos no PDF também pedem o recurso por conta
 Antes do aceite do dono, quem pediu o PDF (`viewer`) precisa ter as fotos das manutenções ligadas (MaintenancePhotoAccess; features.md): sem isso o exportador nem consulta o dono e o PDF sai sem foto de OS. Sem viewer (null) conta como sem recurso. O cartão "PDF do histórico" em /conta e a preferência no PUT /api/v1/me só existem para a conta com o recurso.
+
+## Baixar o PDF pede prazo e posse na hora, não só na geração
+`VehiclePdfExportService::userCanViewExport` exige quem pediu a exportação (ou um admin) **e**
+`VehiclePolicy::viewFullHistory` no veículo **naquele momento**: guardar o arquivo não guarda o
+direito. Quem vendeu o carro para de baixar junto com a posse (403), e o lojista segue baixando só
+enquanto a consignação dele libera o histórico — a mesma ability que autorizou o pedido em
+`createExport`, nunca uma segunda cópia da regra. Dono atual, admin e lojista liberado continuam
+passando.
+
+O prazo (`expires_at`, `vehicle-pdf-export.file_ttl_hours`, 24 h, gravado por
+`GenerateVehicleMaintenancePdfExport`) é cobrado no ato por `VehiclePdfExport::isExpired()`: **410**
+na API (status e download) e na web (`resources/views/errors/410.blade.php`), não 404 — o 404 desses
+endpoints quer dizer "ainda não ficou pronto" e o app continua consultando, enquanto o prazo vencido
+é definitivo. O status expirado nem chega a montar o payload, então não entrega mais URL assinada do
+storage.
+
+`vehicle-pdf-exports:cleanup` deixou de ser o único lugar que aplica o prazo e virou faxina de
+arquivo: roda de hora em hora (era diário) só para encurtar a brecha da URL assinada que o status
+entregou pouco antes do vencimento (`download_url_expiry_minutes`, 60 min) e que resolve enquanto o
+arquivo existir.

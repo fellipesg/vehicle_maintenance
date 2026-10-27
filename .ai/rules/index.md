@@ -38,7 +38,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
 | app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
-| resources/views/pdfs/vehicle_maintenance_export.blade.php,app/Services/Vehicle/VehiclePdfMaintenancePhotos.php,app/Services/Vehicle/VehicleMaintenancePdfExporter.php | .ai/rules/pdfs.md |
+| resources/views/pdfs/vehicle_maintenance_export.blade.php,app/Services/Vehicle/VehiclePdfMaintenancePhotos.php,app/Services/Vehicle/VehicleMaintenancePdfExporter.php,app/Services/Vehicle/VehiclePdfExportService.php,app/Http/Controllers/Api/VehiclePdfExportController.php,app/Http/Controllers/Web/User/VehiclePdfExportDownloadController.php,app/Console/Commands/CleanupVehiclePdfExports.php | .ai/rules/pdfs.md |
 | app/Policies/** | .ai/rules/policies.md |
 | routes/web.php,routes/api.php | .ai/rules/routes.md |
 | bootstrap/app.php,app/Support/PortalAccess.php,app/Support/FriendlyHttpErrors.php,app/Http/Controllers/Web/Auth/**,app/Http/Controllers/Web/AuthController.php | .ai/rules/portal-access.md |
