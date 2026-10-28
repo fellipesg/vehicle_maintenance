@@ -91,6 +91,15 @@ ordem app primeiro, backend depois. Conta que entra só por Google/Apple não te
 e usa o link assinado de `/excluir-conta`; a mensagem do 422 traz essa URL. Os detalhes da decisão,
 o que a exclusão apaga e o que fica estão em `.ai/rules/user.md`.
 
+## Nota fiscal no store e no update da OS
+`POST` e `PUT /api/v1/maintenances/{id}` recebem `invoices` (array, teto de
+`InvoiceFile::MAX_FILES_PER_REQUEST`) e anexam pelo `InvoiceUploadProcessor`. O `PUT` acrescenta às notas
+que a OS já tem; sem a chave, a lista fica intacta. Quem lê o envelope encontra `parsed_items_count`,
+`parse_warnings` e, só no `PUT`, `invoice_failures` com os nomes do que não foi anexado (lá a OS editada
+já está commitada e não volta atrás). O porquê da ordem e da limpeza de arquivo órfão está em
+"No store da API é transação; no update, não", em `.ai/rules/invoices.md`. Anexar por fora continua
+sendo `POST /api/v1/invoices/upload`, que pede `ability:invoices:write` e `invoice_type`.
+
 ## Preferência de fotos no PDF: GET/PUT /api/v1/me
 `export_include_photos` (true | false | null) vem em UserResource, logo em GET /api/v1/me, login e PUT /api/v1/me. Nulo = o proprietário nunca respondeu (o app pergunta uma vez). O PUT aceita só esse campo (`sometimes|boolean`, `name` também é `sometimes`, então atualização parcial funciona) e recusa null e texto com 422. Só vale para a conta de proprietário; o PDF consulta a preferência do dono ATUAL do veículo (.ai/rules/pdfs.md). Na web é o cartão "PDF do histórico" em /conta (PUT /conta/preferencias, só `user.type:user`).
 
