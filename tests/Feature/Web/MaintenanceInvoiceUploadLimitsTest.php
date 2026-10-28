@@ -5,6 +5,7 @@ namespace Tests\Feature\Web;
 use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Rules\InvoiceFile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -15,11 +16,18 @@ use Tests\Feature\Web\Concerns\InspectsOwnerPages;
 use Tests\TestCase;
 
 /**
- * Registrar e editar OS no portal do Proprietário e do Lojista recebe nota fiscal, e a App\Rules\InvoiceFile
- * lê o arquivo inteiro (MIME por conteúdo, cabeçalho do PDF e uma passada de XMLReader). Por isso essas
- * rotas entram no mesmo balde 'uploads' das rotas da oficina e da API (10/min por conta,
- * App\Providers\AppServiceProvider) e o array `invoices` tem teto de InvoiceFile::MAX_FILES_PER_REQUEST
- * notas por requisição.
+ * Registrar e editar OS recebe nota fiscal nos três portais web, e a App\Rules\InvoiceFile lê o arquivo
+ * inteiro (MIME por conteúdo, cabeçalho do PDF e uma passada de XMLReader). Por isso essas rotas entram
+ * no mesmo balde 'uploads' das rotas da API (10/min por conta, App\Providers\AppServiceProvider) e o
+ * array `invoices` tem teto de InvoiceFile::MAX_FILES_PER_REQUEST notas por requisição.
+ *
+ * São cinco superfícies web, não seis: o portal do Lojista não tem rota de update de OS
+ * (`.ai/rules/routes.md`).
+ *
+ * O PUT /api/v1/maintenances fica de fora de propósito. Ele valida `invoices` com o mesmo teto e
+ * depois descarta os arquivos (`unset($data['invoices'])` em Api\MaintenanceController::update), e o
+ * que ele deve fazer com a nota está sendo decidido em outra mudança. Cobrir o 422 de hoje seria
+ * fixar justamente o que está em aberto; quando a decisão sair, o caso entra aqui.
  */
 class MaintenanceInvoiceUploadLimitsTest extends TestCase
 {
@@ -36,11 +44,13 @@ class MaintenanceInvoiceUploadLimitsTest extends TestCase
             'nova OS (proprietário)' => ['owner-store'],
             'editar OS (proprietário)' => ['owner-update'],
             'nova OS (lojista)' => ['dealer-store'],
+            'nova OS (oficina)' => ['workshop-store'],
+            'editar OS (oficina)' => ['workshop-update'],
         ];
     }
 
     #[DataProvider('invoiceRouteProvider')]
-    public function test_every_owner_and_dealer_invoice_route_is_throttled(string $surface): void
+    public function test_every_web_invoice_route_is_throttled(string $surface): void
     {
         [$actor, $method, $url] = $this->invoiceRoute($surface);
 
@@ -152,6 +162,42 @@ class MaintenanceInvoiceUploadLimitsTest extends TestCase
      */
     private function invoiceRoute(string $surface): array
     {
+        if (str_starts_with($surface, 'workshop-')) {
+            $workshopUser = User::factory()->asWorkshop()->create();
+            $vehicle = Vehicle::factory()->create([
+                'license_plate' => 'OFI4N23',
+                'current_kilometers' => 40_000,
+                'odometer_at_registration' => 40_000,
+            ]);
+            $this->attachVehicleToUser(User::factory()->asUser()->create(), $vehicle);
+
+            if ($surface === 'workshop-update') {
+                // Só a oficina que declarou a OS pode editá-la (redirectUnlessAuthored).
+                $order = Maintenance::factory()->sealedByWorkshop()->create([
+                    'workshop_id' => $workshopUser->workshop->id,
+                    'user_id' => $workshopUser->id,
+                    'vehicle_id' => $vehicle->id,
+                    'maintenance_date' => now()->toDateString(),
+                    'kilometers' => 40_000,
+                ]);
+
+                return [$workshopUser, 'put', route('workshop.maintenances.update', $order), [
+                    'maintenance_type' => 'Revisão',
+                    'maintenance_date' => now()->toDateString(),
+                    'kilometers' => 40_000,
+                    'service_category' => 'mechanical',
+                ]];
+            }
+
+            return [$workshopUser, 'post', route('workshop.maintenances.store'), [
+                'license_plate' => $vehicle->license_plate,
+                'maintenance_type' => 'Revisão',
+                'maintenance_date' => now()->toDateString(),
+                'kilometers' => 40_500,
+                'service_category' => 'mechanical',
+            ]];
+        }
+
         if ($surface === 'dealer-store') {
             $dealer = User::factory()->asGarage()->create();
             $vehicle = $this->stockVehicle($dealer, ['current_kilometers' => 30_000, 'odometer_at_registration' => 30_000]);

@@ -1,44 +1,6 @@
 <?php
 
-/**
- * @return list<string>
- */
-if (! function_exists('cors_allowed_origins')) {
-    function cors_allowed_origins(): array
-    {
-        $raw = env('CORS_ALLOWED_ORIGINS');
-
-        if (is_string($raw) && trim($raw) !== '') {
-            return array_values(array_filter(array_map('trim', explode(',', $raw))));
-        }
-
-        if (env('APP_ENV') === 'production') {
-            $appUrl = rtrim((string) env('APP_URL', ''), '/');
-
-            return $appUrl !== '' ? [$appUrl] : [];
-        }
-
-        return ['*'];
-    }
-}
-
-/**
- * @return list<string>
- */
-if (! function_exists('cors_allowed_origin_patterns')) {
-    function cors_allowed_origin_patterns(): array
-    {
-        $raw = env('CORS_ALLOWED_ORIGIN_PATTERNS');
-
-        // No wildcard default: credentialed CORS must only be granted to origins
-        // explicitly listed in CORS_ALLOWED_ORIGINS / CORS_ALLOWED_ORIGIN_PATTERNS.
-        if (! is_string($raw) || trim($raw) === '') {
-            return [];
-        }
-
-        return array_values(array_filter(array_map('trim', explode(',', $raw))));
-    }
-}
+use App\Support\CorsOrigins;
 
 return [
     /*
@@ -50,6 +12,9 @@ return [
     | or "CORS". This determines what cross-origin operations may execute
     | in web browsers. You are free to adjust these settings as needed.
     |
+    | As origens vêm de App\Support\CorsOrigins. Nada de lógica declarada aqui dentro:
+    | sob `config:cache` este arquivo não é carregado (ver .ai/rules/config.md).
+    |
     | To learn more: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
     |
     */
@@ -58,9 +23,9 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => cors_allowed_origins(),
+    'allowed_origins' => CorsOrigins::allowed(),
 
-    'allowed_origins_patterns' => cors_allowed_origin_patterns(),
+    'allowed_origins_patterns' => CorsOrigins::patterns(),
 
     'allowed_headers' => ['*'],
 
@@ -68,5 +33,5 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => ! in_array('*', cors_allowed_origins(), true),
+    'supports_credentials' => CorsOrigins::supportsCredentials(),
 ];

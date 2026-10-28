@@ -45,10 +45,29 @@ class MaintenancePhotoImageProcessorTest extends TestCase
     private function processor(string $driver): MaintenancePhotoImageProcessor
     {
         if ($driver === MaintenancePhotoImageProcessor::DRIVER_IMAGICK && ! extension_loaded('imagick')) {
-            $this->markTestSkipped('Extensão imagick não instalada.');
+            $this->refuseOrSkipWithoutImagick();
         }
 
         return new MaintenancePhotoImageProcessor($driver);
+    }
+
+    /**
+     * Pular em silêncio é o que escondeu que nenhum ambiente nosso exercitava o Imagick: sem a extensão,
+     * os catorze casos do driver pulavam e o PHPUnit ainda saía com 0. Na máquina de quem não tem a
+     * extensão o pulo continua; onde o ambiente se diz CI, a ausência é defeito de imagem e falha.
+     */
+    private function refuseOrSkipWithoutImagick(): never
+    {
+        $ci = getenv('CI');
+
+        if (is_string($ci) && ! in_array(strtolower($ci), ['', '0', 'false'], true)) {
+            $this->fail(
+                'Extensão imagick ausente no CI. Ela está na lista de extensions do .github/workflows/ci.yml: '
+                .'se o job passou sem ela, a imagem mudou e o caminho Imagick voltaria a não ser testado.',
+            );
+        }
+
+        $this->markTestSkipped('Extensão imagick não instalada.');
     }
 
     public function test_driver_defaults_to_imagick_only_when_the_extension_exists(): void
