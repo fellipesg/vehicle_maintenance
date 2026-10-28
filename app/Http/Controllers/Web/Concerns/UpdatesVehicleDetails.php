@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Concerns;
 
 use App\Models\Vehicle;
 use App\Rules\Chassis;
+use App\Rules\UniqueRenavam;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehiclePlateHistoryService;
 use App\Support\Vehicle\VehicleEntryFlow;
@@ -40,7 +41,7 @@ trait UpdatesVehicleDetails
 
         $data = $request->validate([
             'license_plate' => ['required', 'string', 'max:10', Rule::unique('vehicles', 'license_plate')->ignore($vehicle->id)],
-            'renavam' => ['required', 'string', 'max:20', Rule::unique('vehicles', 'renavam')->ignore($vehicle->id)],
+            'renavam' => ['required', 'string', 'max:20', new UniqueRenavam($vehicle->id)],
             'crv_number' => ['required', 'string', 'max:20'],
             'brand' => ['required', 'string', 'max:100'],
             'model' => ['required', 'string', 'max:100'],

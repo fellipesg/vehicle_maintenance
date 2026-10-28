@@ -132,7 +132,7 @@ class MaintenanceController extends Controller
             'kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
             'service_category' => ['required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => ['nullable', 'boolean'],
-            'invoices' => ['nullable', 'array'],
+            'invoices' => ['nullable', 'array', 'max:'.InvoiceFile::MAX_FILES_PER_REQUEST],
             'invoices.*' => ['bail', 'file', 'max:10240', new InvoiceFile],
             'return_to' => ['nullable', 'in:vehicle'],
         ]);

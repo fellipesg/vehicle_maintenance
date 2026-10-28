@@ -36,7 +36,13 @@ $photo->url, porque só a busca por placa abre aquele bloco e lá x-vehicle.deta
 fotos públicas (veículo/depois); a rota responderia 403 a quem só buscou a placa. O arquivo sai pelo
 MaintenancePhotoFileResponse, compartilhado com a rota da API. Do lado da API a foto também passou a
 sair por rota autorizada (api.maintenance-photos.show), e a busca pública mantém a mesma exceção:
-ver .ai/rules/api.md.
+ver .ai/rules/api.md (agora com variantes em URL temporária, só depois da policy). As telas web
+(maintenances/_detail e partials/maintenance-photos-form) usam MaintenancePhotoUrls::forViewer($photo,
+auth()->user()): policy primeiro, depois as variantes em URL temporária. Miniatura = `thumb`; item da
+<x-ui.lightbox> = `display` (chave `original` = `master`, que o "Abrir original" usa); link da miniatura
+= `master`. Foto negada (null) some da tela. A rota maintenance-photos.show virou só o fallback, quando
+a assinatura falha. Defina `$photo->setRelation('maintenance', ...)` antes para a policy não consultar
+por foto.
 
 ## Nota fiscal nunca pelo caminho do storage
 O link "Abrir" de uma nota fiscal (maintenances/_detail e partials/workshop-maintenance-form) aponta
@@ -45,3 +51,6 @@ InvoicePolicy::view. Não volte a usar AppStorage::url($invoice->file_path): no 
 arquivo abre sem login e, no S3/R2, a URL assinada é compartilhável. A rota serve só PDF na aba
 (Content-Disposition inline); XML e o resto baixam, com nosniff e CSP sandbox, porque o arquivo é do
 cliente.
+
+## Fotos só aparecem para quem tem o recurso ligado
+Telas de portal não mostram foto, contagem de fotos nem etapa de envio quando a conta não tem as fotos das manutenções (MaintenancePhotoAccess, features.md): MaintenanceRedactor tira `photos` e zera `photos_count` (parâmetro `publicLookup` só na busca pública), `x-provenance-card` esconde a contagem de quem está logado sem o recurso (a consulta pública, `expandable`, não muda), o formulário da oficina não inclui `partials.maintenance-photos-form` e o servidor responde 403 a um envio forjado. A busca pública por placa continua com as fotos públicas.

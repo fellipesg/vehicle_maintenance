@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -319,11 +320,141 @@ class AccountDeletionTest extends TestCase
     }
 
     /**
+     * Teto por aparelho (IP): 5 pedidos por minuto, mesmo que cada um aponte para um e-mail
+     * diferente — aqui o balde por destinatário nunca é o que barra.
+     */
+    public function test_sixth_request_from_the_same_ip_in_a_minute_returns_429(): void
+    {
+        Mail::fake();
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->requestDeletion('203.0.113.9', "pessoa{$attempt}@example.com")
+                ->assertRedirect(route('account-deletion.show'));
+        }
+
+        $this->requestDeletion('203.0.113.9', 'pessoa6@example.com')->assertStatus(429);
+
+        Mail::assertNothingQueued();
+    }
+
+    /**
+     * O defeito que isto cobre: com teto só por IP, trocar de IP mandava e-mails sem limite para a
+     * caixa de outra pessoa. O balde por destinatário soma todos os IPs, então um IP novo a cada
+     * pedido não aumenta quantos e-mails um endereço recebe por dia.
+     */
+    public function test_destination_email_is_capped_per_day_across_every_ip(): void
+    {
+        Mail::fake();
+
+        User::factory()->create(['email' => 'alvo@example.com']);
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->requestDeletion("198.51.100.{$attempt}", 'alvo@example.com')
+                ->assertRedirect(route('account-deletion.show'));
+        }
+
+        $this->requestDeletion('198.51.100.250', 'alvo@example.com')->assertStatus(429);
+
+        Mail::assertQueued(AccountDeletionRequestMail::class, 5);
+    }
+
+    /** Trocar maiúsculas por minúsculas não abre um balde novo para a mesma caixa. */
+    public function test_the_daily_cap_ignores_the_case_of_the_email(): void
+    {
+        Mail::fake();
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->requestDeletion("198.51.100.{$attempt}", 'ALVO@EXAMPLE.COM')
+                ->assertRedirect(route('account-deletion.show'));
+        }
+
+        $this->requestDeletion('198.51.100.250', 'alvo@example.com')->assertStatus(429);
+    }
+
+    /**
+     * Sem oráculo: ter ou não conta não muda nada que o visitante possa ver. Nem a resposta do
+     * pedido, nem o momento em que o teto por destinatário passa a recusar — porque a chave do
+     * balde é o e-mail digitado, não a conta encontrada. As duas sequências usam os mesmos IPs na
+     * mesma ordem, então a única diferença entre elas é existir o cadastro.
+     */
+    public function test_existing_and_unknown_emails_are_indistinguishable(): void
+    {
+        Mail::fake();
+
+        User::factory()->create(['email' => 'cadastrado@example.com']);
+
+        $registered = $this->attemptsUntilTheCap('cadastrado@example.com');
+        $this->flushSession();
+        $unknown = $this->attemptsUntilTheCap('ninguem@example.com');
+
+        $this->assertSame($registered, $unknown);
+        $this->assertSame([302, 302, 302, 302, 302, 429], array_column($registered, 'status'));
+
+        // E só o endereço cadastrado recebeu e-mail, sem que isso apareça na resposta.
+        Mail::assertQueued(AccountDeletionRequestMail::class, 5);
+    }
+
+    /**
+     * /contato e /excluir-conta dividiam o balde 'contact': mensagens ao suporte gastavam a cota
+     * de quem precisava do link de exclusão, e vice-versa. Agora cada rota tem o seu.
+     */
+    public function test_contact_messages_do_not_spend_the_account_deletion_quota(): void
+    {
+        Mail::fake();
+
+        $contactPayload = [
+            'name' => 'Ana Silva',
+            'email' => 'ana@example.com',
+            'subject' => 'support',
+            'message' => 'Preciso de ajuda com o relatório do veículo.',
+        ];
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->post(route('contact.store'), $contactPayload)->assertRedirect(route('contact.show'));
+        }
+
+        $this->post(route('contact.store'), $contactPayload)->assertStatus(429);
+
+        $this->post(route('account-deletion.request'), ['email' => 'dono@example.com'])
+            ->assertRedirect(route('account-deletion.show'));
+    }
+
+    /**
+     * Tudo o que o visitante consegue observar em cada tentativa até o teto por destinatário
+     * recusar — status, destino do redirecionamento e corpo da resposta —, sempre com um IP
+     * próprio para que nenhum balde por IP interfira.
+     *
+     * @return list<array{status: int, location: string|null, body: string}>
+     */
+    /**
      * Limpa guarda e sessão, como se a próxima requisição viesse de outro navegador.
      */
     private function leaveDevice(): void
     {
         $this->app['auth']->forgetGuards();
         $this->flushSession();
+    }
+
+    private function attemptsUntilTheCap(string $email): array
+    {
+        $attempts = [];
+
+        for ($attempt = 1; $attempt <= 6; $attempt++) {
+            $response = $this->requestDeletion("192.0.2.{$attempt}", $email);
+
+            $attempts[] = [
+                'status' => $response->getStatusCode(),
+                'location' => $response->headers->get('Location'),
+                'body' => $response->getContent(),
+            ];
+        }
+
+        return $attempts;
+    }
+
+    private function requestDeletion(string $ip, string $email): TestResponse
+    {
+        return $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->post(route('account-deletion.request'), ['email' => $email]);
     }
 }

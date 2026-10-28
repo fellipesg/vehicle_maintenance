@@ -70,11 +70,18 @@ class GeoGeocodeAddresses extends Command
         return $count;
     }
 
+    /**
+     * Só o proprietário. Loja e oficina têm endereço no cadastro da empresa, e o que
+     * sobrou nas colunas de `users` dessas contas não aparece em mapa nenhum
+     * (admin.maps.users filtra user_type = 'user'): geocodificar é gastar chamada
+     * do Nominatim à toa.
+     */
     private function geocodeUsers(AddressGeocoder $geocoder, int $sleepSeconds): int
     {
         $count = 0;
 
         User::query()
+            ->where('user_type', 'user')
             ->whereNull('latitude')
             ->whereNull('longitude')
             ->whereNotNull('city')

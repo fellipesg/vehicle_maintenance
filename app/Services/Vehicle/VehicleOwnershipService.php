@@ -362,7 +362,7 @@ class VehicleOwnershipService
             return false;
         }
 
-        return $givenRenavam === $vehicleRenavam && $givenPlate === $vehiclePlate;
+        return Vehicle::renavamsMatch($givenRenavam, $vehicleRenavam) && $givenPlate === $vehiclePlate;
     }
 
     private function assertCrlvMatchesRegistration(
@@ -371,7 +371,7 @@ class VehicleOwnershipService
         string $crvNumber,
         array $vehicleData,
     ): void {
-        if ($crlv->normalizedRenavam() !== $renavam) {
+        if (! Vehicle::renavamsMatch($crlv->normalizedRenavam(), $renavam)) {
             throw new RuntimeException('O RENAVAM informado não confere com o CRLV-e.');
         }
 
@@ -426,7 +426,7 @@ class VehicleOwnershipService
             if ($crlvChassis === '' || $vehicleChassis === '' || $crlvChassis !== $vehicleChassis) {
                 throw new RuntimeException('O chassi do CRLV-e não confere com o veículo cadastrado.');
             }
-        } elseif ($crlv->normalizedRenavam() !== $vehicleRenavam) {
+        } elseif (! Vehicle::renavamsMatch($crlv->normalizedRenavam(), $vehicleRenavam)) {
             throw new RuntimeException('O RENAVAM do CRLV-e não confere com o veículo cadastrado.');
         }
 

@@ -13,10 +13,14 @@ use App\Policies\MaintenancePhotoPolicy;
 use App\Policies\MaintenancePolicy;
 use App\Policies\VehiclePolicy;
 use App\Policies\WorkshopPolicy;
+use App\Support\ApiResponse;
+use App\Support\Maintenance\MaintenancePhotoUrls;
 use App\Support\StorageEndpointResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Console\AboutCommand;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureLocale();
 
+        MaintenancePhotoUrls::registerLocalTemporaryUrls(Storage::disk('public'));
+
         Model::preventLazyLoading(! $this->app->isProduction());
 
         // Em produção, nenhum comando que apaga dados pode rodar: o deploy usa `migrate --force`,
@@ -56,20 +62,21 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('auth', fn (Request $request) => $this->buildAuthRateLimit(
             $request,
-            fn (Request $request, array $headers) => response()->json([
-                'success' => false,
-                'message' => $this->tooManyAttemptsMessage($headers),
-            ], 429, $headers),
+            fn (Request $request, array $headers) => $this->tooManyAttemptsJson($headers),
         ));
 
+        // O formulário web volta com aviso, mas um cliente que pede JSON (um XHR no mesmo
+        // formulário) não lê o erro do flash: para ele o redirect esconderia o 429 e o Retry-After.
         RateLimiter::for('auth-web', fn (Request $request) => $this->buildAuthRateLimit(
             $request,
-            fn (Request $request, array $headers) => redirect()
-                ->back()
-                ->withInput($request->only('email', 'name', 'phone', 'document', 'trade_name', 'cnpj', 'ref'))
-                ->withErrors([
-                    'email' => $this->tooManyAttemptsMessage($headers),
-                ]),
+            fn (Request $request, array $headers) => $request->expectsJson()
+                ? $this->tooManyAttemptsJson($headers)
+                : redirect()
+                    ->back()
+                    ->withInput($request->only('email', 'name', 'phone', 'document', 'trade_name', 'cnpj', 'ref'))
+                    ->withErrors([
+                        'email' => $this->tooManyAttemptsMessage($headers),
+                    ]),
         ));
 
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by(
@@ -114,9 +121,28 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(10)->by('2fa-ip|'.$request->ip()),
         ]);
 
+        // O /contato só manda para o suporte: o e-mail digitado vira Reply-To, nunca destinatário,
+        // então não há como usar o formulário para encher a caixa de outra pessoa. Teto por IP basta.
         RateLimiter::for('contact', fn (Request $request) => Limit::perMinute(5)->by(
             'contact|'.$request->ip(),
         ));
+
+        // O /excluir-conta manda o link de exclusão para o endereço que foi digitado, então um teto
+        // só por IP não protege o destinatário: trocar de IP libera quantos e-mails o atacante
+        // quiser para a mesma caixa. Daí o balde por destinatário, que soma todos os IPs. A chave é
+        // o e-mail digitado e não a conta encontrada, para o 429 não revelar quem tem cadastro —
+        // mesma regra da resposta única do AccountDeletionController e do PasswordResetController.
+        // O preço conhecido é poder gastar a cota de alguém; quem precisa excluir a conta ainda tem
+        // o caminho pelo app e o e-mail do suporte, os dois citados na própria página.
+        RateLimiter::for('account-deletion', fn (Request $request) => [
+            Limit::perMinute(5)->by('account-deletion-ip|'.$request->ip()),
+            Limit::perHour(20)->by('account-deletion-ip-hourly|'.$request->ip()),
+            Limit::perDay(5)->by('account-deletion-email|'.hash('sha256', Str::lower((string) $request->input('email', '')))),
+        ]);
+
+        if ($this->app->runningInConsole()) {
+            $this->describeAbuseGuards();
+        }
 
         Gate::policy(Vehicle::class, VehiclePolicy::class);
         Gate::policy(Maintenance::class, MaintenancePolicy::class);
@@ -130,6 +156,23 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
+     * `php artisan about` responde se o captcha do /contato está de pé, porque a chave vem do
+     * ambiente e some sem avisar. Em produção o formulário recusa tudo sem ela
+     * (App\Http\Requests\Web\StoreContactRequest), então vale poder conferir sem abrir o .env.
+     *
+     * Só no console: AboutCommand::add guarda o resolvedor num estático, e registrar a cada
+     * requisição só empilharia cópias de algo que apenas o comando lê.
+     */
+    private function describeAbuseGuards(): void
+    {
+        AboutCommand::add('RevisaLog', fn () => [
+            'Captcha do /contato (Turnstile)' => filled(config('services.turnstile.secret_key'))
+                ? '<fg=green;options=bold>configurado</>'
+                : '<fg=red;options=bold>SEM CHAVE</>',
+        ]);
+    }
+
+    /**
      * Carbon's package provider already follows app.locale; setting it here keeps
      * diffForHumans()/translatedFormat() and Number helpers in pt_BR even if that
      * provider stops being discovered.
@@ -140,6 +183,17 @@ class AppServiceProvider extends ServiceProvider
 
         Carbon::setLocale($locale);
         Number::useLocale($locale);
+    }
+
+    /**
+     * Mesma resposta para a API e para um cliente JSON na rota web: envelope com a mensagem em
+     * pt-BR e os cabeçalhos do limiter, Retry-After incluído.
+     *
+     * @param  array<string, mixed>  $headers  Rate limiter headers, including Retry-After.
+     */
+    private function tooManyAttemptsJson(array $headers): JsonResponse
+    {
+        return ApiResponse::error($this->tooManyAttemptsMessage($headers), 429)->withHeaders($headers);
     }
 
     /**

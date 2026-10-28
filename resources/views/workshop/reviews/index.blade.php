@@ -42,7 +42,8 @@
                             $declarantFirstName = \Illuminate\Support\Str::before(trim((string) $maintenance->user?->name), ' ');
                             $declaredBy = $maintenance->registered_by_type === 'garage' ? 'Lojista' : 'Proprietário';
                             $invoiceCount = $maintenance->invoices->count();
-                            $photoCount = $maintenance->photos->count();
+                            $mayShowPhotos = \App\Support\Maintenance\MaintenancePhotoAccess::allows(auth()->user());
+                            $photoCount = $mayShowPhotos ? $maintenance->photos->count() : 0;
                             $dialogId = 'nao-reconheco-'.$maintenance->id;
                             $serviceLabel = $maintenance->maintenance_type.($plate ? ' · '.$plate : '');
                         @endphp
@@ -61,7 +62,7 @@
                                         <div class="flex gap-1.5"><dt class="text-muted-foreground">Quilometragem:</dt><dd class="tabular-nums text-foreground">{{ number_format((int) $maintenance->kilometers, 0, ',', '.') }} km</dd></div>
                                         <div class="flex gap-1.5"><dt class="text-muted-foreground">Cliente:</dt><dd class="text-foreground">{{ $declarantFirstName !== '' ? $declarantFirstName : $declaredBy }}</dd></div>
                                         <div class="flex gap-1.5"><dt class="text-muted-foreground">Itens:</dt><dd class="tabular-nums text-foreground">{{ (int) $maintenance->items_count }}@if((float) $maintenance->items_total > 0) · {{ $money($maintenance->items_total) }}@endif</dd></div>
-                                        <div class="flex gap-1.5"><dt class="text-muted-foreground">Anexos:</dt><dd class="text-foreground">{{ $invoiceCount === 1 ? '1 nota fiscal' : $invoiceCount.' notas fiscais' }}, {{ $photoCount === 1 ? '1 foto' : $photoCount.' fotos' }}</dd></div>
+                                        <div class="flex gap-1.5"><dt class="text-muted-foreground">Anexos:</dt><dd class="text-foreground">{{ $invoiceCount === 1 ? '1 nota fiscal' : $invoiceCount.' notas fiscais' }}@if($mayShowPhotos), {{ $photoCount === 1 ? '1 foto' : $photoCount.' fotos' }}@endif</dd></div>
                                     </dl>
                                     @if(filled($maintenance->description))
                                         <p class="line-clamp-2 max-w-prose text-sm text-muted-foreground">{{ $maintenance->description }}</p>

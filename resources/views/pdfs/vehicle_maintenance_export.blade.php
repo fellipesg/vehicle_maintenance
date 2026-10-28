@@ -464,6 +464,33 @@
             font-weight: bold;
         }
 
+        .photo-grid {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .photo-grid tr {
+            page-break-inside: avoid;
+        }
+
+        .photo-grid td {
+            width: 50%;
+            padding: 0 8px 0 0;
+            vertical-align: top;
+        }
+
+        .photo-caption {
+            margin-top: 3px;
+            font-size: 8pt;
+            color: #5a7289;
+        }
+
+        .photo-more {
+            margin-top: 6px;
+            font-size: 8pt;
+            color: #5a7289;
+        }
+
         .empty-state {
             margin-top: 16px;
             padding: 16px 12px;
@@ -851,6 +878,34 @@
                                         @endforeach
                                     </tbody>
                                 </table>
+                            </td>
+                        </tr>
+                    @endif
+                    @php $osPhotos = ($maintenancePhotos ?? [])[$maintenance->id] ?? null; @endphp
+                    @if($osPhotos !== null && $osPhotos['items'] !== [])
+                        <tr>
+                            <td>
+                                <div class="section-heading">Fotos do serviço</div>
+                                <table class="photo-grid" cellpadding="0" cellspacing="0">
+                                    @foreach(array_chunk($osPhotos['items'], 2) as $photoRow)
+                                        <tr>
+                                            @foreach($photoRow as $photo)
+                                                <td>
+                                                    <img src="{{ $photo['src'] }}" width="{{ $photo['width'] }}" height="{{ $photo['height'] }}" alt="{{ $photo['label'] }}">
+                                                    <div class="photo-caption">{{ $photo['label'] }}</div>
+                                                </td>
+                                            @endforeach
+                                            @if(count($photoRow) < 2)
+                                                <td></td>
+                                            @endif
+                                        </tr>
+                                    @endforeach
+                                </table>
+                                @if($osPhotos['extra'] > 0)
+                                    <div class="photo-more">
+                                        +{{ $osPhotos['extra'] }} {{ $osPhotos['extra'] === 1 ? 'foto' : 'fotos' }} no RevisaLog{{ $maintenance->verification_code ? ' · revisalog.com.br/v/'.$maintenance->verification_code : '' }}
+                                    </div>
+                                @endif
                             </td>
                         </tr>
                     @endif

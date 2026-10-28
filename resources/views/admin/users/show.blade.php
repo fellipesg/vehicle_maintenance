@@ -90,6 +90,38 @@
             </div>
         </section>
 
+        <x-ui.section id="recursos-da-conta" title="Recursos da conta" description="Funcionalidades desligadas por padrão, que o admin liga conta a conta. A conta tem o recurso quando ele está ligado nela ou na oficina ou loja dela.">
+            <x-ui.card>
+                <div class="divide-y divide-border" data-slot="account-features">
+                    <x-admin.maintenance-photos-toggle
+                        class="pb-3 last:pb-0"
+                        :action="route('admin.users.maintenance-photos', $user)"
+                        :enabled="$photosFeature['user']"
+                        subject="a conta"
+                        :inherited="$photosFeature['effective'] ? ($photosFeature['workshop'] ? 'pela oficina' : ($photosFeature['garage'] ? 'pela loja' : null)) : null"
+                    />
+                    @if($workshop)
+                        <x-admin.maintenance-photos-toggle
+                            class="py-3 last:pb-0"
+                            :action="route('admin.workshops.maintenance-photos', $workshop)"
+                            :enabled="$photosFeature['workshop']"
+                            subject="a oficina vinculada"
+                            :inherited="$photosFeature['user'] ? 'pela conta' : null"
+                        />
+                    @endif
+                    @if($garage)
+                        <x-admin.maintenance-photos-toggle
+                            class="py-3 last:pb-0"
+                            :action="route('admin.garages.maintenance-photos', $garage)"
+                            :enabled="$photosFeature['garage']"
+                            subject="a loja vinculada"
+                            :inherited="$photosFeature['user'] ? 'pela conta' : null"
+                        />
+                    @endif
+                </div>
+            </x-ui.card>
+        </x-ui.section>
+
         @if($isWorkshopAccount)
             <x-ui.section id="oficina-vinculada" title="Oficina vinculada" description="Dados que aparecem no Selo da oficina e no mapa.">
                 @if($workshop)

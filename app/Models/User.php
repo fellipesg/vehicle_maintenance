@@ -55,6 +55,7 @@ class User extends Authenticatable
         'provider',
         'provider_id',
         'avatar',
+        'export_include_photos',
     ];
 
     /**
@@ -83,6 +84,7 @@ class User extends Authenticatable
             'document' => 'encrypted',
             'is_admin' => 'boolean',
             'subscription_active' => 'boolean',
+            'export_include_photos' => 'boolean',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'two_factor_secret' => 'encrypted',

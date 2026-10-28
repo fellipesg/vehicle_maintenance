@@ -15,9 +15,6 @@ class MaintenanceAttachmentPurger
         $count = 0;
 
         foreach ($maintenance->photos()->get() as $photo) {
-            if (AppStorage::disk()->exists($photo->path)) {
-                AppStorage::disk()->delete($photo->path);
-            }
             $photo->delete();
             $count++;
         }

@@ -256,6 +256,42 @@ class AuthTest extends TestCase
         );
     }
 
+    public function test_web_login_rate_limit_answers_json_when_the_client_expects_json(): void
+    {
+        // Mesma rota, cliente diferente: um XHR no formulário de entrada não lê o erro do flash,
+        // então o limiter responde o envelope com o 429 e o Retry-After em vez do redirect.
+        User::factory()->asUser()->create([
+            'email' => 'xhr-ratelimit@example.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $response = $this->postJson('/login/usuario', [
+                'email' => 'xhr-ratelimit@example.com',
+                'password' => 'wrong-password',
+            ]);
+
+            $this->assertNotSame(429, $response->status());
+        }
+
+        $response = $this->postJson('/login/usuario', [
+            'email' => 'xhr-ratelimit@example.com',
+            'password' => 'wrong-password',
+        ])->assertStatus(429);
+
+        $seconds = (int) $response->headers->get('Retry-After');
+
+        $this->assertGreaterThan(0, $seconds);
+        $this->assertStringContainsString(
+            'application/json',
+            (string) $response->headers->get('Content-Type')
+        );
+        $response->assertJsonPath('success', false)
+            ->assertJsonPath('message', $seconds === 1
+                ? 'Muitas tentativas. Aguarde 1 segundo e tente de novo.'
+                : "Muitas tentativas. Aguarde {$seconds} segundos e tente de novo.");
+    }
+
     public function test_web_register_rate_limit_returns_redirect_not_json(): void
     {
         Mail::fake();

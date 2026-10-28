@@ -187,7 +187,7 @@ class PublicVehicleSearchTest extends TestCase
 
         $empty = $this->element($page, '[data-vehicle-search-empty]');
         $this->assertSame('Nenhum veículo com “NAO0000”', $this->text($this->element($empty, 'h2')));
-        $this->assertStringContainsString('O chassi tem 17 caracteres e o RENAVAM, 11 dígitos.', $this->text($empty));
+        $this->assertStringContainsString('O chassi tem 17 caracteres e o RENAVAM, de 9 a 11 dígitos.', $this->text($empty));
         $this->assertStringContainsString('Placas antigas do veículo também são pesquisadas.', $this->text($empty));
         $this->assertSame(route('user.vehicles.create'), $this->link($empty, 'Adicionar veículo')->getAttribute('href'));
         $this->assertSame('#vehicle-search-identifier', $this->link($empty, 'Tentar outra busca')->getAttribute('href'));

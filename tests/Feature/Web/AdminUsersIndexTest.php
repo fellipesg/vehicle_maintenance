@@ -60,7 +60,7 @@ class AdminUsersIndexTest extends TestCase
 
     public function test_search_matches_name_or_email_and_keeps_the_tab(): void
     {
-        $admin = $this->adminUser(['name' => 'Ana Admin']);
+        $admin = $this->adminUser(['name' => 'Ana Admin', 'email' => 'ana.admin@example.test']);
         User::factory()->asUser()->create(['name' => 'Carla Souza', 'email' => 'carla@example.test']);
         User::factory()->asUser()->create(['name' => 'Diego Lima', 'email' => 'diego.souza@example.test']);
         User::factory()->asGarage()->create(['name' => 'Souza Veículos']);

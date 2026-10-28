@@ -66,7 +66,7 @@ class VehiclePlateSearch
         }
 
         $renavamDigits = preg_replace('/\D/', '', $trimmed) ?? '';
-        if (strlen($renavamDigits) === 11) {
+        if (strlen($renavamDigits) >= 9 && strlen($renavamDigits) <= 11) {
             $byRenavam = Vehicle::findByRenavam($renavamDigits);
             if ($byRenavam !== null) {
                 return new VehicleLookupResult($byRenavam, VehicleLookupResult::MATCH_RENAVAM);

@@ -2,15 +2,27 @@
 
 namespace App\Services\Maintenance;
 
+use App\Jobs\ProcessMaintenancePhoto;
 use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
 use App\Models\User;
 use App\Support\AppStorage;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
+use Throwable;
 
 class MaintenancePhotoService
 {
+    public function __construct(private readonly MaintenancePhotoImageProcessor $images) {}
+
+    /**
+     * Guarda o master (até 2048px, JPEG q85, sem EXIF e com a orientação aplicada) em
+     * `maintenance-photos/{maintenance_id}/{uuid}/master.jpg` e enfileira o ProcessMaintenancePhoto,
+     * que gera thumb e display. O original enviado não é guardado: a foto do celular traz a
+     * localização de quem fotografou.
+     */
     public function store(
         Maintenance $maintenance,
         UploadedFile $file,
@@ -21,12 +33,17 @@ class MaintenancePhotoService
     ): MaintenancePhoto {
         $this->assertGroupLimit($maintenance, $subject, $stage);
 
-        $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-        $fileName = $maintenance->id.'_'.uniqid('', true).'.'.$extension;
-        $path = AppStorage::MAINTENANCE_PHOTOS_PREFIX.$fileName;
+        try {
+            $master = $this->images->master($this->contentsOf($file));
+        } catch (RuntimeException) {
+            throw ValidationException::withMessages([
+                'photo' => 'Não foi possível processar a imagem enviada.',
+            ]);
+        }
 
-        $contents = $this->processedContents($file);
-        AppStorage::disk()->put($path, $contents);
+        $directory = AppStorage::MAINTENANCE_PHOTOS_PREFIX.$maintenance->id.'/'.Str::uuid();
+        $path = $directory.'/master.jpg';
+        AppStorage::disk()->put($path, $master['contents']);
 
         $sort = (int) MaintenancePhoto::query()
             ->where('maintenance_id', $maintenance->id)
@@ -34,24 +51,37 @@ class MaintenancePhotoService
             ->where('stage', $stage)
             ->max('sort') + 1;
 
-        return MaintenancePhoto::create([
-            'maintenance_id' => $maintenance->id,
-            'maintenance_item_id' => $maintenanceItemId,
-            'subject' => $subject,
-            'stage' => $stage,
-            'path' => $path,
-            'original_name' => $file->getClientOriginalName(),
-            'sort' => $sort,
-            'created_by' => $user->id,
-        ]);
-    }
+        try {
+            $photo = MaintenancePhoto::create([
+                'maintenance_id' => $maintenance->id,
+                'maintenance_item_id' => $maintenanceItemId,
+                'subject' => $subject,
+                'stage' => $stage,
+                'path' => $path,
+                'width' => $master['width'],
+                'height' => $master['height'],
+                'bytes' => $master['bytes'],
+                'dominant_color' => $master['dominant_color'],
+                'original_name' => $file->getClientOriginalName(),
+                'sort' => $sort,
+                'created_by' => $user->id,
+            ]);
+        } catch (Throwable $exception) {
+            AppStorage::disk()->deleteDirectory($directory);
 
-    public function delete(MaintenancePhoto $photo): void
-    {
-        if (AppStorage::disk()->exists($photo->path)) {
-            AppStorage::disk()->delete($photo->path);
+            throw $exception;
         }
 
+        ProcessMaintenancePhoto::dispatch($photo);
+
+        return $photo;
+    }
+
+    /**
+     * Apaga a linha; o evento `deleting` do model remove todos os arquivos (master, thumb, display).
+     */
+    public function delete(MaintenancePhoto $photo): void
+    {
         $photo->delete();
     }
 
@@ -70,51 +100,16 @@ class MaintenancePhotoService
         }
     }
 
-    private function processedContents(UploadedFile $file): string
+    private function contentsOf(UploadedFile $file): string
     {
         $contents = file_get_contents($file->getRealPath());
+
         if ($contents === false) {
             throw ValidationException::withMessages([
                 'photo' => 'Não foi possível ler o arquivo enviado.',
             ]);
         }
 
-        if (! function_exists('imagecreatefromstring')) {
-            return $contents;
-        }
-
-        $image = @imagecreatefromstring($contents);
-        if ($image === false) {
-            return $contents;
-        }
-
-        $width = imagesx($image);
-        $height = imagesy($image);
-        $maxWidth = 1920;
-
-        if ($width <= $maxWidth) {
-            imagedestroy($image);
-
-            return $contents;
-        }
-
-        $newWidth = $maxWidth;
-        $newHeight = (int) round($height * ($maxWidth / $width));
-        $resized = imagecreatetruecolor($newWidth, $newHeight);
-
-        imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
-        imagedestroy($image);
-
-        $mime = $file->getMimeType();
-        ob_start();
-        match ($mime) {
-            'image/png' => imagepng($resized, null, 8),
-            'image/webp' => function_exists('imagewebp') ? imagewebp($resized, null, 85) : imagejpeg($resized, null, 85),
-            default => imagejpeg($resized, null, 85),
-        };
-        imagedestroy($resized);
-        $output = ob_get_clean();
-
-        return is_string($output) && $output !== '' ? $output : $contents;
+        return $contents;
     }
 }
