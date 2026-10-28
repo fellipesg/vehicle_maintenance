@@ -38,6 +38,12 @@ de até 4 MB). O balde existe contra a conta comum que repete upload; atrás do 
 passa um punhado de contas nossas, e a importação de prospecção é feita em lote por uma pessoa, que
 10/min atrapalharia. Se um dia o /admin abrir para fora dessas contas, as três voltam para o balde.
 
+## Rota que manda e-mail para o endereço digitado tem balde próprio
+
+Além do `throttle` por IP, essa rota precisa de um teto por destinatário, e nunca divide o balde com
+outra rota. Hoje: `POST /excluir-conta` com `throttle:account-deletion`. O porquê, os limites e o
+cuidado para o 429 não revelar quem tem cadastro estão em `.ai/rules/abuse-guards.md`.
+
 ## `invoices` tem teto de quantidade
 
 O array `invoices` vale no máximo `App\Rules\InvoiceFile::MAX_FILES_PER_REQUEST` por requisição, com
