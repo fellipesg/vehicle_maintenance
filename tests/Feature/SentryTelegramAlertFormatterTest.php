@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\Monitoring\SentryTelegramAlertFormatter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SentryTelegramAlertFormatterTest extends TestCase
@@ -167,5 +168,240 @@ class SentryTelegramAlertFormatterTest extends TestCase
             strpos($trace, 'Pipeline.php'),
             strpos($trace, 'app/Http/Controllers/Foo.php'),
         );
+    }
+
+    public function test_request_detail_keeps_path_and_method_without_the_query_string(): void
+    {
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/AccountDeletionController.php', 61, 'destroy', true),
+        ], 'Falha ao excluir a conta', ['request' => [
+            'url' => 'https://revisalog.com.br/excluir-conta/confirmar/42?expires=1792000000&hash=9f1c7a&signature=deadbeefcafe',
+            'method' => 'DELETE',
+        ]]);
+
+        $message = (new SentryTelegramAlertFormatter)->format($data)['message'];
+
+        $this->assertStringContainsString('<b>Requisição:</b> DELETE https://revisalog.com.br/excluir-conta/confirmar/42', $message);
+        $this->assertStringNotContainsString('signature', $message);
+        $this->assertStringNotContainsString('deadbeefcafe', $message);
+        $this->assertStringNotContainsString('hash=', $message);
+        $this->assertStringNotContainsString('expires', $message);
+        $this->assertStringNotContainsString('?', $message);
+    }
+
+    public function test_request_detail_drops_the_encrypted_email_of_the_invite_unsubscribe(): void
+    {
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/MaintenanceInviteController.php', 88, 'unsubscribe', true),
+        ], 'Falha ao descadastrar', ['request' => [
+            'url' => 'https://revisalog.com.br/convite/descadastrar?email=eyJpdiI6ImFiYyJ9&signature=f00dsig',
+            'method' => 'POST',
+        ]]);
+
+        $message = (new SentryTelegramAlertFormatter)->format($data)['message'];
+
+        $this->assertStringContainsString('<b>Requisição:</b> POST https://revisalog.com.br/convite/descadastrar', $message);
+        $this->assertStringNotContainsString('eyJpdiI6ImFiYyJ9', $message);
+        $this->assertStringNotContainsString('email=', $message);
+        $this->assertStringNotContainsString('f00dsig', $message);
+    }
+
+    public function test_exception_message_loses_the_query_string_in_the_alert_and_in_the_full_trace(): void
+    {
+        $value = 'Client error: GET https://revisalog.com.br/convite/descadastrar?email=eyJpdiI6InNlZ3JlZG8ifQ&signature=f00dbabe resulted in a 500';
+
+        $result = (new SentryTelegramAlertFormatter)->format($this->exceptionData([
+            $this->frame('/app/Services/Outreach/Sender.php', 21, 'send', true),
+        ], $value));
+
+        foreach ([$result['message'], (string) $result['fullTrace']] as $output) {
+            $this->assertStringContainsString('https://revisalog.com.br/convite/descadastrar', $output);
+            $this->assertStringContainsString('resulted in a 500', $output);
+            $this->assertStringNotContainsString('eyJpdiI6InNlZ3JlZG8ifQ', $output);
+            $this->assertStringNotContainsString('f00dbabe', $output);
+            $this->assertStringNotContainsString('signature', $output);
+        }
+    }
+
+    public function test_chained_exception_in_the_full_trace_also_loses_the_query_string(): void
+    {
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/AccountDeletionController.php', 61, 'destroy', true),
+        ]);
+        array_unshift($data['event']['exception']['values'], [
+            'type' => 'InvalidSignatureException',
+            'value' => 'Assinatura inválida em /excluir-conta/confirmar/42?hash=9f1c7a&signature=deadbeefcafe',
+            'stacktrace' => ['frames' => [$this->frame('/vendor/laravel/framework/src/Signed.php', 30, 'handle', false)]],
+        ]);
+
+        $trace = (string) (new SentryTelegramAlertFormatter)->format($data)['fullTrace'];
+
+        $this->assertStringContainsString('InvalidSignatureException: Assinatura inválida em /excluir-conta/confirmar/42', $trace);
+        $this->assertStringNotContainsString('deadbeefcafe', $trace);
+        $this->assertStringNotContainsString('signature', $trace);
+    }
+
+    public function test_culprit_loses_the_query_string(): void
+    {
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/AccountDeletionController.php', 61, 'destroy', true),
+        ], 'Falha ao excluir a conta', ['culprit' => 'DELETE /excluir-conta/confirmar/42?hash=9f1c7a&signature=deadbeefcafe']);
+
+        $message = (new SentryTelegramAlertFormatter)->format($data)['message'];
+
+        $this->assertStringContainsString('<b>Culprit:</b> DELETE /excluir-conta/confirmar/42', $message);
+        $this->assertStringNotContainsString('deadbeefcafe', $message);
+        $this->assertStringNotContainsString('signature', $message);
+    }
+
+    public function test_title_from_logentry_message_or_title_loses_the_query_string(): void
+    {
+        $formatter = new SentryTelegramAlertFormatter;
+        $url = 'https://revisalog.com.br/excluir-conta/confirmar/42?signature=deadbeefcafe';
+
+        foreach (['logentry' => ['formatted' => 'Falha em '.$url], 'message' => 'Falha em '.$url, 'title' => 'Falha em '.$url] as $key => $content) {
+            $message = $formatter->format(['event' => [$key => $content, 'event_id' => 'e1']])['message'];
+
+            $this->assertStringContainsString('Falha em https://revisalog.com.br/excluir-conta/confirmar/42', $message);
+            $this->assertStringNotContainsString('deadbeefcafe', $message, "chave {$key}");
+            $this->assertStringNotContainsString('signature', $message, "chave {$key}");
+        }
+    }
+
+    public function test_breadcrumbs_extra_tags_user_and_request_body_never_reach_the_alert(): void
+    {
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/AccountDeletionController.php', 61, 'destroy', true),
+        ], 'Falha ao excluir a conta', [
+            'breadcrumbs' => ['values' => [
+                ['category' => 'sql', 'message' => 'select * from users where remember_token = SEGREDO-BREADCRUMB'],
+            ]],
+            'extra' => ['signed_url' => 'https://revisalog.com.br/excluir-conta/confirmar/42?signature=SEGREDO-EXTRA'],
+            'tags' => [['url', 'https://revisalog.com.br/excluir-conta/confirmar/42?signature=SEGREDO-TAG']],
+            'user' => ['id' => 42, 'email' => 'segredo-user@example.com', 'ip_address' => '203.0.113.7'],
+            'contexts' => ['trace' => ['description' => 'SEGREDO-CONTEXT']],
+            'request' => [
+                'url' => 'https://revisalog.com.br/excluir-conta/confirmar/42',
+                'method' => 'DELETE',
+                'query_string' => 'signature=SEGREDO-QUERYSTRING',
+                'cookies' => ['revisalog_session' => 'SEGREDO-COOKIE'],
+                'headers' => [['Authorization', 'Bearer SEGREDO-HEADER']],
+                'data' => ['password' => 'SEGREDO-BODY'],
+            ],
+        ]);
+
+        $result = (new SentryTelegramAlertFormatter)->format($data);
+        $output = $result['message']."\n".(string) $result['fullTrace'];
+
+        foreach (['SEGREDO-BREADCRUMB', 'SEGREDO-EXTRA', 'SEGREDO-TAG', 'SEGREDO-CONTEXT', 'SEGREDO-QUERYSTRING', 'SEGREDO-COOKIE', 'SEGREDO-HEADER', 'SEGREDO-BODY', 'segredo-user@example.com', '203.0.113.7'] as $secret) {
+            $this->assertStringNotContainsString($secret, $output);
+        }
+
+        $this->assertStringContainsString('<b>Requisição:</b> DELETE https://revisalog.com.br/excluir-conta/confirmar/42', $result['message']);
+    }
+
+    public function test_frame_vars_are_never_sent(): void
+    {
+        $frame = $this->frame('/app/Http/Controllers/Web/AccountDeletionController.php', 61, 'destroy', true);
+        $frame['vars'] = ['signature' => 'SEGREDO-VARS', 'user' => ['email' => 'segredo-vars@example.com']];
+        $frame['pre_context'] = ['$signature = "SEGREDO-PRECONTEXT";'];
+        $frame['context_line'] = '$hash = "SEGREDO-CONTEXTLINE";';
+
+        $result = (new SentryTelegramAlertFormatter)->format($this->exceptionData([$frame]));
+        $output = $result['message']."\n".(string) $result['fullTrace'];
+
+        foreach (['SEGREDO-VARS', 'segredo-vars@example.com', 'SEGREDO-PRECONTEXT', 'SEGREDO-CONTEXTLINE'] as $secret) {
+            $this->assertStringNotContainsString($secret, $output);
+        }
+
+        $this->assertStringContainsString('app/Http/Controllers/Web/AccountDeletionController.php:61 in destroy', $result['message']);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function tokenInThePathProvider(): array
+    {
+        $prospect = str_repeat('aB3', 13).'x';          // Str::random(40) da WorkshopProspect
+        $invite = str_repeat('cD4', 13).'y';            // Str::random(40) do MaintenanceInvite
+        $consignment = str_repeat('eF5', 16);           // Str::random(48) da consignação
+
+        return [
+            'consignação' => ['/consignacao/'.$consignment, $consignment],
+            'consignação liberar histórico' => ['/consignacao/'.$consignment.'/liberar-historico', $consignment],
+            'consignação contestar' => ['/consignacao/'.$consignment.'/contestar', $consignment],
+            'convite' => ['/convite/'.$invite, $invite],
+            'descadastro da prospect' => ['/descadastrar/'.$prospect, $prospect],
+            'clique rastreado' => ['/o/'.$prospect, $prospect],
+        ];
+    }
+
+    #[DataProvider('tokenInThePathProvider')]
+    public function test_token_in_the_path_is_masked_in_the_request_detail(string $path, string $token): void
+    {
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/ConsignmentOwnerController.php', 44, 'show', true),
+        ], 'Falha na ação do proprietário', ['request' => [
+            'url' => 'https://revisalog.com.br'.$path,
+            'method' => 'POST',
+        ]]);
+
+        $message = (new SentryTelegramAlertFormatter)->format($data)['message'];
+
+        $this->assertStringNotContainsString($token, $message);
+        $this->assertStringContainsString('•••', $message);
+        $this->assertStringContainsString('<b>Requisição:</b> POST https://revisalog.com.br/'.explode('/', ltrim($path, '/'))[0].'/•••', $message);
+    }
+
+    public function test_masking_the_token_keeps_the_action_segment_of_the_consignment_route(): void
+    {
+        $token = str_repeat('eF5', 16);
+        $data = $this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/ConsignmentOwnerController.php', 71, 'approveHistory', true),
+        ], 'Falha ao liberar histórico', ['request' => [
+            'url' => 'https://revisalog.com.br/consignacao/'.$token.'/liberar-historico',
+            'method' => 'POST',
+        ]]);
+
+        $message = (new SentryTelegramAlertFormatter)->format($data)['message'];
+
+        $this->assertStringContainsString('<b>Requisição:</b> POST https://revisalog.com.br/consignacao/•••/liberar-historico', $message);
+        $this->assertStringNotContainsString($token, $message);
+    }
+
+    public function test_token_in_the_path_is_masked_in_the_exception_message_and_in_the_full_trace(): void
+    {
+        $token = str_repeat('eF5', 16);
+
+        $result = (new SentryTelegramAlertFormatter)->format($this->exceptionData([
+            $this->frame('/app/Http/Controllers/Web/ConsignmentOwnerController.php', 44, 'show', true),
+        ], 'Nenhuma consignação em /consignacao/'.$token.'/contestar'));
+
+        foreach ([$result['message'], (string) $result['fullTrace']] as $output) {
+            $this->assertStringNotContainsString($token, $output);
+            $this->assertStringContainsString('/consignacao/•••/contestar', $output);
+        }
+    }
+
+    public function test_readable_path_segments_and_the_host_survive_the_masking(): void
+    {
+        $formatter = new SentryTelegramAlertFormatter;
+
+        $kept = [
+            'https://revisalog.com.br/garagem',
+            'https://revisalog.com.br/excluir-conta/confirmar/42',
+            'https://revisalog.com.br/v/RVL-AB12-CD',
+            'https://revisalog.com.br/consignacao/eF5eF5/liberar-historico',
+            'https://revisalog.com.br/api/v1/vehicles/9WBAB1234567890AB/maintenances',
+        ];
+
+        foreach ($kept as $url) {
+            $message = $formatter->format($this->exceptionData([
+                $this->frame('/app/Http/Controllers/Foo.php', 10, 'bar', true),
+            ], 'Falha', ['request' => ['url' => $url, 'method' => 'GET']]))['message'];
+
+            $this->assertStringContainsString('<b>Requisição:</b> GET '.$url, $message);
+            $this->assertStringNotContainsString('•••', $message);
+        }
     }
 }
