@@ -17,11 +17,17 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 #[Group('Vehicle PDF Exports', weight: 11)]
 class VehiclePdfExportController extends Controller
 {
+    /**
+     * 410, e não 404: o 404 deste endpoint quer dizer "ainda não ficou pronto" e o app continua
+     * consultando. O prazo vencido é definitivo — o arquivo não volta, o caminho é pedir outro.
+     */
+    public const EXPIRED_MESSAGE = 'O prazo deste PDF terminou. Peça a exportação de novo.';
+
     public function __construct(private readonly VehiclePdfExportService $exports) {}
 
     #[Endpoint(
         title: 'Get vehicle PDF export status',
-        description: 'Poll every 2 seconds until status is completed or failed. download_url is only present when completed.',
+        description: 'Poll every 2 seconds until status is completed or failed. download_url is only present when completed. Returns 410 once the export has expired.',
     )]
     public function show(Request $request, string $exportId): JsonResponse
     {
@@ -29,6 +35,10 @@ class VehiclePdfExportController extends Controller
 
         if (! $this->exports->userCanViewExport($request->user(), $export)) {
             return ApiResponse::error('Forbidden', 403);
+        }
+
+        if ($export->isExpired()) {
+            return ApiResponse::error(self::EXPIRED_MESSAGE, 410);
         }
 
         return ApiResponse::success(
@@ -46,6 +56,10 @@ class VehiclePdfExportController extends Controller
 
         if (! $this->exports->userCanViewExport($request->user(), $export)) {
             return ApiResponse::error('Forbidden', 403);
+        }
+
+        if ($export->isExpired()) {
+            return ApiResponse::error(self::EXPIRED_MESSAGE, 410);
         }
 
         if (! $export->isCompleted() || $export->file_path === null) {

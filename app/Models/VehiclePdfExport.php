@@ -85,4 +85,14 @@ class VehiclePdfExport extends Model
     {
         return $this->status === self::STATUS_FAILED;
     }
+
+    /**
+     * Prazo do arquivo gerado (vehicle-pdf-export.file_ttl_hours, gravado por
+     * GenerateVehicleMaintenancePdfExport). Exportação ainda sem prazo (pendente, em processamento
+     * ou que falhou) nunca conta como expirada.
+     */
+    public function isExpired(): bool
+    {
+        return $this->expires_at !== null && $this->expires_at->isPast();
+    }
 }

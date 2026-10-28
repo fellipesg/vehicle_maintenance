@@ -6,6 +6,15 @@ use App\Models\VehiclePdfExport;
 use App\Support\AppStorage;
 use Illuminate\Console\Command;
 
+/**
+ * Faxina do arquivo expirado, não o portão: o prazo é cobrado na hora do download
+ * (VehiclePdfExport::isExpired, 410 na API e na web), então um arquivo que sobreviveu até a próxima
+ * execução já não baixa.
+ *
+ * Roda de hora em hora, e não uma vez por dia, para encurtar a única brecha que sobra: a URL
+ * assinada do storage que o status entregou pouco antes do prazo (download_url_expiry_minutes, 60)
+ * continua resolvendo enquanto o arquivo existir. Apagar o arquivo mata essa URL.
+ */
 class CleanupVehiclePdfExports extends Command
 {
     protected $signature = 'vehicle-pdf-exports:cleanup';
