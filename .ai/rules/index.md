@@ -11,6 +11,7 @@ must agree on the same contract; they are listed in a separate table below.
 
 | Applies to | Rule file |
 | --- | --- |
+| app/Providers/AppServiceProvider.php,app/Http/Requests/Web/StoreContactRequest.php,config/services.php | .ai/rules/abuse-guards.md |
 | resources/views/admin/maintenances/**,resources/views/admin/vehicles/show.blade.php | .ai/rules/admin-vehicles.md |
 | app/Http/Controllers/Web/Admin/** | .ai/rules/admin.md |
 | app/Features/**,app/Support/Maintenance/MaintenancePhotoAccess.php,app/Http/Controllers/Web/Admin/MaintenancePhotosFeatureController.php,app/Http/Requests/Web/Admin/**,resources/views/components/admin/maintenance-photos-toggle.blade.php,config/pennant.php | .ai/rules/features.md |

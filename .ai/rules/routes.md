@@ -22,6 +22,12 @@ PDF), cadastro e edição da oficina (logo), `POST /api/v1/me/avatar`,
 `POST /api/v1/invoices/upload`. Rota nova que receba arquivo entra junto. Telas GET de conferência
 ficam fora de propósito (`.ai/rules/vehicles-entry.md`).
 
+## Rota que manda e-mail para o endereço digitado tem balde próprio
+
+Além do `throttle` por IP, essa rota precisa de um teto por destinatário, e nunca divide o balde com
+outra rota. Hoje: `POST /excluir-conta` com `throttle:account-deletion`. O porquê, os limites e o
+cuidado para o 429 não revelar quem tem cadastro estão em `.ai/rules/abuse-guards.md`.
+
 ## `invoices` tem teto de quantidade
 
 O array `invoices` vale no máximo `App\Rules\InvoiceFile::MAX_FILES_PER_REQUEST` por requisição, com
