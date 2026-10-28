@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Http\Controllers\Concerns\EndsDeletedAccountSession;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Account\DeleteAccountRequest;
 use App\Http\Requests\Web\Account\UpdateAccountPasswordRequest;
@@ -13,7 +14,6 @@ use App\Services\User\DeleteUserAccount;
 use App\Support\PortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +28,8 @@ use Illuminate\View\View;
  */
 class AccountController extends Controller
 {
+    use EndsDeletedAccountSession;
+
     public function edit(Request $request): View
     {
         $user = $request->user();
@@ -122,11 +124,10 @@ class AccountController extends Controller
 
     public function destroy(DeleteAccountRequest $request, DeleteUserAccount $deleteUserAccount): RedirectResponse
     {
-        $deleteUserAccount->handle($request->user());
+        $user = $request->user();
 
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $deleteUserAccount->handle($user);
+        $this->endWebSessionOf($request, $user);
 
         return redirect()->route('home')
             ->with('success', 'Sua conta foi excluída. O histórico de manutenções continua ligado ao chassi de cada veículo.');

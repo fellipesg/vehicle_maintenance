@@ -84,6 +84,13 @@ assinada do S3/R2 é compartilhável até expirar.
 `x-provenance-card` tem na web (registrada em `.ai/rules/views.md`). Se um dia essa lista precisar de
 foto não pública, a rota não serve: o caminho é uma URL assinada de vida curta só para ela.
 
+## DELETE /api/v1/me pede a senha atual (contrato com o app)
+O endpoint passou a exigir `current_password` no corpo e responde 422 sem ele. Isso **quebra o app
+Flutter atual**, que manda o DELETE vazio: implante junto com a versão do app que pede a senha, na
+ordem app primeiro, backend depois. Conta que entra só por Google/Apple não tem senha para digitar
+e usa o link assinado de `/excluir-conta`; a mensagem do 422 traz essa URL. Os detalhes da decisão,
+o que a exclusão apaga e o que fica estão em `.ai/rules/user.md`.
+
 ## Preferência de fotos no PDF: GET/PUT /api/v1/me
 `export_include_photos` (true | false | null) vem em UserResource, logo em GET /api/v1/me, login e PUT /api/v1/me. Nulo = o proprietário nunca respondeu (o app pergunta uma vez). O PUT aceita só esse campo (`sometimes|boolean`, `name` também é `sometimes`, então atualização parcial funciona) e recusa null e texto com 422. Só vale para a conta de proprietário; o PDF consulta a preferência do dono ATUAL do veículo (.ai/rules/pdfs.md). Na web é o cartão "PDF do histórico" em /conta (PUT /conta/preferencias, só `user.type:user`).
 

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\EndsDeletedAccountSession;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\DeleteAccountRequest;
 use App\Http\Requests\Api\V1\UpdateProfileRequest;
 use App\Http\Requests\Api\V1\UploadAvatarRequest;
 use App\Http\Resources\Api\V1\UserResource;
@@ -12,11 +14,12 @@ use App\Support\AppStorage;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 #[Group('Profile', weight: 15)]
 class ProfileController extends Controller
 {
+    use EndsDeletedAccountSession;
+
     public function update(UpdateProfileRequest $request): JsonResponse
     {
         $user = $request->user();
@@ -49,12 +52,25 @@ class ProfileController extends Controller
     /**
      * Delete the authenticated account and associated personal data.
      *
+     * Requires `current_password`: the token alone must not be enough to destroy the account.
+     * Accounts that sign in only through Google or Apple never chose a password and use the
+     * signed-link flow at `/excluir-conta` instead.
+     *
      * Vehicle maintenance history remains attached to the chassis/VIN.
      */
-    #[Endpoint(title: 'Delete account')]
-    public function destroy(Request $request, DeleteUserAccount $deleteUserAccount): JsonResponse
+    #[Endpoint(
+        title: 'Delete account',
+        description: 'Reauthentication required. Send the account password in `current_password`.',
+    )]
+    public function destroy(DeleteAccountRequest $request, DeleteUserAccount $deleteUserAccount): JsonResponse
     {
-        $deleteUserAccount->handle($request->user());
+        $user = $request->user();
+
+        $deleteUserAccount->handle($user);
+
+        // Chamada do portal pela sessão (EnsureFrontendRequestsAreStateful): o token já saiu, a
+        // sessão também tem de sair.
+        $this->endWebSessionOf($request, $user);
 
         return ApiResponse::success(message: 'Account deleted successfully');
     }
