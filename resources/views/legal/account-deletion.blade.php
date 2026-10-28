@@ -76,6 +76,8 @@
                     <li>Autenticação em duas etapas: segredo e códigos de recuperação.</li>
                     <li>Ligação da conta com o login do Google ou da Apple.</li>
                     <li>O vínculo entre você e os veículos da sua conta.</li>
+                    <li>As notificações que você recebeu na plataforma.</li>
+                    <li>Os relatórios em PDF que você gerou, registro e arquivo.</li>
                 </ul>
             </x-ui.section>
         </x-ui.card>
@@ -94,6 +96,13 @@
                         como <strong class="text-foreground">&ldquo;Conta excluída&rdquo;</strong>, sem nenhum dado
                         pessoal e sem possibilidade de login. Apagar a linha levaria junto as manutenções que você
                         registrou, inclusive as de carros que hoje pertencem a outras pessoas.
+                    </p>
+                    <p>
+                        <strong class="text-foreground">Notas fiscais e fotos das manutenções também ficam</strong>,
+                        mesmo as que você anexou. Elas são prova do serviço feito naquele chassi, não cadastro de
+                        quem o declarou, e sem elas o histórico perde o valor para o próximo dono. Se algum
+                        documento ou foto expuser um dado pessoal seu que não deveria continuar ali, peça a remoção
+                        pelo suporte e analisamos caso a caso.
                     </p>
                     <p>
                         A exclusão é imediata e definitiva: não guardamos cópia dos dados pessoais apagados nem há

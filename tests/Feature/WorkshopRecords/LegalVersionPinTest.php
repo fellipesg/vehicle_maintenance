@@ -13,7 +13,7 @@ class LegalVersionPinTest extends TestCase
     public function test_versions_are_bumped_together_with_the_new_clauses(): void
     {
         $this->assertSame('2026-10-10', config('legal.terms_version'));
-        $this->assertSame('2026-10-10', config('legal.privacy_version'));
+        $this->assertSame('2026-10-27', config('legal.privacy_version'));
     }
 
     public function test_terms_have_the_workshop_clause(): void
@@ -36,7 +36,7 @@ class LegalVersionPinTest extends TestCase
             ->assertSee('marca irreversível (hash)')
             ->assertSee('do próprio celular dela');
 
-        $this->getJson('/api/v1/legal/privacy-policy')->assertJsonPath('data.version', '2026-10-10');
+        $this->getJson('/api/v1/legal/privacy-policy')->assertJsonPath('data.version', '2026-10-27');
         $this->getJson('/api/v1/legal/terms-of-use')->assertJsonPath('data.version', '2026-10-10');
     }
 }

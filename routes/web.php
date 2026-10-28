@@ -85,7 +85,7 @@ Route::post('/contato', [ContactController::class, 'store'])
 // a quem não tem (ou já desinstalou) o aplicativo. Quem confirma é a caixa de e-mail da conta.
 Route::get('/excluir-conta', [AccountDeletionController::class, 'show'])->name('account-deletion.show');
 Route::post('/excluir-conta', [AccountDeletionController::class, 'request'])
-    ->middleware('throttle:contact')
+    ->middleware('throttle:account-deletion')
     ->name('account-deletion.request');
 Route::middleware('signed')->group(function () {
     Route::get('/excluir-conta/confirmar/{user}', [AccountDeletionController::class, 'confirm'])

@@ -12,7 +12,7 @@ return [
 
     'terms_version' => '2026-10-10',
 
-    'privacy_version' => '2026-10-10',
+    'privacy_version' => '2026-10-27',
 
     'terms_of_use' => <<<'TEXT'
 Termos de Uso — RevisaLog
@@ -87,7 +87,11 @@ Não vendemos seus dados. Compartilhamos apenas o necessário com:
 Alguns desses prestadores armazenam dados fora do Brasil, com as salvaguardas previstas no art. 33 da LGPD.
 
 7. Conservação
-Mantemos os dados enquanto a conta estiver ativa e o histórico do veículo for necessário ao serviço, ou pelo prazo exigido por lei. Você pode excluir a conta no aplicativo (Configurações → Excluir conta) ou pelo e-mail de suporte. Ao excluir a conta, apagamos ou anonimizamos os dados pessoais, exceto os que precisamos manter por obrigação legal. Os registros de manutenção continuam vinculados ao veículo, sem identificar você.
+Mantemos os dados enquanto a conta estiver ativa e o histórico do veículo for necessário ao serviço, ou pelo prazo exigido por lei. Você pode excluir a conta no aplicativo (Configurações → Excluir conta), em "Minha conta" no site, ou pela página revisalog.com.br/excluir-conta, que envia um link de confirmação válido por 1 hora. A exclusão pelo aplicativo e por "Minha conta" pede a sua senha atual; quem entra pelo Google ou pela Apple usa a página com link de confirmação, porque nunca escolheu uma senha. Ao excluir a conta, apagamos ou anonimizamos os dados pessoais, exceto os que precisamos manter por obrigação legal.
+
+O que sai na hora: nome, e-mail, telefone, CPF/CNPJ, endereço e coordenadas, foto de perfil, senha e identificador do provedor social, os vínculos entre você e seus veículos, os tokens de acesso do aplicativo e de aviso push, as suas sessões abertas em qualquer aparelho, as notificações que você recebeu na plataforma, os relatórios em PDF que você gerou (registro e arquivo) e a cópia do seu contato que a loja tenha declarado ao registrar uma consignação.
+
+O que permanece: os registros de manutenção do veículo, inclusive as notas fiscais e as fotos do serviço, ainda que tenha sido você quem os anexou. Eles são prova do serviço feito naquele chassi, não cadastro de quem os declarou, e é esse histórico que acompanha o carro para o próximo proprietário. Depois da exclusão, esses registros não identificam mais você: ficam ligados ao veículo, sem nome, e-mail, telefone ou documento. Se você entende que um documento ou uma foto específica expõe dado pessoal seu que não deveria continuar ali, peça a remoção pelo suporte (art. 18 da LGPD) e analisamos caso a caso. Anexos de serviços registrados por oficina em veículo sem conta seguem a regra própria da seção 5.
 
 8. Seus direitos
 Você pode solicitar confirmação de tratamento, acesso, correção, anonimização, bloqueio ou eliminação, portabilidade, informação sobre compartilhamentos e revogação de consentimento, quando aplicável. No aplicativo, a exclusão da conta está em Configurações → Excluir conta. Envie o pedido para suporte@revisalog.com.br; respondemos em até 15 dias. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
