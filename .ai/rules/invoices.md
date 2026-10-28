@@ -43,12 +43,24 @@ As disks rodam com `throw => false` (`config/filesystems.php`), então uma falha
 `{stored, failed}`, chama `report()` e o nome do arquivo entra na mesma mensagem do usuário. Não volte a
 tratar esse `null` com `continue`: a OS nascia sem a nota e nada aparecia na tela nem no log.
 
-## Na API é transação, e lá o insert relança
+## No store da API é transação; no update, não
 `POST /api/v1/maintenances` grava tudo dentro de `DB::beginTransaction`, então usa
 `createInvoiceRecords` (que relança) e o rollback tira todas as linhas — não existe OS pela metade ali, e
 o `catch` descarta todos os arquivos. Um arquivo recusado pelo storage falha a requisição inteira **antes**
 de criar qualquer coisa: antes virava 201 com a OS sem a nota. O `catch (\Exception)` ganhou um
-`catch (\Throwable)` ao lado porque um `Error` escapava sem rollback nem limpeza. `PUT` não aceita notas.
+`catch (\Throwable)` ao lado porque um `Error` escapava sem rollback nem limpeza.
+
+`PUT /api/v1/maintenances/{id}` **anexa**, e lá não há transação nenhuma. O campo era validado (teto de
+10, `InvoiceFile` lendo cada arquivo) e caído no `unset` das relações: 200 com o parsing pago e nada
+anexado, e com oficina da rede escolhida a `RequiresInvoiceWhenWorkshopAssigned` ainda exigia a nota que
+seria descartada. A ordem é a do portal web, com uma diferença: `storeUploads` roda **antes** de gravar a
+OS, então o arquivo que o storage recusar devolve 500 com a edição ainda intacta (como no store, e
+diferente do web, que grava a OS primeiro). Depois vêm os itens, e só então
+`createInvoiceRecordsOrDiscard` e o parsing. Um `\Throwable` entre o update e as linhas descarta todos os
+arquivos, porque nenhuma nota existe ainda; da criação das linhas em diante a limpeza é só do que ficou
+sem linha. A OS editada nunca volta atrás: a nota que não entrou sai em `invoice_failures` (nomes dos
+arquivos) e a `message` passa a dizer que algo não foi anexado, que é o equivalente do flash `error` da
+web. Não troque isso por 500 nem por rollback.
 
 Mensagens da API seguem em inglês (ver `.ai/rules/locale.md`); as da web, em pt-BR.
 
