@@ -58,9 +58,13 @@ class MaintenancePhotoImageProcessorTest extends TestCase
      */
     private function refuseOrSkipWithoutImagick(): never
     {
-        $ci = getenv('CI');
+        // getenv() não lê $_SERVER, e é por <server> que a configuração do PHPUnit entrega
+        // variável de ambiente (ver .ai/rules/ci.md): olhar só o getenv faria este guarda voltar a
+        // pular em silêncio num runner que anuncia o ambiente por essa via.
+        $ci = $_SERVER['CI'] ?? $_ENV['CI'] ?? getenv('CI');
+        $ci = is_scalar($ci) ? strtolower(trim((string) $ci)) : '';
 
-        if (is_string($ci) && ! in_array(strtolower($ci), ['', '0', 'false'], true)) {
+        if (! in_array($ci, ['', '0', 'false'], true)) {
             $this->fail(
                 'Extensão imagick ausente no CI. Ela está na lista de extensions do .github/workflows/ci.yml: '
                 .'se o job passou sem ela, a imagem mudou e o caminho Imagick voltaria a não ser testado.',

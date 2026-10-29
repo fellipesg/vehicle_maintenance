@@ -7,8 +7,14 @@ namespace App\Support;
  *
  * A lógica morava em duas funções globais declaradas dentro de `config/cors.php`. Sob
  * `config:cache` o arquivo de config não é carregado, então aquelas funções não existiam em
- * runtime — só nos testes, que carregam a config do arquivo. Aqui a classe é autoloaded, então
- * vale nos dois modos.
+ * runtime — só nos testes, que carregam a config do arquivo. Sendo autoloaded, a classe não
+ * desaparece desse jeito.
+ *
+ * Mesmo assim, estes métodos servem para **montar** a config, não para consultar em runtime: eles
+ * leem `env()`, e com a config em cache o Laravel nem carrega o `.env`
+ * (`LoadEnvironmentVariables::bootstrap` sai na primeira linha), de modo que `allowed()` cairia no
+ * `['*']` fora de produção. Quem precisa das origens depois de a aplicação subir lê
+ * `config('cors.allowed_origins')`, que é o valor que este arquivo produziu.
  */
 class CorsOrigins
 {

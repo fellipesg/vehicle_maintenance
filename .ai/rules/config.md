@@ -29,9 +29,14 @@ carregado — o cache já traz os valores —, então as funções só existiam 
 nos testes. Era uma função pública de aparência que nenhum runtime cacheado tinha.
 
 A lógica agora está em `App\Support\CorsOrigins` (`allowed()`, `patterns()`,
-`supportsCredentials()`), que é autoloaded e vale nos dois modos; o arquivo de config voltou a ser um
-array. Config nova segue o mesmo caminho: `env()` e chamada de classe, nunca uma função declarada
-ali dentro.
+`supportsCredentials()`), que é autoloaded e por isso não desaparece sob cache; o arquivo de config
+voltou a ser um array. Isso resolve a função fantasma, não a leitura de ambiente: os métodos leem
+`env()`, e com a config em cache o `.env` não é carregado, então eles valem na hora de montar a
+config e nada mais. Em runtime se lê `config('cors.*')` — pedir as origens direto à classe com a
+config cacheada devolveria `['*']` fora de produção.
+
+Config nova segue o mesmo caminho: `env()` e chamada de classe, nunca uma função declarada ali
+dentro.
 
 Hoje o `config:cache` deste projeto nem completa — `scramble.security_strategy.1.scheme` não é
 serializável —, então a armadilha nunca chegou a morder em produção. Ela voltaria inteira no dia em

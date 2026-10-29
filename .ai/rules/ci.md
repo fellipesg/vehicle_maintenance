@@ -41,6 +41,13 @@ Both jobs must be green before merging.
 ## Both image drivers are installed in CI, and a missing one must fail
 `MaintenancePhotoImageProcessor` has an Imagick path and a GD path, because we do not control which one production brings; `MaintenancePhotoImageProcessorTest` drives both through a data provider. CI installs `gd` **and** `imagick` for that reason. Before `imagick` was on the `extensions` line, fourteen data sets called `markTestSkipped` on every machine and runner we have, and PHPUnit still exited 0 — the Imagick path shipped with no coverage anywhere and nothing said so. The test now **fails** instead of skipping when `CI` is set in the environment, so a runner image that drops the extension turns the job red instead of quietly shrinking the suite.
 
+Because the container resolves the processor with no explicit driver, installing `imagick` in CI
+would have flipped every service-level photo test to Imagick while production stayed on GD. So
+`Tests\TestCase::setUp` binds `MaintenancePhotoImageProcessor` to the GD driver for the whole suite:
+the suite exercises the driver production runs, and it runs the same code on a machine that has the
+extension and on one that does not. The two-driver promise is kept by the unit test, which asks for
+each driver by name.
+
 The `Dockerfile` deliberately stays on GD alone: `pecl install imagick` there costs `libmagickwand-dev` plus a build step for a driver the container does not need, and CI is where keeping the two-driver promise is cheap. So on a machine without the extension those fourteen data sets still skip. That is the expected local state, not the gap this section is about.
 
 ## `Sanctum::actingAs` gives a mock token whose key is `false`
