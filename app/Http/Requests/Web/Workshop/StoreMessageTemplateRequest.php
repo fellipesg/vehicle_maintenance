@@ -24,7 +24,7 @@ class StoreMessageTemplateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'trigger' => ['required', Rule::enum(WorkshopMessageTrigger::class)],
+            'trigger' => ['required', Rule::enum(WorkshopMessageTrigger::class)->only(WorkshopMessageTrigger::dispatchableCases())],
             'service_category' => ['nullable', Rule::in(ServiceCategory::values())],
             'title' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string', 'max:5000'],

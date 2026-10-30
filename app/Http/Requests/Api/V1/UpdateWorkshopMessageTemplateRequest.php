@@ -29,7 +29,7 @@ class UpdateWorkshopMessageTemplateRequest extends ApiFormRequest
     public function rules(): array
     {
         return [
-            'trigger' => ['sometimes', 'required', Rule::enum(WorkshopMessageTrigger::class)],
+            'trigger' => ['sometimes', 'required', Rule::enum(WorkshopMessageTrigger::class)->only(WorkshopMessageTrigger::dispatchableCases())],
             'service_category' => ['nullable', Rule::in(ServiceCategory::values())],
             'title' => 'sometimes|required|string|max:255',
             'body' => 'sometimes|required|string|max:5000',

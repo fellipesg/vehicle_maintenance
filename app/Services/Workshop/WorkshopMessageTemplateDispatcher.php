@@ -23,6 +23,15 @@ class WorkshopMessageTemplateDispatcher
      */
     private const CHUNK = 100;
 
+    /**
+     * Contas que já receberam mensagem de oficina dentro do intervalo mínimo, nesta rodada: a
+     * consulta sai uma vez por conta, e o que esta rodada manda também conta. Zerada no começo de
+     * dispatchFollowUps().
+     *
+     * @var array<int, bool>
+     */
+    private array $messagedRecently = [];
+
     public function __construct(
         private readonly VehicleEstimatedKmService $estimatedKm,
         private readonly VehicleMaintenanceReminderService $reminders,
@@ -32,9 +41,14 @@ class WorkshopMessageTemplateDispatcher
     public function dispatchFollowUps(): int
     {
         $sent = 0;
+        $this->messagedRecently = [];
 
         WorkshopMessageTemplate::query()
             ->where('is_active', true)
+            // Modelo ativo com gatilho sem rodada (WorkshopMessageTrigger::isDispatchable) fica de
+            // fora: ele não tem o que disparar, e no match abaixo derrubava a rodada de todas as
+            // oficinas com UnhandledMatchError.
+            ->whereIn('trigger', WorkshopMessageTrigger::dispatchableValues())
             ->with('workshop')
             ->orderBy('id')
             ->chunkById(50, function (Collection $templates) use (&$sent): void {
@@ -42,6 +56,9 @@ class WorkshopMessageTemplateDispatcher
                     $sent += match ($template->trigger) {
                         WorkshopMessageTrigger::ScheduledRevision => $this->dispatchScheduledTemplate($template),
                         WorkshopMessageTrigger::CorrectiveFollowUp => $this->dispatchCorrectiveTemplate($template),
+                        // Gatilho marcado com rodada antes de a rodada existir: nada sai, mas a
+                        // rodada das outras oficinas continua.
+                        default => 0,
                     };
                 }
             });
@@ -112,6 +129,18 @@ class WorkshopMessageTemplateDispatcher
             ->where('workshop_id', $template->workshop_id)
             ->whereNotNull('workshop_id')
             ->whereDate('maintenance_date', '<=', $cutoffDate);
+
+        // Sem a janela, uma oficina que liga o modelo hoje dispara para todo o histórico dela de
+        // uma vez: a OS de três anos atrás também está "a mais de minDays do serviço".
+        $windowDays = (int) config('workshop_messages.send_window_days', 60);
+
+        if ($windowDays > 0) {
+            $maintenancesQuery->whereDate(
+                'maintenance_date',
+                '>=',
+                now()->subDays($minDays + $windowDays)->startOfDay(),
+            );
+        }
 
         if ($template->service_category !== null) {
             $maintenancesQuery->where('service_category', $template->service_category);
@@ -212,6 +241,12 @@ class WorkshopMessageTemplateDispatcher
             return false;
         }
 
+        // Fora do intervalo mínimo o envio não acontece e nada é gravado: a próxima rodada tenta de
+        // novo, porque o dedupe desta oportunidade continua livre.
+        if ($this->isWithinQuietPeriod($owner)) {
+            return false;
+        }
+
         $context = $this->renderer->buildContext(
             $owner,
             $vehicle,
@@ -245,9 +280,33 @@ class WorkshopMessageTemplateDispatcher
             ));
         });
 
+        $this->messagedRecently[$owner->id] = true;
+
         $this->sendPushNotification($owner, $template, $vehicle, $title, $body, $nextDueKm, $sourceMaintenance?->id);
 
         return true;
+    }
+
+    /**
+     * O cliente recebeu mensagem de oficina há pouco?
+     *
+     * O intervalo mínimo (config('workshop_messages.min_days_between_messages_per_user')) vale
+     * somando todas as oficinas e todos os modelos: duas oficinas que atenderam o mesmo carro, ou
+     * dois modelos da mesma oficina, não falam com a pessoa na mesma semana. A coluna sent_at tem
+     * índice com user_id para esta consulta. Zero ou menos desliga a guarda.
+     */
+    private function isWithinQuietPeriod(User $owner): bool
+    {
+        $minDays = (int) config('workshop_messages.min_days_between_messages_per_user', 7);
+
+        if ($minDays <= 0) {
+            return false;
+        }
+
+        return $this->messagedRecently[$owner->id] ??= WorkshopMessageDispatch::query()
+            ->where('user_id', $owner->id)
+            ->where('sent_at', '>=', now()->subDays($minDays))
+            ->exists();
     }
 
     private function alreadyDispatched(

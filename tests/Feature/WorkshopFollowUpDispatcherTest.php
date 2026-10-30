@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\WorkshopMessageTrigger;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -239,6 +240,157 @@ class WorkshopFollowUpDispatcherTest extends TestCase
             $ownerLookups,
             'Os donos do lote saem em uma consulta, não em uma por veículo por template.',
         );
+    }
+
+    public function test_a_template_whose_trigger_has_no_round_does_not_take_the_run_down(): void
+    {
+        Mail::fake();
+
+        $workshop = Workshop::factory()->create();
+        $owner = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 70_000,
+            'odometer_at_registration' => 70_000,
+        ]);
+        $this->attachVehicleToUser($owner, $vehicle);
+
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $owner->id,
+            'tenant_id' => $owner->tenant_id,
+            'workshop_id' => $workshop->id,
+            'kilometers' => 80_000,
+            'maintenance_date' => '2025-01-01',
+        ]);
+
+        // Gatilho sem rodada, ativo e com id menor: no `match` sem default ele estourava
+        // UnhandledMatchError e levava a rodada de todas as oficinas, inclusive a de baixo.
+        WorkshopMessageTemplate::factory()->forWorkshop($workshop)->create([
+            'trigger' => WorkshopMessageTrigger::WarrantyExpiring,
+            'is_active' => true,
+        ]);
+        WorkshopMessageTemplate::factory()->forWorkshop($workshop)->scheduledRevision()->create([
+            'lead_kilometers' => 2_000,
+        ]);
+
+        $this->assertSame(1, app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps());
+        $this->assertDatabaseCount('workshop_message_dispatches', 1);
+    }
+
+    public function test_a_service_older_than_the_send_window_gets_no_message(): void
+    {
+        Mail::fake();
+
+        $workshop = Workshop::factory()->create();
+        $this->assertSame(60, config('workshop_messages.send_window_days'));
+
+        // min_days 60 + janela 60: a OS de 2026-03-01 (92 dias) está dentro, a de 2025-01-01 não.
+        $inside = $this->servicedVehicle($workshop, '2026-03-01');
+        $outside = $this->servicedVehicle($workshop, '2025-01-01');
+
+        WorkshopMessageTemplate::factory()->forWorkshop($workshop)->correctiveFollowUp()->create([
+            'min_days_since_service' => 60,
+        ]);
+
+        $this->assertSame(1, app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps());
+        $this->assertDatabaseHas('workshop_message_dispatches', ['vehicle_id' => $inside->vehicle_id]);
+        $this->assertDatabaseMissing('workshop_message_dispatches', ['vehicle_id' => $outside->vehicle_id]);
+    }
+
+    public function test_the_customer_waits_the_minimum_interval_between_two_messages(): void
+    {
+        Mail::fake();
+
+        $this->assertSame(7, config('workshop_messages.min_days_between_messages_per_user'));
+
+        $workshop = Workshop::factory()->create();
+        $owner = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 70_000,
+            'odometer_at_registration' => 70_000,
+        ]);
+        $this->attachVehicleToUser($owner, $vehicle);
+
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $owner->id,
+            'tenant_id' => $owner->tenant_id,
+            'workshop_id' => $workshop->id,
+            'kilometers' => 80_000,
+            'maintenance_date' => '2025-01-01',
+        ]);
+
+        WorkshopMessageTemplate::factory()->forWorkshop($workshop)->scheduledRevision()->create([
+            'lead_kilometers' => 2_000,
+        ]);
+
+        // Outra oficina falou com esta pessoa dois dias atrás: o intervalo soma todas as oficinas.
+        WorkshopMessageDispatch::factory()->create([
+            'user_id' => $owner->id,
+            'sent_at' => now()->subDays(2),
+        ]);
+
+        $this->assertSame(0, app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps());
+        $this->assertDatabaseCount('workshop_message_dispatches', 1);
+
+        // E não é castigo: passado o intervalo, a mesma oportunidade ainda sai.
+        Carbon::setTestNow('2026-06-09');
+
+        $this->assertSame(1, app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps());
+        $this->assertDatabaseCount('workshop_message_dispatches', 2);
+    }
+
+    public function test_two_workshops_do_not_both_reach_the_same_customer_in_one_run(): void
+    {
+        Mail::fake();
+
+        $owner = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 70_000,
+            'odometer_at_registration' => 70_000,
+        ]);
+        $this->attachVehicleToUser($owner, $vehicle);
+
+        foreach (range(1, 2) as $index) {
+            $workshop = Workshop::factory()->create();
+
+            Maintenance::factory()->create([
+                'vehicle_id' => $vehicle->id,
+                'user_id' => $owner->id,
+                'tenant_id' => $owner->tenant_id,
+                'workshop_id' => $workshop->id,
+                'kilometers' => 80_000,
+                'maintenance_date' => '2025-01-01',
+            ]);
+
+            WorkshopMessageTemplate::factory()->forWorkshop($workshop)->scheduledRevision()->create([
+                'lead_kilometers' => 2_000,
+            ]);
+        }
+
+        // As duas oficinas atenderam o carro e as duas têm modelo ativo: a pessoa recebe uma só.
+        $this->assertSame(1, app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps());
+        $this->assertDatabaseCount('workshop_message_dispatches', 1);
+    }
+
+    /**
+     * Veículo com dono vinculado e uma OS da oficina na data pedida.
+     */
+    private function servicedVehicle(Workshop $workshop, string $maintenanceDate): Maintenance
+    {
+        $owner = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create(['current_kilometers' => 55_000]);
+        $this->attachVehicleToUser($owner, $vehicle);
+
+        return Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $owner->id,
+            'tenant_id' => $owner->tenant_id,
+            'workshop_id' => $workshop->id,
+            'kilometers' => 50_000,
+            'maintenance_date' => $maintenanceDate,
+            'service_category' => 'mechanical',
+        ]);
     }
 
     public function test_the_workshop_name_reaches_the_notification_without_double_escaping(): void

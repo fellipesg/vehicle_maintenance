@@ -11,7 +11,9 @@
     use App\Enums\WorkshopMessageTrigger;
     use App\Enums\ServiceCategory;
 
-    $triggerOptions = WorkshopMessageTrigger::options();
+    // Só os gatilhos com rodada no dispatcher: escolher um sem rodada criava modelo que nunca
+    // manda mensagem (WorkshopMessageTrigger::isDispatchable).
+    $triggerOptions = WorkshopMessageTrigger::dispatchableOptions();
     $categoryOptions = collect(ServiceCategory::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all();
 @endphp
 
