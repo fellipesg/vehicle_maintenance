@@ -154,6 +154,18 @@ class PlayReviewAccountsSeederTest extends TestCase
         $this->actingAs($garage)->get(route('garage.vehicles.index'))->assertOk();
     }
 
+    public function test_review_workshop_is_approved_so_it_can_register_and_seal(): void
+    {
+        (new PlayReviewAccountsSeeder)->run();
+
+        $workshop = User::where('email', PlayReviewAccountsSeeder::WORKSHOP_EMAIL)->firstOrFail();
+
+        $this->assertTrue($workshop->workshop->isApproved());
+
+        // Oficina em análise só abriria "Minha oficina", e o revisor não tem a quem pedir aprovação.
+        $this->actingAs($workshop)->get(route('workshop.maintenances.create'))->assertOk();
+    }
+
     public function test_seeder_creates_nothing_without_a_configured_password(): void
     {
         config(['services.play_review.password' => null]);

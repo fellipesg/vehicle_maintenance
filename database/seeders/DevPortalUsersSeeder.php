@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\GarageStatus;
+use App\Enums\WorkshopStatus;
 use App\Models\User;
 use App\Models\Workshop;
 use App\Services\TenantService;
@@ -125,7 +126,7 @@ class DevPortalUsersSeeder extends Seeder
             ->first();
 
         if ($workshop === null) {
-            Workshop::create([
+            $this->approveDevWorkshop(Workshop::create([
                 'user_id' => $workshopUser->id,
                 'tenant_id' => $workshopUser->tenant_id,
                 'name' => 'Dev Oficina',
@@ -138,7 +139,7 @@ class DevPortalUsersSeeder extends Seeder
                 'neighborhood' => 'Centro',
                 'city' => 'Londrina',
                 'state' => 'PR',
-            ]);
+            ]));
 
             return;
         }
@@ -148,5 +149,21 @@ class DevPortalUsersSeeder extends Seeder
             'tenant_id' => $workshopUser->tenant_id,
             'email' => self::WORKSHOP_EMAIL,
         ]);
+
+        $this->approveDevWorkshop($workshop);
+    }
+
+    /**
+     * Mesma razão da loja: oficina em análise só abre "Minha oficina", não registra OS e não emite
+     * selo, então a de desenvolvimento nasce aprovada. A coluna tem default 'pending' (toda oficina
+     * nova passa pela análise), e `status` não é fillable. Para exercitar a fila, volte o status
+     * para 'pending' na mão ou use /admin/oficinas.
+     */
+    private function approveDevWorkshop(Workshop $workshop): void
+    {
+        $workshop->forceFill([
+            'status' => WorkshopStatus::Approved,
+            'reviewed_at' => now(),
+        ])->save();
     }
 }

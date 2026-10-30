@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\GarageStatus;
+use App\Enums\WorkshopStatus;
 use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
 use App\Models\User;
@@ -87,6 +88,7 @@ class PlayReviewAccountsSeeder extends Seeder
         }
 
         $this->approveReviewGarage($users['lojista']);
+        $this->approveReviewWorkshop($users['oficina']);
         $this->seedOwnerHistory($users['usuario'], $users['oficina']);
         $this->seedGarageStock($users['lojista']);
 
@@ -141,6 +143,22 @@ class PlayReviewAccountsSeeder extends Seeder
 
         $garage->garage?->forceFill([
             'status' => GarageStatus::Approved,
+            'reviewed_at' => now(),
+        ])->save();
+    }
+
+    /**
+     * A oficina de revisão nasce aprovada, pelo mesmo motivo da loja: cadastro em análise só abre
+     * "Minha oficina" (App\Http\Middleware\EnsureWorkshopApproved) e não emite selo, e o revisor do
+     * Play não tem a quem pedir aprovação. A linha em `workshops` vem do TenantService, com a coluna
+     * no default 'pending'; `status` não é fillable.
+     */
+    private function approveReviewWorkshop(User $workshop): void
+    {
+        $workshop->loadMissing('workshop');
+
+        $workshop->workshop?->forceFill([
+            'status' => WorkshopStatus::Approved,
             'reviewed_at' => now(),
         ])->save();
     }
@@ -247,14 +265,7 @@ class PlayReviewAccountsSeeder extends Seeder
                 ]));
             }
 
-            if ($sealed && $workshop !== null) {
-                // Demo: a OS é da oficina de revisão no carro do proprietário. No fluxo real o selo
-                // num carro com dono exige relação provada (App\Support\Maintenance\WorkshopVehicleLink);
-                // aqui a autorização do dono já é dada, como se ele tivesse vinculado o registro.
-                $stamper->sealAfterOwnerLink($maintenance, $workshop->id);
-            } else {
-                $stamper->stamp($maintenance, $owner);
-            }
+            $stamper->stamp($maintenance, $sealed && $workshop !== null ? $workshopUser : $owner);
         }
 
         app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
