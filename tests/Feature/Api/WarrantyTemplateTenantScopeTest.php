@@ -17,9 +17,9 @@ class WarrantyTemplateTenantScopeTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Os dois apiResource de oficina aplicam `workshops:read` e `workshops:write` em toda rota (o
-     * mapa de middleware por método é ignorado), e o token do app traz as duas: é com as duas que
-     * um cliente real chega aqui.
+     * O token do app traz as duas abilities de oficina (SanctumMobileToken::ABILITIES): é com as
+     * duas que um cliente real chega aqui, e a policy é que decide de qual oficina ele lê. A
+     * ability de cada rota do recurso é assunto do ApiResourceAbilitiesTest.
      *
      * @var list<string>
      */

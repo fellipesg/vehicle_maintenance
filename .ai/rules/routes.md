@@ -22,6 +22,18 @@ PDF), cadastro e edição da oficina (logo), `POST /api/v1/me/avatar`,
 `POST /api/v1/invoices/upload`. Rota nova que receba arquivo entra junto. Telas GET de conferência
 ficam fora de propósito (`.ai/rules/vehicles-entry.md`).
 
+## Ability por método de um resource vai em `->middlewareFor()`
+
+`Route::apiResource(...)->middleware(['index' => 'ability:a', 'store' => 'ability:b'])` **ignora as
+chaves**: `PendingResourceRegistration::middleware()` só faz `Arr::wrap` e aplica todas as entradas
+em todas as rotas do recurso. Era assim nos dois `apiResource` de oficina
+(`workshops.message-templates` e `workshops.warranty-templates`), que acabavam exigindo
+`workshops:read` *e* `workshops:write` em cada rota — nenhum teste de comportamento pegava, porque o
+token do app traz as duas (`App\Support\SanctumMobileToken::ABILITIES`). O certo é
+`->middlewareFor(['index', 'show'], 'ability:workshops:read')` por grupo de métodos.
+`ApiResourceAbilitiesTest` lê as rotas registradas e trava a ability de cada uma, além de cobrir
+token com uma ability só; recurso novo com ability por método entra no provider dele.
+
 ## Rota que busca veículo por identificador entra no balde `search`
 
 Toda tela que acha veículo a partir de placa, chassi ou RENAVAM é oráculo de enumeração e leva

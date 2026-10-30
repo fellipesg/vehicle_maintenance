@@ -22,11 +22,10 @@ MaintenancePolicy::view nega a OS oculta (hidden_from_public_at) para quem não 
 checar nada. Os únicos consumidores são `WarrantyTemplateController::index` e `::show`, então era por
 ali que qualquer conta do app lia nome, prazo e termo de garantia de **qualquer** oficina. O
 diretório de oficinas (`GET /api/v1/workshops`, `/api/v1/workshops/{id}`, `/usuario/oficinas`) não
-passa por policy nenhuma e continua aberto; `viewAny` não tem consumidor. Cuidado ao ler as abilities
-desses endpoints: os dois `apiResource` de oficina em `routes/api.php` passam um mapa de middleware
-por método para `->middleware()`, que o Laravel ignora, então **toda** rota dos dois exige
-`workshops:read` *e* `workshops:write`. O token do app traz as duas (`SanctumMobileToken::ABILITIES`),
-e é com as duas que os testes reproduzem o cliente real.
+passa por policy nenhuma e continua aberto; `viewAny` não tem consumidor. A ability não substitui a
+policy: `workshops:read` diz que o token pode ler oficina, a policy diz **qual**. As duas rotas que
+chamam `view` ficam com `ability:workshops:read` (ver a regra de `middlewareFor` em
+`.ai/rules/routes.md`).
 
 ## Fotos: o recurso por conta vem antes de tudo
 MaintenancePhotoPolicy::view/create/delete negam primeiro quando a conta não tem as fotos das manutenções (App\Support\Maintenance\MaintenancePhotoAccess, flag Pennant ligada pelo admin; ver features.md) e só depois seguem a MaintenancePolicy. O envio pela API passa por `create` (StoreMaintenancePhotoRequest). Foto negada nunca ganha URL assinada, e as rotas autorizadas (API e web) respondem 403.
