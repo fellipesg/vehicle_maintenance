@@ -123,6 +123,81 @@ class WorkshopMessageTemplatePlanLimitTest extends TestCase
         $this->assertFalse($parked->fresh()->is_active);
     }
 
+    /**
+     * Uma oficina pode estar acima do teto sem ter burlado nada: o teto é novo (o config existia
+     * sem leitor), e o plano é trocado pelo admin, não pela oficina. Nesse estado ela ainda tem de
+     * conseguir corrigir o texto do que já tem — a saída é desativar um modelo, e trancar a edição
+     * trancava justamente a tela onde se desativa.
+     */
+    public function test_a_workshop_over_the_ceiling_still_edits_an_active_template(): void
+    {
+        $user = $this->workshopOnFreePlan();
+        WorkshopMessageTemplate::factory()->forWorkshop($user->workshop)->count(3)->create(['is_active' => true]);
+        $active = $user->workshop->messageTemplates()->where('is_active', true)->first();
+
+        $this->actingAs($user)
+            ->put(route('workshop.message-templates.update', $active), $this->payload([
+                'title' => 'Título corrigido',
+                'is_active' => '1',
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('Título corrigido', $active->fresh()->title);
+        $this->assertSame(3, $user->workshop->messageTemplates()->where('is_active', true)->count());
+    }
+
+    public function test_a_workshop_over_the_ceiling_still_deactivates_a_template(): void
+    {
+        $user = $this->workshopOnFreePlan();
+        WorkshopMessageTemplate::factory()->forWorkshop($user->workshop)->count(3)->create(['is_active' => true]);
+        $active = $user->workshop->messageTemplates()->where('is_active', true)->first();
+
+        $this->actingAs($user)
+            ->put(route('workshop.message-templates.update', $active), $this->payload(['is_active' => '0']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertFalse($active->fresh()->is_active);
+        $this->assertSame(2, $user->workshop->messageTemplates()->where('is_active', true)->count());
+    }
+
+    /**
+     * Soltar a edição não solta o teto: acima dele, ativar mais um continua recusado.
+     */
+    public function test_a_workshop_over_the_ceiling_still_cannot_activate_another_template(): void
+    {
+        $user = $this->workshopOnFreePlan();
+        WorkshopMessageTemplate::factory()->forWorkshop($user->workshop)->count(3)->create(['is_active' => true]);
+        $parked = WorkshopMessageTemplate::factory()->forWorkshop($user->workshop)->create(['is_active' => false]);
+
+        $this->actingAs($user)
+            ->put(route('workshop.message-templates.update', $parked), $this->payload(['is_active' => '1']))
+            ->assertSessionHasErrors('is_active');
+
+        $this->assertFalse($parked->fresh()->is_active);
+
+        $this->actingAs($user)
+            ->post(route('workshop.message-templates.store'), $this->payload())
+            ->assertSessionHasErrors('is_active');
+
+        $this->assertSame(3, $user->workshop->messageTemplates()->where('is_active', true)->count());
+    }
+
+    public function test_the_api_update_over_the_ceiling_still_edits_an_active_template(): void
+    {
+        $user = $this->workshopOnFreePlan();
+        WorkshopMessageTemplate::factory()->forWorkshop($user->workshop)->count(3)->create(['is_active' => true]);
+        $active = $user->workshop->messageTemplates()->where('is_active', true)->first();
+
+        Sanctum::actingAs($user, ['workshops:read', 'workshops:write']);
+
+        $this->putJson("/api/v1/workshops/{$user->workshop->id}/message-templates/{$active->id}", [
+            'title' => 'Título corrigido',
+        ])->assertOk();
+
+        $this->assertSame('Título corrigido', $active->fresh()->title);
+        $this->assertTrue($active->fresh()->is_active);
+    }
+
     private function workshopOnFreePlan(): User
     {
         $user = User::factory()->asWorkshop()->create();
