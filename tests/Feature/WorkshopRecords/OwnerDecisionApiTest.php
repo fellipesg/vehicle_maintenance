@@ -31,7 +31,7 @@ class OwnerDecisionApiTest extends TestCase
      */
     private function decision(array $body = []): array
     {
-        return $body + ['link' => true, 'attach_files' => false, 'hide_from_public' => false];
+        return $body + ['link' => true, 'attach_files' => false];
     }
 
     public function test_pending_list_returns_the_contract_without_free_text_or_prices(): void
@@ -120,7 +120,12 @@ class OwnerDecisionApiTest extends TestCase
         $this->assertNotNull(Maintenance::find($record->id));
     }
 
-    public function test_hide_sets_the_timestamp_and_can_be_undone(): void
+    /**
+     * O app ainda manda hide_from_public, então o campo continua aceito — mas pedir para ocultar
+     * responde 422 apontando a contestação, em vez de "salvar" sem gravar nada em silêncio
+     * (.ai/rules/api.md). Ocultar é da equipe agora.
+     */
+    public function test_asking_to_hide_is_refused_and_points_to_the_dispute(): void
     {
         $vehicle = $this->ownerlessVehicle();
         $record = $this->ownerlessRecord($this->workshopAccount(), $vehicle);
@@ -128,10 +133,12 @@ class OwnerDecisionApiTest extends TestCase
 
         $this->actingAsApiUser($owner);
         $this->postJson("/api/v1/maintenances/{$record->id}/owner-decision", $this->decision(['hide_from_public' => true]))
-            ->assertOk()->assertJsonPath('data.hidden_from_public', true);
-        $this->assertNotNull($record->fresh()->hidden_from_public_at);
-        $this->assertSame($owner->id, $record->fresh()->owner_decided_by_user_id);
+            ->assertStatus(422)
+            ->assertJsonPath('message', \App\Http\Requests\Api\V1\OwnerDecisionRequest::HIDE_REMOVED_MESSAGE);
 
+        $this->assertNull($record->fresh()->hidden_from_public_at);
+
+        // Sem o campo, ou com false, a decisão passa normalmente.
         $this->postJson("/api/v1/maintenances/{$record->id}/owner-decision", $this->decision())
             ->assertOk()->assertJsonPath('data.hidden_from_public', false);
     }
@@ -170,14 +177,14 @@ class OwnerDecisionApiTest extends TestCase
         $this->assertSame(1, $record->fresh()->invoices()->count());
     }
 
-    public function test_unverified_owner_cannot_decline_hide_or_link(): void
+    public function test_unverified_owner_cannot_decline_or_link(): void
     {
         $vehicle = $this->ownerlessVehicle();
         $record = $this->withPendingAttachments($this->ownerlessRecord($this->workshopAccount(), $vehicle));
         $owner = $this->ownerOf($vehicle, verified: false);
 
         $this->actingAsApiUser($owner);
-        foreach ([['link' => false], ['hide_from_public' => true], []] as $choice) {
+        foreach ([['link' => false], []] as $choice) {
             $this->postJson("/api/v1/maintenances/{$record->id}/owner-decision", $this->decision($choice))
                 ->assertStatus(422)
                 ->assertJsonPath('message', 'Para decidir sobre os registros da oficina, confirme que o veículo é seu enviando o CRLV-e.');

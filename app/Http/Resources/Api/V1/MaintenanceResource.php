@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Services\Maintenance\MaintenanceOwnerDecisionService;
 use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\MaintenanceRedactor;
 use Illuminate\Http\Request;
@@ -59,6 +60,9 @@ class MaintenanceResource extends JsonResource
             'owner_status' => $maintenance->owner_status,
             'attachments_status' => $isOwnerless ? $maintenance->attachments_status : null,
             'hidden_from_public' => $maintenance->isHiddenFromPublic(),
+            'disputed' => $maintenance->isDisputed(),
+            'can_dispute' => $request->user() !== null
+                && app(MaintenanceOwnerDecisionService::class)->canDispute($request->user(), $maintenance),
             $this->mergeWhen(
                 $isOwnerless && $this->resource->isCreatedByWorkshopOf($request->user()),
                 fn () => [

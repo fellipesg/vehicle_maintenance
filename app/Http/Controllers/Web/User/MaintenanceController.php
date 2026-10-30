@@ -12,6 +12,7 @@ use App\Models\Workshop;
 use App\Policies\MaintenancePolicy;
 use App\Rules\InvoiceFile;
 use App\Rules\RequiresInvoiceWhenWorkshopAssigned;
+use App\Services\Maintenance\MaintenanceOwnerDecisionService;
 use App\Services\Maintenance\MaintenancePhotoService;
 use App\Services\Maintenance\MaintenanceVerificationStamper;
 use App\Services\Maintenance\WorkshopReviewService;
@@ -155,7 +156,7 @@ class MaintenanceController extends Controller
         );
     }
 
-    public function show(Maintenance $maintenance): View
+    public function show(Request $request, Maintenance $maintenance): View
     {
         Gate::authorize('view', $maintenance);
 
@@ -166,6 +167,9 @@ class MaintenanceController extends Controller
         return view('user.maintenances.show', [
             'maintenance' => $maintenance,
             'canViewVehicle' => $vehicle !== null && Gate::allows('view', $vehicle),
+            // Contestar a OS de uma oficina não pede CRLV-e nem é "decisão pendente": é aqui que o
+            // dono responde a um registro que apareceu no carro dele.
+            'canDispute' => app(MaintenanceOwnerDecisionService::class)->canDispute($request->user(), $maintenance),
             'canUpdate' => $updateDecision->allowed(),
             'canDelete' => Gate::allows('delete', $maintenance),
             // Declarada por esta conta num veículo que já saiu dela (vendido ou desvinculado).

@@ -26,3 +26,9 @@ WorkshopApprovalDecidedNotification (mail + database) é a resposta da análise 
 oficina (`App\Services\Workshop\WorkshopReview`, ver `.ai/rules/garage.md`). Não confundir com
 WorkshopReviewDecidedNotification, que é a resposta da oficina sobre uma manutenção que alguém
 declarou citando ela.
+
+## maintenance_disputed
+MaintenanceDisputedNotification (mail + database, type maintenance_disputed) vai para a conta da
+**oficina** quando o proprietário contesta uma OS dela (`MaintenanceOwnerDecisionService::dispute`).
+É de propósito: a oficina é a única que pode corrigir ou excluir o registro, e sem o aviso a
+contestação ficaria invisível para quem resolve. O payload leva maintenance_id, vehicle_id e reason.

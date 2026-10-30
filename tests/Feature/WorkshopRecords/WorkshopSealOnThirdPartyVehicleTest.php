@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Notifications\WorkshopRecordRegisteredNotification;
 use App\Services\FcmService;
+use App\Services\Maintenance\MaintenanceOwnerDecisionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -22,8 +23,8 @@ use Tests\TestCase;
  * vínculo provado). A regra caiu porque cobrava o preço no caso legítimo — oficina credenciada
  * atendendo cliente novo — e o risco que ela endereçava passou a ser coberto pela análise do
  * cadastro da oficina (EnsureWorkshopApproved: CNPJ conferido, conta que se perde) somada ao aviso
- * ao proprietário. O que sobreviveu e segue testado aqui: o selo sai na hora em carro de terceiro, o
- * dono é avisado, e data futura é recusada.
+ * ao proprietário e à contestação. O que sobreviveu e segue testado aqui: o dono é avisado, pode
+ * contestar, a contestação tira o número do hodômetro, e data futura é recusada.
  */
 class WorkshopSealOnThirdPartyVehicleTest extends TestCase
 {
@@ -115,6 +116,45 @@ class WorkshopSealOnThirdPartyVehicleTest extends TestCase
             WorkshopRecordRegisteredNotification::class,
             fn (WorkshopRecordRegisteredNotification $n): bool => $n->maintenance->vehicle_id === $vehicle->id,
         );
+    }
+
+    public function test_the_owner_can_contest_and_the_kilometres_stop_counting(): void
+    {
+        Notification::fake();
+
+        [$owner, $vehicle] = $this->ownedVehicle();
+
+        $this->actingAs($this->workshopAccount())
+            ->post('/oficina/manutencoes', $this->payload(['kilometers' => 9_999_999]))
+            ->assertSessionHasNoErrors();
+
+        $maintenance = Maintenance::firstOrFail();
+        $this->assertSame(9_999_999, $vehicle->fresh()->current_kilometers);
+
+        app(MaintenanceOwnerDecisionService::class)->dispute($maintenance, $owner, 'Nunca levei aqui.');
+
+        // Contestado não governa o hodômetro: o veículo volta ao que a história não contestada diz.
+        $this->assertSame(10_000, $vehicle->fresh()->current_kilometers);
+        // Mas o registro continua no histórico, com o selo e a marca.
+        $this->assertNotNull($maintenance->fresh()->verified_at);
+        $this->assertNull($maintenance->fresh()->hidden_from_public_at);
+    }
+
+    public function test_withdrawing_the_dispute_brings_the_kilometres_back(): void
+    {
+        Notification::fake();
+
+        [$owner, $vehicle] = $this->ownedVehicle();
+
+        $this->actingAs($this->workshopAccount())->post('/oficina/manutencoes', $this->payload());
+        $maintenance = Maintenance::firstOrFail();
+
+        $decisions = app(MaintenanceOwnerDecisionService::class);
+        $decisions->dispute($maintenance, $owner);
+        $this->assertSame(10_000, $vehicle->fresh()->current_kilometers);
+
+        $decisions->withdrawDispute($maintenance->fresh(), $owner);
+        $this->assertSame(55_000, $vehicle->fresh()->current_kilometers);
     }
 
     public function test_future_maintenance_date_is_refused(): void

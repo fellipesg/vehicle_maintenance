@@ -112,6 +112,9 @@ Route::prefix('v1')->group(function () {
         // OS de oficina em carro sem proprietário: decisão do proprietário e convite do cliente.
         Route::get('/me/workshop-records', [WorkshopRecordController::class, 'index'])->middleware('ability:maintenances:read');
         Route::post('/maintenances/{id}/owner-decision', [WorkshopRecordController::class, 'decide'])->middleware('ability:maintenances:write');
+        // Contestar não exige CRLV-e, ao contrário de owner-decision (MaintenanceOwnerDecisionService::dispute).
+        Route::post('/maintenances/{id}/dispute', [WorkshopRecordController::class, 'dispute'])->middleware('ability:maintenances:write');
+        Route::delete('/maintenances/{id}/dispute', [WorkshopRecordController::class, 'withdrawDispute'])->middleware('ability:maintenances:write');
         Route::post('/maintenances/{id}/invites/email', [MaintenanceInviteController::class, 'email'])->middleware(['ability:maintenances:write', 'throttle:workshop-invites']);
         Route::post('/maintenances/{id}/invites/whatsapp', [MaintenanceInviteController::class, 'whatsapp'])->middleware(['ability:maintenances:write', 'throttle:workshop-invites']);
 

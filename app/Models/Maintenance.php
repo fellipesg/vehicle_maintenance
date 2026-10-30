@@ -55,6 +55,7 @@ class Maintenance extends Model
             'verified_at' => 'datetime',
             'hidden_from_public_at' => 'datetime',
             'owner_decided_at' => 'datetime',
+            'owner_disputed_at' => 'datetime',
             'workshop_review_status' => WorkshopReviewStatus::class,
             'workshop_reviewed_at' => 'datetime',
             'workshop_review_requested_at' => 'datetime',
@@ -92,6 +93,34 @@ class Maintenance extends Model
     public function isHiddenFromPublic(): bool
     {
         return $this->hidden_from_public_at !== null;
+    }
+
+    /**
+     * O proprietário atual contestou este registro: ele diz que o serviço não aconteceu no carro
+     * dele (MaintenanceOwnerDecisionService::dispute).
+     *
+     * Contestar **marca, não apaga**: o registro continua aparecendo em todas as superfícies, com o
+     * aviso de que o proprietário contesta. O histórico pertence ao chassi e é o ativo do produto;
+     * tirá-lo de circulação por declaração de uma das partes é o que a contestação substituiu
+     * (antes o dono com CRLV-e ocultava, e o comprador não distinguia "carro sem histórico" de
+     * "histórico suprimido"). Esconder de verdade ficou só com a equipe, depois de analisar
+     * (App\Services\Maintenance\MaintenancePublicVisibilityService).
+     */
+    public function isDisputed(): bool
+    {
+        return $this->owner_disputed_at !== null;
+    }
+
+    /**
+     * Pode ser contestado? Qualquer OS que uma oficina registrou (registered_by_type workshop),
+     * com selo ou sem. Contestar é a única resposta que o proprietário tem — e, como só marca, vale
+     * para a selada também: é o caso do dono que chega depois e encontra no chassi dele um serviço
+     * que não reconhece. O que ele declarou (owner) ou o lojista declarou (garage) ele resolve
+     * editando ou excluindo, não contestando.
+     */
+    public function isDisputable(): bool
+    {
+        return $this->registered_by_type === 'workshop';
     }
 
     /**
@@ -174,8 +203,10 @@ class Maintenance extends Model
     }
 
     /**
-     * Fora da consulta pública e do histórico: oculta pelo proprietário (direito de oposição). Só
-     * a oficina autora e quem ocultou ainda a veem.
+     * Fora da consulta pública e do histórico: oculta pela equipe
+     * (MaintenancePublicVisibilityService) ou, em dados anteriores à mudança, pelo proprietário. Só
+     * a oficina autora e quem decidiu ainda a veem; o admin enxerga por outro caminho (as telas de
+     * admin não passam por aqui).
      */
     public function hiddenFrom(?User $viewer): bool
     {
@@ -277,6 +308,22 @@ class Maintenance extends Model
 
         return $this->registered_by_type === 'workshop'
             && (int) $this->workshop_id === $workshopId;
+    }
+
+    /**
+     * Registros que contam para o hodômetro do veículo (VehicleMileageService).
+     *
+     * Fica de fora o que o proprietário contestou: ele diz que aquele serviço não aconteceu no
+     * carro dele, e até a equipe analisar o número não pode governar o `current_kilometers` — era
+     * por aí que uma quilometragem absurda entrava e não saía mais. O registro continua no
+     * histórico, com a marca; só não manda no hodômetro.
+     *
+     * @param  Builder<Maintenance>  $query
+     * @return Builder<Maintenance>
+     */
+    public function scopeCountsTowardOdometer(Builder $query): Builder
+    {
+        return $query->whereNull('owner_disputed_at');
     }
 
     /**
@@ -449,6 +496,22 @@ class Maintenance extends Model
     public function checklists(): HasMany
     {
         return $this->hasMany(Checklist::class);
+    }
+
+    /**
+     * Quem da equipe tirou o registro da consulta pública.
+     */
+    public function hiddenBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'hidden_by_user_id');
+    }
+
+    /**
+     * Quem contestou o registro (o proprietário atual na época).
+     */
+    public function disputedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_disputed_by_user_id');
     }
 
     /**

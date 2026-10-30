@@ -63,7 +63,7 @@ class VehicleMileageService
         $vehicle->update([
             'current_kilometers' => max(
                 (int) ($vehicle->odometer_at_registration ?? 0),
-                (int) $vehicle->maintenances()->max('kilometers'),
+                (int) $vehicle->maintenances()->countsTowardOdometer()->max('kilometers'),
                 $kilometers,
             ),
         ]);
@@ -74,14 +74,14 @@ class VehicleMileageService
         $vehicle->update([
             'current_kilometers' => max(
                 (int) ($vehicle->odometer_at_registration ?? 0),
-                (int) $vehicle->maintenances()->max('kilometers'),
+                (int) $vehicle->maintenances()->countsTowardOdometer()->max('kilometers'),
             ),
         ]);
     }
 
     private function minimumAllowedKilometers(Vehicle $vehicle, ?CarbonImmutable $date, ?Maintenance $except): int
     {
-        $query = $vehicle->maintenances()->whereNotNull('kilometers');
+        $query = $vehicle->maintenances()->countsTowardOdometer()->whereNotNull('kilometers');
 
         if ($except !== null) {
             $query->where('id', '!=', $except->id);
@@ -107,6 +107,7 @@ class VehicleMileageService
         }
 
         $query = $vehicle->maintenances()
+            ->countsTowardOdometer()
             ->whereNotNull('kilometers')
             ->whereDate('maintenance_date', '>', $date);
 

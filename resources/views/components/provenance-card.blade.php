@@ -168,6 +168,12 @@
         @endif
 
         <p class="mt-1 text-sm font-medium text-[color:var(--prov-ink)]" data-slot="provenance-card-label">{{ $maintenance->provenance_card_label }}</p>
+        @if ($maintenance->isDisputed())
+            {{-- Contestada aparece, não desaparece: o comprador fica com as duas versões. --}}
+            <p class="mt-1" data-slot="provenance-card-disputed">
+                <x-ui.badge variant="warning" icon="exclamation-triangle" size="sm">Contestada pelo proprietário</x-ui.badge>
+            </p>
+        @endif
         @if ($evidence !== [])
             <p class="text-xs text-muted-foreground" data-slot="provenance-card-evidence">
                 @foreach ($evidence as $evidenceIndex => $evidenceText)

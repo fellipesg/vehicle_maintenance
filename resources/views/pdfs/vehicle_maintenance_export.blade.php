@@ -758,6 +758,11 @@
                                 $sealInvoiceCount = $maintenance->invoices->count();
                                 $sealActor = $maintenance->registered_by_type === 'garage' ? 'lojista' : 'proprietário';
                             @endphp
+                            @if($maintenance->isDisputed())
+                                <div class="seal-meta" style="padding: 4px 0; font-weight: bold;">
+                                    Contestada pelo proprietário: ele diz que este serviço não foi feito no carro dele. O registro permanece no histórico do chassi com esta ressalva.
+                                </div>
+                            @endif
                             @if($maintenance->isVerified())
                                 <table class="seal seal--verified" cellpadding="0" cellspacing="0">
                                     <tr>

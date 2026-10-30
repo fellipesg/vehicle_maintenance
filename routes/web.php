@@ -237,6 +237,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/registros-de-oficinas/{maintenance}', [UserWorkshopRecordController::class, 'decide'])
             ->whereNumber('maintenance')
             ->name('workshop-records.decide');
+        // Contestar não exige CRLV-e: é a ação do dono sem o documento (ver o docblock de
+        // MaintenanceOwnerDecisionService::dispute).
+        Route::post('/registros-de-oficinas/{maintenance}/contestar', [UserWorkshopRecordController::class, 'dispute'])
+            ->whereNumber('maintenance')
+            ->name('workshop-records.dispute');
+        Route::delete('/registros-de-oficinas/{maintenance}/contestar', [UserWorkshopRecordController::class, 'withdrawDispute'])
+            ->whereNumber('maintenance')
+            ->name('workshop-records.dispute.withdraw');
     });
 
     Route::prefix('garagem')->middleware(['user.type:garage', 'garage.approved'])->name('garage.')->group(function () {
@@ -348,6 +356,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/veiculos', [AdminVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
+        // Ocultar da consulta pública é ação da equipe, não do proprietário: ver
+        // App\Services\Maintenance\MaintenancePublicVisibilityService.
+        Route::post('/manutencoes/{maintenance}/ocultar', [AdminMaintenanceController::class, 'hide'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.hide');
+        Route::post('/manutencoes/{maintenance}/publicar', [AdminMaintenanceController::class, 'restore'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.restore');
         Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
         Route::put('/oficinas/{workshop}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'workshop'])->name('workshops.maintenance-photos');
         Route::post('/oficinas/{workshop}/aprovar', [AdminWorkshopController::class, 'approve'])->name('workshops.approve');

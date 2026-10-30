@@ -31,6 +31,45 @@ dele); **sem** dono, nasce `pending` e espera quem assumir o veículo (fluxo de 
 
 Data de manutenção futura é recusada na validação das quatro superfícies (`before_or_equal:today`).
 
+## O proprietário contesta; esconder é da equipe
+**O dono não oculta mais registro nenhum.** O `hide_from_public` saiu de
+`MaintenanceOwnerDecisionService::decide`, e a razão é o próprio produto: o histórico pertence ao
+chassi e é o ativo, e aquele ocultar apagava justamente o que o comprador precisa ver — sem deixar
+sinal, o que torna "carro sem histórico" indistinguível de "histórico suprimido". Quem escondia era
+quem tinha interesse em esconder.
+
+No lugar entrou `dispute`, a única ação que **não** exige `ownership_verified_at`: basta ser o dono
+atual, e o registro ser de oficina (`Maintenance::isDisputable` = `registered_by_type` workshop, com
+selo ou sem — o que o próprio dono ou o lojista declarou ele resolve editando). Contestar **marca e
+não esconde**: grava `owner_disputed_at`/`owner_disputed_by_user_id`/`owner_dispute_reason` (nenhum
+fillable), o registro continua em TODAS as superfícies com o aviso "Contestada pelo proprietário"
+(`provenance-card`, `provenance-seal`, `/v/{código}`, PDF, busca pública e linha do tempo), a oficina
+autora é avisada (`MaintenanceDisputedNotification`, é ela quem corrige ou exclui) e o caso entra na
+fila do admin. O comprador fica com **mais** informação, não menos. Vincular depois limpa a
+contestação (vincular é aceitar) e `withdrawDispute` desfaz.
+
+O texto do proprietário (`owner_dispute_reason`) **não** vai para a busca pública: lá só a marca. Ele
+aparece para o próprio dono, para a oficina (na notificação) e no admin.
+
+Esconder de verdade continua existindo, mas só com um humano responsável:
+`App\Services\Maintenance\MaintenancePublicVisibilityService` é a única escrita de
+`hidden_from_public_at`, chamada de `admin.maintenances.hide`, e grava `hidden_by_user_id` e
+`hidden_reason`. É o fim de linha de uma contestação que a equipe confirmou (fraude, chassi errado) ou
+de um pedido de remoção que a empresa honre. `hiddenFrom` e o scope `visibleInHistoryTo` seguem
+olhando só `hidden_from_public_at` — contestação não entra ali, e as duas formas continuam casadas
+como policies.md exige.
+
+**Registros ocultados antes desta mudança continuam ocultos**: republicar na marra o que alguém
+exerceu como direito de oposição é decisão de produto e jurídico, não de migration.
+
+## Hodômetro: o que tira o número da conta é a contestação
+`Maintenance::scopeCountsTowardOdometer` é o filtro de `VehicleMileageService` (apply, refresh e os
+limites de km) e deixa de fora **o que o proprietário contestou** (`owner_disputed_at`). Era por aí
+que uma quilometragem absurda entrava e não saía mais: o registro continua no histórico, com a marca,
+mas não governa o `current_kilometers` enquanto a equipe não analisar. `dispute` e `withdrawDispute`
+recalculam na hora, e `decide` também — toda mudança no que conta precisa do recálculo, senão o
+veículo fica com o km velho até a próxima gravação qualquer.
+
 ## OS sem proprietário: tenant nulo, estado na própria manutenção
 Uma OS que a oficina registra num veículo sem dono atual nasce com tenant_id nulo (VehicleTenantResolver não decide mais isso; OwnerlessMaintenanceService::tenantIdFor) e owner_status pending. As colunas owner_status (pending|linked|declined), attachments_status (none|pending|accepted|declined|revoked), hidden_from_public_at e owner_decided_* não são fillable: só OwnerlessMaintenanceService e MaintenanceOwnerDecisionService gravam. owner_status nulo = OS comum. Invoice e MaintenancePhoto criados voltam attachments_status a pending (nunca depois de accepted).
 

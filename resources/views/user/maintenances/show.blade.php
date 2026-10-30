@@ -79,6 +79,36 @@
             @endif
         </x-ui.page-header>
 
+        @if ($maintenance->isDisputed())
+            <x-ui.alert variant="warning" role="status" class="mb-6" title="Você contestou este registro" data-maintenance-disputed>
+                Ele continua no histórico do veículo, com o Selo da oficina e com a marca de que você contesta — quem consultar o carro vê as duas versões. A oficina foi avisada e a nossa equipe está analisando.
+                @if (filled($maintenance->owner_dispute_reason))
+                    <span class="mt-1 block">O que você informou: {{ $maintenance->owner_dispute_reason }}</span>
+                @endif
+                <x-slot:actions>
+                    <form method="POST" action="{{ route('user.workshop-records.dispute.withdraw', $maintenance) }}">
+                        @csrf
+                        @method('DELETE')
+                        <x-ui.button variant="secondary" size="sm" type="submit" loading-label="Retirando…">Retirar contestação</x-ui.button>
+                    </form>
+                </x-slot:actions>
+            </x-ui.alert>
+        @elseif ($canDispute ?? false)
+            <details class="mb-6 rounded-lg border border-border p-4" data-maintenance-dispute-form>
+                <summary class="cursor-pointer text-sm font-medium text-foreground">Este serviço não foi feito no meu carro</summary>
+                <form method="POST" action="{{ route('user.workshop-records.dispute', $maintenance) }}" class="mt-3 space-y-3">
+                    @csrf
+                    <p class="text-sm text-muted-foreground">
+                        O registro <strong>não sai</strong> do histórico: ele continua visível para quem consultar o veículo, marcado como contestado por você. O histórico é o que dá valor ao carro, e suprimi-lo deixaria quem vai comprar sem saber que houve contestação. Avisamos a oficina, que pode corrigir ou excluir, e a nossa equipe analisa.
+                    </p>
+                    <x-ui.textarea name="reason" id="maintenance-dispute-reason" rows="2" maxlength="500"
+                        label="O que aconteceu (opcional)"
+                        placeholder="Ex.: nunca levei o carro nesta oficina." />
+                    <x-ui.button variant="secondary" type="submit" loading-label="Contestando…">Contestar registro</x-ui.button>
+                </form>
+            </details>
+        @endif
+
         @include('maintenances._detail', [
             'maintenance' => $maintenance,
             'portal' => Portal::Owner,

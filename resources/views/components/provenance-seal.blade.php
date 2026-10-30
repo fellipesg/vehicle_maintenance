@@ -32,6 +32,13 @@
     $citedWorkshopName = ! $verified && $maintenance->workshop_id ? $maintenance->displayWorkshopName() : null;
 @endphp
 
+@if ($maintenance->isDisputed())
+    {{-- O proprietário contesta. Fica acima da procedência porque muda como ela deve ser lida. --}}
+    <x-ui.alert variant="warning" role="status" class="mb-4" title="Contestada pelo proprietário" data-slot="provenance-disputed">
+        O proprietário atual do veículo diz que este serviço não foi feito no carro dele. O registro continua no histórico do chassi, com esta ressalva, enquanto a RevisaLog analisa.
+    </x-ui.alert>
+@endif
+
 @if ($verified)
     <div {{ $attributes->class(['prov-seal prov-verified']) }} data-slot="provenance-seal">
         <div class="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">

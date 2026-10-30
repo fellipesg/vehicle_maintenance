@@ -13,3 +13,15 @@ When a page has more than one form for the same fields (Nova marca/Editar marca,
 
 ## Recursos por conta: interruptores no admin
 Liga/desliga de recurso por conta (hoje, as fotos das manutenções) é `MaintenancePhotosFeatureController`: um PUT por escopo (usuário, oficina, loja) com `UpdateMaintenancePhotosFeatureRequest`, log de quem mudou e `back()` com aviso. Valores lidos por MaintenancePhotoAccess::isActiveFor / preload (nada de uma consulta por linha); ver features.md.
+
+## OS contestada tem filtro, pendência e é aqui que se esconde
+`admin.maintenances.index?contestadas=1` filtra o que o proprietário contestou
+(`owner_disputed_at`, ver models.md) e aparece como chip removível junto dos outros filtros de
+contexto. O caminho até lá é o cartão de Pendências da visão geral ("OS contestadas").
+
+A contestação **não** tira a OS da consulta pública — ela só marca. Quem tira é a equipe, e só por
+aqui: `POST admin/manutencoes/{maintenance}/ocultar` (motivo opcional) e `.../publicar`, via
+`App\Services\Maintenance\MaintenancePublicVisibilityService`, que grava `hidden_by_user_id` e
+`hidden_reason`. Suprimir um registro é tirar de circulação o ativo do produto: tem que ter nome e
+motivo. Use para fraude confirmada e erro de chassi, não para acalmar um proprietário incomodado — é
+exatamente por isso que a alavanca saiu da mão dele.
