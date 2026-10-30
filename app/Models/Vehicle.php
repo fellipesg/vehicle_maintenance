@@ -220,6 +220,16 @@ class Vehicle extends Model
     }
 
     /**
+     * A conta dona atual deste veículo, ou null quando ele não tem dono.
+     */
+    public function currentOwner(): ?User
+    {
+        return $this->owners()
+            ->whereRaw('user_vehicles.is_current_owner = true')
+            ->first();
+    }
+
+    /**
      * Veículo criado pela oficina só pelo chassi: sem dono, sem placa e sem RENAVAM. É o único que um
      * proprietário assume apenas com o chassi (o vínculo não é verificado) ou com o CRLV-e.
      */

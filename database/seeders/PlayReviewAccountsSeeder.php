@@ -247,7 +247,14 @@ class PlayReviewAccountsSeeder extends Seeder
                 ]));
             }
 
-            $stamper->stamp($maintenance, $sealed && $workshop !== null ? $workshopUser : $owner);
+            if ($sealed && $workshop !== null) {
+                // Demo: a OS é da oficina de revisão no carro do proprietário. No fluxo real o selo
+                // num carro com dono exige relação provada (App\Support\Maintenance\WorkshopVehicleLink);
+                // aqui a autorização do dono já é dada, como se ele tivesse vinculado o registro.
+                $stamper->sealAfterOwnerLink($maintenance, $workshop->id);
+            } else {
+                $stamper->stamp($maintenance, $owner);
+            }
         }
 
         app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());

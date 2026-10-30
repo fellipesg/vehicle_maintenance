@@ -80,7 +80,9 @@ class Maintenance extends Model
     }
 
     /**
-     * A OS nasceu num carro sem proprietário e depende da decisão dele (owner_status não nulo).
+     * A OS de oficina nasceu num carro sem proprietário atual e depende da decisão de quem assumir
+     * o veículo (owner_status não nulo). Num carro que já tem dono, owner_status é nulo: o registro
+     * entra no histórico dele direto, com o selo, e o que ele tem é contestar.
      */
     public function isOwnerlessRecord(): bool
     {
@@ -255,6 +257,29 @@ class Maintenance extends Model
     }
 
     /**
+     * A OS é desta oficina, isto é, foi ela que a registrou?
+     *
+     * Com o Selo da oficina é o verified_workshop_id. Sem selo é o workshop_id junto com
+     * registered_by_type workshop — não existe mais caminho que crie OS de oficina sem selo, mas
+     * dados de um período em que o selo dependia de vínculo provado continuam valendo, e a oficina
+     * precisa poder corrigir e excluir o que registrou. A declarada que só CITA a oficina
+     * (workshop_id com registered_by_type owner ou garage) segue de quem declarou.
+     */
+    public function isAuthoredByWorkshopId(?int $workshopId): bool
+    {
+        if ($workshopId === null) {
+            return false;
+        }
+
+        if ($this->isVerified()) {
+            return (int) $this->verified_workshop_id === $workshopId;
+        }
+
+        return $this->registered_by_type === 'workshop'
+            && (int) $this->workshop_id === $workshopId;
+    }
+
+    /**
      * Declarada citando uma oficina da rede, ainda sem resposta dela.
      */
     public function isAwaitingWorkshopReview(): bool
@@ -286,7 +311,7 @@ class Maintenance extends Model
     public function getProvenanceLabelAttribute(): string
     {
         return match ($this->registered_by_type) {
-            'workshop' => 'Selo da oficina',
+            'workshop' => $this->isVerified() ? 'Selo da oficina' : 'Registrada pela oficina',
             'garage' => 'Declarada pelo lojista',
             default => 'Declarada pelo proprietário',
         };
@@ -305,7 +330,7 @@ class Maintenance extends Model
                 ?? $this->workshop_name
                 ?? 'Oficina';
 
-            return 'Selo da oficina · '.$name;
+            return $this->provenance_label.' · '.$name;
         }
 
         return $this->provenance_label;

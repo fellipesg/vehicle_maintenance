@@ -26,6 +26,15 @@ GET /api/v1/auth/{provider}/redirect responde 200 com success=false e error_code
 ## Registros de oficinas (contrato com o app)
 GET /api/v1/me/workshop-records?status=pending|all, POST /api/v1/maintenances/{id}/owner-decision {link, attach_files, hide_from_public}, GET /api/v1/workshop/vehicles/lookup?chassis=, POST /api/v1/workshop/vehicles, POST /api/v1/maintenances/{id}/invites/email|whatsapp, e pending_workshop_records_count em GET /api/v1/me. MaintenanceResource ganhou is_ownerless_record, owner_status (null em OS comum), attachments_status (null em OS comum) e hidden_from_public. Erros de decisão e convite voltam 422 com message em pt-BR.
 
+## O que mais mudou no contrato
+`owner_status`, `is_ownerless_record` e `attachments_status` seguem como eram: não nulos só na OS de
+carro que não tinha proprietário. Em carro com dono a OS da oficina nasce **selada** e sem eles — é
+manutenção comum do histórico do proprietário, não item de fila.
+
+Duas mudanças a conferir no app: (1) `POST`/`PUT /api/v1/maintenances` recusam `maintenance_date`
+futura com 422 (`before_or_equal:today`); (2) chegou o aviso `workshop_record_registered` na central
+de notificações, que é como o dono sabe que uma oficina escreveu no carro dele.
+
 ## Oficina em análise só lê pela API (contrato com o app)
 A oficina em análise (`workshops.status`, ver `.ai/rules/garage.md`) responde 403 em qualquer método
 de escrita da API, com `message` em inglês no envelope, igual à loja em análise: o app precisa mostrar

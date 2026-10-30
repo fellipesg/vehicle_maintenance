@@ -19,6 +19,7 @@ use App\Services\Maintenance\MaintenanceInviteService;
 use App\Services\Maintenance\MaintenancePhotoService;
 use App\Services\Maintenance\MaintenanceVerificationStamper;
 use App\Services\Maintenance\OwnerlessMaintenanceService;
+use App\Services\Maintenance\WorkshopRecordsArrivalNotifier;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\WorkshopVehicleRegistrar;
 use App\Support\AppStorage;
@@ -166,7 +167,7 @@ class MaintenanceController extends Controller
             'new_vehicle.year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'maintenance_type' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
-            'maintenance_date' => ['required', 'date'],
+            'maintenance_date' => ['required', 'date', 'before_or_equal:today'],
             'kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
             'service_category' => ['required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => ['nullable', 'boolean'],
@@ -254,11 +255,15 @@ class MaintenanceController extends Controller
                         'tenant_id' => $ownerless->tenantIdFor($vehicle),
                     ]);
 
+                    $maintenance->setRelation('vehicle', $vehicle);
+                    $maintenance = app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
+
+                    // Carro sem dono: o registro espera quem assumir o veículo. Com dono, entra no
+                    // histórico dele direto (com selo) e o aviso sai depois da transação.
                     if ($ownerless->isOwnerless($vehicle)) {
-                        $ownerless->markPending($maintenance);
+                        $maintenance = $ownerless->markPending($maintenance)->fresh();
                     }
 
-                    app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
                     app(VehicleMileageService::class)->applyMaintenanceKilometers(
                         $vehicle,
                         (int) $data['kilometers'],
@@ -274,6 +279,8 @@ class MaintenanceController extends Controller
         $maintenance = $result['maintenance']->fresh();
 
         $this->storePhotosFromRequest($request, $maintenance, $request->user());
+
+        app(WorkshopRecordsArrivalNotifier::class)->notifyOwnerOfWorkshopRecord($maintenance);
 
         return $this->redirectWithInvoiceFeedback(
             redirect()->route('workshop.maintenances.show', $maintenance),
@@ -351,7 +358,7 @@ class MaintenanceController extends Controller
         $data = $request->validate(array_merge([
             'maintenance_type' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
-            'maintenance_date' => ['required', 'date'],
+            'maintenance_date' => ['required', 'date', 'before_or_equal:today'],
             'kilometers' => ['required', 'integer', 'min:0', 'max:9999999'],
             'service_category' => ['required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => ['nullable', 'boolean'],
@@ -453,15 +460,13 @@ class MaintenanceController extends Controller
     }
 
     /**
-     * A OS é da oficina: ela aplicou o Selo da oficina. Registros que um proprietário ou lojista
-     * declarou citando a oficina (workshop_id) aparecem para ela, mas só quem declarou pode
-     * alterar ou excluir (a oficina não é autora e o registro continua "Declarada").
+     * A OS é da oficina: ela a registrou (Maintenance::isAuthoredByWorkshopId). Registros que um
+     * proprietário ou lojista declarou citando a oficina (workshop_id) aparecem para ela, mas só
+     * quem declarou pode alterar ou excluir.
      */
     public static function isAuthoredBy(Maintenance $maintenance, ?Workshop $workshop): bool
     {
-        return $workshop !== null
-            && $maintenance->isVerified()
-            && (int) $maintenance->verified_workshop_id === (int) $workshop->id;
+        return $maintenance->isAuthoredByWorkshopId($workshop?->id);
     }
 
     /**
@@ -484,9 +489,11 @@ class MaintenanceController extends Controller
 
     private static function createdMessage(Maintenance $maintenance): string
     {
-        return $maintenance->verification_code
-            ? 'OS registrada. Selo da oficina emitido: '.$maintenance->verification_code.'.'
-            : 'OS registrada.';
+        if ($maintenance->verification_code) {
+            return 'OS registrada. Selo da oficina emitido: '.$maintenance->verification_code.'.';
+        }
+
+        return 'OS registrada.';
     }
 
     private function redirectUnlessAuthored(Request $request, Maintenance $maintenance): ?RedirectResponse

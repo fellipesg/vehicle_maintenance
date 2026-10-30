@@ -26,6 +26,10 @@ e-mail e WhatsApp para terceiros; e um selo emitido não volta atrás. Estado em
 `WorkshopApprovalDecidedNotification` para a conta (não confundir com
 `WorkshopReviewDecidedNotification`, que é a resposta da oficina sobre uma declarada).
 
+Com o portão em pé, o selo não depende mais de vínculo provado com o veículo (ver
+`.ai/rules/models.md`, "O selo não espera o proprietário"): a identidade conferida aqui é o que
+responde "quem é essa oficina?", e foi o que permitiu devolver o selo ao caso legítimo.
+
 `status` **não** é fillable e a migration marca 'approved' tudo o que já existia; a WorkshopFactory
 nasce aprovada (`pending()`/`rejected()` para a fila). Diferenças deliberadas em relação ao lojista:
 conta de oficina **sem** linha em `workshops` passa pelo portão (não há o que conferir, e sem ela não

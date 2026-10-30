@@ -8,6 +8,29 @@ paths:
 ## Procedência só via MaintenanceVerificationStamper
 registered_by_type, verified_at, verified_workshop_id e verification_code não são fillable. Selo (workshop) só quando o ator é oficina e workshop_id da manutenção é o da oficina. Código RVL-XXXX-XX gerado com retry. Manutenção verificada não é editável/apagável por não-oficina.
 
+## O selo não espera o proprietário
+Oficina **aprovada** (`.ai/rules/garage.md`) sela a OS que registrou em **qualquer** veículo, com ou
+sem proprietário cadastrado, e o registro entra no histórico do chassi na hora. O histórico pertence
+ao chassi e é o ativo do produto: ele não depende de um terceiro clicar, e silêncio não vira veto.
+
+Houve um período em que o selo em carro com dono exigia vínculo provado com o veículo
+(`WorkshopVehicleLink`, removido). A regra caiu porque cobrava o preço no caso central — oficina
+credenciada atendendo cliente novo cujo carro já tem conta — e podia deixar aquela oficina sem selo
+para sempre se o dono ignorasse o aviso. O risco que ela endereçava ("quem é essa oficina escrevendo
+no carro de terceiro?") passou a ser coberto por outras três coisas, que juntas valem mais:
+
+1. **identidade**: só oficina de CNPJ conferido e aprovada por um admin registra (`EnsureWorkshopApproved`);
+2. **aviso**: o dono atual é avisado na hora (`WorkshopRecordRegisteredNotification`);
+3. **resposta**: ele pode contestar, sem CRLV-e, e a contestação aparece em todas as superfícies.
+
+`provenance_label` não chama de "Selo da oficina" um registro de oficina sem selo — não existe mais
+caminho que crie um, mas dados daquele período continuam valendo.
+
+Em carro **com** dono o registro nasce com `owner_status` nulo (é manutenção comum do histórico
+dele); **sem** dono, nasce `pending` e espera quem assumir o veículo (fluxo de convite e decisão).
+
+Data de manutenção futura é recusada na validação das quatro superfícies (`before_or_equal:today`).
+
 ## OS sem proprietário: tenant nulo, estado na própria manutenção
 Uma OS que a oficina registra num veículo sem dono atual nasce com tenant_id nulo (VehicleTenantResolver não decide mais isso; OwnerlessMaintenanceService::tenantIdFor) e owner_status pending. As colunas owner_status (pending|linked|declined), attachments_status (none|pending|accepted|declined|revoked), hidden_from_public_at e owner_decided_* não são fillable: só OwnerlessMaintenanceService e MaintenanceOwnerDecisionService gravam. owner_status nulo = OS comum. Invoice e MaintenancePhoto criados voltam attachments_status a pending (nunca depois de accepted).
 

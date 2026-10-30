@@ -4,6 +4,8 @@ namespace App\Services\Maintenance;
 
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Models\Vehicle;
+use App\Services\Vehicle\VehicleMileageService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -110,7 +112,7 @@ class MaintenanceOwnerDecisionService
             }
         }
 
-        return DB::transaction(function () use ($maintenance, $owner, $link, $attachFiles, $hideFromPublic): Maintenance {
+        $decided = DB::transaction(function () use ($maintenance, $owner, $link, $attachFiles, $hideFromPublic): Maintenance {
             $updates = [
                 'owner_status' => $link ? Maintenance::OWNER_LINKED : Maintenance::OWNER_DECLINED,
                 'tenant_id' => $link ? $owner->tenant_id : null,
@@ -131,7 +133,30 @@ class MaintenanceOwnerDecisionService
 
             $maintenance->forceFill($updates)->save();
 
+            if ($link && ! $maintenance->isVerified() && $maintenance->workshop_id !== null) {
+                app(MaintenanceVerificationStamper::class)
+                    ->sealAfterOwnerLink($maintenance, (int) $maintenance->workshop_id);
+            }
+
             return $maintenance->fresh();
         });
+
+        $this->refreshOdometer($maintenance);
+
+        return $decided;
+    }
+
+    /**
+     * Toda vez que muda o que o veículo tem de histórico contado, o current_kilometers precisa ser
+     * recalculado na hora — senão fica parado no valor antigo até a próxima gravação qualquer.
+     */
+    private function refreshOdometer(Maintenance $maintenance): void
+    {
+        $maintenance->loadMissing('vehicle');
+        $vehicle = $maintenance->getRelationValue('vehicle');
+
+        if ($vehicle instanceof Vehicle) {
+            app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle);
+        }
     }
 }
