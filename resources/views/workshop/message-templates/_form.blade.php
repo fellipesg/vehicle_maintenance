@@ -61,7 +61,8 @@
         </x-ui.form-section>
 
         <x-ui.form-section title="Status">
-            <x-ui.checkbox name="is_active" value="1" :checked="old('is_active', $template?->is_active ?? true)" label="Modelo ativo" hint="Modelos inativos não disparam mensagens." />
+            <x-ui.switch name="is_active" label="Modelo ativo" :checked="(bool) ($template?->is_active ?? true)"
+                         description="Ativo: entra na rodada diária de mensagens. Inativo: não dispara e não conta no limite do plano." />
         </x-ui.form-section>
 
         <div class="flex gap-3">
