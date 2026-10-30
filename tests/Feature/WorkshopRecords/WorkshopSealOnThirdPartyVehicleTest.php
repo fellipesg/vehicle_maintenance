@@ -63,6 +63,32 @@ class WorkshopSealOnThirdPartyVehicleTest extends TestCase
         $this->assertSame(55_000, $vehicle->fresh()->current_kilometers);
     }
 
+    /**
+     * O teste acima garante o tenant; este garante a TELA, que é onde a falta aparece para quem usa.
+     * O registro tem de estar no veículo do proprietário na hora, com o selo e o código — sem ele a
+     * OS pode existir no banco e mesmo assim "não aparecer no meu veículo".
+     */
+    public function test_the_record_shows_on_the_owners_vehicle_page_right_away(): void
+    {
+        Notification::fake();
+
+        [$owner, $vehicle] = $this->ownedVehicle();
+
+        $this->actingAs($this->workshopAccount())
+            ->post('/oficina/manutencoes', $this->payload())
+            ->assertSessionHasNoErrors();
+
+        $maintenance = Maintenance::firstOrFail();
+
+        $this->actingAs($owner)
+            ->get(route('user.vehicles.show', $vehicle))
+            ->assertOk()
+            ->assertSee('Revisão geral')
+            ->assertSee('Selo da oficina')
+            ->assertSee($maintenance->verification_code)
+            ->assertDontSee('Nenhuma manutenção registrada');
+    }
+
     public function test_the_seal_is_public_right_away(): void
     {
         Notification::fake();
