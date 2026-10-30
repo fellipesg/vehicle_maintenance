@@ -8,8 +8,11 @@ use App\Models\Vehicle;
 use App\Notifications\MaintenanceDisputedNotification;
 use App\Services\FcmService;
 use App\Services\Maintenance\MaintenanceOwnerDecisionService;
+use App\Services\Maintenance\MaintenancePublicVisibilityService;
+use App\Services\Vehicle\VehicleMileageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\Feature\Concerns\BuildsOwnerlessRecords;
@@ -365,6 +368,113 @@ class OwnerDisputeTest extends TestCase
         $this->assertCount(1, $this->publicMaintenances());
     }
 
+    /**
+     * Tirar de circulação inclui o número. Sem isto a ação mais forte valia menos que a mais fraca:
+     * a contestação de uma das partes limpava o hodômetro, e a supressão decidida pela equipe
+     * depois de analisar, não — o km de um registro que ninguém mais vê seguia público e seguia
+     * sendo o piso de plausibilidade, recusando toda OS nova abaixo dele.
+     */
+    public function test_a_record_the_team_hides_stops_driving_the_odometer(): void
+    {
+        Notification::fake();
+
+        [, , $record, $vehicle] = $this->workshopRecordOnOwnedCar();
+
+        $this->assertSame(55_000, $vehicle->fresh()->current_kilometers);
+
+        $admin = User::factory()->asAdmin()->create();
+        $visibility = app(MaintenancePublicVisibilityService::class);
+
+        $record = $visibility->hide($record, $admin, 'Chassi de outro veículo.');
+
+        $this->assertSame(10_000, $vehicle->fresh()->current_kilometers);
+
+        // E o piso cai junto: uma OS legítima abaixo do número suprimido volta a entrar.
+        app(VehicleMileageService::class)->assertMaintenanceKilometers(
+            $vehicle->fresh(),
+            20_000,
+            now()->toDateString(),
+        );
+
+        $visibility->restore($record);
+
+        $this->assertSame(55_000, $vehicle->fresh()->current_kilometers);
+    }
+
+    /**
+     * O ocultar do fluxo antigo era do proprietário e não diz que o serviço não aconteceu — ele só
+     * se opôs à publicação. Esses registros (hidden_from_public_at com hidden_by_user_id nulo)
+     * continuam contando para o hodômetro; o filtro novo olha quem ocultou, não o fato de estar
+     * oculto.
+     */
+    public function test_a_record_hidden_under_the_old_owner_flow_still_counts(): void
+    {
+        Notification::fake();
+
+        [, , $record, $vehicle] = $this->workshopRecordOnOwnedCar();
+
+        $record->forceFill([
+            'hidden_from_public_at' => now(),
+            'hidden_by_user_id' => null,
+        ])->save();
+
+        app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
+
+        $this->assertSame(55_000, $vehicle->fresh()->current_kilometers);
+    }
+
+    /**
+     * can_dispute pergunta ao MaintenanceOwnerDecisionService, que memoriza a resposta por (conta,
+     * veículo) — mas o memo só existe se o serviço for a MESMA instância na requisição inteira.
+     * Resolvido por registro, cada linha da listagem repetia a consulta de policy.
+     */
+    public function test_the_api_list_does_not_pay_a_query_per_record_for_can_dispute(): void
+    {
+        Notification::fake();
+
+        [$owner, , , $vehicle] = $this->workshopRecordOnOwnedCar();
+
+        $this->actingAsApiUser($owner);
+
+        $extras = fn (int $quantos) => Maintenance::factory()->count($quantos)->create([
+            'vehicle_id' => $vehicle->id,
+            'tenant_id' => $owner->tenant_id,
+            'user_id' => $owner->id,
+        ]);
+
+        $extras(5);
+        $comSeisRegistros = $this->ownershipQueriesOnTheApiList(expected: 6);
+
+        $extras(5);
+        $comOnzeRegistros = $this->ownershipQueriesOnTheApiList(expected: 11);
+
+        // Dobrar a lista não move o número: a resposta de propriedade é por veículo, não por
+        // registro. Se escalasse por linha seriam 6 e 11 aqui — e, com per_page=100, cem.
+        $this->assertLessThanOrEqual(2, $comSeisRegistros, 'Uma consulta de propriedade por registro.');
+        $this->assertLessThanOrEqual(2, $comOnzeRegistros, 'A listagem cresce em consultas junto com os registros.');
+    }
+
+    /**
+     * Quantas vezes a listagem da API pergunta ao banco quem é o dono do veículo
+     * (VehiclePolicy::update, a consulta em user_vehicles que can_dispute dispara).
+     */
+    private function ownershipQueriesOnTheApiList(int $expected = 1): int
+    {
+        $consultas = 0;
+
+        DB::listen(function ($query) use (&$consultas): void {
+            if (str_contains($query->sql, 'user_vehicles')) {
+                $consultas++;
+            }
+        });
+
+        $this->getJson('/api/v1/maintenances?per_page=100')
+            ->assertOk()
+            ->assertJsonCount($expected, 'data');
+
+        return $consultas;
+    }
+
     public function test_admin_sees_the_disputed_record_in_its_own_filter(): void
     {
         Notification::fake();
@@ -382,7 +492,10 @@ class OwnerDisputeTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.maintenances.index', ['contestadas' => '1']))
             ->assertOk()
-            ->assertSee('Contestadas pelo proprietário');
+            ->assertSee('Contestadas pelo proprietário')
+            // Quem contestou é o que a equipe precisa para analisar: o dono pode já ter vendido o
+            // carro quando o caso for aberto.
+            ->assertSee($owner->name);
     }
 
     /**

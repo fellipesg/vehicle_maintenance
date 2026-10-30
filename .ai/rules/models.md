@@ -62,12 +62,24 @@ como policies.md exige.
 **Registros ocultados antes desta mudança continuam ocultos**: republicar na marra o que alguém
 exerceu como direito de oposição é decisão de produto e jurídico, não de migration.
 
-## Hodômetro: o que tira o número da conta é a contestação
+## Hodômetro: sai da conta o que foi contestado e o que a equipe suprimiu
 `Maintenance::scopeCountsTowardOdometer` é o filtro de `VehicleMileageService` (apply, refresh e os
-limites de km) e deixa de fora **o que o proprietário contestou** (`owner_disputed_at`). Era por aí
-que uma quilometragem absurda entrava e não saía mais: o registro continua no histórico, com a marca,
-mas não governa o `current_kilometers` enquanto a equipe não analisar. `dispute` e `withdrawDispute`
-recalculam na hora, e `decide` também — toda mudança no que conta precisa do recálculo, senão o
+limites de km) e deixa de fora duas coisas: **o que o proprietário contestou** (`owner_disputed_at`)
+e **o que a equipe tirou de circulação** (`hidden_by_user_id`). Era por aí que uma quilometragem
+absurda entrava e não saía mais.
+
+As duas juntas, e nessa ordem, por um motivo: sem a segunda, a ação mais fraca (a declaração de uma
+das partes) limpava o número e a mais forte (a supressão decidida depois da análise) não — o km de um
+registro que ninguém mais vê continuava público e continuava sendo o **piso de plausibilidade**,
+recusando toda OS nova abaixo dele. Um erro de chassi de 500.000 km trancava o veículo para sempre, e
+o dono nem podia contestar, porque `hiddenFrom` já tinha tirado o registro das telas dele.
+
+O ocultar do **fluxo antigo**, que era do proprietário, continua contando: ali o serviço aconteceu e
+ele só se opôs à publicação. Esses registros têm `hidden_from_public_at` com `hidden_by_user_id`
+nulo, e é essa diferença que o scope usa — não o fato de estar oculto.
+
+Toda mudança no que conta recalcula na hora: `dispute`, `withdrawDispute`, `decide`
+(MaintenanceOwnerDecisionService) e `hide`/`restore` (MaintenancePublicVisibilityService). Sem isso o
 veículo fica com o km velho até a próxima gravação qualquer.
 
 ## OS sem proprietário: tenant nulo, estado na própria manutenção

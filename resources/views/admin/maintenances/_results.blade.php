@@ -112,6 +112,10 @@
                         @if($maintenance->isDisputed())
                             <p class="mt-1" data-admin-disputed="{{ $maintenance->id }}">
                                 <x-ui.badge variant="warning" size="sm">Contestada pelo proprietário</x-ui.badge>
+                                <span class="mt-1 block text-xs text-muted-foreground">
+                                    @if($maintenance->disputedBy)por {{ $maintenance->disputedBy->name }}@endif
+                                    @if($maintenance->owner_disputed_at) · {{ $maintenance->owner_disputed_at->format('d/m/Y H:i') }}@endif
+                                </span>
                                 @if(filled($maintenance->owner_dispute_reason))
                                     <span class="mt-1 block text-xs text-muted-foreground">{{ $maintenance->owner_dispute_reason }}</span>
                                 @endif

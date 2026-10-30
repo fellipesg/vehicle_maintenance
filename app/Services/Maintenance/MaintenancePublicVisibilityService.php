@@ -4,6 +4,8 @@ namespace App\Services\Maintenance;
 
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Models\Vehicle;
+use App\Services\Vehicle\VehicleMileageService;
 
 /**
  * Tirar um registro da consulta pública, e devolvê-lo. É a **única** escrita de
@@ -29,7 +31,10 @@ class MaintenancePublicVisibilityService
             'hidden_reason' => $reason,
         ])->save();
 
-        return $maintenance->fresh();
+        $maintenance = $maintenance->fresh();
+        $this->refreshOdometer($maintenance);
+
+        return $maintenance;
     }
 
     public function restore(Maintenance $maintenance): Maintenance
@@ -40,6 +45,25 @@ class MaintenancePublicVisibilityService
             'hidden_reason' => null,
         ])->save();
 
-        return $maintenance->fresh();
+        $maintenance = $maintenance->fresh();
+        $this->refreshOdometer($maintenance);
+
+        return $maintenance;
+    }
+
+    /**
+     * Tirar de circulação inclui o número: o registro sai da conta do hodômetro
+     * (Maintenance::scopeCountsTowardOdometer), então o current_kilometers precisa ser recalculado
+     * na hora — senão o veículo fica exibindo o km de um registro que ninguém mais vê, e o piso de
+     * plausibilidade continua recusando OS nova. Vale nos dois sentidos: republicar devolve.
+     */
+    private function refreshOdometer(Maintenance $maintenance): void
+    {
+        $maintenance->loadMissing('vehicle');
+        $vehicle = $maintenance->getRelationValue('vehicle');
+
+        if ($vehicle instanceof Vehicle) {
+            app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle);
+        }
     }
 }

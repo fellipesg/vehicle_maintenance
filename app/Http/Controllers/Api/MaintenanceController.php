@@ -48,7 +48,7 @@ class MaintenanceController extends Controller
         $user = $request->user();
         // verifiedWorkshop entra porque MaintenanceResource expõe provenance_card_label, que o lê:
         // sem ele é lazy load (exceção fora de produção, uma consulta por registro em produção).
-        $query = Maintenance::with(['vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'verifiedWorkshop', 'photos', 'invite']);
+        $query = Maintenance::with(['vehicle', 'user.workshop', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'verifiedWorkshop', 'photos', 'invite']);
 
         if ($user->isWorkshop() && $user->workshop) {
             $query->where('workshop_id', $user->workshop->id);
@@ -235,7 +235,7 @@ class MaintenanceController extends Controller
                 'invoices',
                 'checklists',
                 'vehicle',
-                'user',
+                'user.workshop',
                 'workshop',
                 'verifiedWorkshop',
                 'photos',
@@ -282,7 +282,7 @@ class MaintenanceController extends Controller
     {
         $maintenance = Maintenance::with([
             'vehicle',
-            'user',
+            'user.workshop',
             'items.warranty',
             'generalWarranty',
             'warranties',
@@ -366,7 +366,7 @@ class MaintenanceController extends Controller
 
         return ApiResponse::success(
             new MaintenanceResource($maintenance->fresh([
-                'vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'verifiedWorkshop',
+                'vehicle', 'user.workshop', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'verifiedWorkshop',
             ])),
             'Maintenance updated successfully',
         );

@@ -62,7 +62,7 @@ class MaintenanceController extends Controller
         $counts = $this->provenanceCounts(clone $filtered);
 
         $maintenances = $filtered
-            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user', 'hiddenBy'])
+            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user', 'hiddenBy', 'disputedBy'])
             ->when($filters['verified'] === '1', fn (Builder $query) => $query->whereNotNull('verified_at'))
             ->when($filters['verified'] === '0', fn (Builder $query) => $query->whereNull('verified_at'))
             ->orderBy('maintenance_date', $filters['direction'])

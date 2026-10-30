@@ -318,12 +318,22 @@ class Maintenance extends Model
      * por aí que uma quilometragem absurda entrava e não saía mais. O registro continua no
      * histórico, com a marca; só não manda no hodômetro.
      *
+     * E fica de fora o que a **equipe** tirou de circulação (`hidden_by_user_id`, escrito só por
+     * MaintenancePublicVisibilityService). Senão a ação mais forte valeria menos que a mais fraca:
+     * a contestação de uma das partes limpava o número, e a supressão decidida depois da análise
+     * não — o km de um registro que ninguém mais vê continuava público e, pior, continuava sendo o
+     * piso de plausibilidade, trancando toda OS futura abaixo dele.
+     *
+     * O ocultar do fluxo antigo, que era do proprietário, **continua contando**: ali o serviço
+     * aconteceu e ele só exerceu oposição à publicação. Esses registros têm
+     * `hidden_from_public_at` e `hidden_by_user_id` nulo, e é essa diferença que o filtro usa.
+     *
      * @param  Builder<Maintenance>  $query
      * @return Builder<Maintenance>
      */
     public function scopeCountsTowardOdometer(Builder $query): Builder
     {
-        return $query->whereNull('owner_disputed_at');
+        return $query->whereNull('owner_disputed_at')->whereNull('hidden_by_user_id');
     }
 
     /**
