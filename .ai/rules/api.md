@@ -26,6 +26,11 @@ GET /api/v1/auth/{provider}/redirect responde 200 com success=false e error_code
 ## Registros de oficinas (contrato com o app)
 GET /api/v1/me/workshop-records?status=pending|all, POST /api/v1/maintenances/{id}/owner-decision {link, attach_files, hide_from_public}, GET /api/v1/workshop/vehicles/lookup?chassis=, POST /api/v1/workshop/vehicles, POST /api/v1/maintenances/{id}/invites/email|whatsapp, e pending_workshop_records_count em GET /api/v1/me. MaintenanceResource ganhou is_ownerless_record, owner_status (null em OS comum), attachments_status (null em OS comum) e hidden_from_public. Erros de decisão e convite voltam 422 com message em pt-BR.
 
+## Oficina em análise só lê pela API (contrato com o app)
+A oficina em análise (`workshops.status`, ver `.ai/rules/garage.md`) responde 403 em qualquer método
+de escrita da API, com `message` em inglês no envelope, igual à loja em análise: o app precisa mostrar
+a espera em vez de parecer quebrado.
+
 ## Endereço é da empresa, não da conta (contrato com o app)
 A conta não tem endereço na web: `/conta` edita só nome, e-mail, senha e telefone, nos quatro
 portais. Quem tem endereço é a loja (`garages`, em "Minha loja") e a oficina (`workshops`, em "Minha

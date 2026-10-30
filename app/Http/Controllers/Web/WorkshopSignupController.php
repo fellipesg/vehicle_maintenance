@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Enums\Portal;
 use App\Enums\RegistrationSource;
 use App\Events\UserRegistered;
 use App\Http\Controllers\Controller;
@@ -19,7 +20,7 @@ use Illuminate\View\View;
  */
 class WorkshopSignupController extends Controller
 {
-    public const REGISTERED_MESSAGE = 'Oficina cadastrada. Enviamos as boas-vindas para :email. Próximo passo: complete o perfil e registre a primeira OS.';
+    public const REGISTERED_MESSAGE = 'Oficina cadastrada. Enviamos as boas-vindas para :email. Vamos conferir o CNPJ e avisar quando liberar; enquanto isso, complete o perfil.';
 
     public function __construct(private WorkshopSignupService $signup) {}
 
@@ -47,8 +48,11 @@ class WorkshopSignupController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
+        // A oficina nasce em análise, e o dashboard devolveria para "Minha oficina"
+        // (App\Http\Middleware\EnsureWorkshopApproved): dashboardRouteFor já resolve o destino
+        // certo, igual ao login.
         return redirect()
-            ->route('workshop.dashboard')
+            ->route(Portal::Workshop->dashboardRouteFor($user))
             ->with('success', str_replace(':email', $user->email, self::REGISTERED_MESSAGE))
             ->with('analytics_event', 'sign_up')
             ->with('analytics_method', 'workshop');

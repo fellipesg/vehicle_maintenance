@@ -128,7 +128,7 @@ class WorkshopProfilePagesTest extends TestCase
             'state' => 'sp',
             'instagram' => '@oficinanova',
             'facebook' => 'facebook.com/oficinanova',
-        ])->assertSessionHasNoErrors()->assertRedirect(route('workshop.dashboard'));
+        ])->assertSessionHasNoErrors()->assertRedirect(route('workshop.profile.show'));
 
         $this->assertDatabaseHas('workshops', [
             'user_id' => $user->id,

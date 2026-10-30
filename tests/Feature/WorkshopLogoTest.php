@@ -70,7 +70,7 @@ class WorkshopLogoTest extends TestCase
                 'logo' => $file,
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('workshop.dashboard'));
+            ->assertRedirect(route('workshop.profile.show'));
 
         $workshop = $user->fresh()->workshop;
 

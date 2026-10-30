@@ -285,7 +285,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->name('maintenances.show');
     });
 
-    Route::prefix('oficina')->middleware('user.type:workshop')->name('workshop.')->group(function () {
+    Route::prefix('oficina')->middleware(['user.type:workshop', 'workshop.approved'])->name('workshop.')->group(function () {
         Route::get('/dashboard', [WorkshopDashboardController::class, 'index'])->name('dashboard');
         Route::get('/perfil', [WorkshopProfileController::class, 'show'])->name('profile.show');
         Route::get('/perfil/criar', [WorkshopProfileController::class, 'create'])->name('profile.create');
@@ -350,6 +350,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
         Route::put('/oficinas/{workshop}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'workshop'])->name('workshops.maintenance-photos');
+        Route::post('/oficinas/{workshop}/aprovar', [AdminWorkshopController::class, 'approve'])->name('workshops.approve');
+        Route::post('/oficinas/{workshop}/recusar', [AdminWorkshopController::class, 'reject'])->name('workshops.reject');
         Route::get('/prospeccao', [AdminOutreachController::class, 'index'])->name('outreach.index');
         Route::post('/prospeccao/importar', [AdminOutreachController::class, 'import'])->name('outreach.import');
         Route::post('/prospeccao/pausar', [AdminOutreachController::class, 'pause'])->name('outreach.pause');

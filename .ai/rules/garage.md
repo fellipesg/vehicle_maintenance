@@ -15,6 +15,23 @@ Coming from the vehicle page (?vehicle_id=), the maintenance form sends return_t
 ## Lojista não decide registros de oficinas
 A tela e o aviso de registros de oficinas são do Proprietário (/usuario/registros-de-oficinas). WorkshopRecordsArrivalNotifier ignora conta de lojista.
 
+## O portão da oficina é o mesmo da loja, e por um motivo mais forte
+`EnsureWorkshopApproved` ('workshop.approved' na web, 'workshop.approved:api' na API) espelha o portão
+do lojista: oficina em análise só abre `workshop.profile.*` na web e só lê na API. O motivo é o do
+lojista elevado — a oficina escreve no histórico permanente de um chassi **com o Selo da oficina**,
+que é o que o comprador confere em /v/{código}, move o hodômetro do veículo e manda convite por
+e-mail e WhatsApp para terceiros; e um selo emitido não volta atrás. Estado em `workshops.status`
+(`App\Enums\WorkshopStatus`, + reviewed_by/reviewed_at/review_notes), decidido por
+`App\Services\Workshop\WorkshopReview` na aba "Em análise" de /admin/oficinas, com
+`WorkshopApprovalDecidedNotification` para a conta (não confundir com
+`WorkshopReviewDecidedNotification`, que é a resposta da oficina sobre uma declarada).
+
+`status` **não** é fillable e a migration marca 'approved' tudo o que já existia; a WorkshopFactory
+nasce aprovada (`pending()`/`rejected()` para a fila). Diferenças deliberadas em relação ao lojista:
+conta de oficina **sem** linha em `workshops` passa pelo portão (não há o que conferir, e sem ela não
+se registra OS nem sai selo), /admin/oficinas abre em "Todas" porque a página também é o diretório, e
+não existe `resetForDocumentChange` porque "Minha oficina" não edita o CNPJ — há teste guardando isso.
+
 ## O portão da loja vale na web e na API
 `EnsureGarageApproved` protege os dois clientes: na web a loja em análise só abre `garage.profile.*`
 (lista de liberação, então rota nova nasce fechada) e na API, com `garage.approved:api` no grupo

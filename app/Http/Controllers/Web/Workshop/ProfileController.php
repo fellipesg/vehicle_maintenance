@@ -51,8 +51,13 @@ class ProfileController extends Controller
             $this->logos->store($workshop, $logo);
         }
 
-        return redirect()->route('workshop.dashboard')
-            ->with('success', 'Oficina cadastrada.');
+        // Oficina nova nasce em análise, então o dashboard devolveria para cá
+        // (App\Http\Middleware\EnsureWorkshopApproved): manda direto para o cadastro, onde o aviso
+        // da espera aparece.
+        return $workshop->isApproved()
+            ? redirect()->route('workshop.dashboard')->with('success', 'Oficina cadastrada.')
+            : redirect()->route('workshop.profile.show')
+                ->with('success', 'Oficina cadastrada. Vamos conferir o CNPJ e avisar quando liberar.');
     }
 
     public function edit(Request $request): View
@@ -86,6 +91,10 @@ class ProfileController extends Controller
             $this->logos->store($workshop, $logo);
         }
 
+        // O CNPJ não está entre os campos de validateWorkshop: ele vem do cadastro
+        // (WorkshopSignupService) e esta tela não o troca, então não há análise para refazer. Se um
+        // dia ele virar editável aqui, copie o App\Services\Garage\GarageReview::resetForDocumentChange
+        // do Lojista — aprovar o CNPJ A e deixar trocar para B tornaria a aprovação teatro.
         return redirect()->route('workshop.profile.show')
             ->with('success', 'Dados da oficina atualizados.');
     }

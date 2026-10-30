@@ -10,3 +10,9 @@ MailMessage defaults the footer to Regards + APP_NAME (vehicle_maintenance on Cl
 
 ## workshop_records_pending
 WorkshopRecordsPendingNotification (mail + database, type workshop_records_pending, payload vehicle_id e count) é enviada por WorkshopRecordsArrivalNotifier, que também faz o push FCM com try/catch. Conta de lojista não recebe: a tela de registros é do Proprietário.
+
+## workshop-approval-decided
+WorkshopApprovalDecidedNotification (mail + database) é a resposta da análise do **cadastro** da
+oficina (`App\Services\Workshop\WorkshopReview`, ver `.ai/rules/garage.md`). Não confundir com
+WorkshopReviewDecidedNotification, que é a resposta da oficina sobre uma manutenção que alguém
+declarou citando ela.
