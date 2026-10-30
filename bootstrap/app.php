@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
@@ -31,12 +32,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         // Descadastro de um clique (RFC 8058): o provedor de e-mail faz o POST sem sessão; a URL
-        // assinada protege. As rotas sem token levam a carga na query, então o padrão tem de ser o
-        // caminho exato: 'convite/descadastrar/*' não casa com 'convite/descadastrar'.
+        // assinada protege. Quem leva a carga na query, e não no caminho, tem de vir como caminho
+        // exato: 'convite/descadastrar/*' não casa com 'convite/descadastrar' (Str::is).
         $middleware->validateCsrfTokens(except: [
             'descadastrar/*',
             'convite/descadastrar',
             'oficinas/descadastrar',
+            'webhooks/*',
         ]);
 
         $middleware->append(\App\Http\Middleware\SetSecurityHeaders::class);
@@ -49,6 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'abilities' => CheckAbilities::class,
             'ability' => CheckApiAbility::class,
             'user.type' => \App\Http\Middleware\EnsureUserType::class,
+            'garage.approved' => \App\Http\Middleware\EnsureGarageApproved::class,
             'tenant' => \App\Http\Middleware\SetTenantContext::class,
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
             'etag.vehicle_list' => \App\Http\Middleware\EtagForVehicleList::class,
@@ -81,6 +84,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
+            // Uma exceção que já carrega a resposta pronta (ThrottleRequests embrulha o response()
+            // do limiter num HttpResponseException, que não é HttpExceptionInterface nem
+            // TooManyRequestsHttpException): devolver null faz o Laravel enviar essa resposta — status,
+            // corpo e Retry-After — em vez de ela cair no 500 genérico do fim deste renderizador.
+            if ($e instanceof HttpResponseException) {
+                return null;
+            }
+
             if ($e instanceof ValidationException) {
                 return ApiResponse::validation($e->errors());
             }
@@ -106,7 +117,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($e instanceof TooManyRequestsHttpException) {
-                return ApiResponse::error('Too many requests.', 429);
+                return ApiResponse::error('Too many requests.', 429)->withHeaders($e->getHeaders());
             }
 
             if ($e instanceof HttpExceptionInterface) {
@@ -121,7 +132,8 @@ return Application::configure(basePath: dirname(__DIR__))
                         default => 'An error occurred.',
                     };
 
-                return ApiResponse::error($message ?: 'An error occurred.', $e->getStatusCode());
+                return ApiResponse::error($message ?: 'An error occurred.', $e->getStatusCode())
+                    ->withHeaders($e->getHeaders());
             }
 
             if (app()->hasDebugModeEnabled()) {

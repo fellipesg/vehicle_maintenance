@@ -1,6 +1,12 @@
 ---
 paths:
   - resources/views/pdfs/vehicle_maintenance_export.blade.php
+  - app/Services/Vehicle/VehiclePdfMaintenancePhotos.php
+  - app/Services/Vehicle/VehicleMaintenancePdfExporter.php
+  - app/Services/Vehicle/VehiclePdfExportService.php
+  - app/Http/Controllers/Api/VehiclePdfExportController.php
+  - app/Http/Controllers/Web/User/VehiclePdfExportDownloadController.php
+  - app/Console/Commands/CleanupVehiclePdfExports.php
 ---
 
 # Pdfs
@@ -31,3 +37,31 @@ The template receives $identifiersMasked (VehicleMaintenancePdfExporter::generat
 
 ## Registros de oficina no PDF seguem quem pediu
 VehicleMaintenancePdfExporter::generate(..., viewer:) passa o solicitante ao MaintenanceRedactor. No PDF do próprio proprietário, o registro que ele vinculou e ocultou da consulta pública continua aparecendo (ocultar vale só para os outros); pendentes e recusados saem na forma mínima. Sem viewer, ou com outra pessoa (admin, lojista em consignação), o ocultado não entra.
+
+## Fotos das OS no PDF: só com o aceite do dono atual
+VehiclePdfMaintenancePhotos decide. Só entram fotos quando o proprietário ATUAL do veículo tem `users.export_include_photos = true` (nulo = nunca perguntado e falso = não, os dois sem foto; capa não muda). Quem pediu sendo esse dono leva, por OS, o primeiro antes + o primeiro depois do veículo (por `sort`), ou, se faltar o par, o "antes" avulso (OS com "antes" e nenhum "depois") ou os dois primeiros "depois" (OS sem "antes"); qualquer outra pessoa que exporta (lojista em consignação, admin, sem viewer) leva só as públicas (`MaintenancePhoto::isPublicVisible`), no máximo 2. As OS que o MaintenanceRedactor esvaziou continuam sem foto: o serviço só lê a relação `photos` que sobrou, nunca recarrega nem contorna. Teto de MAX_PER_PDF (16) fotos por arquivo, as OS mais recentes primeiro, para o PDF ficar bem abaixo de ~8 MB (o e-mail anexa o arquivo e o merge ainda cola as notas em PDF); o excedente vira "+N fotos no RevisaLog" com o link do selo.
+
+Cada foto sai JPEG de até 900px no maior lado, qualidade 75, sobre fundo branco (o Dompdf não lida bem com WebP), convertida uma por vez e embutida como data URI (mesma regra da capa: nada de caminho em /tmp no src). Prefere `display_path` (variante de exibição) quando a coluna existe e está preenchida, lida por `getAttributes()`, senão `path`. No Blade: `.photo-grid` de 2 colunas abaixo da tabela de itens, `<img>` com width/height explícitos (caixa 300×225) e legenda "Antes"/"Depois"; tr com page-break-inside:avoid, sem tabela aninhada no letterhead nem na faixa.
+
+## Fotos no PDF também pedem o recurso por conta
+Antes do aceite do dono, quem pediu o PDF (`viewer`) precisa ter as fotos das manutenções ligadas (MaintenancePhotoAccess; features.md): sem isso o exportador nem consulta o dono e o PDF sai sem foto de OS. Sem viewer (null) conta como sem recurso. O cartão "PDF do histórico" em /conta e a preferência no PUT /api/v1/me só existem para a conta com o recurso.
+
+## Baixar o PDF pede prazo e posse na hora, não só na geração
+`VehiclePdfExportService::userCanViewExport` exige quem pediu a exportação (ou um admin) **e**
+`VehiclePolicy::viewFullHistory` no veículo **naquele momento**: guardar o arquivo não guarda o
+direito. Quem vendeu o carro para de baixar junto com a posse (403), e o lojista segue baixando só
+enquanto a consignação dele libera o histórico — a mesma ability que autorizou o pedido em
+`createExport`, nunca uma segunda cópia da regra. Dono atual, admin e lojista liberado continuam
+passando.
+
+O prazo (`expires_at`, `vehicle-pdf-export.file_ttl_hours`, 24 h, gravado por
+`GenerateVehicleMaintenancePdfExport`) é cobrado no ato por `VehiclePdfExport::isExpired()`: **410**
+na API (status e download) e na web (`resources/views/errors/410.blade.php`), não 404 — o 404 desses
+endpoints quer dizer "ainda não ficou pronto" e o app continua consultando, enquanto o prazo vencido
+é definitivo. O status expirado nem chega a montar o payload, então não entrega mais URL assinada do
+storage.
+
+`vehicle-pdf-exports:cleanup` deixou de ser o único lugar que aplica o prazo e virou faxina de
+arquivo: roda de hora em hora (era diário) só para encurtar a brecha da URL assinada que o status
+entregou pouco antes do vencimento (`download_url_expiry_minutes`, 60 min) e que resolve enquanto o
+arquivo existir.

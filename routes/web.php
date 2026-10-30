@@ -1,11 +1,14 @@
 <?php
 
 use App\Http\Controllers\Web\AccountController;
+use App\Http\Controllers\Web\AccountDeletionController;
 use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryController;
 use App\Http\Controllers\Web\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Web\Admin\ConsignmentController as AdminConsignmentController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Web\Admin\GarageController as AdminGarageController;
 use App\Http\Controllers\Web\Admin\MaintenanceController as AdminMaintenanceController;
+use App\Http\Controllers\Web\Admin\MaintenancePhotosFeatureController as AdminMaintenancePhotosFeatureController;
 use App\Http\Controllers\Web\Admin\MapController as AdminMapController;
 use App\Http\Controllers\Web\Admin\OutreachController as AdminOutreachController;
 use App\Http\Controllers\Web\Admin\UserController as AdminUserController;
@@ -21,13 +24,17 @@ use App\Http\Controllers\Web\ConsignmentOwnerController;
 use App\Http\Controllers\Web\ContactController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
+use App\Http\Controllers\Web\Garage\ProfileController as GarageProfileController;
 use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
+use App\Http\Controllers\Web\InvoiceDownloadController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\MaintenanceInviteController;
+use App\Http\Controllers\Web\MaintenancePhotoController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OutreachController;
 use App\Http\Controllers\Web\PublicVehicleController;
+use App\Http\Controllers\Web\SentryWebhookController;
 use App\Http\Controllers\Web\SitemapController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\Web\User\MaintenanceController as UserMaintenanceController;
@@ -54,6 +61,8 @@ Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
 Route::get('/blog/feed', BlogFeedController::class)->name('blog.feed');
 Route::get('/blog/categoria/{category}', [BlogController::class, 'category'])->name('blog.category');
 Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
+// Webhook do Sentry (Internal Integration): autenticado pela assinatura HMAC, sem CSRF.
+Route::post('/webhooks/sentry', SentryWebhookController::class)->middleware('throttle:60,1')->name('webhooks.sentry');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
 Route::get('/para-oficinas', WorkshopLandingController::class)->name('workshops.landing');
@@ -78,6 +87,18 @@ Route::get('/convite/{token}', [MaintenanceInviteController::class, 'show'])
 Route::post('/contato', [ContactController::class, 'store'])
     ->middleware('throttle:contact')
     ->name('contact.store');
+// Exclusão de conta pedida de fora do app: o Google Play exige o link na ficha da loja, acessível
+// a quem não tem (ou já desinstalou) o aplicativo. Quem confirma é a caixa de e-mail da conta.
+Route::get('/excluir-conta', [AccountDeletionController::class, 'show'])->name('account-deletion.show');
+Route::post('/excluir-conta', [AccountDeletionController::class, 'request'])
+    ->middleware('throttle:account-deletion')
+    ->name('account-deletion.request');
+Route::middleware('signed')->group(function () {
+    Route::get('/excluir-conta/confirmar/{user}', [AccountDeletionController::class, 'confirm'])
+        ->name('account-deletion.confirm');
+    Route::delete('/excluir-conta/confirmar/{user}', [AccountDeletionController::class, 'destroy'])
+        ->name('account-deletion.destroy');
+});
 // Resposta do proprietário de um veículo em consignação, pelo link do e-mail: liberar o histórico
 // anterior ou contestar. Sem login de propósito — o dono do carro consignado quase nunca tem conta.
 Route::prefix('consignacao')->name('consignments.owner.')->middleware('throttle:search')->group(function () {
@@ -128,6 +149,18 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+    // Nota fiscal de uma manutenção: mesma rota para Proprietário, Lojista e Oficina; quem pode
+    // abrir é a InvoicePolicy::view, não quem tiver o link do arquivo.
+    Route::get('/notas-fiscais/{invoice}', InvoiceDownloadController::class)
+        ->whereNumber('invoice')
+        ->name('invoices.show');
+
+    // Foto de uma manutenção: mesma rota para Proprietário, Lojista e Oficina; quem pode abrir é a
+    // MaintenancePhotoPolicy::view, não quem tiver o link do arquivo.
+    Route::get('/fotos-manutencao/{photo}', MaintenancePhotoController::class)
+        ->whereNumber('photo')
+        ->name('maintenance-photos.show');
+
     Route::get('/notificacoes', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notificacoes/{notification}/lida', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notificacoes/lidas', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
@@ -136,6 +169,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::put('/conta', [AccountController::class, 'update'])
         ->middleware('throttle:6,1,account-update')
         ->name('account.update');
+    Route::put('/conta/preferencias', [AccountController::class, 'updatePreferences'])
+        ->middleware('user.type:user')
+        ->name('account.preferences');
     Route::put('/conta/senha', [AccountController::class, 'updatePassword'])
         ->middleware('throttle:6,1')
         ->name('account.password');
@@ -147,22 +183,34 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');
         Route::get('/veiculos', [UserVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/novo', [UserVehicleController::class, 'create'])->name('vehicles.create');
-        Route::post('/veiculos/importar-crlv', [UserVehicleController::class, 'importCrlv'])->name('vehicles.import-crlv');
+        Route::post('/veiculos/importar-crlv', [UserVehicleController::class, 'importCrlv'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.import-crlv');
         Route::get('/veiculos/importar-crlv/preview', [UserVehicleController::class, 'previewCrlvImport'])->name('vehicles.import.preview');
         Route::get('/veiculos/vincular', [UserVehicleController::class, 'showClaimForm'])->name('vehicles.claim');
-        Route::post('/veiculos/vincular/crlv', [UserVehicleController::class, 'importCrlvForClaim'])->name('vehicles.claim.import-crlv');
+        Route::post('/veiculos/vincular/crlv', [UserVehicleController::class, 'importCrlvForClaim'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.claim.import-crlv');
         Route::get('/veiculos/vincular/preview', [UserVehicleController::class, 'previewCrlvClaim'])->name('vehicles.claim.preview');
         Route::post('/veiculos/vincular', [UserVehicleController::class, 'claim'])->name('vehicles.claim.store');
         Route::get('/veiculos/consignacao', [UserVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
-        Route::post('/veiculos/consignacao', [UserVehicleController::class, 'storeConsignment'])->name('vehicles.consignment.store');
+        Route::post('/veiculos/consignacao', [UserVehicleController::class, 'storeConsignment'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.consignment.store');
         Route::delete('/veiculos/consignacao', [UserVehicleController::class, 'cancelConsignment'])->name('vehicles.consignment.cancel');
         Route::post('/veiculos', [UserVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/veiculos/{vehicle}', [UserVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/veiculos/{vehicle}/editar', [UserVehicleController::class, 'edit'])->name('vehicles.edit');
-        Route::post('/veiculos/{vehicle}/importar-crlv', [UserVehicleController::class, 'importCrlvForEdit'])->name('vehicles.import-crlv.edit');
-        Route::put('/veiculos/{vehicle}', [UserVehicleController::class, 'update'])->name('vehicles.update');
+        Route::post('/veiculos/{vehicle}/importar-crlv', [UserVehicleController::class, 'importCrlvForEdit'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.import-crlv.edit');
+        Route::put('/veiculos/{vehicle}', [UserVehicleController::class, 'update'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.update');
         Route::get('/veiculos/{vehicle}/capas', [UserVehicleController::class, 'editCovers'])->name('vehicles.covers');
-        Route::put('/veiculos/{vehicle}/capas', [UserVehicleController::class, 'updateCovers'])->name('vehicles.covers.update');
+        Route::put('/veiculos/{vehicle}/capas', [UserVehicleController::class, 'updateCovers'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.covers.update');
         Route::post('/veiculos/{vehicle}/pdf', [UserVehicleController::class, 'exportPdf'])->name('vehicles.export-pdf');
         Route::get('/exportacoes-pdf/{export}/baixar', [VehiclePdfExportDownloadController::class, 'redirectToNamedFile'])
             ->name('vehicle-pdf-exports.redirect');
@@ -171,7 +219,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->name('vehicle-pdf-exports.download');
         Route::get('/manutencoes', [UserMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [UserMaintenanceController::class, 'create'])->name('maintenances.create');
-        Route::post('/manutencoes', [UserMaintenanceController::class, 'store'])->name('maintenances.store');
+        // Store/update aceitam nota fiscal (InvoiceFile lê o arquivo inteiro), então entram no
+        // mesmo balde 'uploads' das rotas de upload da oficina e da API.
+        Route::post('/manutencoes', [UserMaintenanceController::class, 'store'])
+            ->middleware('throttle:uploads')
+            ->name('maintenances.store');
         Route::get('/manutencoes/{maintenance}', [UserMaintenanceController::class, 'show'])
             ->whereNumber('maintenance')
             ->name('maintenances.show');
@@ -181,6 +233,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->name('maintenances.edit');
         Route::put('/manutencoes/{maintenance}', [UserMaintenanceController::class, 'update'])
             ->whereNumber('maintenance')
+            ->middleware('throttle:uploads')
             ->name('maintenances.update');
         Route::delete('/manutencoes/{maintenance}', [UserMaintenanceController::class, 'destroy'])
             ->whereNumber('maintenance')
@@ -192,18 +245,26 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->name('workshop-records.decide');
     });
 
-    Route::prefix('garagem')->middleware('user.type:garage')->name('garage.')->group(function () {
+    Route::prefix('garagem')->middleware(['user.type:garage', 'garage.approved'])->name('garage.')->group(function () {
         Route::get('/dashboard', [GarageDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/minha-loja', [GarageProfileController::class, 'show'])->name('profile.show');
+        Route::put('/minha-loja', [GarageProfileController::class, 'update'])->name('profile.update');
         Route::get('/estoque', [GarageVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/estoque/novo', [GarageVehicleController::class, 'create'])->name('vehicles.create');
-        Route::post('/estoque/importar-crlv', [GarageVehicleController::class, 'importCrlv'])->name('vehicles.import-crlv');
+        Route::post('/estoque/importar-crlv', [GarageVehicleController::class, 'importCrlv'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.import-crlv');
         Route::get('/estoque/importar-crlv/preview', [GarageVehicleController::class, 'previewCrlvImport'])->name('vehicles.import.preview');
         Route::get('/estoque/vincular', [GarageVehicleController::class, 'showClaimForm'])->name('vehicles.claim');
-        Route::post('/estoque/vincular/crlv', [GarageVehicleController::class, 'importCrlvForClaim'])->name('vehicles.claim.import-crlv');
+        Route::post('/estoque/vincular/crlv', [GarageVehicleController::class, 'importCrlvForClaim'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.claim.import-crlv');
         Route::get('/estoque/vincular/preview', [GarageVehicleController::class, 'previewCrlvClaim'])->name('vehicles.claim.preview');
         Route::post('/estoque/vincular', [GarageVehicleController::class, 'claim'])->name('vehicles.claim.store');
         Route::get('/estoque/consignacao', [GarageVehicleController::class, 'showConsignmentForm'])->name('vehicles.consignment');
-        Route::post('/estoque/consignacao', [GarageVehicleController::class, 'storeConsignment'])->name('vehicles.consignment.store');
+        Route::post('/estoque/consignacao', [GarageVehicleController::class, 'storeConsignment'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.consignment.store');
         Route::delete('/estoque/consignacao', [GarageVehicleController::class, 'cancelConsignment'])->name('vehicles.consignment.cancel');
         Route::post('/estoque', [GarageVehicleController::class, 'store'])->name('vehicles.store');
         Route::get('/estoque/{vehicle}', [GarageVehicleController::class, 'show'])->name('vehicles.show');
@@ -212,12 +273,19 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/estoque/{vehicle}/pedir-historico', [GarageVehicleController::class, 'requestHistoryAccess'])
             ->name('vehicles.consignment.request-history');
         Route::get('/estoque/{vehicle}/editar', [GarageVehicleController::class, 'edit'])->name('vehicles.edit');
-        Route::put('/estoque/{vehicle}', [GarageVehicleController::class, 'update'])->name('vehicles.update');
+        Route::put('/estoque/{vehicle}', [GarageVehicleController::class, 'update'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.update');
         Route::get('/estoque/{vehicle}/capas', [GarageVehicleController::class, 'editCovers'])->name('vehicles.covers');
-        Route::put('/estoque/{vehicle}/capas', [GarageVehicleController::class, 'updateCovers'])->name('vehicles.covers.update');
+        Route::put('/estoque/{vehicle}/capas', [GarageVehicleController::class, 'updateCovers'])
+            ->middleware('throttle:uploads')
+            ->name('vehicles.covers.update');
         Route::get('/manutencoes', [GarageMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [GarageMaintenanceController::class, 'create'])->name('maintenances.create');
-        Route::post('/manutencoes', [GarageMaintenanceController::class, 'store'])->name('maintenances.store');
+        // Mesmo balde das demais rotas de upload: a OS do lojista também recebe nota fiscal.
+        Route::post('/manutencoes', [GarageMaintenanceController::class, 'store'])
+            ->middleware('throttle:uploads')
+            ->name('maintenances.store');
         Route::get('/manutencoes/{maintenance}', [GarageMaintenanceController::class, 'show'])
             ->whereNumber('maintenance')
             ->name('maintenances.show');
@@ -227,9 +295,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/dashboard', [WorkshopDashboardController::class, 'index'])->name('dashboard');
         Route::get('/perfil', [WorkshopProfileController::class, 'show'])->name('profile.show');
         Route::get('/perfil/criar', [WorkshopProfileController::class, 'create'])->name('profile.create');
-        Route::post('/perfil', [WorkshopProfileController::class, 'store'])->name('profile.store');
+        // O cadastro e a edição da oficina recebem a logo (imagem), então também entram no balde.
+        Route::post('/perfil', [WorkshopProfileController::class, 'store'])
+            ->middleware('throttle:uploads')
+            ->name('profile.store');
         Route::get('/perfil/editar', [WorkshopProfileController::class, 'edit'])->name('profile.edit');
-        Route::put('/perfil', [WorkshopProfileController::class, 'update'])->name('profile.update');
+        Route::put('/perfil', [WorkshopProfileController::class, 'update'])
+            ->middleware('throttle:uploads')
+            ->name('profile.update');
         Route::get('/manutencoes', [WorkshopMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/manutencoes/nova', [WorkshopMaintenanceController::class, 'create'])->name('maintenances.create');
         Route::post('/manutencoes', [WorkshopMaintenanceController::class, 'store'])
@@ -273,14 +346,18 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->parameters(['templates' => 'warranty_template']);
     });
 
+    // Exceção consciente ao balde 'uploads': as rotas daqui que recebem arquivo (importar
+    // prospecção, capa de post) ficam fora dele. Ver .ai/rules/routes.md.
     Route::prefix('admin')->middleware('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('/usuarios', [AdminUserController::class, 'index'])->name('users.index');
         Route::get('/usuarios/{user}', [AdminUserController::class, 'show'])->name('users.show');
+        Route::put('/usuarios/{user}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'user'])->name('users.maintenance-photos');
         Route::get('/veiculos', [AdminVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
         Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
+        Route::put('/oficinas/{workshop}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'workshop'])->name('workshops.maintenance-photos');
         Route::get('/prospeccao', [AdminOutreachController::class, 'index'])->name('outreach.index');
         Route::post('/prospeccao/importar', [AdminOutreachController::class, 'import'])->name('outreach.import');
         Route::post('/prospeccao/pausar', [AdminOutreachController::class, 'pause'])->name('outreach.pause');
@@ -289,6 +366,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/prospeccao/{prospect}/convertida', [AdminOutreachController::class, 'markConverted'])->name('outreach.converted');
         Route::post('/prospeccao/{prospect}/devolvido', [AdminOutreachController::class, 'markBounced'])->name('outreach.bounced');
         Route::post('/prospeccao/{prospect}/descadastrar', [AdminOutreachController::class, 'unsubscribe'])->name('outreach.unsubscribe');
+        Route::get('/lojas', [AdminGarageController::class, 'index'])->name('garages.index');
+        Route::put('/lojas/{garage}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'garage'])->name('garages.maintenance-photos');
+        Route::post('/lojas/{garage}/aprovar', [AdminGarageController::class, 'approve'])->name('garages.approve');
+        Route::post('/lojas/{garage}/recusar', [AdminGarageController::class, 'reject'])->name('garages.reject');
         Route::get('/consignacoes', [AdminConsignmentController::class, 'index'])->name('consignments.index');
         Route::get('/consignacoes/{consignment}/procuracao', [AdminConsignmentController::class, 'downloadPowerOfAttorney'])
             ->name('consignments.power-of-attorney');

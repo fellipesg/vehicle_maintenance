@@ -20,16 +20,32 @@ class CrlvImportFailureMail extends Mailable implements ShouldQueue
 
     /**
      * Chave do contexto => rótulo da tabela. Chave nova sem rótulo aqui aparece com a primeira letra
-     * maiúscula e sem o "_".
+     * maiúscula e sem o "_". Não há rótulo para o e-mail de quem enviou nem para o nome do arquivo:
+     * o aviso identifica a conta pelo id e o documento pela extensão, pelo tamanho e por um hash
+     * curto do conteúdo (App\Services\Crlv\CrlvImportFailureReporter), e o que falta ao suporte é o
+     * layout do documento, não a pessoa.
      *
      * @var array<string, string>
      */
     public const CONTEXT_LABELS = [
         'origem' => 'Origem',
-        'arquivo' => 'Arquivo',
+        'extensao' => 'Extensão',
         'tamanho_kb' => 'Tamanho (KB)',
+        'hash_arquivo' => 'Hash do arquivo',
         'usuario_id' => 'ID do usuário',
-        'usuario_email' => 'E-mail do usuário',
+    ];
+
+    /**
+     * Chaves que nunca vão para a tabela, mesmo que cheguem no contexto: o nome escolhido pelo
+     * cliente pode trazer nome ou CPF da pessoa (LGPD, .ai/rules/models.md) e o e-mail da conta não
+     * ajuda a cobrir um layout de DETRAN. O corte fica aqui, na borda que manda o aviso para fora.
+     *
+     * @var list<string>
+     */
+    public const BLOCKED_CONTEXT_KEYS = [
+        'arquivo',
+        'nome_arquivo',
+        'usuario_email',
     ];
 
     /**
@@ -71,8 +87,8 @@ class CrlvImportFailureMail extends Mailable implements ShouldQueue
     }
 
     /**
-     * Linhas da tabela, na ordem do contexto, sem os valores vazios. O "|" do valor é trocado por
-     * "/" para não quebrar a tabela em markdown.
+     * Linhas da tabela, na ordem do contexto, sem os valores vazios e sem as chaves bloqueadas. O
+     * "|" do valor é trocado por "/" para não quebrar a tabela em markdown.
      *
      * @return list<array{label: string, value: string}>
      */
@@ -82,6 +98,10 @@ class CrlvImportFailureMail extends Mailable implements ShouldQueue
 
         foreach ($this->context as $key => $value) {
             if ($value === null || $value === '' || ! is_scalar($value)) {
+                continue;
+            }
+
+            if (in_array((string) $key, self::BLOCKED_CONTEXT_KEYS, true)) {
                 continue;
             }
 

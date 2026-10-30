@@ -32,7 +32,7 @@
 
     @if($accountDocumentMissing)
         <x-ui.alert variant="warning" role="status" title="Sua conta ainda não tem o CNPJ da loja" data-account-document-missing>
-            Sem ele, não conseguimos confirmar que um veículo é da loja, e todo CRLV-e entra como consignação, com procuração. <a href="{{ route('contact.show') }}">Fale com a equipe</a> para incluir o CNPJ.
+            Sem ele, não conseguimos confirmar que um veículo é da loja, e todo CRLV-e entra como consignação, com procuração. Inclua o CNPJ em <a href="{{ route('garage.profile.show') }}">Minha loja</a>.
         </x-ui.alert>
     @endif
 

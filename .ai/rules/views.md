@@ -20,3 +20,37 @@ Timestamps are stored in UTC (config app.timezone). A time (or a date next to a 
 
 ## Placa nula
 Nunca imprima license_plate direto: use filled() e, nas telas privadas, "Placa não informada". Telas públicas não mostram nada no lugar.
+
+## Foto de manutenção nunca pelo caminho do storage
+A miniatura, o link "abre em nova aba" e os itens da <x-ui.lightbox> em maintenances/_detail e
+partials/maintenance-photos-form apontam para route('maintenance-photos.show', $photo) —
+MaintenancePhotoController, atrás de auth e da MaintenancePhotoPolicy::view (nega enquanto
+Maintenance::hidesAttachmentsFrom, como a nota). Não use $photo->url (AppStorage::url) numa tela de
+portal: no disco público a foto abre sem login e, no S3/R2, a URL assinada é compartilhável — e a
+foto de OS sem proprietário continuaria legível por quem tiver o link, mesmo com o
+MaintenanceRedactor tirando-a da tela. A rota abre jpg/jpeg/png/webp inline (o resto baixa), com
+nosniff, CSP sandbox e Cache-Control privado e curto; `private` tem de ser marcado no objeto de
+resposta (`setPrivate()`), porque o BinaryFileResponse de response()->download() nasce público e
+descarta um 'Cache-Control' do array de cabeçalhos. Exceção registrada: x-provenance-card ainda usa
+$photo->url, porque só a busca por placa abre aquele bloco e lá x-vehicle.detail carrega apenas as
+fotos públicas (veículo/depois); a rota responderia 403 a quem só buscou a placa. O arquivo sai pelo
+MaintenancePhotoFileResponse, compartilhado com a rota da API. Do lado da API a foto também passou a
+sair por rota autorizada (api.maintenance-photos.show), e a busca pública mantém a mesma exceção:
+ver .ai/rules/api.md (agora com variantes em URL temporária, só depois da policy). As telas web
+(maintenances/_detail e partials/maintenance-photos-form) usam MaintenancePhotoUrls::forViewer($photo,
+auth()->user()): policy primeiro, depois as variantes em URL temporária. Miniatura = `thumb`; item da
+<x-ui.lightbox> = `display` (chave `original` = `master`, que o "Abrir original" usa); link da miniatura
+= `master`. Foto negada (null) some da tela. A rota maintenance-photos.show virou só o fallback, quando
+a assinatura falha. Defina `$photo->setRelation('maintenance', ...)` antes para a policy não consultar
+por foto.
+
+## Nota fiscal nunca pelo caminho do storage
+O link "Abrir" de uma nota fiscal (maintenances/_detail e partials/workshop-maintenance-form) aponta
+para route('invoices.show', $invoice) — InvoiceDownloadController, atrás de auth e da
+InvoicePolicy::view. Não volte a usar AppStorage::url($invoice->file_path): no disco público o
+arquivo abre sem login e, no S3/R2, a URL assinada é compartilhável. A rota serve só PDF na aba
+(Content-Disposition inline); XML e o resto baixam, com nosniff e CSP sandbox, porque o arquivo é do
+cliente.
+
+## Fotos só aparecem para quem tem o recurso ligado
+Telas de portal não mostram foto, contagem de fotos nem etapa de envio quando a conta não tem as fotos das manutenções (MaintenancePhotoAccess, features.md): MaintenanceRedactor tira `photos` e zera `photos_count` (parâmetro `publicLookup` só na busca pública), `x-provenance-card` esconde a contagem de quem está logado sem o recurso (a consulta pública, `expandable`, não muda), o formulário da oficina não inclui `partials.maintenance-photos-form` e o servidor responde 403 a um envio forjado. A busca pública por placa continua com as fotos públicas.

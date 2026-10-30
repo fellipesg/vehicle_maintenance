@@ -34,26 +34,37 @@ class InvoiceController extends Controller
 
         Gate::authorize('update', $maintenance);
 
+        $processor = app(InvoiceUploadProcessor::class);
+        $file = $request->file('file');
+
         try {
-            $file = $request->file('file');
-            $filePath = app(InvoiceUploadProcessor::class)->storeFile($file);
+            $filePath = $processor->storeFile($file);
 
             if ($filePath === null) {
                 throw new \RuntimeException('Invoice file could not be stored.');
             }
 
-            $invoice = Invoice::create([
-                'maintenance_id' => $request->maintenance_id,
-                'maintenance_item_id' => $request->maintenance_item_id,
-                'invoice_type' => $request->invoice_type,
-                'file_path' => $filePath,
-                'file_name' => $file->getClientOriginalName(),
-                'invoice_number' => $request->invoice_number ?? null,
-                'invoice_date' => $request->invoice_date ?? null,
-                'total_amount' => $request->total_amount ?? null,
-            ]);
+            try {
+                $invoice = Invoice::create([
+                    'maintenance_id' => $request->maintenance_id,
+                    'maintenance_item_id' => $request->maintenance_item_id,
+                    'invoice_type' => $request->invoice_type,
+                    'file_path' => $filePath,
+                    'file_name' => $file->getClientOriginalName(),
+                    'invoice_number' => $request->invoice_number ?? null,
+                    'invoice_date' => $request->invoice_date ?? null,
+                    'total_amount' => $request->total_amount ?? null,
+                ]);
+            } catch (\Throwable $e) {
+                // Sem a linha no banco, o arquivo já gravado no S3/R2 fica órfão: pago e
+                // sem referência. \Throwable, e não \Exception, porque um Error aqui
+                // escaparia do catch de baixo e deixaria o mesmo órfão.
+                $processor->discardUpload($filePath);
 
-            $result = app(InvoiceUploadProcessor::class)->processStoredPath(
+                throw $e;
+            }
+
+            $result = $processor->processStoredPath(
                 $maintenance,
                 $invoice,
                 $filePath,

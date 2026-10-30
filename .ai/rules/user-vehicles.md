@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'frontend/lib/views/vehicles/**,resources/views/user/vehicles/**'
+  - 'resources/views/user/vehicles/**'
 ---
 
 # User Vehicles

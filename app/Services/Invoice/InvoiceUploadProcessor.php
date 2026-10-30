@@ -19,34 +19,43 @@ class InvoiceUploadProcessor
 
     /**
      * @param  array<int, UploadedFile>|UploadedFile|null  $files
-     * @return array{items_created: int, warnings: string[]}
+     * @return array{items_created: int, warnings: string[], failed: list<string>}
      */
     public function processForMaintenance(Maintenance $maintenance, array|UploadedFile|null $files): array
     {
-        $stored = $this->storeUploads($files);
+        $uploads = $this->storeUploads($files);
 
-        if ($stored === []) {
+        if ($uploads['stored'] === []) {
             return [
                 'items_created' => 0,
                 'warnings' => [],
+                'failed' => $uploads['failed'],
             ];
         }
 
-        $this->createInvoiceRecords($maintenance, $stored);
+        $records = $this->createInvoiceRecordsOrDiscard($maintenance, $uploads['stored']);
 
-        return $this->parseStoredUploads($maintenance, $stored);
+        return [
+            ...$this->parseStoredUploads($maintenance, $uploads['stored']),
+            'failed' => [...$uploads['failed'], ...$records['failed']],
+        ];
     }
 
     /**
      * Upload files to object storage only. Safe to call outside a DB transaction.
      *
+     * `failed` carries the original name of every file the storage refused. The
+     * app disks run with `throw => false`, so a failed write comes back as a
+     * plain `false` from `storeAs`: without this list the upload would vanish
+     * with no exception, no log line and nothing to tell the user.
+     *
      * @param  array<int, UploadedFile>|UploadedFile|null  $files
-     * @return list<array{path: string, original_name: string}>
+     * @return array{stored: list<array{path: string, original_name: string}>, failed: list<string>}
      */
     public function storeUploads(array|UploadedFile|null $files): array
     {
         if ($files === null) {
-            return [];
+            return ['stored' => [], 'failed' => []];
         }
 
         if (! is_array($files)) {
@@ -54,6 +63,7 @@ class InvoiceUploadProcessor
         }
 
         $stored = [];
+        $failed = [];
 
         foreach ($files as $file) {
             if (! $file instanceof UploadedFile || ! $file->isValid()) {
@@ -63,6 +73,11 @@ class InvoiceUploadProcessor
             $path = $this->storeFile($file);
 
             if ($path === null) {
+                $failed[] = $file->getClientOriginalName();
+                report(new \RuntimeException(
+                    'Falha ao gravar a nota fiscal no storage: '.$file->getClientOriginalName(),
+                ));
+
                 continue;
             }
 
@@ -72,7 +87,7 @@ class InvoiceUploadProcessor
             ];
         }
 
-        return $stored;
+        return ['stored' => $stored, 'failed' => $failed];
     }
 
     /**
@@ -97,6 +112,11 @@ class InvoiceUploadProcessor
      * Persist invoice rows for already-uploaded files. Call inside the same
      * DB transaction that creates the maintenance, so the FK always holds.
      *
+     * In a transaction the rollback removes every row, so the caller discards every
+     * uploaded file (Api/MaintenanceController::store does that). Outside one, use
+     * createInvoiceRecordsOrDiscard instead: there the rows before the failure are
+     * already committed and their files must stay.
+     *
      * @param  list<array{path: string, original_name: string}>  $stored
      * @return list<Invoice>
      */
@@ -105,19 +125,70 @@ class InvoiceUploadProcessor
         $invoices = [];
 
         foreach ($stored as $file) {
-            $invoices[] = Invoice::create([
-                'maintenance_id' => $maintenance->id,
-                'maintenance_item_id' => null,
-                'invoice_type' => 'general',
-                'file_path' => $file['path'],
-                'file_name' => $file['original_name'],
-                'invoice_number' => null,
-                'invoice_date' => null,
-                'total_amount' => null,
-            ]);
+            $invoices[] = $this->createInvoiceRecord($maintenance, $file);
         }
 
         return $invoices;
+    }
+
+    /**
+     * Persist the invoice rows and, when one of them fails, delete only the files
+     * that were left without a row and report which notas did not make it.
+     *
+     * There is no transaction around these inserts (see the note in
+     * StoresMaintenanceInvoices about the Neon pooler), so the rows created before
+     * the failure are already committed. Deleting their files too would leave a nota
+     * pointing at nothing — worse than the orphan object this guards against, because
+     * the download route can only answer "Invoice file not found" from then on.
+     *
+     * It does not rethrow: the OS and the notas before the failure are committed, and
+     * a 500 here would tell the user that nothing was saved, which is how a duplicate
+     * OS gets created on the retry. The failure is reported and the caller turns
+     * `failed` into a message naming the files to send again.
+     *
+     * @param  list<array{path: string, original_name: string}>  $stored
+     * @return array{invoices: list<Invoice>, failed: list<string>}
+     */
+    public function createInvoiceRecordsOrDiscard(Maintenance $maintenance, array $stored): array
+    {
+        $invoices = [];
+
+        foreach ($stored as $index => $file) {
+            try {
+                $invoices[] = $this->createInvoiceRecord($maintenance, $file);
+            } catch (\Throwable $e) {
+                report($e);
+
+                // A primeira falha vale pelas seguintes: o insert quebrou por algo da conexão
+                // ou da tabela, e insistir nas próximas só repetiria o erro.
+                $leftOut = array_slice($stored, $index);
+                $this->discardUploads($leftOut);
+
+                return [
+                    'invoices' => $invoices,
+                    'failed' => array_column($leftOut, 'original_name'),
+                ];
+            }
+        }
+
+        return ['invoices' => $invoices, 'failed' => []];
+    }
+
+    /**
+     * @param  array{path: string, original_name: string}  $file
+     */
+    private function createInvoiceRecord(Maintenance $maintenance, array $file): Invoice
+    {
+        return Invoice::create([
+            'maintenance_id' => $maintenance->id,
+            'maintenance_item_id' => null,
+            'invoice_type' => 'general',
+            'file_path' => $file['path'],
+            'file_name' => $file['original_name'],
+            'invoice_number' => null,
+            'invoice_date' => null,
+            'total_amount' => null,
+        ]);
     }
 
     /**
@@ -164,31 +235,29 @@ class InvoiceUploadProcessor
     public function discardUploads(array $stored): void
     {
         foreach ($stored as $file) {
-            try {
-                AppStorage::disk()->delete($file['path']);
-            } catch (\Throwable $e) {
-                report($e);
-            }
+            $this->discardUpload($file['path']);
         }
     }
 
     /**
-     * @return array{items_created: int, warnings: string[]}
+     * Best-effort cleanup of a single uploaded file. Without it, a failed insert
+     * leaves the object in S3/R2 orphaned: paid for and referenced by no row.
+     */
+    public function discardUpload(string $path): void
+    {
+        try {
+            AppStorage::disk()->delete($path);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * @return array{items_created: int, warnings: string[], failed: list<string>}
      */
     public function processSingleFile(Maintenance $maintenance, UploadedFile $file): array
     {
-        $stored = $this->storeUploads([$file]);
-
-        if ($stored === []) {
-            return [
-                'items_created' => 0,
-                'warnings' => [],
-            ];
-        }
-
-        $this->createInvoiceRecords($maintenance, $stored);
-
-        return $this->parseStoredUploads($maintenance, $stored);
+        return $this->processForMaintenance($maintenance, [$file]);
     }
 
     public function processStoredPath(Maintenance $maintenance, Invoice $invoice, string $storagePath, ?string $originalName = null): array

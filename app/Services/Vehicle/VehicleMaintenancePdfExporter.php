@@ -3,9 +3,11 @@
 namespace App\Services\Vehicle;
 
 use App\Models\Invoice;
+use App\Models\MaintenancePhoto;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Support\AppStorage;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\MaintenanceRedactor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Adapter\CPDF;
@@ -41,13 +43,18 @@ class VehicleMaintenancePdfExporter
 
     private const PAGE_FOOTER_FONT_SIZE = 7.5;
 
+    public function __construct(
+        private readonly VehiclePdfMaintenancePhotos $maintenancePhotos,
+    ) {}
+
     /**
      * $viewer: quem pediu o PDF, para o MaintenanceRedactor (null = qualquer pessoa de fora).
      * $maskIdentifiers: quem pediu o PDF não é o dono atual (VehiclePolicy::update), como o lojista em
      * consignação ou o admin. O PDF sai com chassi e RENAVAM parciais (VehicleIdentifierMask) e sem
      * o código do motor, a mesma regra da API e da ficha na web. Quem decide é quem enfileira o PDF
      * (App\Jobs\GenerateVehicleMaintenancePdfExport, App\Jobs\EmailVehicleMaintenancePdf), que
-     * sabe quem pediu.
+     * sabe quem pediu. As fotos das OS dependem da preferência do dono atual e de quem pediu
+     * (VehiclePdfMaintenancePhotos).
      *
      * @return array{
      *     content: string,
@@ -58,7 +65,13 @@ class VehicleMaintenancePdfExporter
      */
     public function generate(Vehicle $vehicle, bool $maskIdentifiers = false, ?User $viewer = null): array
     {
-        $vehicle->load([
+        // Fotos das OS só quando quem pediu o PDF tem as fotos das manutenções ligadas na conta
+        // (MaintenancePhotoAccess) e o proprietário atual autorizou (VehiclePdfMaintenancePhotos).
+        $photoOwner = MaintenancePhotoAccess::allows($viewer)
+            ? $this->maintenancePhotos->ownerAllowingPhotos($vehicle)
+            : null;
+
+        $relations = [
             'plates' => fn ($q) => $q->orderByDesc('started_at')->orderByDesc('created_at'),
             'maintenances.items.warranty',
             'maintenances.generalWarranty',
@@ -67,11 +80,17 @@ class VehicleMaintenancePdfExporter
             'maintenances.user',
             'maintenances.workshop',
             'maintenances.verifiedWorkshop',
-            'maintenances.photos' => fn ($query) => $query
-                ->where('subject', \App\Models\MaintenancePhoto::SUBJECT_VEHICLE)
-                ->where('stage', \App\Models\MaintenancePhoto::STAGE_AFTER)
-                ->orderBy('sort'),
-        ]);
+        ];
+
+        if ($photoOwner !== null) {
+            $relations['maintenances.photos'] = fn ($query) => $query
+                ->where('subject', MaintenancePhoto::SUBJECT_VEHICLE)
+                ->whereIn('stage', [MaintenancePhoto::STAGE_BEFORE, MaintenancePhoto::STAGE_AFTER])
+                ->orderBy('sort')
+                ->orderBy('id');
+        }
+
+        $vehicle->load($relations);
 
         $vehicle->setRelation(
             'maintenances',
@@ -84,7 +103,15 @@ class VehicleMaintenancePdfExporter
         $temps = [];
 
         try {
-            $pathsToFetch = $this->collectAssetPaths($vehicle);
+            // O dono atual vê o antes/depois; qualquer outra pessoa que exporta, só as fotos públicas.
+            $photoSelection = $photoOwner !== null
+                ? $this->maintenancePhotos->select($vehicle->maintenances, $viewer !== null && $viewer->is($photoOwner))
+                : [];
+
+            $pathsToFetch = array_values(array_unique([
+                ...$this->collectAssetPaths($vehicle),
+                ...$this->maintenancePhotos->paths($photoSelection),
+            ]));
             $copies = AppStorage::localCopies($pathsToFetch);
 
             $workshopLogos = [];
@@ -110,8 +137,11 @@ class VehicleMaintenancePdfExporter
                 ? $this->coverImageSrcFromCopy($copies[$coverPath] ?? null, $temps)
                 : null;
 
+            $maintenancePhotos = $this->maintenancePhotos->embed($photoSelection, $copies, $temps);
+
             $pdf = Pdf::loadView('pdfs.vehicle_maintenance_export', [
                 'vehicle' => $vehicle,
+                'maintenancePhotos' => $maintenancePhotos,
                 'identifiersMasked' => $maskIdentifiers,
                 'coverImageSrc' => $coverImageSrc,
                 'workshopLogos' => $workshopLogos,

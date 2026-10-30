@@ -107,7 +107,18 @@ class MaintenanceController extends Controller
         }
 
         $processor = app(InvoiceUploadProcessor::class);
-        $storedInvoices = $processor->storeUploads($request->file('invoices'));
+        $uploads = $processor->storeUploads($request->file('invoices'));
+        $storedInvoices = $uploads['stored'];
+
+        // Um arquivo que o storage recusou não virava erro nenhum: a OS nascia sem a nota
+        // e o cliente recebia 201. Aqui nada foi gravado ainda, então a requisição falha
+        // inteira e o app pode repetir o envio.
+        if ($uploads['failed'] !== []) {
+            $processor->discardUploads($storedInvoices);
+            Log::error('Error storing maintenance invoices', ['files' => $uploads['failed']]);
+
+            return ApiResponse::error('Unable to store the invoice files. No maintenance was created.', 500);
+        }
 
         try {
             DB::beginTransaction();
@@ -245,6 +256,13 @@ class MaintenanceController extends Controller
                     : 'Unable to create maintenance.',
                 500,
             );
+        } catch (\Throwable $e) {
+            // Um Error escapava deste bloco sem rollback e sem limpeza, deixando no S3/R2 o
+            // arquivo da nota de uma OS que a transação desfez.
+            DB::rollBack();
+            $processor->discardUploads($storedInvoices);
+
+            throw $e;
         }
     }
 
@@ -300,45 +318,96 @@ class MaintenanceController extends Controller
         $previousWorkshopId = $maintenance->workshop_id;
         $previousDate = $maintenance->maintenance_date?->toDateString();
 
-        // Relações, não colunas: sincronizadas abaixo.
+        // Relações, não colunas: sincronizadas abaixo. `invoices` entra pelo
+        // InvoiceUploadProcessor, como no store.
         unset($data['items'], $data['general_warranty_template_id'], $data['invoices']);
 
-        $maintenance->update($data);
+        // Os arquivos sobem antes de qualquer gravação: aqui a OS ainda está intacta, então
+        // a nota que o storage recusar falha a requisição inteira em vez de deixar a edição
+        // pela metade — mesma escolha do store. Sem transação em volta: o insert da nota fica
+        // fora dela de propósito (pooler do Neon, em .ai/rules/invoices.md).
+        $processor = app(InvoiceUploadProcessor::class);
+        $uploads = $processor->storeUploads($request->file('invoices'));
 
-        if (! $request->user()->isWorkshop()) {
-            app(WorkshopReviewService::class)->syncAfterDeclaration($maintenance->fresh(), $previousWorkshopId);
+        if ($uploads['failed'] !== []) {
+            $processor->discardUploads($uploads['stored']);
+            Log::error('Error storing maintenance invoices', ['files' => $uploads['failed']]);
+
+            return ApiResponse::error('Unable to store the invoice files. No maintenance was updated.', 500);
         }
 
-        if (isset($data['kilometers'])) {
-            app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
-        }
+        try {
+            $maintenance->update($data);
 
-        // Mesma ordem do portal web: itens primeiro, para que as garantias
-        // casem com os itens que ficaram. Sem a chave `items` a lista fica como
-        // está — um PUT parcial não deve zerar os itens da OS.
-        if ($request->has('items')) {
-            $this->syncMaintenanceItems($maintenance, $request);
-
-            // Garantia é promessa da oficina, então só o portal dela aplica
-            // template. Item removido já leva a garantia junto: a FK
-            // maintenance_warranties.maintenance_item_id é cascadeOnDelete.
-            $workshop = $request->user()->isWorkshop() ? $request->user()->workshop : null;
-
-            if ($workshop !== null) {
-                $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
+            if (! $request->user()->isWorkshop()) {
+                app(WorkshopReviewService::class)->syncAfterDeclaration($maintenance->fresh(), $previousWorkshopId);
             }
+
+            if (isset($data['kilometers'])) {
+                app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
+            }
+
+            // Mesma ordem do portal web: itens primeiro, para que as garantias
+            // casem com os itens que ficaram. Sem a chave `items` a lista fica como
+            // está — um PUT parcial não deve zerar os itens da OS.
+            if ($request->has('items')) {
+                $this->syncMaintenanceItems($maintenance, $request);
+
+                // Garantia é promessa da oficina, então só o portal dela aplica
+                // template. Item removido já leva a garantia junto: a FK
+                // maintenance_warranties.maintenance_item_id é cascadeOnDelete.
+                $workshop = $request->user()->isWorkshop() ? $request->user()->workshop : null;
+
+                if ($workshop !== null) {
+                    $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
+                }
+            }
+
+            if ($previousDate !== $maintenance->maintenance_date?->toDateString()) {
+                $this->recomputeMaintenanceWarrantyDates($maintenance->fresh(['warranties']));
+            }
+        } catch (\Throwable $e) {
+            // Nenhuma linha de nota existe ainda, então todos os arquivos podem ir embora:
+            // sem isso um 422 do sync de garantias deixaria o objeto órfão no S3/R2.
+            $processor->discardUploads($uploads['stored']);
+
+            throw $e;
         }
 
-        if ($previousDate !== $maintenance->maintenance_date?->toDateString()) {
-            $this->recomputeMaintenanceWarrantyDates($maintenance->fresh(['warranties']));
+        // Depois dos itens, como no portal da oficina: com a OS sem itens, os da NF-e a preenchem.
+        $records = $processor->createInvoiceRecordsOrDiscard($maintenance, $uploads['stored']);
+        $parsed = $processor->parseStoredUploads($maintenance, $uploads['stored']);
+
+        $extra = [];
+
+        if ($parsed['items_created'] > 0) {
+            $extra['parsed_items_count'] = $parsed['items_created'];
         }
 
-        return ApiResponse::success(
-            new MaintenanceResource($maintenance->fresh([
-                'vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop',
-            ])),
-            'Maintenance updated successfully',
+        if ($parsed['warnings'] !== []) {
+            $extra['parse_warnings'] = $parsed['warnings'];
+        }
+
+        // A OS editada está commitada e não volta atrás (mesma razão do portal web): a nota que
+        // não entrou é nomeada para o cliente reenviar só ela, em vez de repetir a edição.
+        if ($records['failed'] !== []) {
+            $extra['invoice_failures'] = $records['failed'];
+        }
+
+        $payload = array_merge(
+            [
+                'success' => true,
+                'data' => new MaintenanceResource($maintenance->fresh([
+                    'vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop',
+                ])),
+                'message' => $records['failed'] === []
+                    ? 'Maintenance updated successfully'
+                    : 'Maintenance updated, but some invoice files were not attached.',
+            ],
+            $extra,
         );
+
+        return response()->json($payload);
     }
 
     public function destroy(string $id): JsonResponse
@@ -346,12 +415,7 @@ class MaintenanceController extends Controller
         $maintenance = Maintenance::findOrFail($id);
         Gate::authorize('delete', $maintenance);
 
-        foreach ($maintenance->photos as $photo) {
-            if (AppStorage::disk()->exists($photo->path)) {
-                AppStorage::disk()->delete($photo->path);
-            }
-        }
-
+        // As fotos (e as variantes) saem do storage no evento deleting da própria OS.
         foreach ($maintenance->invoices as $invoice) {
             if (AppStorage::disk()->exists($invoice->file_path)) {
                 AppStorage::disk()->delete($invoice->file_path);

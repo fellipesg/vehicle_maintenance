@@ -23,8 +23,8 @@
 @php
     use App\Enums\ServiceCategory;
     use App\Models\MaintenancePhoto;
-    use App\Support\AppStorage;
     use App\Support\Maintenance\MaintenanceLinks;
+    use App\Support\Maintenance\MaintenancePhotoUrls;
 
     $maintenance->loadMissing([
         'vehicle',
@@ -82,6 +82,13 @@
         MaintenancePhoto::SUBJECT_PART.'_'.MaintenancePhoto::STAGE_DURING,
     ];
     $detailPhotoViewerId = 'fotos-manutencao-'.$maintenance->id;
+    // URLs temporárias (thumb, display, master) só depois da MaintenancePhotoUrls::forViewer, que
+    // consulta a MaintenancePhotoPolicy::view; foto sem URL (negada) não aparece.
+    $detailPhotoUrls = $maintenance->photos
+        ->each(fn ($photo) => $photo->setRelation('maintenance', $maintenance))
+        ->mapWithKeys(fn ($photo): array => [$photo->id => MaintenancePhotoUrls::forViewer($photo, auth()->user())])
+        ->filter();
+    $detailPhotos = $detailPhotos->map(fn ($group) => $group->filter(fn ($photo): bool => $detailPhotoUrls->has($photo->id)))->filter(fn ($group): bool => $group->isNotEmpty());
     $detailPhotoTotal = collect($detailPhotoOrder)->sum(fn (string $key): int => $detailPhotos->get($key)?->count() ?? 0);
     // Alt contextual, o mesmo na miniatura e na lightbox: "Foto 2 de 4 — Troca de óleo, 12/03/2025.
     // Carro antes do serviço". A numeração segue a ordem da tela (antes, depois, durante).
@@ -96,7 +103,8 @@
         foreach ($detailPhotos->get($photoGroupKey, collect()) as $photo) {
             $detailPhotoPositions[$photo->id] = count($detailPhotoItems);
             $detailPhotoItems[] = [
-                'src' => $photo->url,
+                'src' => $detailPhotoUrls[$photo->id]['display'],
+                'original' => $detailPhotoUrls[$photo->id]['master'],
                 'caption' => $detailPhotoGroups[$photoGroupKey],
                 'alt' => 'Foto '.(count($detailPhotoItems) + 1).' de '.$detailPhotoTotal.' — '.$detailPhotoContext.'. '.$detailPhotoGroups[$photoGroupKey],
             ];
@@ -272,7 +280,7 @@
             <ul role="list" class="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
                 @foreach ($maintenance->invoices as $invoice)
                     <li>
-                        <a href="{{ AppStorage::url($invoice->file_path) }}" target="_blank" rel="noopener" class="flex min-h-12 items-center justify-between gap-3 px-4 py-3 text-sm transition-colors duration-fast ease-smooth-out hover:bg-surface-muted/60 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring motion-reduce:transition-none">
+                        <a href="{{ route('invoices.show', $invoice) }}" target="_blank" rel="noopener" class="flex min-h-12 items-center justify-between gap-3 px-4 py-3 text-sm transition-colors duration-fast ease-smooth-out hover:bg-surface-muted/60 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring motion-reduce:transition-none">
                             <span class="flex min-w-0 items-center gap-2 font-medium text-foreground">
                                 <x-ui.icon name="document-text" class="size-5 text-muted-foreground" />
                                 <span class="truncate">{{ $invoice->file_name }}</span>
@@ -314,14 +322,14 @@
                                     @php($photoPosition = $detailPhotoPositions[$photo->id])
                                     <li>
                                         <a
-                                            href="{{ $photo->url }}"
+                                            href="{{ $detailPhotoUrls[$photo->id]['master'] }}"
                                             target="_blank"
                                             rel="noopener"
                                             class="block overflow-hidden rounded-control border border-border bg-surface-muted transition-colors duration-fast ease-smooth-out hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
                                             data-lightbox-open="{{ $detailPhotoViewerId }}"
                                             data-lightbox-index="{{ $photoPosition }}"
                                         >
-                                            <img src="{{ $photo->url }}" alt="{{ $detailPhotoItems[$photoPosition]['alt'] }}" loading="lazy" decoding="async" class="aspect-[4/3] w-full object-contain">
+                                            <img src="{{ $detailPhotoUrls[$photo->id]['thumb'] }}" alt="{{ $detailPhotoItems[$photoPosition]['alt'] }}" loading="lazy" decoding="async" class="aspect-[4/3] w-full object-contain">
                                             <span class="sr-only" data-lightbox-new-tab-hint>(abre em nova aba)</span>
                                         </a>
                                     </li>

@@ -63,26 +63,35 @@ trait StoresMaintenanceInvoices
      * pooler connections, where a swallowed query error aborts the whole block
      * (SQLSTATE 25P02) and hides the real failure.
      *
+     * Because of that, an invoice that fails after the OS is created cannot be rolled
+     * back: the OS, its items, the selo and the vehicle kilometers are already
+     * committed. The OS is kept and `invoice_failures` names the files that did not
+     * make it, so the user sends those again instead of filling the form a second
+     * time — that retry is what used to create the duplicated OS.
+     *
      * @param  callable(): Maintenance  $createMaintenance
-     * @return array{maintenance: Maintenance, items_created: int, items_skipped: int, warnings: string[]}
+     * @return array{maintenance: Maintenance, items_created: int, items_skipped: int, warnings: string[], invoice_failures: list<string>}
      */
     protected function storeMaintenanceWithInvoices(Request $request, callable $createMaintenance): array
     {
         $processor = app(InvoiceUploadProcessor::class);
-        $stored = $processor->storeUploads($request->file('invoices'));
+        $uploads = $processor->storeUploads($request->file('invoices'));
 
         try {
             $maintenance = $createMaintenance();
-            $processor->createInvoiceRecords($maintenance, $stored);
         } catch (\Throwable $e) {
-            $processor->discardUploads($stored);
+            // Nenhuma nota foi gravada ainda, então todos os arquivos podem ir embora.
+            $processor->discardUploads($uploads['stored']);
 
             throw $e;
         }
 
+        $records = $processor->createInvoiceRecordsOrDiscard($maintenance, $uploads['stored']);
+
         return [
             'maintenance' => $maintenance,
-            ...$this->parseMaintenanceInvoices($maintenance, $stored),
+            ...$this->parseMaintenanceInvoices($maintenance, $uploads['stored']),
+            'invoice_failures' => [...$uploads['failed'], ...$records['failed']],
         ];
     }
 
@@ -90,15 +99,18 @@ trait StoresMaintenanceInvoices
      * Store, record and parse the invoices sent with an existing OS. Call it
      * after the OS items are saved, so an empty list lets the NF-e fill it.
      *
-     * @return array{items_created: int, items_skipped: int, warnings: string[]}
+     * @return array{items_created: int, items_skipped: int, warnings: string[], invoice_failures: list<string>}
      */
     protected function processMaintenanceInvoices(Request $request, Maintenance $maintenance): array
     {
         $processor = app(InvoiceUploadProcessor::class);
-        $stored = $processor->storeUploads($request->file('invoices'));
-        $processor->createInvoiceRecords($maintenance, $stored);
+        $uploads = $processor->storeUploads($request->file('invoices'));
+        $records = $processor->createInvoiceRecordsOrDiscard($maintenance, $uploads['stored']);
 
-        return $this->parseMaintenanceInvoices($maintenance, $stored);
+        return [
+            ...$this->parseMaintenanceInvoices($maintenance, $uploads['stored']),
+            'invoice_failures' => [...$uploads['failed'], ...$records['failed']],
+        ];
     }
 
     /**
@@ -172,7 +184,12 @@ trait StoresMaintenanceInvoices
     }
 
     /**
+     * O sucesso continua aparecendo quando uma nota falha: a OS está salva, e esconder
+     * isso é o que levava o usuário a cadastrá-la de novo. O que não entrou vai no
+     * flash `error`, que o x-ui.flash desenha com role="alert".
+     *
      * @param  string[]  $warnings
+     * @param  list<string>  $failedInvoices
      */
     protected function redirectWithInvoiceFeedback(
         RedirectResponse $redirect,
@@ -180,6 +197,7 @@ trait StoresMaintenanceInvoices
         array $warnings = [],
         int $itemsSkipped = 0,
         string $successMessage = 'Manutenção registrada com sucesso!',
+        array $failedInvoices = [],
     ): RedirectResponse {
         if ($itemsCreated > 0) {
             $successMessage .= $itemsCreated === 1
@@ -195,6 +213,10 @@ trait StoresMaintenanceInvoices
 
         if ($warnings !== []) {
             $redirect = $redirect->with('warning', implode(' ', $warnings));
+        }
+
+        if ($failedInvoices !== []) {
+            $redirect = $redirect->with('error', InvoiceParseFeedback::notAttachedMessage($failedInvoices));
         }
 
         return $redirect;

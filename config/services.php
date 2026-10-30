@@ -80,4 +80,21 @@ return [
         'measurement_id' => env('GA_MEASUREMENT_ID'),
     ],
 
+    'sentry_webhook' => [
+        'client_secret' => env('SENTRY_WEBHOOK_CLIENT_SECRET'),
+    ],
+
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'alerts_chat_id' => env('TELEGRAM_ALERTS_CHAT_ID'),
+    ],
+
+    /*
+    | Senha das contas permanentes de revisão entregues ao Google Play
+    | (PlayReviewAccountsSeeder). Fora do repositório, de propósito.
+    */
+    'play_review' => [
+        'password' => env('PLAY_REVIEW_PASSWORD'),
+    ],
+
 ];

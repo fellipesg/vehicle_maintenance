@@ -55,6 +55,7 @@ class User extends Authenticatable
         'provider',
         'provider_id',
         'avatar',
+        'export_include_photos',
     ];
 
     /**
@@ -83,6 +84,7 @@ class User extends Authenticatable
             'document' => 'encrypted',
             'is_admin' => 'boolean',
             'subscription_active' => 'boolean',
+            'export_include_photos' => 'boolean',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'two_factor_secret' => 'encrypted',
@@ -263,7 +265,7 @@ class User extends Authenticatable
         return $this->belongsTo(Tenant::class);
     }
 
-    public function garage()
+    public function garage(): HasOne
     {
         return $this->hasOne(Garage::class);
     }
@@ -318,13 +320,52 @@ class User extends Authenticatable
         return (bool) $this->subscription_active;
     }
 
+    /**
+     * Identidade da loja para quem está de fora — o proprietário de um veículo em consignação, antes
+     * de tudo. Vale o dado da loja (garages) e, quando ele está vazio, o da conta: é comum a loja
+     * não ter e-mail nem telefone próprios e usar os da pessoa, e nesse caso o cadastro da loja
+     * nasce com uma cópia (App\Services\TenantService). Nunca mostre users.name para um terceiro:
+     * o nome que ele conhece é o da loja.
+     *
+     * @return array{name: string, email: ?string, phone: ?string, address: ?string}
+     */
+    public function storeIdentity(): array
+    {
+        $garage = $this->garage;
+
+        return [
+            'name' => (string) ($garage?->name ?: $this->name),
+            'email' => $garage?->email ?: $this->email,
+            'phone' => $garage?->phone ?: $this->phone,
+            'address' => $garage !== null && $garage->addressLine() !== '' ? $garage->addressLine() : null,
+        ];
+    }
+
+    /**
+     * Nome pelo qual a loja é conhecida fora da conta.
+     */
+    public function storeName(): string
+    {
+        return $this->storeIdentity()['name'];
+    }
+
+    /**
+     * CPF/CNPJ da conta, só com dígitos. No lojista o documento é o da loja (garages.document,
+     * mantido em "Minha loja"); users.document fica como reserva para as contas de garagem que
+     * receberam o CNPJ antes de a loja existir. Ponto único de leitura: VehicleEntryFlow e
+     * VehicleOwnershipService decidem estoque próprio x consignação por aqui.
+     */
     public function normalizedDocument(): ?string
     {
-        if ($this->document === null) {
+        $document = $this->isGarage()
+            ? ($this->garage?->document ?? $this->document)
+            : $this->document;
+
+        if ($document === null) {
             return null;
         }
 
-        return preg_replace('/\D/', '', $this->document) ?: null;
+        return preg_replace('/\D/', '', $document) ?: null;
     }
 
     /**

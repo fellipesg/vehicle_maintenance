@@ -29,7 +29,7 @@ class PortalShellTest extends TestCase
     {
         return [
             'proprietário' => ['asUser', 'user.vehicles.index', ['Início', 'Meus veículos', 'Manutenções', 'Oficinas'], 'Meus veículos', 'Adicionar veículo', 'user.vehicles.create', 'Proprietário'],
-            'lojista' => ['asGarage', 'garage.vehicles.index', ['Início', 'Estoque', 'Manutenções'], 'Estoque', 'Adicionar ao estoque', 'garage.vehicles.create', 'Lojista'],
+            'lojista' => ['asGarage', 'garage.vehicles.index', ['Início', 'Estoque', 'Manutenções', 'Minha loja'], 'Estoque', 'Adicionar ao estoque', 'garage.vehicles.create', 'Lojista'],
             'oficina' => ['asWorkshop', 'workshop.maintenances.index', ['Início', 'Ordens de serviço', 'Validações', 'Modelos de garantia', 'Minha oficina'], 'Ordens de serviço', 'Nova OS', 'workshop.maintenances.create', 'Oficina'],
         ];
     }
@@ -231,7 +231,7 @@ class PortalShellTest extends TestCase
             iterator_to_array($page->query('//*[@id="menu-mobile"]//nav[@aria-label="Menu do portal"]//a')),
         );
 
-        $this->assertSame(['Início', 'Estoque', 'Manutenções'], $sheetItems);
+        $this->assertSame(['Início', 'Estoque', 'Manutenções', 'Minha loja'], $sheetItems);
         $this->assertSame('Manutenções', $this->text($this->element($page, '//*[@id="menu-mobile"]//nav[@aria-label="Menu do portal"]//a[@aria-current="page"]')));
 
         $accountBlock = $this->text($this->element($page, '//*[@data-mobile-nav-account]'));

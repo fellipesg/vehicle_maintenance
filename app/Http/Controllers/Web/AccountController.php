@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Http\Controllers\Concerns\EndsDeletedAccountSession;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Account\DeleteAccountRequest;
 use App\Http\Requests\Web\Account\UpdateAccountPasswordRequest;
+use App\Http\Requests\Web\Account\UpdateAccountPreferencesRequest;
 use App\Http\Requests\Web\Account\UpdateAccountRequest;
+use App\Models\User;
 use App\Notifications\AccountEmailChangedNotification;
 use App\Services\User\DeleteUserAccount;
 use App\Support\PortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -25,6 +28,8 @@ use Illuminate\View\View;
  */
 class AccountController extends Controller
 {
+    use EndsDeletedAccountSession;
+
     public function edit(Request $request): View
     {
         $user = $request->user();
@@ -33,7 +38,38 @@ class AccountController extends Controller
             'user' => $user,
             'accountLabel' => PortalAccess::accountLabel($user),
             'homeUrl' => PortalAccess::homeUrl($user),
+            'businessProfile' => $this->businessProfile($user),
         ]);
+    }
+
+    /**
+     * Para conta de empresa, o aviso que leva ao cadastro dela. "Minha conta" é a mesma tela nos
+     * quatro portais e guarda só o acesso; CNPJ, endereço e o contato que o cliente vê ficam na
+     * área da loja ou da oficina, e é lá que se procura primeiro.
+     *
+     * @return array{title: string, description: string, action: string, url: string}|null
+     */
+    private function businessProfile(User $user): ?array
+    {
+        if ($user->isGarage() && Route::has('garage.profile.show')) {
+            return [
+                'title' => 'Dados da loja ficam em "Minha loja"',
+                'description' => 'CNPJ, endereço e o contato que o proprietário de um veículo em consignação vê são da loja, não da sua conta. Eles começam iguais aos daqui e podem ser trocados lá.',
+                'action' => 'Abrir Minha loja',
+                'url' => route('garage.profile.show'),
+            ];
+        }
+
+        if ($user->isWorkshop() && Route::has('workshop.profile.show')) {
+            return [
+                'title' => 'Dados da oficina ficam em "Minha oficina"',
+                'description' => 'Nome, endereço e contato que aparecem no Selo da oficina e no diretório são da oficina, não da sua conta.',
+                'action' => 'Abrir Minha oficina',
+                'url' => route('workshop.profile.show'),
+            ];
+        }
+
+        return null;
     }
 
     public function update(UpdateAccountRequest $request): RedirectResponse
@@ -65,6 +101,13 @@ class AccountController extends Controller
         return redirect()->route('account.edit')->with('success', 'Dados da conta atualizados.');
     }
 
+    public function updatePreferences(UpdateAccountPreferencesRequest $request): RedirectResponse
+    {
+        $request->user()->update(['export_include_photos' => $request->boolean('export_include_photos')]);
+
+        return redirect()->route('account.edit')->with('success', 'Preferência do PDF atualizada.');
+    }
+
     public function updatePassword(UpdateAccountPasswordRequest $request): RedirectResponse
     {
         // A senha nova derruba a sessão dos outros aparelhos (App\Http\Middleware\AuthenticateWebSession)
@@ -81,11 +124,10 @@ class AccountController extends Controller
 
     public function destroy(DeleteAccountRequest $request, DeleteUserAccount $deleteUserAccount): RedirectResponse
     {
-        $deleteUserAccount->handle($request->user());
+        $user = $request->user();
 
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $deleteUserAccount->handle($user);
+        $this->endWebSessionOf($request, $user);
 
         return redirect()->route('home')
             ->with('success', 'Sua conta foi excluída. O histórico de manutenções continua ligado ao chassi de cada veículo.');

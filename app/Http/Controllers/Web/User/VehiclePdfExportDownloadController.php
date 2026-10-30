@@ -31,10 +31,18 @@ class VehiclePdfExportDownloadController extends Controller
         return $this->exports->downloadFileResponse($export);
     }
 
+    /**
+     * Mesma regra da API: quem pediu e ainda pode ver o histórico daquele veículo, dentro do prazo.
+     * O 410 separa o link vencido (definitivo) do 404 de arquivo que não existe.
+     */
     private function authorizeDownload(Request $request, VehiclePdfExport $export): void
     {
         if (! $this->exports->userCanViewExport($request->user(), $export)) {
             abort(403);
+        }
+
+        if ($export->isExpired()) {
+            abort(410);
         }
 
         if (! $export->isCompleted() || $export->file_path === null) {

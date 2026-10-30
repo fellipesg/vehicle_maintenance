@@ -19,6 +19,12 @@ class OwnerDecisionApiTest extends TestCase
     use BuildsOwnerlessRecords;
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
+
     /**
      * @param  array<string, bool>  $body
      * @return array<string, bool>

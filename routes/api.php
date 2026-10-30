@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\LegalController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\MaintenanceInviteController;
 use App\Http\Controllers\Api\MaintenancePhotoController;
+use App\Http\Controllers\Api\MaintenancePhotoSignedFileController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProfileController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Api\WorkshopController;
 use App\Http\Controllers\Api\WorkshopMessageTemplateController;
 use App\Http\Controllers\Api\WorkshopRecordController;
 use App\Http\Controllers\Api\WorkshopVehicleController;
+use App\Support\Maintenance\MaintenancePhotoUrls;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -46,12 +48,25 @@ Route::prefix('v1')->group(function () {
     Route::post('/password/forgot', [PasswordController::class, 'forgot'])
         ->middleware('throttle:password-forgot');
 
+    // Arquivo de uma foto de manutenção por URL assinada de vida curta. Quem recebe a URL já passou
+    // pela MaintenancePhotoPolicy::view ao montar o MaintenancePhotoResource; a assinatura vale por
+    // uma foto e uma variante. Sem auth:sanctum porque o carregador de imagem do app e o <img> não
+    // mandam Authorization. Só o disco local usa esta rota (S3/R2 assina no próprio storage).
+    Route::get('/maintenance-photo-files/{photo}/{variant}', MaintenancePhotoSignedFileController::class)
+        ->whereNumber('photo')
+        ->whereIn('variant', MaintenancePhotoUrls::VARIANTS)
+        ->middleware(['signed', 'throttle:api'])
+        ->name('api.maintenance-photos.signed');
+
     // Workshop routes (public - visible to all users)
     Route::get('/workshops', [WorkshopController::class, 'index'])->middleware('throttle:api');
     Route::get('/workshops/{id}', [WorkshopController::class, 'show'])->middleware('throttle:api');
 
     // Protected routes (require authentication)
-    Route::middleware(['auth:sanctum', 'tenant', 'throttle:api'])->group(function () {
+    // garage.approved:api — loja em análise só lê pela API. Sem isto o portão existiria apenas
+    // na web, e o app seria o caminho livre para escrever no histórico de um chassi e mandar
+    // convite para terceiros (App\Http\Middleware\EnsureGarageApproved).
+    Route::middleware(['auth:sanctum', 'tenant', 'throttle:api', 'garage.approved:api'])->group(function () {
         // Auth routes
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me'])->middleware('ability:profile:read');
@@ -84,9 +99,11 @@ Route::prefix('v1')->group(function () {
 
         // Maintenance routes
         Route::get('/maintenances', [MaintenanceController::class, 'index'])->middleware('ability:maintenances:read');
-        Route::post('/maintenances', [MaintenanceController::class, 'store'])->middleware('ability:maintenances:write');
+        // Store e update recebem `invoices` (InvoiceFile lê o arquivo inteiro), como /invoices/upload:
+        // o balde 'uploads' fica por cima do 'throttle:api' do grupo.
+        Route::post('/maintenances', [MaintenanceController::class, 'store'])->middleware(['ability:maintenances:write', 'throttle:uploads']);
         Route::get('/maintenances/{id}', [MaintenanceController::class, 'show'])->middleware('ability:maintenances:read');
-        Route::put('/maintenances/{id}', [MaintenanceController::class, 'update'])->middleware('ability:maintenances:write');
+        Route::put('/maintenances/{id}', [MaintenanceController::class, 'update'])->middleware(['ability:maintenances:write', 'throttle:uploads']);
         Route::delete('/maintenances/{id}', [MaintenanceController::class, 'destroy'])->middleware('ability:maintenances:write');
 
         // OS de oficina em carro sem proprietário: decisão do proprietário e convite do cliente.
@@ -103,6 +120,13 @@ Route::prefix('v1')->group(function () {
             ->middleware(['ability:maintenances:write', 'throttle:uploads']);
         Route::delete('/maintenances/{maintenance}/photos/{photo}', [MaintenancePhotoController::class, 'destroy'])
             ->middleware('ability:maintenances:write');
+
+        // Foto de uma manutenção: quem pode abrir é a MaintenancePhotoPolicy::view, não quem
+        // tiver o link do arquivo no storage. É o que o MaintenancePhotoResource devolve.
+        Route::get('/maintenance-photos/{photo}', [MaintenancePhotoController::class, 'show'])
+            ->middleware('ability:maintenances:read')
+            ->whereNumber('photo')
+            ->name('api.maintenance-photos.show');
 
         // Export maintenance history to PDF (async)
         Route::post('/vehicles/{id}/export-pdf', [VehicleController::class, 'requestExportPdf'])->middleware('ability:vehicles:read');

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\GarageStatus;
 use App\Models\Garage;
 use App\Models\Tenant;
 use App\Models\User;
@@ -50,11 +51,16 @@ class UserFactory extends Factory
             $user->update(['tenant_id' => $tenant->id]);
 
             if ($type === 'garage') {
+                // Loja de teste nasce aprovada: a análise é o assunto de quem testa a fila, e
+                // esses testes marcam o status na mão.
+                // Espelha o TenantService: a loja nasce com uma cópia do contato da conta.
                 Garage::create([
                     'tenant_id' => $tenant->id,
                     'user_id' => $user->id,
                     'name' => $user->name,
-                ]);
+                    'phone' => $user->phone,
+                    'email' => $user->email,
+                ])->forceFill(['status' => GarageStatus::Approved])->save();
             }
 
             if ($type === 'workshop') {

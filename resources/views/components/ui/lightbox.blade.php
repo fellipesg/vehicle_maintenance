@@ -20,13 +20,14 @@
     Props:
     - id (obrigatório).
     - title (obrigatório): título do diálogo ("Fotos do serviço").
-    - items (obrigatório): lista de ['src' => url, 'alt' => texto alternativo contextual,
-      'caption' => legenda visível opcional]. Use o mesmo alt na miniatura.
+    - items (obrigatório): lista de ['src' => url exibida (variante display), 'original' => url do
+      arquivo inteiro para "Abrir original" (opcional; sem ela vale o src), 'alt' => texto alternativo
+      contextual, 'caption' => legenda visível opcional]. Use o mesmo alt na miniatura.
     - label: nome do carrossel (o padrão é o title).
 
-    Ex.:
-    <a href="{{ $photo->url }}" target="_blank" rel="noopener" data-lightbox-open="fotos-os-12" data-lightbox-index="0">
-        <img src="{{ $photo->url }}" alt="Foto 1 de 4 — Troca de óleo, 12/03/2025. Carro antes do serviço" class="aspect-[4/3] w-full object-contain">
+    Ex.: (a foto de uma OS vem de MaintenancePhotoUrls::forViewer, nunca de $photo->url)
+    <a href="{{ $urls['master'] }}" target="_blank" rel="noopener" data-lightbox-open="fotos-os-12" data-lightbox-index="0">
+        <img src="{{ $urls['thumb'] }}" alt="Foto 1 de 4 — Troca de óleo, 12/03/2025. Carro antes do serviço" class="aspect-[4/3] w-full object-contain">
         <span class="sr-only" data-lightbox-new-tab-hint>(abre em nova aba)</span>
     </a>
     <x-ui.lightbox id="fotos-os-12" title="Fotos do serviço" :items="$photoItems" />
@@ -44,6 +45,7 @@
     $lightboxItems = collect(is_iterable($items) ? $items : [])
         ->map(fn (mixed $item): array => [
             'src' => trim((string) (is_array($item) ? ($item['src'] ?? '') : $item)),
+            'original' => trim((string) (is_array($item) ? ($item['original'] ?? '') : '')),
             'alt' => trim((string) (is_array($item) ? ($item['alt'] ?? '') : '')),
             'caption' => trim((string) (is_array($item) ? ($item['caption'] ?? '') : '')),
         ])
@@ -87,7 +89,7 @@
             <p class="text-sm text-muted-foreground tabular-nums" aria-hidden="true" data-lightbox-counter>Foto 1 de {{ $lightboxTotal }}</p>
         </div>
         <a
-            href="{{ $lightboxFirst['src'] }}"
+            href="{{ $lightboxFirst['original'] !== '' ? $lightboxFirst['original'] : $lightboxFirst['src'] }}"
             target="_blank"
             rel="noopener"
             class="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-control px-3 text-sm font-medium text-link transition-colors duration-fast ease-smooth-out hover:bg-surface-muted hover:text-link-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
@@ -126,7 +128,7 @@
                     @if($lightboxIndex > 0) aria-hidden="true" @endif
                     class="flex h-full w-full shrink-0 snap-center snap-always flex-col gap-3 px-4 py-4 sm:px-16"
                     data-lightbox-slide
-                    data-lightbox-src="{{ $lightboxItem['src'] }}"
+                    data-lightbox-src="{{ $lightboxItem['original'] !== '' ? $lightboxItem['original'] : $lightboxItem['src'] }}"
                     data-lightbox-alt="{{ $lightboxItem['alt'] }}"
                 >
                     <div class="flex min-h-0 flex-1 items-center justify-center">

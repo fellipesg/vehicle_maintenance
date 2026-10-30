@@ -59,12 +59,12 @@ class OwnerlessVisibilityTest extends TestCase
             ->assertDontSee('pendente.pdf');
     }
 
-    public function test_current_owner_sees_the_minimal_form_in_the_vehicle_history_before_deciding(): void
+    public function test_unverified_current_owner_sees_the_minimal_form_in_the_vehicle_history_before_deciding(): void
     {
         $workshop = $this->workshopAccount();
         $vehicle = $this->ownerlessVehicle();
         $record = $this->withPendingAttachments($this->ownerlessRecord($workshop, $vehicle));
-        $owner = $this->ownerOf($vehicle);
+        $owner = $this->ownerOf($vehicle, verified: false);
 
         $this->actingAsApiUser($owner);
         $json = $this->getJson("/api/v1/vehicles/{$vehicle->id}/maintenances")->assertOk()->json('data.0');
@@ -92,12 +92,12 @@ class OwnerlessVisibilityTest extends TestCase
         $this->assertCount(1, $json['invoices']);
     }
 
-    public function test_pending_invoice_cannot_be_downloaded_by_the_owner_before_acceptance(): void
+    public function test_pending_invoice_cannot_be_downloaded_by_an_unverified_owner_before_acceptance(): void
     {
         $workshop = $this->workshopAccount();
         $vehicle = $this->ownerlessVehicle();
         $record = $this->withPendingAttachments($this->ownerlessRecord($workshop, $vehicle));
-        $owner = $this->ownerOf($vehicle);
+        $owner = $this->ownerOf($vehicle, verified: false);
 
         $this->actingAsApiUser($owner);
         $this->getJson('/api/v1/invoices/'.$record->invoices()->first()->id.'/download')->assertForbidden();

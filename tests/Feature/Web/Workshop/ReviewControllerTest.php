@@ -80,13 +80,12 @@ class ReviewControllerTest extends TestCase
     public function test_maintenance_from_another_workshop_not_visible(): void
     {
         $anotherWorkshopUser = User::factory()->asWorkshop()->create();
-
-        // O rótulo é explícito e fora da lista da MaintenanceFactory: sorteado entre oito valores,
-        // ele caía no mesmo da OS do setUp (que a fila mostra) e o assertDontSee achava aquela.
+        // Tipo explícito: o factory sorteia de uma lista curta, e um sorteio igual ao da
+        // manutenção desta oficina fazia o assertDontSee falhar sem haver vazamento.
         $otherMaintenance = Maintenance::factory()->create([
             'workshop_id' => $anotherWorkshopUser->workshop->id,
             'workshop_review_status' => WorkshopReviewStatus::Pending,
-            'maintenance_type' => 'Serviço de outra oficina',
+            'maintenance_type' => 'Serviço exclusivo de outra oficina',
         ]);
 
         $this->actingAs($this->workshopUser)

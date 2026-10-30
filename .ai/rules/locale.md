@@ -17,3 +17,11 @@ Some API messages (ApiResponse::validation, the error envelope in bootstrap/app.
 
 ## Mensagens de registros de oficinas
 Decisão do proprietário e convite respondem 422 com message em pt-BR no envelope da API (ApiResponse::error com a primeira mensagem); e-mail inválido ou suprimido usa a mesma frase genérica "Não foi possível enviar para este e-mail." para não revelar a supressão.
+
+## As variáveis de ambiente dos testes precisam de `<server>`, não só de `<env>`
+`APP_LOCALE`, `APP_FALLBACK_LOCALE` e `APP_FAKER_LOCALE` aparecem duas vezes em `phpunit.xml` e em
+`phpunit.pgsql.xml` (`<env force="true">` **e** `<server>`) pelo mesmo motivo de todas as outras
+variáveis que moldam o ambiente de teste: um shell que exporta o `.env` vence o `<env>`. A armadilha
+inteira, com o mecanismo e o estrago no banco de desenvolvimento, está em `.ai/rules/ci.md`
+("An exported environment variable beats `<env>` without `force`"). Ao mexer em um dos dois blocos,
+mantenha o outro em sincronia.

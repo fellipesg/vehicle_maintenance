@@ -151,6 +151,7 @@ class MaintenanceController extends Controller
             $redirect,
             $result['items_created'],
             $result['warnings'],
+            failedInvoices: $result['invoice_failures'],
         );
     }
 
@@ -234,6 +235,7 @@ class MaintenanceController extends Controller
             $result['warnings'],
             $result['items_skipped'],
             'Manutenção atualizada.',
+            $result['invoice_failures'],
         );
     }
 
@@ -296,12 +298,13 @@ class MaintenanceController extends Controller
                 $existingInvoices === 0 ? 'required_with:workshop_id' : 'nullable',
                 'nullable',
                 'array',
+                'max:'.InvoiceFile::MAX_FILES_PER_REQUEST,
                 new RequiresInvoiceWhenWorkshopAssigned(
                     workshopId: $request->filled('workshop_id') ? (int) $request->input('workshop_id') : null,
                     existingInvoiceCount: $existingInvoices,
                 ),
             ],
-            'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
+            'invoices.*' => ['bail', 'file', 'max:10240', new InvoiceFile],
         ];
 
         if ($maintenance === null) {

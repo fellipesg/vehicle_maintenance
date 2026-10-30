@@ -13,6 +13,7 @@
         "dedoc/scramble": "^0.13.42",
         "kreait/firebase-php": "^7.24",
         "laravel/framework": "^12.63",
+        "laravel/pennant": "^1.26",
         "laravel/sanctum": "^4.2",
         "laravel/socialite": "^5.23",
         "laravel/tinker": "^2.10.1",

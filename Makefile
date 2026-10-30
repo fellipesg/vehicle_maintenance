@@ -20,11 +20,14 @@ down: ## Stop the stack (keeps the database volume)
 
 restart: down up ## Restart the stack
 
-install: up node-install ## First run: .env, composer/npm deps, APP_KEY, migrations
+install: up node-install ## First run: .env, composer/npm deps, APP_KEY, migrations, seeds
 	@test -f .env || cp .env.example .env
 	$(EXEC) composer install --no-interaction
 	@grep -qE '^APP_KEY=.+' .env || $(EXEC) php artisan key:generate
+# Relativo: o mesmo link funciona no container (/var/www/html) e no host.
+	$(EXEC) php artisan storage:link --relative
 	$(EXEC) php artisan migrate --force
+	$(EXEC) php artisan db:seed --force
 	$(NODE) npm run build
 
 node-install: ## npm ci into the node_modules volume (Linux binaries)
@@ -42,7 +45,9 @@ test: ## Test suite in the container (sqlite in-memory, phpunit.xml)
 	$(EXEC) php artisan test --compact
 
 test-pgsql: ## Test suite against the compose Postgres (phpunit.pgsql.xml)
-	$(EXEC) php artisan test --compact --configuration=phpunit.pgsql.xml
+# `artisan test` appends its own --configuration=phpunit.xml and the duplicate makes
+# PHPUnit exit 1 even when the suite passes, so this target calls PHPUnit directly.
+	$(EXEC) vendor/bin/phpunit --configuration=phpunit.pgsql.xml
 
 migrate: ## Run migrations on the compose Postgres
 	$(EXEC) php artisan migrate

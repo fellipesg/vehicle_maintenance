@@ -12,13 +12,16 @@
 @php
     $vehicle = $consignment->vehicle;
     $vehicleName = trim($vehicle->brand.' '.$vehicle->model);
+
+    // Quem o proprietário conhece é a loja, não a pessoa dona da conta.
+    $storeIdentity = $consignment->garageUser->storeIdentity();
 @endphp
 
 @section('content')
     <x-ui.container size="md" padded>
         <x-ui.page-header
             title="Seu veículo está em consignação"
-            :description="'A loja '.$consignment->garageUser->name.' informou que está com o seu '.$vehicleName.(filled($vehicle->license_plate) ? ' ('.$vehicle->license_plate.')' : '').' para venda desde '.$consignment->started_at->format('d/m/Y').'.'"
+            :description="'A loja '.$storeIdentity['name'].' informou que está com o seu '.$vehicleName.(filled($vehicle->license_plate) ? ' ('.$vehicle->license_plate.')' : '').' para venda desde '.$consignment->started_at->format('d/m/Y').'.'"
         />
 
         @if($consignment->isDisputed())
@@ -35,6 +38,33 @@
                 registros ficam no histórico do carro, o que costuma valorizá-lo na venda.
             </x-ui.alert>
         @endif
+
+        <x-ui.card as="section" heading-level="h2" title="A loja" class="mb-6" data-slot="store-contact">
+            <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                <div class="min-w-0 sm:col-span-2">
+                    <dt class="text-muted-foreground">Nome</dt>
+                    <dd class="font-semibold text-foreground">{{ $storeIdentity['name'] }}</dd>
+                </div>
+                @if($storeIdentity['address'] !== null)
+                    <div class="min-w-0 sm:col-span-2">
+                        <dt class="text-muted-foreground">Endereço</dt>
+                        <dd class="text-foreground">{{ $storeIdentity['address'] }}</dd>
+                    </div>
+                @endif
+                @if(filled($storeIdentity['phone']))
+                    <div class="min-w-0">
+                        <dt class="text-muted-foreground">Telefone</dt>
+                        <dd><x-ui.link :href="'tel:'.preg_replace('/\D+/', '', (string) $storeIdentity['phone'])" variant="inline">{{ $storeIdentity['phone'] }}</x-ui.link></dd>
+                    </div>
+                @endif
+                @if(filled($storeIdentity['email']))
+                    <div class="min-w-0">
+                        <dt class="text-muted-foreground">E-mail</dt>
+                        <dd class="truncate"><x-ui.link :href="'mailto:'.$storeIdentity['email']" variant="inline">{{ $storeIdentity['email'] }}</x-ui.link></dd>
+                    </div>
+                @endif
+            </dl>
+        </x-ui.card>
 
         <x-ui.card as="section" heading-level="h2" title="Manutenções registradas pela loja" class="mb-6">
             @forelse($maintenances as $maintenance)

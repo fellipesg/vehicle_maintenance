@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Web;
 
-use App\Http\Controllers\Web\Workshop\ProfileController;
 use App\Rules\ValidCnpj;
+use App\Support\BrazilianStates;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -56,7 +56,7 @@ class StoreWorkshopSignupRequest extends FormRequest
             'complement' => ['nullable', 'string', 'max:255'],
             'neighborhood' => ['required', 'string', 'max:255'],
             'city' => ['required', 'string', 'max:255'],
-            'state' => ['required', 'string', 'size:2', Rule::in(array_keys(ProfileController::STATES))],
+            'state' => ['required', 'string', 'size:2', Rule::in(BrazilianStates::codes())],
             'ref' => ['nullable', 'string', 'max:64'],
         ];
     }

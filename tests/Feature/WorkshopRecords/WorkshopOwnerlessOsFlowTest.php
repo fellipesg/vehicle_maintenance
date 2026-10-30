@@ -19,6 +19,12 @@ class WorkshopOwnerlessOsFlowTest extends TestCase
     use BuildsOwnerlessRecords;
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
+
     /**
      * @param  array<string, mixed>  $extra
      * @return array<string, mixed>

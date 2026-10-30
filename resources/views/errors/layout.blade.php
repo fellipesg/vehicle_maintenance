@@ -1,5 +1,5 @@
 {{--
-    Layout das páginas de erro (403, 404, 419, 429, 500, 503), no visual do guest: fundo escuro
+    Layout das páginas de erro (403, 404, 410, 419, 429, 500, 503), no visual do guest: fundo escuro
     (.theme-inverse), lockup da marca, cartão com código, título, explicação e ações.
 
     Sem sino, menu nem consultas além da conta logada, e nem essa nos erros 5xx (o banco pode ser a

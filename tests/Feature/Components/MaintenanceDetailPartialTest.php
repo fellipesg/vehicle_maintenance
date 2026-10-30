@@ -9,7 +9,9 @@ use App\Models\Maintenance;
 use App\Models\MaintenanceItem;
 use App\Models\MaintenancePhoto;
 use App\Models\MaintenanceWarranty;
+use App\Models\User;
 use App\Models\Vehicle;
+use App\Support\Maintenance\MaintenancePhotoUrls;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Feature\Ui\Concerns\InspectsUiMarkup;
 use Tests\TestCase;
@@ -22,6 +24,12 @@ class MaintenanceDetailPartialTest extends TestCase
 {
     use InspectsUiMarkup;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enableMaintenancePhotosForEveryone();
+    }
 
     public function test_detail_shows_seal_service_data_warranty_items_invoices_and_photos(): void
     {
@@ -57,6 +65,7 @@ class MaintenanceDetailPartialTest extends TestCase
         Invoice::factory()->create(['maintenance_id' => $maintenance->id, 'file_name' => 'nfe-123.xml', 'file_path' => 'invoices/nfe-123.xml']);
         MaintenancePhoto::factory()->create(['maintenance_id' => $maintenance->id, 'subject' => MaintenancePhoto::SUBJECT_VEHICLE, 'stage' => MaintenancePhoto::STAGE_AFTER]);
 
+        $this->actingAsViewerOf($maintenance);
         $html = view('maintenances._detail', ['maintenance' => $maintenance->fresh(), 'portal' => Portal::Owner])->render();
         $xpath = $this->parseHtml($html);
 
@@ -116,11 +125,12 @@ class MaintenanceDetailPartialTest extends TestCase
             'path' => $path,
         ]);
         $photo(MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_AFTER, 'maintenance-photos/carro-depois.jpg');
-        $photo(MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_BEFORE, 'maintenance-photos/carro-antes.jpg');
+        $carBefore = $photo(MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_BEFORE, 'maintenance-photos/carro-antes.jpg');
         $photo(MaintenancePhoto::SUBJECT_VEHICLE, MaintenancePhoto::STAGE_DURING, 'maintenance-photos/carro-durante.jpg');
         $photo(MaintenancePhoto::SUBJECT_PART, MaintenancePhoto::STAGE_BEFORE, 'maintenance-photos/peca-antes-1.jpg');
         $photo(MaintenancePhoto::SUBJECT_PART, MaintenancePhoto::STAGE_BEFORE, 'maintenance-photos/peca-antes-2.jpg');
 
+        $this->actingAsViewerOf($maintenance);
         $xpath = $this->parseHtml(view('maintenances._detail', ['maintenance' => $maintenance->fresh(), 'portal' => Portal::Workshop])->render());
 
         $viewerId = 'fotos-manutencao-'.$maintenance->id;
@@ -139,11 +149,17 @@ class MaintenanceDetailPartialTest extends TestCase
         $this->assertSame($viewerId, $items->item(0)->getAttribute('data-lightbox-open'));
         $this->assertSame(['0', '1', '2', '3', '4'], array_map(fn ($item) => $item->getAttribute('data-lightbox-index'), iterator_to_array($items)));
         $this->assertSame('_blank', $items->item(0)->getAttribute('target'));
-        $this->assertStringContainsString('carro-antes.jpg', $items->item(0)->getAttribute('href'));
+        // O link abre o master por URL temporária (.ai/rules/views.md), nunca o caminho no storage.
+        $urls = MaintenancePhotoUrls::variants($carBefore);
+        $this->assertSame($urls['master'], $items->item(0)->getAttribute('href'));
+        $this->assertStringNotContainsString('carro-antes.jpg', $items->item(0)->getAttribute('href'));
         $this->assertSame('(abre em nova aba)', $this->uiText($this->uiElement($xpath, '//a[@data-lightbox-index="0"]//*[@data-lightbox-new-tab-hint]')));
 
         $thumbnail = $this->uiElement($xpath, '//a[@data-lightbox-index="0"]//img');
         $this->assertSame('Foto 1 de 5 — Troca de pastilhas, 12/03/2026. Carro antes do serviço', $thumbnail->getAttribute('alt'));
+        $this->assertSame($urls['thumb'], $thumbnail->getAttribute('src'));
+        $this->assertSame($urls['display'], $this->uiElement($xpath, '//dialog//*[@data-lightbox-slide][1]//img')->getAttribute('src'));
+        $this->assertSame($urls['master'], $this->uiElement($xpath, '//dialog//*[@data-lightbox-slide][1]')->getAttribute('data-lightbox-src'));
         $this->assertSame('lazy', $thumbnail->getAttribute('loading'));
         $this->assertStringContainsString('object-contain', $thumbnail->getAttribute('class'));
         $this->assertStringNotContainsString('object-cover', $thumbnail->getAttribute('class'), 'A miniatura não corta a foto.');
@@ -179,6 +195,7 @@ class MaintenanceDetailPartialTest extends TestCase
         $maintenance = Maintenance::factory()->declaredByOwner()->create();
         MaintenancePhoto::factory()->create(['maintenance_id' => $maintenance->id, 'subject' => MaintenancePhoto::SUBJECT_PART, 'stage' => MaintenancePhoto::STAGE_AFTER]);
 
+        $this->actingAsViewerOf($maintenance);
         $xpath = $this->parseHtml(view('maintenances._detail', ['maintenance' => $maintenance->fresh(), 'portal' => Portal::Owner])->render());
 
         $this->assertSame('Foto 1 de 1', $this->uiText($this->uiElement($xpath, '//dialog//*[@data-lightbox-counter]')));
@@ -188,9 +205,14 @@ class MaintenanceDetailPartialTest extends TestCase
 
     public function test_declared_maintenance_without_warranty_items_or_attachments(): void
     {
-        $maintenance = Maintenance::factory()->declaredByOwner()->create(['service_category' => 'unknown', 'kilometers' => null]);
+        $maintenance = Maintenance::factory()->declaredByOwner()->create(['kilometers' => null]);
 
-        $html = view('maintenances._detail', ['maintenance' => $maintenance->fresh(), 'portal' => 'user', 'vehicleUrl' => false])->render();
+        // A categoria fica só em memória: a check constraint da tabela recusa valores fora do
+        // enum, e o que se testa aqui é o rótulo de fallback da view para categoria desconhecida.
+        $detail = $maintenance->fresh();
+        $detail->service_category = 'unknown';
+
+        $html = view('maintenances._detail', ['maintenance' => $detail, 'portal' => 'user', 'vehicleUrl' => false])->render();
         $xpath = $this->parseHtml($html);
 
         $this->assertStringContainsString('Declarada pelo proprietário', $html);
@@ -215,5 +237,10 @@ class MaintenanceDetailPartialTest extends TestCase
         $html = view('maintenances._detail', ['maintenance' => $maintenance->fresh(), 'portal' => Portal::Dealer])->render();
 
         $this->assertStringContainsString('Garantia encerrada', $html);
+    }
+
+    private function actingAsViewerOf(Maintenance $maintenance): void
+    {
+        $this->actingAs(User::factory()->asUser()->create(['tenant_id' => $maintenance->tenant_id]));
     }
 }

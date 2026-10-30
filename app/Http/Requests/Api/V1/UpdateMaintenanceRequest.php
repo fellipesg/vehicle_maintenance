@@ -58,13 +58,14 @@ class UpdateMaintenanceRequest extends ApiFormRequest
             'invoices' => [
                 'nullable',
                 'array',
+                'max:'.InvoiceFile::MAX_FILES_PER_REQUEST,
                 new RequiresInvoiceWhenWorkshopAssigned(
                     workshopId: $workshopId,
                     isWorkshopPortal: (bool) $this->user()?->isWorkshop(),
                     existingInvoiceCount: $maintenance?->invoices()->count() ?? 0,
                 ),
             ],
-            'invoices.*' => ['file', new InvoiceFile, 'max:10240'],
+            'invoices.*' => ['bail', 'file', 'max:10240', new InvoiceFile],
         ];
     }
 }

@@ -71,6 +71,11 @@
     }
     $photoCount = $maintenance->photos_count
         ?? ($maintenance->relationLoaded('photos') ? $maintenance->photos->count() : null);
+    // Quem está logado sem as fotos das manutenções ligadas não vê a contagem. A consulta pública
+    // (expandable, sem login) segue como sempre mostrou as fotos públicas.
+    if (! $expandable && auth()->check() && ! \App\Support\Maintenance\MaintenancePhotoAccess::allows(auth()->user())) {
+        $photoCount = 0;
+    }
 
     $evidence = [];
     if ($verified && filled($maintenance->verification_code)) {
@@ -194,6 +199,12 @@
                     </ul>
                 @endif
                 @if ($expandPhotos->isNotEmpty())
+                    {{--
+                        Só a busca por placa abre este bloco, e lá x-vehicle.detail carrega apenas
+                        as fotos do depois do veículo (as públicas) de quem não é dono. Por isso
+                        aqui é AppStorage::url e não route('maintenance-photos.show'): a rota segue
+                        a MaintenancePhotoPolicy::view e responderia 403 para quem só buscou a placa.
+                    --}}
                     <ul role="list" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Fotos do serviço">
                         @foreach ($expandPhotos as $expandPhoto)
                             <li>

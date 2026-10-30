@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Workshop;
 use App\Http\Controllers\Controller;
 use App\Models\Workshop;
 use App\Services\Workshop\WorkshopLogoService;
+use App\Support\BrazilianStates;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -13,21 +14,6 @@ use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
-    /**
-     * Siglas das 27 unidades da federação, na ordem alfabética do nome do estado.
-     *
-     * @var array<string, string>
-     */
-    public const STATES = [
-        'AC' => 'Acre', 'AL' => 'Alagoas', 'AP' => 'Amapá', 'AM' => 'Amazonas', 'BA' => 'Bahia',
-        'CE' => 'Ceará', 'DF' => 'Distrito Federal', 'ES' => 'Espírito Santo', 'GO' => 'Goiás',
-        'MA' => 'Maranhão', 'MT' => 'Mato Grosso', 'MS' => 'Mato Grosso do Sul', 'MG' => 'Minas Gerais',
-        'PA' => 'Pará', 'PB' => 'Paraíba', 'PR' => 'Paraná', 'PE' => 'Pernambuco', 'PI' => 'Piauí',
-        'RJ' => 'Rio de Janeiro', 'RN' => 'Rio Grande do Norte', 'RS' => 'Rio Grande do Sul',
-        'RO' => 'Rondônia', 'RR' => 'Roraima', 'SC' => 'Santa Catarina', 'SP' => 'São Paulo',
-        'SE' => 'Sergipe', 'TO' => 'Tocantins',
-    ];
-
     public function __construct(
         private WorkshopLogoService $logos,
     ) {}
@@ -127,7 +113,7 @@ class ProfileController extends Controller
             'complement' => ['nullable', 'string', 'max:255'],
             'neighborhood' => [$partial ? 'sometimes' : 'required', 'string', 'max:255'],
             'city' => [$partial ? 'sometimes' : 'required', 'string', 'max:255'],
-            'state' => [$partial ? 'sometimes' : 'required', 'string', 'size:2', Rule::in(array_keys(self::STATES))],
+            'state' => [$partial ? 'sometimes' : 'required', 'string', 'size:2', Rule::in(BrazilianStates::codes())],
         ];
 
         if ($logo) {

@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\User;
 use App\Models\VehicleConsignment;
+use App\Support\Garage\StoreContactLines;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -33,15 +34,21 @@ class ConsignmentHistoryAccessRequestedNotification extends Notification impleme
     public function toMail(object $notifiable): MailMessage
     {
         $vehicle = $this->consignment->vehicle;
-        $garageName = $this->consignment->garageUser->name;
+        $garageName = $this->consignment->garageUser->storeName();
         $label = trim("{$vehicle->brand} {$vehicle->model}");
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject("{$garageName} quer ver o histórico do seu {$label}")
             ->greeting('Olá, '.$this->firstName().'!')
             ->line("A garagem **{$garageName}**, que está com o seu **{$label}** (placa {$vehicle->license_plate}) para venda, pediu acesso ao histórico de manutenções anterior à consignação.")
             ->line('Esse histórico é seu e hoje ela não vê nada dele. Liberar costuma ajudar na venda, porque mostra ao comprador o cuidado que o carro teve.')
-            ->action('Ver e decidir', route('consignments.owner.show', $this->consignment->owner_action_token))
+            ->action('Ver e decidir', route('consignments.owner.show', $this->consignment->owner_action_token));
+
+        foreach (StoreContactLines::for($this->consignment->garageUser) as $contactLine) {
+            $message->line($contactLine);
+        }
+
+        return $message
             ->line('Você pode recusar simplesmente ignorando este e-mail.')
             ->salutation('RevisaLog');
     }
@@ -56,11 +63,11 @@ class ConsignmentHistoryAccessRequestedNotification extends Notification impleme
         return [
             'type' => 'consignment-history-request',
             'title' => 'Pedido de acesso ao histórico',
-            'body' => "{$this->consignment->garageUser->name} pediu acesso ao histórico do seu {$vehicle->brand} {$vehicle->model}.",
+            'body' => "{$this->consignment->garageUser->storeName()} pediu acesso ao histórico do seu {$vehicle->brand} {$vehicle->model}.",
             'consignment_id' => $this->consignment->id,
             'vehicle_id' => $vehicle->id,
             'license_plate' => $vehicle->license_plate,
-            'garage_name' => $this->consignment->garageUser->name,
+            'garage_name' => $this->consignment->garageUser->storeName(),
             'action_url' => route('consignments.owner.show', $this->consignment->owner_action_token, absolute: false),
         ];
     }

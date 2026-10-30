@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\GarageStatus;
 use App\Enums\Portal;
+use App\Models\Garage;
 use App\Models\User;
 use App\Support\PortalAccess;
 use Illuminate\Http\Request;
@@ -75,7 +77,7 @@ class PortalTest extends TestCase
         $labels = fn (Portal $portal): array => array_column($portal->navigation(), 'label');
 
         $this->assertSame(['Início', 'Meus veículos', 'Manutenções', 'Oficinas'], $labels(Portal::Owner));
-        $this->assertSame(['Início', 'Estoque', 'Manutenções'], $labels(Portal::Dealer));
+        $this->assertSame(['Início', 'Estoque', 'Manutenções', 'Minha loja'], $labels(Portal::Dealer));
         $this->assertSame(['Início', 'Ordens de serviço', 'Validações', 'Modelos de garantia', 'Minha oficina'], $labels(Portal::Workshop));
 
         foreach ([Portal::Owner, Portal::Dealer, Portal::Workshop] as $portal) {
@@ -136,6 +138,9 @@ class PortalTest extends TestCase
     {
         $admin = User::factory()->asWorkshop()->asAdmin()->make();
         $dealer = User::factory()->asGarage()->make();
+        // Loja aprovada anexada em memória: este teste não toca o banco, e conta sem loja conta
+        // como não aprovada, caindo em "Minha loja" (GarageApprovalGateTest cobre esse caso).
+        $dealer->setRelation('garage', (new Garage)->forceFill(['status' => GarageStatus::Approved->value]));
 
         $this->assertSame('admin.dashboard', PortalAccess::homeRouteName($admin));
         $this->assertSame('Administrador', PortalAccess::accountLabel($admin));
@@ -159,8 +164,8 @@ class PortalTest extends TestCase
         $usersMap = collect(Portal::Admin->navigationItems($this->requestFor(route('admin.maps.users', absolute: false))))
             ->firstWhere('label', 'Cadastros')['items'];
 
-        $this->assertSame(['Usuários' => false, 'Oficinas' => true, 'Prospecção' => false], array_column($workshopsMap, 'active', 'label'));
-        $this->assertSame(['Usuários' => true, 'Oficinas' => false, 'Prospecção' => false], array_column($usersMap, 'active', 'label'));
+        $this->assertSame(['Usuários' => false, 'Lojas' => false, 'Oficinas' => true, 'Prospecção' => false], array_column($workshopsMap, 'active', 'label'));
+        $this->assertSame(['Usuários' => true, 'Lojas' => false, 'Oficinas' => false, 'Prospecção' => false], array_column($usersMap, 'active', 'label'));
     }
 
     public function test_navigation_items_resolve_hrefs_and_mark_the_active_route_family(): void

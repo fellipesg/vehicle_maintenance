@@ -311,6 +311,6 @@ class AuthController extends Controller
             return $intendedUrl;
         }
 
-        return route($portal->dashboardRoute());
+        return route($portal->dashboardRouteFor($user));
     }
 }
