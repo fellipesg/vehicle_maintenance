@@ -43,6 +43,7 @@ use App\Http\Controllers\Web\Workshop\ProfileController as WorkshopProfileContro
 use App\Http\Controllers\Web\Workshop\ReviewController as WorkshopReviewController;
 use App\Http\Controllers\Web\Workshop\WarrantyTemplateController as WorkshopWarrantyTemplateController;
 use App\Http\Controllers\Web\WorkshopLandingController;
+use App\Http\Controllers\Web\WorkshopMessageOptOutController;
 use App\Http\Controllers\Web\WorkshopSignupController;
 use Illuminate\Support\Facades\Route;
 
@@ -65,6 +66,11 @@ Route::middleware('signed')->group(function () {
 Route::middleware('signed')->group(function () {
     Route::get('/convite/descadastrar', [MaintenanceInviteController::class, 'showUnsubscribe'])->name('invites.unsubscribe.show');
     Route::post('/convite/descadastrar', [MaintenanceInviteController::class, 'unsubscribe'])->name('invites.unsubscribe.perform');
+});
+// Descadastro das mensagens que a oficina manda ao dono do veículo (WorkshopFollowUpNotification).
+Route::middleware('signed')->group(function () {
+    Route::get('/oficinas/descadastrar', [WorkshopMessageOptOutController::class, 'show'])->name('workshops.messages.unsubscribe.show');
+    Route::post('/oficinas/descadastrar', [WorkshopMessageOptOutController::class, 'unsubscribe'])->name('workshops.messages.unsubscribe.perform');
 });
 Route::get('/convite/{token}', [MaintenanceInviteController::class, 'show'])
     ->middleware('throttle:search')

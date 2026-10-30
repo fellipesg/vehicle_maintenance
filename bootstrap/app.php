@@ -30,8 +30,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 
-        // Descadastro de um clique (RFC 8058): o provedor de e-mail faz o POST sem sessão; a URL assinada protege.
-        $middleware->validateCsrfTokens(except: ['descadastrar/*', 'convite/descadastrar/*']);
+        // Descadastro de um clique (RFC 8058): o provedor de e-mail faz o POST sem sessão; a URL
+        // assinada protege. As rotas sem token levam a carga na query, então o padrão tem de ser o
+        // caminho exato: 'convite/descadastrar/*' não casa com 'convite/descadastrar'.
+        $middleware->validateCsrfTokens(except: [
+            'descadastrar/*',
+            'convite/descadastrar',
+            'oficinas/descadastrar',
+        ]);
 
         $middleware->append(\App\Http\Middleware\SetSecurityHeaders::class);
 
