@@ -4,11 +4,16 @@ namespace App\Http\Requests\Web\Workshop;
 
 use App\Enums\ServiceCategory;
 use App\Enums\WorkshopMessageTrigger;
+use App\Http\Requests\Concerns\EnforcesWorkshopMessageTemplateLimit;
+use App\Models\WorkshopMessageTemplate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateMessageTemplateRequest extends FormRequest
 {
+    use EnforcesWorkshopMessageTemplateLimit;
+
     public function authorize(): bool
     {
         return $this->user()?->isWorkshop() ?? false;
@@ -28,5 +33,15 @@ class UpdateMessageTemplateRequest extends FormRequest
             'min_days_since_service' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'is_active' => ['sometimes', 'boolean'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $workshop = $this->user()?->workshop;
+        $template = $this->route('message_template');
+
+        if ($workshop !== null && $template instanceof WorkshopMessageTemplate) {
+            $this->addActiveMessageTemplateLimitRule($validator, $workshop, $template);
+        }
     }
 }

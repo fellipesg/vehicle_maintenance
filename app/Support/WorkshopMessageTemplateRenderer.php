@@ -19,17 +19,21 @@ class WorkshopMessageTemplateRenderer
      *     days_since_service?: int|string,
      *     last_service?: string,
      * }  $context
+     *
+     * Devolve texto puro, sem escapar: quem exibe escapa. O título e o corpo vão para o Blade do
+     * e-mail e do sino (`{{ }}`), para o assunto do MailMessage e para o payload do FCM — escapar
+     * aqui fazia "José & Filhos" chegar como "José &amp; Filhos" nos quatro.
      */
     public function render(string $template, array $context): string
     {
         $replacements = [
-            '{{workshop_name}}' => e((string) ($context['workshop_name'] ?? '')),
-            '{{customer_name}}' => e((string) ($context['customer_name'] ?? '')),
-            '{{vehicle}}' => e((string) ($context['vehicle'] ?? '')),
-            '{{estimated_km}}' => e($this->formatKilometers($context['estimated_km'] ?? '')),
-            '{{next_due_km}}' => e($this->formatKilometers($context['next_due_km'] ?? '')),
-            '{{days_since_service}}' => e((string) ($context['days_since_service'] ?? '')),
-            '{{last_service}}' => e((string) ($context['last_service'] ?? '')),
+            '{{workshop_name}}' => (string) ($context['workshop_name'] ?? ''),
+            '{{customer_name}}' => (string) ($context['customer_name'] ?? ''),
+            '{{vehicle}}' => (string) ($context['vehicle'] ?? ''),
+            '{{estimated_km}}' => $this->formatKilometers($context['estimated_km'] ?? ''),
+            '{{next_due_km}}' => $this->formatKilometers($context['next_due_km'] ?? ''),
+            '{{days_since_service}}' => (string) ($context['days_since_service'] ?? ''),
+            '{{last_service}}' => (string) ($context['last_service'] ?? ''),
         ];
 
         return strtr($template, $replacements);

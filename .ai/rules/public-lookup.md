@@ -15,5 +15,24 @@ Vehicle search and /v/: chassis and RENAVAM go through App\Support\Vehicle\Vehic
 ## Every surface for a non-owner masks, short chassis included
 VehicleIdentifierMask::chassis keeps 3 + 4 characters only on a 17-character VIN; a shorter (pre-1990) chassis shows at most 40% of it, at the end ("BA1234567" -> "••••••567"), so the public search (exact chassis match) is not a guessing oracle. The same Gate update rule masks the web vehicle pages (garage.vehicles.show and user.vehicles.show pass identifiersMasked to x-vehicle.detail) and the history PDF (the export and e-mail jobs decide with VehicleIdentifierVisibility::showsFullIdentifiers for the requester).
 
+## A busca de placa da oficina segue o mascaramento público
+`GET /oficina/manutencoes/nova` (etapa 1 da OS) busca veículo por placa e por chassi para qualquer
+conta de oficina, que nasce por autocadastro: a rota leva `throttle:search`, o mesmo balde de
+`/buscar-veiculo`, `/verificar` e `/v/{code}`. Sem vínculo com o veículo — a oficina não registrou
+(`workshop_id`) nem selou (`verified_workshop_id`) nenhuma OS dele, e ele tem dono atual —
+`App\Support\Workshop\WorkshopVehicleVisibility::showsFullVehicle` devolve false e a tela mostra só
+o que a consulta pública mostra: marca, modelo, ano, cor e capa. Fora ficam **a placa atual** (o card
+devolve a placa que foi digitada, mesmo quando ela é uma placa antiga, e o `input hidden` do store
+leva essa mesma; `VehiclePlateSearch::findByPlate` resolve o veículo pela placa antiga) e **o
+hodômetro do veículo** (`current_kilometers`), que soma registros ocultos e pendentes que a consulta
+pública não lista — ele sai do card, do valor inicial do campo "Quilometragem" e da dica dele. O
+fluxo legítimo continua: a OS para cliente novo abre, e a oficina digita o hodômetro que leu no
+painel, como no portal do lojista (`.ai/rules/garage.md`). Veículo sem dono atual não tem o que
+proteger e aparece inteiro. `$showsFullVehicle` é sempre explícito nos includes
+(`_vehicle-step.blade.php`, `partials/workshop-maintenance-form.blade.php`): quem esquecer recebe o
+card reduzido. Note que o POST ainda revela o piso do hodômetro na mensagem de erro de
+`VehicleMileageService::assertMaintenanceKilometers`, com o custo de `throttle:uploads` e de uma
+tentativa de OS.
+
 ## Consulta pública de OS sem proprietário
 Busca pública, /v/{código} e PDF só mostram o mínimo (data, km, tipo, itens, oficina, selo) de OS pending/declined, nunca anexos nem descrição, e nada do que o proprietário ocultou (/v/ responde 404). A consulta por chassi da oficina (GET /api/v1/workshop/vehicles/lookup, throttle workshop-chassis-lookup) devolve só {id, has_owner:true} quando o carro tem dono.

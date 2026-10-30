@@ -25,6 +25,7 @@ use App\Support\AppStorage;
 use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\WorkshopMaintenanceFilters;
 use App\Support\VehiclePlateSearch;
+use App\Support\Workshop\WorkshopVehicleVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -126,6 +127,8 @@ class MaintenanceController extends Controller
             }
         }
 
+        $vehicleHasOwner = $vehicle !== null && $vehicle->hasCurrentOwner();
+
         return view('workshop.maintenances.create', array_merge(
             [
                 'workshop' => $workshop,
@@ -136,7 +139,12 @@ class MaintenanceController extends Controller
                 'chassisInvalid' => $chassisInvalid,
                 'creatingVehicle' => $creatingVehicle,
                 'lookup' => $lookup,
-                'vehicleHasOwner' => $vehicle !== null && $vehicle->hasCurrentOwner(),
+                'vehicleHasOwner' => $vehicleHasOwner,
+                'showsFullVehicle' => $vehicle === null || WorkshopVehicleVisibility::showsFullVehicle(
+                    $workshop,
+                    $vehicle,
+                    $vehicleHasOwner,
+                ),
             ],
             $this->warrantyTemplateOptions($workshop),
         ));

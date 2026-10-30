@@ -22,6 +22,15 @@ PDF), cadastro e edição da oficina (logo), `POST /api/v1/me/avatar`,
 `POST /api/v1/invoices/upload`. Rota nova que receba arquivo entra junto. Telas GET de conferência
 ficam fora de propósito (`.ai/rules/vehicles-entry.md`).
 
+## Rota que busca veículo por identificador entra no balde `search`
+
+Toda tela que acha veículo a partir de placa, chassi ou RENAVAM é oráculo de enumeração e leva
+`throttle:search` (20/min por IP, `App\Providers\AppServiceProvider`), em qualquer portal — não só
+as públicas. Hoje: `/buscar-veiculo`, `/verificar`, `/v/{code}` e
+`GET /oficina/manutencoes/nova` (a etapa 1 da OS busca por `?license_plate=` e `?chassis=`). O limite
+não basta sozinho: o que cada perfil pode ver do veículo achado está em `.ai/rules/public-lookup.md`.
+A consulta por chassi da oficina na API tem balde próprio (`workshop-chassis-lookup`).
+
 ## Rota que manda e-mail para o endereço digitado tem balde próprio
 
 Além do `throttle` por IP, essa rota precisa de um teto por destinatário, e nunca divide o balde com

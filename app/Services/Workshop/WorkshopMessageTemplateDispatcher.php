@@ -18,6 +18,11 @@ use Illuminate\Support\Facades\DB;
 
 class WorkshopMessageTemplateDispatcher
 {
+    /**
+     * Veículos (ou OS) por lote na rodada diária.
+     */
+    private const CHUNK = 100;
+
     public function __construct(
         private readonly VehicleEstimatedKmService $estimatedKm,
         private readonly VehicleMaintenanceReminderService $reminders,
@@ -53,45 +58,46 @@ class WorkshopMessageTemplateDispatcher
             ->distinct()
             ->pluck('vehicle_id');
 
-        foreach ($vehicleIds as $vehicleId) {
-            $vehicle = Vehicle::query()
-                ->with('maintenances')
-                ->find($vehicleId);
-
-            if ($vehicle === null) {
-                continue;
-            }
-
-            $estimatedKm = $this->estimatedKm->estimate($vehicle);
-            $summary = $this->reminders->summarizeAtKilometers($vehicle, $estimatedKm);
-            $nextDue = $summary['next_due_kilometers'];
-
-            if ($nextDue === null) {
-                continue;
-            }
-
-            $leadKm = $template->lead_kilometers
-                ?: (int) config('maintenance_intervals.notify_before_kilometers', 2_000);
-
-            if (($summary['kilometers_remaining'] ?? PHP_INT_MAX) > $leadKm) {
-                continue;
-            }
-
-            $owners = $this->currentOwnersForVehicle($vehicle);
-
-            foreach ($owners as $owner) {
-                if ($this->dispatchToOwner(
-                    $template,
-                    $owner,
-                    $vehicle,
-                    (string) $nextDue,
-                    $estimatedKm,
-                    $nextDue,
-                )) {
-                    $sent++;
-                }
-            }
+        if ($vehicleIds->isEmpty()) {
+            return 0;
         }
+
+        $leadKm = $template->lead_kilometers
+            ?: (int) config('maintenance_intervals.notify_before_kilometers', 2_000);
+
+        Vehicle::query()
+            ->with('maintenances')
+            ->whereIn('id', $vehicleIds)
+            ->chunkById(self::CHUNK, function (Collection $vehicles) use ($template, $leadKm, &$sent): void {
+                $ownersByVehicle = $this->currentOwnersByVehicle(new Collection($vehicles->modelKeys()));
+
+                foreach ($vehicles as $vehicle) {
+                    $estimatedKm = $this->estimatedKm->estimate($vehicle);
+                    $summary = $this->reminders->summarizeAtKilometers($vehicle, $estimatedKm);
+                    $nextDue = $summary['next_due_kilometers'];
+
+                    if ($nextDue === null) {
+                        continue;
+                    }
+
+                    if (($summary['kilometers_remaining'] ?? PHP_INT_MAX) > $leadKm) {
+                        continue;
+                    }
+
+                    foreach ($ownersByVehicle[$vehicle->id] ?? [] as $owner) {
+                        if ($this->dispatchToOwner(
+                            $template,
+                            $owner,
+                            $vehicle,
+                            (string) $nextDue,
+                            $estimatedKm,
+                            $nextDue,
+                        )) {
+                            $sent++;
+                        }
+                    }
+                }
+            });
 
         return $sent;
     }
@@ -111,48 +117,86 @@ class WorkshopMessageTemplateDispatcher
             $maintenancesQuery->where('service_category', $template->service_category);
         }
 
-        $maintenances = $maintenancesQuery
+        $maintenancesQuery
             ->with('vehicle.maintenances')
-            ->orderBy('id')
-            ->get();
+            ->chunkById(self::CHUNK, function (Collection $maintenances) use ($template, &$sent): void {
+                $ownersByVehicle = $this->currentOwnersByVehicle(
+                    $maintenances->pluck('vehicle_id')->filter()->unique()->values(),
+                );
 
-        foreach ($maintenances as $maintenance) {
-            $vehicle = $maintenance->vehicle;
+                foreach ($maintenances as $maintenance) {
+                    $vehicle = $maintenance->vehicle;
 
-            if ($vehicle === null) {
-                continue;
-            }
+                    if ($vehicle === null) {
+                        continue;
+                    }
 
-            $estimatedKm = $this->estimatedKm->estimate($vehicle);
-            $owners = $this->currentOwnersForVehicle($vehicle);
+                    $estimatedKm = $this->estimatedKm->estimate($vehicle);
 
-            foreach ($owners as $owner) {
-                if ($this->dispatchToOwner(
-                    $template,
-                    $owner,
-                    $vehicle,
-                    (string) $maintenance->id,
-                    $estimatedKm,
-                    null,
-                    $maintenance,
-                )) {
-                    $sent++;
+                    foreach ($ownersByVehicle[$vehicle->id] ?? [] as $owner) {
+                        if ($this->dispatchToOwner(
+                            $template,
+                            $owner,
+                            $vehicle,
+                            (string) $maintenance->id,
+                            $estimatedKm,
+                            null,
+                            $maintenance,
+                        )) {
+                            $sent++;
+                        }
+                    }
                 }
-            }
-        }
+            });
 
         return $sent;
     }
 
     /**
-     * @return Collection<int, User>
+     * Donos atuais de um lote de veículos, em duas consultas: a rodada diária fazia uma por veículo
+     * por template. O filtro é o mesmo de User::currentVehicles() — que não pode ser carregado em
+     * lote, porque lê o tenant_id de uma conta só.
+     *
+     * @param  Collection<int, int|string>  $vehicleIds
+     * @return array<int, list<User>>
      */
-    private function currentOwnersForVehicle(Vehicle $vehicle): Collection
+    private function currentOwnersByVehicle(Collection $vehicleIds): array
     {
-        return User::query()
-            ->whereIn('user_type', ['user', 'garage'])
-            ->whereHas('currentVehicles', fn ($query) => $query->where('vehicles.id', $vehicle->id))
-            ->get();
+        if ($vehicleIds->isEmpty()) {
+            return [];
+        }
+
+        // Postgres rejects "boolean = 1"; use a SQL boolean literal.
+        $links = DB::table('user_vehicles')
+            ->join('users', 'users.id', '=', 'user_vehicles.user_id')
+            ->whereIn('user_vehicles.vehicle_id', $vehicleIds)
+            ->whereRaw('user_vehicles.is_current_owner = true')
+            ->whereIn('users.user_type', ['user', 'garage'])
+            ->whereRaw('(users.tenant_id is null or users.tenant_id = user_vehicles.tenant_id)')
+            ->orderBy('users.id')
+            ->get(['user_vehicles.vehicle_id', 'user_vehicles.user_id']);
+
+        if ($links->isEmpty()) {
+            return [];
+        }
+
+        $owners = User::query()
+            ->whereIn('id', $links->pluck('user_id')->unique()->values())
+            ->get()
+            ->keyBy('id');
+
+        $byVehicle = [];
+
+        foreach ($links as $link) {
+            $owner = $owners->get((int) $link->user_id);
+
+            if ($owner !== null) {
+                // A chave do dono evita repetir a conta que tem duas linhas para o mesmo veículo.
+                $byVehicle[(int) $link->vehicle_id][(int) $link->user_id] = $owner;
+            }
+        }
+
+        return array_map(array_values(...), $byVehicle);
     }
 
     private function dispatchToOwner(

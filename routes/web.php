@@ -298,7 +298,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->middleware('throttle:uploads')
             ->name('profile.update');
         Route::get('/manutencoes', [WorkshopMaintenanceController::class, 'index'])->name('maintenances.index');
-        Route::get('/manutencoes/nova', [WorkshopMaintenanceController::class, 'create'])->name('maintenances.create');
+        // A etapa 1 busca veículo por placa (?license_plate=) e por chassi (?chassis=): é consulta,
+        // e entra no mesmo balde das outras (/buscar-veiculo, /verificar, /v/{code}).
+        Route::get('/manutencoes/nova', [WorkshopMaintenanceController::class, 'create'])
+            ->middleware('throttle:search')
+            ->name('maintenances.create');
         Route::post('/manutencoes', [WorkshopMaintenanceController::class, 'store'])
             ->middleware('throttle:uploads')
             ->name('maintenances.store');

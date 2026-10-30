@@ -12,6 +12,7 @@ use App\Notifications\WorkshopFollowUpNotification;
 use App\Services\Workshop\WorkshopMessageTemplateDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -193,5 +194,86 @@ class WorkshopFollowUpDispatcherTest extends TestCase
         $this->artisan('maintenance:check-km-reminders')
             ->expectsOutputToContain('Follow-ups de oficina enviados: 1')
             ->assertExitCode(0);
+    }
+
+    public function test_owner_lookup_does_not_run_once_per_vehicle(): void
+    {
+        Mail::fake();
+
+        $workshop = Workshop::factory()->create();
+
+        foreach (range(1, 4) as $index) {
+            $owner = User::factory()->asUser()->create();
+            $vehicle = Vehicle::factory()->create([
+                'current_kilometers' => 70_000,
+                'odometer_at_registration' => 70_000,
+            ]);
+            $this->attachVehicleToUser($owner, $vehicle);
+
+            Maintenance::factory()->create([
+                'vehicle_id' => $vehicle->id,
+                'user_id' => $owner->id,
+                'tenant_id' => $owner->tenant_id,
+                'workshop_id' => $workshop->id,
+                'kilometers' => 80_000,
+                'maintenance_date' => '2025-01-01',
+            ]);
+        }
+
+        WorkshopMessageTemplate::factory()->forWorkshop($workshop)->scheduledRevision()->create([
+            'lead_kilometers' => 2_000,
+        ]);
+
+        $statements = [];
+        DB::listen(static function ($query) use (&$statements): void {
+            $statements[] = $query->sql;
+        });
+
+        $sent = app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps();
+
+        $ownerLookups = count(array_filter($statements, static fn (string $sql): bool => str_contains($sql, 'user_vehicles')));
+
+        $this->assertSame(4, $sent);
+        $this->assertLessThanOrEqual(
+            2,
+            $ownerLookups,
+            'Os donos do lote saem em uma consulta, não em uma por veículo por template.',
+        );
+    }
+
+    public function test_the_workshop_name_reaches_the_notification_without_double_escaping(): void
+    {
+        Mail::fake();
+
+        $owner = User::factory()->asUser()->create(['name' => 'Maria Souza']);
+        $workshop = Workshop::factory()->create(['name' => 'José & Filhos']);
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 70_000,
+            'odometer_at_registration' => 70_000,
+        ]);
+        $this->attachVehicleToUser($owner, $vehicle);
+
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $owner->id,
+            'tenant_id' => $owner->tenant_id,
+            'workshop_id' => $workshop->id,
+            'kilometers' => 80_000,
+            'maintenance_date' => '2025-01-01',
+        ]);
+
+        WorkshopMessageTemplate::factory()->forWorkshop($workshop)->create([
+            'title' => 'Revisão na {{workshop_name}}',
+            'body' => 'Olá {{customer_name}}, a {{workshop_name}} espera seu {{vehicle}}.',
+            'lead_kilometers' => 2_000,
+        ]);
+
+        $this->assertSame(1, app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps());
+
+        $data = json_decode((string) DB::table('notifications')->value('data'), true);
+
+        $this->assertSame('Revisão na José & Filhos', $data['title']);
+        $this->assertStringContainsString('a José & Filhos espera', $data['body']);
+        $this->assertStringNotContainsString('&amp;', $data['body'].$data['title']);
     }
 }

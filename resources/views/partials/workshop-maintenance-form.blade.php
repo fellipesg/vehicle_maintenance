@@ -9,7 +9,12 @@
     (resources/js/workshop-maintenance-form.js).
 
     Variáveis: $maintenance (na edição), $vehicle, $orderTemplates, $itemTemplates,
-    $hasActiveTemplates, $existingPhotos e $editable (edição).
+    $hasActiveTemplates, $existingPhotos, $editable (edição) e $showsFullVehicle.
+
+    Sem $showsFullVehicle (veículo com dono e sem OS desta oficina, ver
+    App\Support\Workshop\WorkshopVehicleVisibility), a quilometragem do veículo não entra no campo
+    nem na dica: a oficina digita o hodômetro que leu no painel, como no portal do lojista
+    (.ai/rules/garage.md). É sempre explícito: quem esquecer não recebe o hodômetro.
 --}}
 @php
     use App\Enums\ServiceCategory;
@@ -32,7 +37,8 @@
         }
     }
 
-    $currentKilometers = $vehicle?->current_kilometers;
+    $showsFullVehicle = $showsFullVehicle ?? false;
+    $currentKilometers = $showsFullVehicle ? $vehicle?->current_kilometers : null;
     $kilometersHint = $currentKilometers !== null
         ? 'Última quilometragem registrada do veículo: '.number_format((int) $currentKilometers, 0, ',', '.').' km. Informe o hodômetro na data do serviço.'
         : 'Informe o hodômetro na data do serviço.';
