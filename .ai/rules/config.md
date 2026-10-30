@@ -2,6 +2,7 @@
 paths:
   - config/legal.php
   - config/mail.php
+  - config/cors.php
 ---
 
 # Config
@@ -20,3 +21,23 @@ GA4 (x-analytics, GA_MEASUREMENT_ID in Laravel Cloud) loads only on public pages
 
 ## Textos para registros de oficinas
 config/legal.php (terms 6. Oficinas; privacy 5. Registros de oficinas em veículos sem conta) descreve dado mínimo, base legal, anexos pendentes de 90 dias, escolhas do proprietário e convite por hash. Mudar o que o fluxo guarda ou o prazo exige atualizar o texto e a versão juntos. As chaves maintenance.invite_email_daily_limit e maintenance.pending_attachments_retention_days ficam em config/maintenance.php.
+
+## Arquivo de config não é lugar de código
+`config/cors.php` declarava duas funções globais (`cors_allowed_origins`,
+`cors_allowed_origin_patterns`) e as chamava logo abaixo. Sob `config:cache` o arquivo não é
+carregado — o cache já traz os valores —, então as funções só existiam onde a config vem do arquivo:
+nos testes. Era uma função pública de aparência que nenhum runtime cacheado tinha.
+
+A lógica agora está em `App\Support\CorsOrigins` (`allowed()`, `patterns()`,
+`supportsCredentials()`), que é autoloaded e por isso não desaparece sob cache; o arquivo de config
+voltou a ser um array. Isso resolve a função fantasma, não a leitura de ambiente: os métodos leem
+`env()`, e com a config em cache o `.env` não é carregado, então eles valem na hora de montar a
+config e nada mais. Em runtime se lê `config('cors.*')` — pedir as origens direto à classe com a
+config cacheada devolveria `['*']` fora de produção.
+
+Config nova segue o mesmo caminho: `env()` e chamada de classe, nunca uma função declarada ali
+dentro.
+
+Hoje o `config:cache` deste projeto nem completa — `scramble.security_strategy.1.scheme` não é
+serializável —, então a armadilha nunca chegou a morder em produção. Ela voltaria inteira no dia em
+que o cache de config passar a funcionar.

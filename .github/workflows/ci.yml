@@ -49,7 +49,9 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: pdo_sqlite, pdo_pgsql, mbstring, bcmath, gd, zip, exif, intl, fileinfo
+          # imagick ao lado do gd: MaintenancePhotoImageProcessor tem um caminho para cada um e,
+          # sem a extensão aqui, os catorze casos do driver imagick pulavam sem derrubar o job.
+          extensions: pdo_sqlite, pdo_pgsql, mbstring, bcmath, gd, imagick, zip, exif, intl, fileinfo
           coverage: none
 
       - name: Cache Composer downloads

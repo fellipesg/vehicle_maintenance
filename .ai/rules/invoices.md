@@ -68,5 +68,8 @@ Mensagens da API seguem em inglês (ver `.ai/rules/locale.md`); as da web, em pt
 Caminho aleatório no storage e nome original só nas colunas: "Arquivos enviados nunca usam o nome
 original no caminho", em `.ai/rules/models.md`. Link de download sempre pela rota autorizada, nunca por
 `AppStorage::url`: "Nota fiscal nunca pelo caminho do storage", em `.ai/rules/views.md`. A regra
-`InvoiceFile` vem depois de `max:10240` nas sete superfícies (`['bail', 'file', 'max:10240', new InvoiceFile]`)
-e percorre o XML com `XMLReader` em fluxo — a ordem é o que impede ler 20 MB para depois devolver 422.
+`InvoiceFile` vem depois de `max:10240` nos seis pontos que declaram `invoices.*`
+(`['bail', 'file', 'max:10240', new InvoiceFile]`): `StoreMaintenanceRequest` e
+`UpdateMaintenanceRequest` da API, store e update da oficina, store do lojista e o
+`validateMaintenance` do proprietário, que serve store e update. A regra percorre o XML com
+`XMLReader` em fluxo — a ordem é o que impede ler 20 MB para depois devolver 422.

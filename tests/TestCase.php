@@ -5,6 +5,7 @@ namespace Tests;
 use App\Features\MaintenancePhotos;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Services\Maintenance\MaintenancePhotoImageProcessor;
 use App\Support\SanctumMobileToken;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Config;
@@ -16,6 +17,27 @@ use RuntimeException;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * Fixa o GD como driver de imagem da suíte.
+     *
+     * Sem isto o container escolhe o Imagick sempre que a extensão existe. Desde que o CI passou a
+     * instalá-la, o pipeline de fotos resolvido pelo container rodaria num driver que a imagem de
+     * produção não tem (o Dockerfile fica só com gd de propósito, .ai/rules/ci.md) — e o GD, que é
+     * o que roda em produção, deixaria de ser exercitado pela camada de serviço. Os dois caminhos
+     * seguem cobertos em Tests\Unit\MaintenancePhotoImageProcessorTest, que pede cada driver pelo
+     * nome. Fixar aqui também faz a suíte rodar o mesmo código em toda máquina, com ou sem a
+     * extensão instalada.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->app->bind(
+            MaintenancePhotoImageProcessor::class,
+            fn (): MaintenancePhotoImageProcessor => new MaintenancePhotoImageProcessor(MaintenancePhotoImageProcessor::DRIVER_GD),
+        );
+    }
+
     /**
      * Roda depois de a aplicação subir e **antes** do RefreshDatabase, que é quem faz o
      * migrate:fresh. É o último ponto em que ainda dá para impedir que a suíte apague um banco que

@@ -340,6 +340,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->parameters(['templates' => 'warranty_template']);
     });
 
+    // Exceção consciente ao balde 'uploads': as rotas daqui que recebem arquivo (importar
+    // prospecção, capa de post) ficam fora dele. Ver .ai/rules/routes.md.
     Route::prefix('admin')->middleware('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('/usuarios', [AdminUserController::class, 'index'])->name('users.index');
