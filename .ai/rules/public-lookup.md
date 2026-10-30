@@ -5,6 +5,9 @@ paths:
   - 'app/Http/Resources/Api/V1/**'
   - 'app/Support/Vehicle/VehicleIdentifierVisibility.php'
   - 'app/Support/Vehicle/VehicleIdentifierMask.php'
+  - 'app/Support/Workshop/WorkshopVehicleVisibility.php'
+  - 'app/Http/Controllers/Web/Workshop/MaintenanceController.php'
+  - 'resources/views/workshop/maintenances/**'
 ---
 
 # Public Lookup
@@ -19,7 +22,7 @@ VehicleIdentifierMask::chassis keeps 3 + 4 characters only on a 17-character VIN
 `GET /oficina/manutencoes/nova` (etapa 1 da OS) busca veículo por placa e por chassi para qualquer
 conta de oficina, que nasce por autocadastro: a rota leva `throttle:search`, o mesmo balde de
 `/buscar-veiculo`, `/verificar` e `/v/{code}`. Sem vínculo com o veículo — a oficina não registrou
-(`workshop_id`) nem selou (`verified_workshop_id`) nenhuma OS dele, e ele tem dono atual —
+(`workshop_id`) nem selou (`verified_workshop_id`) nenhuma OS dele —
 `App\Support\Workshop\WorkshopVehicleVisibility::showsFullVehicle` devolve false e a tela mostra só
 o que a consulta pública mostra: marca, modelo, ano, cor e capa. Fora ficam **a placa atual** (o card
 devolve a placa que foi digitada, mesmo quando ela é uma placa antiga, e o `input hidden` do store
@@ -27,8 +30,12 @@ leva essa mesma; `VehiclePlateSearch::findByPlate` resolve o veículo pela placa
 hodômetro do veículo** (`current_kilometers`), que soma registros ocultos e pendentes que a consulta
 pública não lista — ele sai do card, do valor inicial do campo "Quilometragem" e da dica dele. O
 fluxo legítimo continua: a OS para cliente novo abre, e a oficina digita o hodômetro que leu no
-painel, como no portal do lojista (`.ai/rules/garage.md`). Veículo sem dono atual não tem o que
-proteger e aparece inteiro. `$showsFullVehicle` é sempre explícito nos includes
+painel, como no portal do lojista (`.ai/rules/garage.md`). **Veículo sem dono vinculado é mascarado
+igual** nessa busca: ele continua sendo o carro de alguém, e essa população cresce justamente porque
+oficinas registram OS de carro não reivindicado. O que libera o card sem vínculo é a *posse* — a
+consulta exata de 17 caracteres (`?chassis=`), o fluxo em que a oficina está com o carro e cadastra
+o veículo —, nunca a falta de conta do proprietário; chassi de veículo com dono não mostra nada do
+carro, e chassi curto nem resolve veículo. `$showsFullVehicle` é sempre explícito nos includes
 (`_vehicle-step.blade.php`, `partials/workshop-maintenance-form.blade.php`): quem esquecer recebe o
 card reduzido. Note que o POST ainda revela o piso do hodômetro na mensagem de erro de
 `VehicleMileageService::assertMaintenanceKilometers`, com o custo de `throttle:uploads` e de uma

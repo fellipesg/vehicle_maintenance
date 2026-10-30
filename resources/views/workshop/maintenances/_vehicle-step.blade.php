@@ -6,12 +6,13 @@
       convite para o cliente e "Tentar outra placa".
     - Com veículo: card do veículo (role="status") com miniatura, placa, ano, cor e a última
       quilometragem, e "Trocar veículo". Na edição ($readonly) o card não tem troca.
-      Sem $showsFullVehicle (veículo com dono e sem OS desta oficina, ver
+      Sem $showsFullVehicle (veículo achado pela placa e sem OS desta oficina — com dono ou sem, ver
       App\Support\Workshop\WorkshopVehicleVisibility) o card fica no que a consulta pública mostra:
       a placa de volta é a que foi digitada, nunca a atual do veículo, e a quilometragem sai.
 
     Pelo chassi (?chassis=): veículo com proprietário não mostra nada do carro (só manda usar a placa);
-    sem proprietário é reaproveitado; inexistente é criado junto com a OS (marca, modelo e ano).
+    sem proprietário é reaproveitado e aparece inteiro (os 17 caracteres exatos são a posse do carro);
+    inexistente é criado junto com a OS (marca, modelo e ano).
 
     Variáveis: $vehicle, $licensePlate, $chassis, $chassisOwned, $chassisInvalid, $creatingVehicle,
     $lookup (App\Support\Vehicle\VehicleLookupResult), $vehicleHasOwner, $showsFullVehicle e

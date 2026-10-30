@@ -102,16 +102,69 @@ class WorkshopVehicleLookupPrivacyTest extends TestCase
         $this->assertSame('98000', $this->element($xpath, '//input[@name="kilometers"]')->getAttribute('value'));
     }
 
-    public function test_vehicle_without_an_owner_shows_everything_because_there_is_no_owner_to_protect(): void
+    /**
+     * Carro sem dono vinculado continua sendo o carro de alguém, e essa população cresce justamente
+     * porque oficinas registram OS de carro não reivindicado: uma placa não prova nada sobre ele.
+     */
+    public function test_vehicle_without_an_owner_found_by_plate_is_masked_too(): void
     {
         $user = $this->workshopUser();
-        Vehicle::factory()->create(['license_plate' => 'FRE3E33', 'current_kilometers' => 77000]);
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'FRE3E33', 'current_kilometers' => 77000]);
+        VehiclePlate::factory()->ended()->create(['vehicle_id' => $vehicle->id, 'plate' => 'OLD1B13']);
 
-        $xpath = $this->page($this->actingAs($user)->get(route('workshop.maintenances.create', ['license_plate' => 'FRE3E33'])));
+        $response = $this->actingAs($user)->get(route('workshop.maintenances.create', ['license_plate' => 'OLD1B13']));
+        $xpath = $this->page($response);
+
+        // Nem a placa atual a partir da antiga, nem o hodômetro, nem o valor inicial do campo.
+        $response->assertDontSee('FRE3E33');
+        $response->assertDontSee('77.000');
+        $this->assertSame(0, $this->countNodes($xpath, '//*[@data-vehicle-kilometers]'));
+        $this->assertSame('', $this->element($xpath, '//input[@name="kilometers"]')->getAttribute('value'));
+
+        // E o fluxo legítimo continua: o formulário abre com a placa que a oficina digitou.
+        $this->assertSame(1, $this->countNodes($xpath, '//form[@data-maintenance-os-form]'));
+        $this->assertSame(
+            'OLD1B13',
+            $this->element($xpath, '//form[@data-maintenance-os-form]//input[@type="hidden"][@name="license_plate"]')->getAttribute('value'),
+        );
+    }
+
+    /**
+     * O que libera o card sem vínculo é a posse: os 17 caracteres exatos do chassi são o carro ou o
+     * documento na mão, e é o fluxo em que a oficina cadastra o veículo.
+     */
+    public function test_vehicle_without_an_owner_found_by_the_full_chassis_shows_everything(): void
+    {
+        $user = $this->workshopUser();
+        Vehicle::factory()->create([
+            'license_plate' => 'FRE3E34',
+            'chassis' => '9BWZZZ377VT004252',
+            'current_kilometers' => 77000,
+        ]);
+
+        $xpath = $this->page($this->actingAs($user)->get(route('workshop.maintenances.create', ['chassis' => '9BWZZZ377VT004252'])));
 
         $card = $this->element($xpath, '//*[@data-vehicle-found]');
-        $this->assertStringContainsString('FRE3E33', $this->text($card));
+        $this->assertStringContainsString('FRE3E34', $this->text($card));
         $this->assertStringContainsString('Última quilometragem registrada: 77.000 km', $this->text($card));
+        $this->assertSame('77000', $this->element($xpath, '//input[@name="kilometers"]')->getAttribute('value'));
+    }
+
+    /**
+     * A oficina que cadastrou o carro pelo chassi volta depois pela placa e continua vendo tudo: o
+     * vínculo é a OS que ela mesma registrou, não o chassi digitado de novo.
+     */
+    public function test_the_workshop_that_registered_the_ownerless_vehicle_still_sees_it_by_plate(): void
+    {
+        $user = $this->workshopUser();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'FRE3E35', 'current_kilometers' => 42000]);
+        $this->sealedOrder($user, ['vehicle_id' => $vehicle->id]);
+
+        $xpath = $this->page($this->actingAs($user)->get(route('workshop.maintenances.create', ['license_plate' => 'FRE3E35'])));
+
+        $card = $this->element($xpath, '//*[@data-vehicle-found]');
+        $this->assertStringContainsString('FRE3E35', $this->text($card));
+        $this->assertStringContainsString('Última quilometragem registrada: 42.000 km', $this->text($card));
     }
 
     public function test_the_workshop_that_only_cited_another_workshops_record_has_no_link(): void

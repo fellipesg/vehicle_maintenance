@@ -18,14 +18,24 @@ use Illuminate\Database\Eloquent\Builder;
  * pendentes que a consulta pública não lista.
  *
  * Vínculo é o mesmo da MaintenancePolicy (.ai/rules/policies.md): a oficina registrou
- * (workshop_id) ou selou (verified_workshop_id) alguma OS deste veículo. Veículo sem dono atual não
- * tem o que proteger — é o caso do carro que a própria oficina cadastra pelo chassi.
+ * (workshop_id) ou selou (verified_workshop_id) alguma OS deste veículo.
+ *
+ * O que libera o card sem vínculo é a *posse*, não a falta de dono: a consulta por chassi exige os
+ * 17 caracteres exatos, e quem os tem está com o carro ou com o documento na mão — é o fluxo em que
+ * a oficina cadastra o veículo. A busca por placa não prova nada: a placa de um carro alheio,
+ * inclusive uma antiga, é fácil de obter.
  */
 final class WorkshopVehicleVisibility
 {
-    public static function showsFullVehicle(?Workshop $workshop, Vehicle $vehicle, bool $vehicleHasOwner): bool
+    /**
+     * $foundByFullChassis: o veículo veio da consulta exata de 17 caracteres, não da busca por
+     * placa. Carro sem dono vinculado continua sendo o carro de alguém — a placa atual a partir de
+     * uma antiga e o hodômetro vivo não saem em nenhuma tela pública, e não é a falta de conta do
+     * proprietário que os libera para uma oficina que só digitou uma placa.
+     */
+    public static function showsFullVehicle(?Workshop $workshop, Vehicle $vehicle, bool $foundByFullChassis): bool
     {
-        if (! $vehicleHasOwner) {
+        if ($foundByFullChassis) {
             return true;
         }
 

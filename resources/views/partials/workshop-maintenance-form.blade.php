@@ -11,7 +11,7 @@
     Variáveis: $maintenance (na edição), $vehicle, $orderTemplates, $itemTemplates,
     $hasActiveTemplates, $existingPhotos, $editable (edição) e $showsFullVehicle.
 
-    Sem $showsFullVehicle (veículo com dono e sem OS desta oficina, ver
+    Sem $showsFullVehicle (veículo achado pela placa e sem OS desta oficina — com dono ou sem, ver
     App\Support\Workshop\WorkshopVehicleVisibility), a quilometragem do veículo não entra no campo
     nem na dica: a oficina digita o hodômetro que leu no painel, como no portal do lojista
     (.ai/rules/garage.md). É sempre explícito: quem esquecer não recebe o hodômetro.

@@ -128,6 +128,10 @@ class MaintenanceController extends Controller
         }
 
         $vehicleHasOwner = $vehicle !== null && $vehicle->hasCurrentOwner();
+        // Só a consulta exata de 17 caracteres resolve veículo pelo chassi (chassi curto cai em
+        // $chassisInvalid), e veículo com dono já saiu daqui como $chassisOwned: chegar com veículo
+        // por este caminho é a oficina estar com o carro ou com o documento na mão.
+        $foundByFullChassis = $chassis !== '' && $vehicle !== null;
 
         return view('workshop.maintenances.create', array_merge(
             [
@@ -143,7 +147,7 @@ class MaintenanceController extends Controller
                 'showsFullVehicle' => $vehicle === null || WorkshopVehicleVisibility::showsFullVehicle(
                     $workshop,
                     $vehicle,
-                    $vehicleHasOwner,
+                    $foundByFullChassis,
                 ),
             ],
             $this->warrantyTemplateOptions($workshop),

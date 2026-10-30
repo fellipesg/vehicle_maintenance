@@ -45,7 +45,7 @@ must agree on the same contract; they are listed in a separate table below.
 | routes/web.php,routes/api.php | .ai/rules/routes.md |
 | bootstrap/app.php,app/Support/PortalAccess.php,app/Support/FriendlyHttpErrors.php,app/Http/Controllers/Web/Auth/**,app/Http/Controllers/Web/AuthController.php | .ai/rules/portal-access.md |
 | resources/views/layouts/**,app/Enums/Portal.php | .ai/rules/portal-shell.md |
-| app/Http/Controllers/Web/Public*,resources/views/public/**,app/Http/Resources/Api/V1/**,app/Support/Vehicle/VehicleIdentifierVisibility.php,app/Support/Vehicle/VehicleIdentifierMask.php | .ai/rules/public-lookup.md |
+| app/Http/Controllers/Web/Public*,resources/views/public/**,app/Http/Resources/Api/V1/**,app/Support/Vehicle/VehicleIdentifierVisibility.php,app/Support/Vehicle/VehicleIdentifierMask.php,app/Support/Workshop/WorkshopVehicleVisibility.php,app/Http/Controllers/Web/Workshop/MaintenanceController.php,resources/views/workshop/maintenances/** | .ai/rules/public-lookup.md |
 | scripts/crop-brand-assets.php | .ai/rules/scripts.md |
 | app/Support/DemoWorkshopLogoGenerator.php | .ai/rules/support.md |
 | resources/css/provenance.css | .ai/rules/theme.md |
