@@ -20,8 +20,11 @@ VehicleIdentifierMask::chassis keeps 3 + 4 characters only on a 17-character VIN
 
 ## A busca de placa da oficina segue o mascaramento público
 `GET /oficina/manutencoes/nova` (etapa 1 da OS) busca veículo por placa e por chassi para qualquer
-conta de oficina, que nasce por autocadastro: a rota leva `throttle:account-vehicle-search`, balde
-próprio pela conta e não o `search`, que é por IP (`.ai/rules/routes.md`). Sem vínculo com o veículo — a oficina não registrou
+oficina **aprovada** (o prefixo leva `workshop.approved`): a rota leva
+`throttle:account-vehicle-search`, balde pela conta e não o `search`, que é por IP
+(`.ai/rules/routes.md`). Aprovação é cadastro conferido, não vínculo com carro nenhum — uma oficina
+aprovada do outro lado do país não tem mais direito ao histórico deste veículo do que um visitante —,
+então ela não substitui nada do que vem abaixo. Sem vínculo com o veículo — a oficina não registrou
 (`workshop_id`) nem selou (`verified_workshop_id`) nenhuma OS dele —
 `App\Support\Workshop\WorkshopVehicleVisibility::showsFullVehicle` devolve false e a tela mostra só
 o que a consulta pública mostra: marca, modelo, ano, cor e capa. Fora ficam **a placa atual** (o card
@@ -40,6 +43,16 @@ carro, e chassi curto nem resolve veículo. `$showsFullVehicle` é sempre explí
 card reduzido. Note que o POST ainda revela o piso do hodômetro na mensagem de erro de
 `VehicleMileageService::assertMaintenanceKilometers`, com o custo de `throttle:uploads` e de uma
 tentativa de OS.
+
+## OS contestada aparece marcada, não sai
+Registro que o proprietário contestou (`owner_disputed_at`, ver models.md) **continua** na busca
+pública, no histórico, no PDF e em `/v/{código}`, com o aviso "Contestada pelo proprietário" — a busca
+pública leva só o booleano `disputed`, nunca o texto que o dono escreveu. O selo não é revogado por
+uma contestação: em `/v/` a página segue dizendo que o selo é autêntico e acrescenta a ressalva.
+
+Sair da consulta pública é só com `hidden_from_public_at`, que agora **apenas a equipe** escreve
+(`MaintenancePublicVisibilityService`, via `admin.maintenances.hide`). O proprietário perdeu essa
+alavanca de propósito: era ela que permitia suprimir a retífica de motor antes de revender.
 
 ## Consulta pública de OS sem proprietário
 Busca pública, /v/{código} e PDF só mostram o mínimo (data, km, tipo, itens, oficina, selo) de OS pending/declined, nunca anexos nem descrição, e nada do que o proprietário ocultou (/v/ responde 404). A consulta por chassi da oficina (GET /api/v1/workshop/vehicles/lookup, throttle workshop-chassis-lookup) devolve só {id, has_owner:true} quando o carro tem dono.

@@ -13,6 +13,7 @@ use App\Policies\MaintenancePhotoPolicy;
 use App\Policies\MaintenancePolicy;
 use App\Policies\VehiclePolicy;
 use App\Policies\WorkshopPolicy;
+use App\Services\Maintenance\MaintenanceOwnerDecisionService;
 use App\Support\ApiResponse;
 use App\Support\Maintenance\MaintenancePhotoUrls;
 use App\Support\StorageEndpointResolver;
@@ -41,6 +42,14 @@ class AppServiceProvider extends ServiceProvider
         Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
             return new PostgresConnection($connection, $database, $prefix, $config);
         });
+
+        // scoped, não singleton: o serviço guarda em memória o resultado de isCurrentOwner por
+        // (conta, veículo), e sem uma instância única por requisição esse memo não existe — o
+        // MaintenanceResource resolve o serviço por registro para responder can_dispute, e cada
+        // instância nova repetia a consulta de policy, uma por linha da listagem. O container
+        // esquece instâncias scoped a cada requisição e a cada job da fila, que é o que impede a
+        // resposta de propriedade de envelhecer dentro de um worker.
+        $this->app->scoped(MaintenanceOwnerDecisionService::class);
     }
 
     public function boot(): void

@@ -56,8 +56,12 @@ class WorkshopRecordResource extends JsonResource
             'owner_status' => $this->owner_status,
             'attachments_status' => $this->attachments_status,
             'hidden_from_public' => $this->isHiddenFromPublic(),
+            'disputed' => $this->isDisputed(),
+            'dispute_reason' => $this->owner_dispute_reason,
             'can_decide' => $request->user() !== null && $decisions->canDecide($request->user(), $this->resource),
             'can_accept_attachments' => $request->user() !== null && $decisions->canAcceptAttachments($request->user(), $this->resource),
+            // Contestar não exige CRLV-e: pode ser true com can_decide false.
+            'can_dispute' => $request->user() !== null && $decisions->canDispute($request->user(), $this->resource),
         ];
     }
 }

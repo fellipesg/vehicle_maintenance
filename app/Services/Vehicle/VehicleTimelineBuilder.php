@@ -115,6 +115,7 @@ class VehicleTimelineBuilder
                 'is_verified' => $maintenance->isVerified(),
                 'registered_by_type' => $maintenance->registered_by_type,
                 'provenance_label' => $maintenance->provenance_label,
+                'disputed' => $maintenance->isDisputed(),
                 ...$this->photoSummary($maintenance, $photosByMaintenance->get($maintenance->id, new Collection), $viewer),
             ];
         }

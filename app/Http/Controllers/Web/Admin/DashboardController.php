@@ -48,6 +48,7 @@ class DashboardController extends Controller
             'workshopsWithoutCoordinatesCount' => Workshop::query()
                 ->where(fn ($query) => $query->whereNull('latitude')->orWhereNull('longitude'))
                 ->count(),
+            'disputedMaintenanceCount' => Maintenance::query()->whereNotNull('owner_disputed_at')->count(),
             'scheduledPostCount' => BlogPost::query()->scheduled()->count(),
             'draftPostCount' => BlogPost::query()->where('status', BlogPost::STATUS_DRAFT)->count(),
             'recentUsers' => User::query()->latest()->latest('id')->limit(5)->get(),

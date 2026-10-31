@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\WorkshopMessageOptOut;
 use App\Notifications\MaintenanceKmReminderNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -125,5 +126,41 @@ class CheckMaintenanceKmRemindersCommandTest extends TestCase
 
         $response->assertRedirect(route('user.vehicles.show', $vehicle));
         $this->assertNotNull($notification->fresh()->read_at);
+    }
+
+    /**
+     * O lembrete por km é do RevisaLog para o dono sobre o próprio carro, não mensagem de oficina:
+     * workshop_message_opt_outs ("não quero mais mensagens de oficinas") não o alcança, nem o
+     * descadastro global. Teste de fronteira para ninguém acoplar os dois sem decidir.
+     */
+    public function test_workshop_opt_out_does_not_silence_the_owners_own_km_reminder(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 98_500,
+            'odometer_at_registration' => 70_000,
+        ]);
+        $this->attachVehicleToUser($user, $vehicle);
+
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'tenant_id' => $user->tenant_id,
+            'kilometers' => 80_000,
+            'maintenance_date' => '2024-01-10',
+        ]);
+
+        WorkshopMessageOptOut::factory()->everyWorkshop()->create(['user_id' => $user->id]);
+
+        $this->artisan('maintenance:check-km-reminders')
+            ->expectsOutputToContain('Lembretes enviados: 1')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $user->id,
+            'type' => MaintenanceKmReminderNotification::class,
+        ]);
     }
 }

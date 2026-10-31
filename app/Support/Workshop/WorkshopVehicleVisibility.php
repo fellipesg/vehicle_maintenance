@@ -10,8 +10,10 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * O que a oficina pode saber de um veículo que ela só consultou pela placa.
  *
- * A busca da nova OS (/oficina/manutencoes/nova) é aberta a qualquer conta de oficina, que nasce por
- * autocadastro, então ela segue o mascaramento de .ai/rules/public-lookup.md: sem vínculo com o
+ * A busca da nova OS (/oficina/manutencoes/nova) é aberta a qualquer oficina aprovada (o prefixo
+ * /oficina leva o middleware workshop.approved), e aprovação é cadastro conferido, não vínculo com
+ * carro nenhum: uma oficina aprovada do outro lado do país não tem mais direito ao histórico deste
+ * veículo do que um visitante. Daí o mascaramento de .ai/rules/public-lookup.md: sem vínculo com o
  * veículo, a oficina vê o que a consulta pública mostra (marca, modelo, ano, cor e capa) e nada do
  * que a consulta pública esconde — nunca a placa atual, que nenhuma tela pública mostra
  * (.ai/rules/usergaragepublic.md), nem o hodômetro do veículo, que soma registros ocultos e

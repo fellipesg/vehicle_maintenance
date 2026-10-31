@@ -146,11 +146,19 @@ php artisan test
 
 Docker: `make test` (SQLite) or `make test-pgsql` (Postgres, closer to production).
 
-Current state: 463 passing, 2 skipped. The two skipped ones are the Flutter launcher-icon checks in `tests/Unit/BrandAppIconCropTest.php`; they only run when the mobile repo is checked out as a sibling `frontend/` directory next to this one.
+Current state: green, with a handful of tests that skip themselves when the machine cannot run them. For the counts of the moment, read PHPUnit's own summary instead of this paragraph — it is the only number that is never stale.
+
+What skips, and why:
+
+- the two Flutter launcher-icon checks in `tests/Unit/BrandAppIconCropTest.php`, which only run when the mobile repo is checked out as a sibling `frontend/` directory next to this one;
+- the Imagick data sets of `tests/Unit/MaintenancePhotoImageProcessorTest.php`. The image processor has a GD path and an Imagick path, because production may bring either; the Imagick half needs the `imagick` extension, which CI installs and a plain local PHP usually does not. Where the environment says it is CI, those cases **fail** instead of skipping, so a runner image that loses the extension cannot pass quietly (`.ai/rules/ci.md`);
+- several scripts under `tests/Feature` that run the front-end modules through Node, when `node` is not on `PATH`.
+
+Anything else skipping is a finding, not the normal state.
 
 Coverage includes invoice parsers, CRLV import and preview, mileage validation, portal authorization, CORS and API-docs access, contact form, account deletion, and Postgres boolean binding.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push to `main` and on every pull request, twice — SQLite and Postgres 17 — plus `vendor/bin/pint --test` in a separate job. Pint currently fails on 15 pre-existing files, so that job is red until they are formatted.
+GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push to `main` and on every pull request, twice — SQLite and Postgres 17 — plus `vendor/bin/pint --test` in a separate job. Pint passes on the whole repository today, so keep it that way: run `vendor/bin/pint` before pushing. One trap: inside a worktree under `.claude/`, `pint --test` scans nothing and passes vacuously, so check style from the repository root (`.ai/rules/ci.md`).
 
 ## API (overview)
 

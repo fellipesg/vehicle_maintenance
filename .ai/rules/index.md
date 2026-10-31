@@ -18,14 +18,14 @@ must agree on the same contract; they are listed in a separate table below.
 | config/outreach.php,app/Mail/WorkshopProspectInviteMail.php,app/Jobs/SendWorkshopProspectInvite.php,app/Services/Outreach/**,app/Console/Commands/*Prospect*,app/Console/Commands/ExtractReceitaProspects.php,app/Http/Controllers/Web/OutreachController.php,app/Http/Controllers/Web/Admin/OutreachController.php,app/Models/WorkshopProspect.php,app/Models/EmailSuppression.php,resources/views/emails/outreach/**,resources/views/outreach/**,resources/views/admin/outreach/** | .ai/rules/outreach.md |
 | app/Http/Controllers/Api/**, app/Http/Controllers/Api/VehicleController.php, app/Support/Maintenance/MaintenancePhotoUrls.php, app/Http/Resources/Api/V1/MaintenancePhotoResource.php, app/Http/Resources/Api/V1/MaintenanceResource.php, app/Http/Resources/Api/V1/UserResource.php | .ai/rules/api.md |
 | app/Http/Requests/Api/** | .ai/rules/requests-api.md |
-| app/Http/Controllers/Web/BlogController.php,app/Http/Controllers/Web/Admin/BlogPostController.php,app/Models/BlogPost.php,resources/views/blog/**,resources/views/admin/blog/** | .ai/rules/blog.md |
-| .github/workflows/**,Makefile,phpunit.xml,phpunit.pgsql.xml | .ai/rules/ci.md |
+| app/Http/Controllers/Web/BlogController.php,app/Http/Controllers/Web/Admin/BlogPostController.php,app/Models/BlogPost.php,app/Support/BlogCoverArt.php,resources/views/blog/**,resources/views/admin/blog/**,resources/views/components/blog/** | .ai/rules/blog.md |
+| .github/workflows/**,Makefile,Dockerfile,phpunit.xml,phpunit.pgsql.xml | .ai/rules/ci.md |
 | resources/views/components/vehicle-cover.blade.php | .ai/rules/components.md |
-| config/legal.php, config/mail.php | .ai/rules/config.md |
+| config/legal.php,config/mail.php,config/cors.php | .ai/rules/config.md |
 | app/Models/VehicleConsignment.php,app/Services/Vehicle/VehicleConsignmentService.php,app/Http/Controllers/Web/Concerns/HandlesVehicleConsignment.php,app/Http/Controllers/Web/ConsignmentOwnerController.php,app/Http/Controllers/Web/Admin/ConsignmentController.php,resources/views/vehicles/entry/**,resources/views/garage/vehicles/_consignment-status.blade.php | .ai/rules/consignment.md |
 | resources/css/**,resources/views/**,resources/js/** | .ai/rules/design-tokens.md |
 | resources/views/components/{vehicle,maintenance}/**,resources/views/maintenances/**,resources/views/components/provenance-*.blade.php | .ai/rules/domain-components.md |
-| resources/views/garage/**,app/Http/Controllers/Web/Garage/** | .ai/rules/garage.md |
+| resources/views/garage/**,app/Http/Controllers/Web/Garage/**,app/Http/Middleware/EnsureGarageApproved.php,app/Http/Middleware/EnsureWorkshopApproved.php,app/Services/Garage/**,app/Services/Workshop/WorkshopReview.php,app/Enums/WorkshopStatus.php,app/Http/Controllers/Web/Admin/WorkshopController.php | .ai/rules/garage.md |
 | app/Services/Invoice/**,app/Http/Controllers/Web/Concerns/StoresMaintenanceInvoices.php,app/Http/Controllers/Api/InvoiceController.php,app/Rules/InvoiceFile.php | .ai/rules/invoices.md |
 | app/Jobs/**,app/Console/Commands/PurgePendingMaintenanceAttachments.php | .ai/rules/jobs.md |
 | resources/js/user-portal.js,resources/js/owner-maintenance-form.js,resources/js/maintenance-kilometer-range.js,resources/js/utils/maintenance-kilometers.js | .ai/rules/js.md |
@@ -37,12 +37,12 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Mail/** | .ai/rules/mail.md |
 | config/queue.php,config/cache.php,config/session.php,app/Jobs/**,docker-compose.yml | .ai/rules/messaging.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
-| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
+| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php,app/Services/Vehicle/VehicleMileageService.php,app/Services/Maintenance/MaintenancePublicVisibilityService.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
 | app/Services/Workshop/WorkshopMessageTemplateDispatcher.php,app/Enums/WorkshopMessageTrigger.php,app/Enums/WorkshopPlan.php,app/Support/Workshop/WorkshopPlanLimits.php,app/Support/WorkshopMessageTemplateRenderer.php,config/workshop_messages.php,resources/views/workshop/message-templates/** | .ai/rules/workshop-messages.md |
 | resources/views/pdfs/vehicle_maintenance_export.blade.php,app/Services/Vehicle/VehiclePdfMaintenancePhotos.php,app/Services/Vehicle/VehicleMaintenancePdfExporter.php,app/Services/Vehicle/VehiclePdfExportService.php,app/Http/Controllers/Api/VehiclePdfExportController.php,app/Http/Controllers/Web/User/VehiclePdfExportDownloadController.php,app/Console/Commands/CleanupVehiclePdfExports.php | .ai/rules/pdfs.md |
 | app/Policies/** | .ai/rules/policies.md |
-| routes/web.php,routes/api.php | .ai/rules/routes.md |
+| routes/*.php | .ai/rules/routes.md |
 | bootstrap/app.php,app/Support/PortalAccess.php,app/Support/FriendlyHttpErrors.php,app/Http/Controllers/Web/Auth/**,app/Http/Controllers/Web/AuthController.php | .ai/rules/portal-access.md |
 | resources/views/layouts/**,app/Enums/Portal.php | .ai/rules/portal-shell.md |
 | app/Http/Controllers/Web/Public*,resources/views/public/**,app/Http/Resources/Api/V1/**,app/Support/Vehicle/VehicleIdentifierVisibility.php,app/Support/Vehicle/VehicleIdentifierMask.php,app/Support/Workshop/WorkshopVehicleVisibility.php,app/Http/Controllers/Web/Workshop/MaintenanceController.php,resources/views/workshop/maintenances/** | .ai/rules/public-lookup.md |

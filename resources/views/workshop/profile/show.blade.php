@@ -45,7 +45,27 @@
                     <x-ui.button variant="secondary" icon="pencil-square" :href="route('workshop.profile.edit')">Editar oficina</x-ui.button>
                 </x-slot:actions>
             @endif
+            @if($workshop)
+                <x-ui.badge :variant="$workshop->status->badgeVariant()">{{ $workshop->status->label() }}</x-ui.badge>
+            @endif
         </x-ui.page-header>
+
+        @if($workshop?->status === \App\Enums\WorkshopStatus::Pending)
+            <x-ui.alert variant="warning" role="status" title="Oficina em análise" class="mb-6" data-workshop-pending>
+                Estamos conferindo o CNPJ da sua oficina. Enquanto isso, só esta tela fica disponível — as ordens de serviço, o Selo da oficina e os convites ao cliente abrem assim que a análise terminar. Complete os dados para agilizar.
+            </x-ui.alert>
+        @elseif($workshop?->status === \App\Enums\WorkshopStatus::Rejected)
+            <x-ui.alert variant="danger" role="status" title="Cadastro recusado" class="mb-6" data-workshop-rejected>
+                @if(filled($workshop->review_notes))
+                    {{ $workshop->review_notes }}
+                @else
+                    Não conseguimos confirmar o CNPJ desta oficina.
+                @endif
+                <x-slot:actions>
+                    <x-ui.button variant="secondary" size="sm" :href="route('contact.show')">Falar com a equipe</x-ui.button>
+                </x-slot:actions>
+            </x-ui.alert>
+        @endif
 
         @if(! $workshop)
             <x-ui.empty-state icon="building-storefront" heading-level="h2" title="Oficina ainda não cadastrada"

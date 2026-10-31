@@ -12,6 +12,7 @@ use App\Notifications\WorkshopFollowUpNotification;
 use App\Services\FcmService;
 use App\Services\Vehicle\VehicleEstimatedKmService;
 use App\Services\Vehicle\VehicleMaintenanceReminderService;
+use App\Support\Workshop\WorkshopMessageConsent;
 use App\Support\WorkshopMessageTemplateRenderer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,7 @@ class WorkshopMessageTemplateDispatcher
         private readonly VehicleEstimatedKmService $estimatedKm,
         private readonly VehicleMaintenanceReminderService $reminders,
         private readonly WorkshopMessageTemplateRenderer $renderer,
+        private readonly WorkshopMessageConsent $consent,
     ) {}
 
     public function dispatchFollowUps(): int
@@ -237,6 +239,10 @@ class WorkshopMessageTemplateDispatcher
         ?int $nextDueKm = null,
         ?Maintenance $sourceMaintenance = null,
     ): bool {
+        if (! $this->consent->allows($owner->id, $template->workshop_id)) {
+            return false;
+        }
+
         if ($this->alreadyDispatched($template, $owner, $vehicle, $dedupeKey)) {
             return false;
         }

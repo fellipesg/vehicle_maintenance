@@ -31,8 +31,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 
-        // Descadastro de um clique (RFC 8058): o provedor de e-mail faz o POST sem sessão; a URL assinada protege.
-        $middleware->validateCsrfTokens(except: ['descadastrar/*', 'convite/descadastrar/*', 'webhooks/*']);
+        // Descadastro de um clique (RFC 8058): o provedor de e-mail faz o POST sem sessão; a URL
+        // assinada protege. Quem leva a carga na query, e não no caminho, tem de vir como caminho
+        // exato: 'convite/descadastrar/*' não casa com 'convite/descadastrar' (Str::is).
+        $middleware->validateCsrfTokens(except: [
+            'descadastrar/*',
+            'convite/descadastrar',
+            'oficinas/descadastrar',
+            'webhooks/*',
+        ]);
 
         $middleware->append(\App\Http\Middleware\SetSecurityHeaders::class);
 
@@ -45,6 +52,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ability' => CheckApiAbility::class,
             'user.type' => \App\Http\Middleware\EnsureUserType::class,
             'garage.approved' => \App\Http\Middleware\EnsureGarageApproved::class,
+            'workshop.approved' => \App\Http\Middleware\EnsureWorkshopApproved::class,
             'tenant' => \App\Http\Middleware\SetTenantContext::class,
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
             'etag.vehicle_list' => \App\Http\Middleware\EtagForVehicleList::class,

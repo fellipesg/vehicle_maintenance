@@ -137,7 +137,10 @@ class WorkshopOwnerlessOsFlowTest extends TestCase
 
         $maintenance = Maintenance::query()->firstOrFail();
         $this->assertSame($owner->tenant_id, $maintenance->tenant_id);
+        // Carro com dono: entra no histórico dele direto, com selo e sem decisão pendente. O que o
+        // dono tem é contestar (OwnerDisputeTest), não autorizar.
         $this->assertNull($maintenance->owner_status);
+        $this->assertNotNull($maintenance->verified_at);
     }
 
     public function test_workshop_detail_shows_the_invite_card_only_while_ownerless(): void

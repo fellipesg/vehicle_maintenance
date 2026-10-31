@@ -55,6 +55,7 @@ class Maintenance extends Model
             'verified_at' => 'datetime',
             'hidden_from_public_at' => 'datetime',
             'owner_decided_at' => 'datetime',
+            'owner_disputed_at' => 'datetime',
             'workshop_review_status' => WorkshopReviewStatus::class,
             'workshop_reviewed_at' => 'datetime',
             'workshop_review_requested_at' => 'datetime',
@@ -80,7 +81,9 @@ class Maintenance extends Model
     }
 
     /**
-     * A OS nasceu num carro sem proprietário e depende da decisão dele (owner_status não nulo).
+     * A OS de oficina nasceu num carro sem proprietário atual e depende da decisão de quem assumir
+     * o veículo (owner_status não nulo). Num carro que já tem dono, owner_status é nulo: o registro
+     * entra no histórico dele direto, com o selo, e o que ele tem é contestar.
      */
     public function isOwnerlessRecord(): bool
     {
@@ -90,6 +93,34 @@ class Maintenance extends Model
     public function isHiddenFromPublic(): bool
     {
         return $this->hidden_from_public_at !== null;
+    }
+
+    /**
+     * O proprietário atual contestou este registro: ele diz que o serviço não aconteceu no carro
+     * dele (MaintenanceOwnerDecisionService::dispute).
+     *
+     * Contestar **marca, não apaga**: o registro continua aparecendo em todas as superfícies, com o
+     * aviso de que o proprietário contesta. O histórico pertence ao chassi e é o ativo do produto;
+     * tirá-lo de circulação por declaração de uma das partes é o que a contestação substituiu
+     * (antes o dono com CRLV-e ocultava, e o comprador não distinguia "carro sem histórico" de
+     * "histórico suprimido"). Esconder de verdade ficou só com a equipe, depois de analisar
+     * (App\Services\Maintenance\MaintenancePublicVisibilityService).
+     */
+    public function isDisputed(): bool
+    {
+        return $this->owner_disputed_at !== null;
+    }
+
+    /**
+     * Pode ser contestado? Qualquer OS que uma oficina registrou (registered_by_type workshop),
+     * com selo ou sem. Contestar é a única resposta que o proprietário tem — e, como só marca, vale
+     * para a selada também: é o caso do dono que chega depois e encontra no chassi dele um serviço
+     * que não reconhece. O que ele declarou (owner) ou o lojista declarou (garage) ele resolve
+     * editando ou excluindo, não contestando.
+     */
+    public function isDisputable(): bool
+    {
+        return $this->registered_by_type === 'workshop';
     }
 
     /**
@@ -172,8 +203,10 @@ class Maintenance extends Model
     }
 
     /**
-     * Fora da consulta pública e do histórico: oculta pelo proprietário (direito de oposição). Só
-     * a oficina autora e quem ocultou ainda a veem.
+     * Fora da consulta pública e do histórico: oculta pela equipe
+     * (MaintenancePublicVisibilityService) ou, em dados anteriores à mudança, pelo proprietário. Só
+     * a oficina autora e quem decidiu ainda a veem; o admin enxerga por outro caminho (as telas de
+     * admin não passam por aqui).
      */
     public function hiddenFrom(?User $viewer): bool
     {
@@ -255,6 +288,55 @@ class Maintenance extends Model
     }
 
     /**
+     * A OS é desta oficina, isto é, foi ela que a registrou?
+     *
+     * Com o Selo da oficina é o verified_workshop_id. Sem selo é o workshop_id junto com
+     * registered_by_type workshop — não existe mais caminho que crie OS de oficina sem selo, mas
+     * dados de um período em que o selo dependia de vínculo provado continuam valendo, e a oficina
+     * precisa poder corrigir e excluir o que registrou. A declarada que só CITA a oficina
+     * (workshop_id com registered_by_type owner ou garage) segue de quem declarou.
+     */
+    public function isAuthoredByWorkshopId(?int $workshopId): bool
+    {
+        if ($workshopId === null) {
+            return false;
+        }
+
+        if ($this->isVerified()) {
+            return (int) $this->verified_workshop_id === $workshopId;
+        }
+
+        return $this->registered_by_type === 'workshop'
+            && (int) $this->workshop_id === $workshopId;
+    }
+
+    /**
+     * Registros que contam para o hodômetro do veículo (VehicleMileageService).
+     *
+     * Fica de fora o que o proprietário contestou: ele diz que aquele serviço não aconteceu no
+     * carro dele, e até a equipe analisar o número não pode governar o `current_kilometers` — era
+     * por aí que uma quilometragem absurda entrava e não saía mais. O registro continua no
+     * histórico, com a marca; só não manda no hodômetro.
+     *
+     * E fica de fora o que a **equipe** tirou de circulação (`hidden_by_user_id`, escrito só por
+     * MaintenancePublicVisibilityService). Senão a ação mais forte valeria menos que a mais fraca:
+     * a contestação de uma das partes limpava o número, e a supressão decidida depois da análise
+     * não — o km de um registro que ninguém mais vê continuava público e, pior, continuava sendo o
+     * piso de plausibilidade, trancando toda OS futura abaixo dele.
+     *
+     * O ocultar do fluxo antigo, que era do proprietário, **continua contando**: ali o serviço
+     * aconteceu e ele só exerceu oposição à publicação. Esses registros têm
+     * `hidden_from_public_at` e `hidden_by_user_id` nulo, e é essa diferença que o filtro usa.
+     *
+     * @param  Builder<Maintenance>  $query
+     * @return Builder<Maintenance>
+     */
+    public function scopeCountsTowardOdometer(Builder $query): Builder
+    {
+        return $query->whereNull('owner_disputed_at')->whereNull('hidden_by_user_id');
+    }
+
+    /**
      * Declarada citando uma oficina da rede, ainda sem resposta dela.
      */
     public function isAwaitingWorkshopReview(): bool
@@ -286,7 +368,7 @@ class Maintenance extends Model
     public function getProvenanceLabelAttribute(): string
     {
         return match ($this->registered_by_type) {
-            'workshop' => 'Selo da oficina',
+            'workshop' => $this->isVerified() ? 'Selo da oficina' : 'Registrada pela oficina',
             'garage' => 'Declarada pelo lojista',
             default => 'Declarada pelo proprietário',
         };
@@ -305,7 +387,7 @@ class Maintenance extends Model
                 ?? $this->workshop_name
                 ?? 'Oficina';
 
-            return 'Selo da oficina · '.$name;
+            return $this->provenance_label.' · '.$name;
         }
 
         return $this->provenance_label;
@@ -424,6 +506,22 @@ class Maintenance extends Model
     public function checklists(): HasMany
     {
         return $this->hasMany(Checklist::class);
+    }
+
+    /**
+     * Quem da equipe tirou o registro da consulta pública.
+     */
+    public function hiddenBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'hidden_by_user_id');
+    }
+
+    /**
+     * Quem contestou o registro (o proprietário atual na época).
+     */
+    public function disputedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_disputed_by_user_id');
     }
 
     /**

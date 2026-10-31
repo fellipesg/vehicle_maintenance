@@ -44,7 +44,8 @@ class WorkshopPortalTest extends TestCase
                 'city' => 'São Paulo',
                 'state' => 'SP',
             ])
-            ->assertRedirect(route('workshop.dashboard'));
+            // Oficina nova nasce em análise: o cadastro termina em "Minha oficina".
+            ->assertRedirect(route('workshop.profile.show'));
 
         $this->assertDatabaseHas('workshops', [
             'name' => 'Mecânica do Bairro',

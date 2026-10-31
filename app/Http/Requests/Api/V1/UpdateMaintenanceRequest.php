@@ -37,7 +37,7 @@ class UpdateMaintenanceRequest extends ApiFormRequest
             'maintenance_type' => 'sometimes|required|string|max:100',
             'description' => 'nullable|string',
             'workshop_name' => 'nullable|string|max:255',
-            'maintenance_date' => 'sometimes|required|date',
+            'maintenance_date' => 'sometimes|required|date|before_or_equal:today',
             'kilometers' => 'sometimes|required|integer|min:0|max:9999999',
             'service_category' => ['sometimes', 'required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => 'boolean',

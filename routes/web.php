@@ -50,6 +50,7 @@ use App\Http\Controllers\Web\Workshop\ProfileController as WorkshopProfileContro
 use App\Http\Controllers\Web\Workshop\ReviewController as WorkshopReviewController;
 use App\Http\Controllers\Web\Workshop\WarrantyTemplateController as WorkshopWarrantyTemplateController;
 use App\Http\Controllers\Web\WorkshopLandingController;
+use App\Http\Controllers\Web\WorkshopMessageOptOutController;
 use App\Http\Controllers\Web\WorkshopSignupController;
 use Illuminate\Support\Facades\Route;
 
@@ -74,6 +75,11 @@ Route::middleware('signed')->group(function () {
 Route::middleware('signed')->group(function () {
     Route::get('/convite/descadastrar', [MaintenanceInviteController::class, 'showUnsubscribe'])->name('invites.unsubscribe.show');
     Route::post('/convite/descadastrar', [MaintenanceInviteController::class, 'unsubscribe'])->name('invites.unsubscribe.perform');
+});
+// Descadastro das mensagens que a oficina manda ao dono do veículo (WorkshopFollowUpNotification).
+Route::middleware('signed')->group(function () {
+    Route::get('/oficinas/descadastrar', [WorkshopMessageOptOutController::class, 'show'])->name('workshops.messages.unsubscribe.show');
+    Route::post('/oficinas/descadastrar', [WorkshopMessageOptOutController::class, 'unsubscribe'])->name('workshops.messages.unsubscribe.perform');
 });
 Route::get('/convite/{token}', [MaintenanceInviteController::class, 'show'])
     ->middleware('throttle:search')
@@ -239,6 +245,14 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/registros-de-oficinas/{maintenance}', [UserWorkshopRecordController::class, 'decide'])
             ->whereNumber('maintenance')
             ->name('workshop-records.decide');
+        // Contestar não exige CRLV-e: é a ação do dono sem o documento (ver o docblock de
+        // MaintenanceOwnerDecisionService::dispute).
+        Route::post('/registros-de-oficinas/{maintenance}/contestar', [UserWorkshopRecordController::class, 'dispute'])
+            ->whereNumber('maintenance')
+            ->name('workshop-records.dispute');
+        Route::delete('/registros-de-oficinas/{maintenance}/contestar', [UserWorkshopRecordController::class, 'withdrawDispute'])
+            ->whereNumber('maintenance')
+            ->name('workshop-records.dispute.withdraw');
     });
 
     Route::prefix('garagem')->middleware(['user.type:garage', 'garage.approved'])->name('garage.')->group(function () {
@@ -287,7 +301,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->name('maintenances.show');
     });
 
-    Route::prefix('oficina')->middleware('user.type:workshop')->name('workshop.')->group(function () {
+    Route::prefix('oficina')->middleware(['user.type:workshop', 'workshop.approved'])->name('workshop.')->group(function () {
         Route::get('/dashboard', [WorkshopDashboardController::class, 'index'])->name('dashboard');
         Route::get('/perfil', [WorkshopProfileController::class, 'show'])->name('profile.show');
         Route::get('/perfil/criar', [WorkshopProfileController::class, 'create'])->name('profile.create');
@@ -347,6 +361,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->parameters(['templates' => 'warranty_template']);
     });
 
+    // Exceção consciente ao balde 'uploads': as rotas daqui que recebem arquivo (importar
+    // prospecção, capa de post) ficam fora dele. Ver .ai/rules/routes.md.
     Route::prefix('admin')->middleware('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('/usuarios', [AdminUserController::class, 'index'])->name('users.index');
@@ -355,8 +371,18 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/veiculos', [AdminVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
+        // Ocultar da consulta pública é ação da equipe, não do proprietário: ver
+        // App\Services\Maintenance\MaintenancePublicVisibilityService.
+        Route::post('/manutencoes/{maintenance}/ocultar', [AdminMaintenanceController::class, 'hide'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.hide');
+        Route::post('/manutencoes/{maintenance}/publicar', [AdminMaintenanceController::class, 'restore'])
+            ->whereNumber('maintenance')
+            ->name('maintenances.restore');
         Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
         Route::put('/oficinas/{workshop}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'workshop'])->name('workshops.maintenance-photos');
+        Route::post('/oficinas/{workshop}/aprovar', [AdminWorkshopController::class, 'approve'])->name('workshops.approve');
+        Route::post('/oficinas/{workshop}/recusar', [AdminWorkshopController::class, 'reject'])->name('workshops.reject');
         Route::get('/prospeccao', [AdminOutreachController::class, 'index'])->name('outreach.index');
         Route::post('/prospeccao/importar', [AdminOutreachController::class, 'import'])->name('outreach.import');
         Route::post('/prospeccao/pausar', [AdminOutreachController::class, 'pause'])->name('outreach.pause');

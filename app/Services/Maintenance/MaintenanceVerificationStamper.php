@@ -45,6 +45,20 @@ class MaintenanceVerificationStamper
     }
 
     /**
+     * Selo de uma OS de oficina que, por algum motivo, nasceu sem ele (dados de um período em que o
+     * selo dependia de vínculo provado com o veículo). Usado quando o proprietário vincula o
+     * registro ao histórico dele: não há mais caminho que crie OS de oficina sem selo.
+     */
+    public function sealAfterOwnerLink(Maintenance $maintenance, int $workshopId): Maintenance
+    {
+        if ($maintenance->verified_at !== null) {
+            return $maintenance;
+        }
+
+        return $this->applyWorkshopSeal($maintenance, $workshopId, 'confirmed');
+    }
+
+    /**
      * Selo para uma declarada que a oficina citada confirmou (WorkshopReviewService::confirm). O
      * registro continua com o tenant e o autor de quem declarou; só a procedência muda.
      */

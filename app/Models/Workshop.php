@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Enums\WorkshopPlan;
+use App\Enums\WorkshopStatus;
 use App\Observers\WorkshopObserver;
 use App\Support\AppStorage;
+use App\Support\DocumentMask;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,6 +46,7 @@ class Workshop extends Model
     {
         return [
             'plan' => WorkshopPlan::class,
+            'status' => WorkshopStatus::class,
             'weekly_digest_enabled' => 'boolean',
         ];
     }
@@ -54,6 +57,66 @@ class Workshop extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Quem decidiu a análise do cadastro (admin).
+     */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /**
+     * Oficina liberada para trabalhar: registrar OS com o Selo da oficina, convidar cliente e
+     * validar declaradas. Pendente e recusada só abrem "Minha oficina"
+     * (App\Http\Middleware\EnsureWorkshopApproved).
+     */
+    public function isApproved(): bool
+    {
+        return $this->status === WorkshopStatus::Approved;
+    }
+
+    /**
+     * CNPJ só com dígitos, para comparar com o registro público.
+     */
+    public function normalizedDocument(): ?string
+    {
+        if ($this->cnpj === null) {
+            return null;
+        }
+
+        return preg_replace('/\D/', '', $this->cnpj) ?: null;
+    }
+
+    /**
+     * Documento como o admin precisa ver para conferir a oficina: CNPJ por extenso, porque é
+     * número público de registro, e CPF mascarado (App\Support\DocumentMask), porque é dado
+     * pessoal. Mesma regra de Garage::displayDocument.
+     */
+    public function displayDocument(): ?string
+    {
+        $digits = $this->normalizedDocument();
+
+        if ($digits === null) {
+            return null;
+        }
+
+        return strlen($digits) === 14
+            ? preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $digits)
+            : DocumentMask::cpfOrCnpj($digits);
+    }
+
+    /**
+     * Endereço de uma linha ("Rua X, 10 — Centro — Londrina/PR"), vazio quando não há endereço.
+     */
+    public function addressLine(): string
+    {
+        return collect([
+            collect([$this->street, $this->number])->filter(fn (mixed $part): bool => filled($part))->implode(', '),
+            $this->neighborhood,
+            collect([$this->city, $this->state])->filter(fn (mixed $part): bool => filled($part))->implode('/'),
+        ])->filter(fn (mixed $part): bool => filled($part))->implode(' — ');
     }
 
     public function tenant(): BelongsTo

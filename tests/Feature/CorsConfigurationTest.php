@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\CorsOrigins;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -23,13 +24,31 @@ class CorsConfigurationTest extends TestCase
         $this->assertSame('*', $response->headers->get('Access-Control-Allow-Origin'));
     }
 
+    /**
+     * Com a lista explícita, a resposta devolve a origem pedida — nunca `*` — e só então pode
+     * acompanhar `Allow-Credentials`, porque o navegador recusa o curinga junto das credenciais.
+     */
     public function test_explicit_allowed_origins_disable_wildcard_credentials(): void
     {
         Config::set('cors.allowed_origins', ['https://app.example.com']);
+        Config::set('cors.allowed_origins_patterns', []);
         Config::set('cors.supports_credentials', true);
 
-        $this->assertSame(['https://app.example.com'], config('cors.allowed_origins'));
-        $this->assertTrue(config('cors.supports_credentials'));
+        $allowed = $this->getJson('/api/v1/workshops', [
+            'Origin' => 'https://app.example.com',
+        ]);
+
+        $allowed->assertOk();
+        $this->assertSame('https://app.example.com', $allowed->headers->get('Access-Control-Allow-Origin'));
+        $this->assertSame('true', $allowed->headers->get('Access-Control-Allow-Credentials'));
+
+        $other = $this->getJson('/api/v1/workshops', [
+            'Origin' => 'https://outra.example.com',
+        ]);
+
+        $other->assertOk();
+        $this->assertNotSame('*', $other->headers->get('Access-Control-Allow-Origin'));
+        $this->assertNotSame('https://outra.example.com', $other->headers->get('Access-Control-Allow-Origin'));
     }
 
     public function test_production_defaults_to_app_url_only_without_wildcard_patterns(): void
@@ -40,8 +59,8 @@ class CorsConfigurationTest extends TestCase
             'CORS_ALLOWED_ORIGINS' => null,
             'CORS_ALLOWED_ORIGIN_PATTERNS' => null,
         ], function (): void {
-            $this->assertSame(['https://revisalog.com.br'], cors_allowed_origins());
-            $this->assertSame([], cors_allowed_origin_patterns());
+            $this->assertSame(['https://revisalog.com.br'], CorsOrigins::allowed());
+            $this->assertSame([], CorsOrigins::patterns());
         });
     }
 
@@ -53,8 +72,8 @@ class CorsConfigurationTest extends TestCase
             'CORS_ALLOWED_ORIGINS' => 'https://revisalog.com.br, https://app.example.com',
             'CORS_ALLOWED_ORIGIN_PATTERNS' => '#^https://preview-[a-z0-9]+\.example\.com$#',
         ], function (): void {
-            $this->assertSame(['https://revisalog.com.br', 'https://app.example.com'], cors_allowed_origins());
-            $this->assertSame(['#^https://preview-[a-z0-9]+\.example\.com$#'], cors_allowed_origin_patterns());
+            $this->assertSame(['https://revisalog.com.br', 'https://app.example.com'], CorsOrigins::allowed());
+            $this->assertSame(['#^https://preview-[a-z0-9]+\.example\.com$#'], CorsOrigins::patterns());
         });
     }
 

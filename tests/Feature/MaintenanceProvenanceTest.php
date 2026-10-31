@@ -43,6 +43,28 @@ class MaintenanceProvenanceTest extends TestCase
         $this->assertMatchesRegularExpression('/^RVL-[A-Z2-9]{4}-[A-Z2-9]{2}$/', (string) $maintenance->verification_code);
     }
 
+    /**
+     * Nenhum caminho cria OS de oficina sem selo hoje, mas dados de um período em que o selo
+     * dependia de vínculo provado com o veículo continuam na base. O rótulo não pode chamar de
+     * "Selo da oficina" o que não tem selo.
+     */
+    public function test_a_legacy_unsealed_workshop_record_is_not_labelled_as_a_seal(): void
+    {
+        $workshop = Workshop::factory()->create(['name' => 'Oficina Antiga']);
+        $maintenance = Maintenance::factory()->create(['workshop_id' => $workshop->id]);
+        $maintenance->forceFill([
+            'registered_by_type' => 'workshop',
+            'verified_at' => null,
+            'verification_code' => null,
+        ])->saveQuietly();
+
+        $maintenance = $maintenance->fresh()->load('workshop');
+
+        $this->assertSame('Registrada pela oficina', $maintenance->provenance_label);
+        $this->assertSame('não verificada', $maintenance->provenance_sublabel);
+        $this->assertSame('Registrada pela oficina · Oficina Antiga', $maintenance->provenance_card_label);
+    }
+
     public function test_owner_cannot_update_verified_maintenance(): void
     {
         $owner = User::factory()->asUser()->create();
