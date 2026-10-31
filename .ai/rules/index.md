@@ -25,7 +25,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Models/VehicleConsignment.php,app/Services/Vehicle/VehicleConsignmentService.php,app/Http/Controllers/Web/Concerns/HandlesVehicleConsignment.php,app/Http/Controllers/Web/ConsignmentOwnerController.php,app/Http/Controllers/Web/Admin/ConsignmentController.php,resources/views/vehicles/entry/**,resources/views/garage/vehicles/_consignment-status.blade.php | .ai/rules/consignment.md |
 | resources/css/**,resources/views/**,resources/js/** | .ai/rules/design-tokens.md |
 | resources/views/components/{vehicle,maintenance}/**,resources/views/maintenances/**,resources/views/components/provenance-*.blade.php | .ai/rules/domain-components.md |
-| resources/views/garage/**,app/Http/Controllers/Web/Garage/** | .ai/rules/garage.md |
+| resources/views/garage/**,app/Http/Controllers/Web/Garage/**,app/Http/Middleware/EnsureGarageApproved.php,app/Http/Middleware/EnsureWorkshopApproved.php,app/Services/Garage/**,app/Services/Workshop/WorkshopReview.php,app/Enums/WorkshopStatus.php,app/Http/Controllers/Web/Admin/WorkshopController.php | .ai/rules/garage.md |
 | app/Services/Invoice/**,app/Http/Controllers/Web/Concerns/StoresMaintenanceInvoices.php,app/Http/Controllers/Api/InvoiceController.php,app/Rules/InvoiceFile.php | .ai/rules/invoices.md |
 | app/Jobs/**,app/Console/Commands/PurgePendingMaintenanceAttachments.php | .ai/rules/jobs.md |
 | resources/js/user-portal.js,resources/js/owner-maintenance-form.js,resources/js/maintenance-kilometer-range.js,resources/js/utils/maintenance-kilometers.js | .ai/rules/js.md |
@@ -37,7 +37,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Mail/** | .ai/rules/mail.md |
 | config/queue.php,config/cache.php,config/session.php,app/Jobs/**,docker-compose.yml | .ai/rules/messaging.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
-| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php | .ai/rules/models.md |
+| app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php,app/Services/Vehicle/VehicleMileageService.php,app/Services/Maintenance/MaintenancePublicVisibilityService.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
 | resources/views/pdfs/vehicle_maintenance_export.blade.php,app/Services/Vehicle/VehiclePdfMaintenancePhotos.php,app/Services/Vehicle/VehicleMaintenancePdfExporter.php,app/Services/Vehicle/VehiclePdfExportService.php,app/Http/Controllers/Api/VehiclePdfExportController.php,app/Http/Controllers/Web/User/VehiclePdfExportDownloadController.php,app/Console/Commands/CleanupVehiclePdfExports.php | .ai/rules/pdfs.md |
 | app/Policies/** | .ai/rules/policies.md |

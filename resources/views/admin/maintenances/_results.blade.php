@@ -109,6 +109,44 @@
                     <div class="min-w-0 text-left">
                         <p class="font-medium text-foreground">{{ $maintenance->provenance_card_label }}</p>
                         <p class="text-xs text-muted-foreground">{{ $maintenance->provenance_meta }}</p>
+                        @if($maintenance->isDisputed())
+                            <p class="mt-1" data-admin-disputed="{{ $maintenance->id }}">
+                                <x-ui.badge variant="warning" size="sm">Contestada pelo proprietário</x-ui.badge>
+                                <span class="mt-1 block text-xs text-muted-foreground">
+                                    @if($maintenance->disputedBy)por {{ $maintenance->disputedBy->name }}@endif
+                                    @if($maintenance->owner_disputed_at) · {{ $maintenance->owner_disputed_at->format('d/m/Y H:i') }}@endif
+                                </span>
+                                @if(filled($maintenance->owner_dispute_reason))
+                                    <span class="mt-1 block text-xs text-muted-foreground">{{ $maintenance->owner_dispute_reason }}</span>
+                                @endif
+                            </p>
+                        @endif
+                        @if($maintenance->isHiddenFromPublic())
+                            <p class="mt-1" data-admin-hidden="{{ $maintenance->id }}">
+                                <x-ui.badge variant="neutral" size="sm">Oculta da consulta pública</x-ui.badge>
+                                <span class="mt-1 block text-xs text-muted-foreground">
+                                    @if($maintenance->hiddenBy)por {{ $maintenance->hiddenBy->name }}@endif
+                                    @if($maintenance->hidden_from_public_at) · {{ $maintenance->hidden_from_public_at->format('d/m/Y H:i') }}@endif
+                                </span>
+                                @if(filled($maintenance->hidden_reason))
+                                    <span class="mt-1 block text-xs text-muted-foreground">{{ $maintenance->hidden_reason }}</span>
+                                @endif
+                            </p>
+                        @endif
+                        <span class="mt-2 block">
+                            @if($maintenance->isHiddenFromPublic())
+                                <form method="POST" action="{{ route('admin.maintenances.restore', $maintenance) }}">
+                                    @csrf
+                                    <x-ui.button variant="secondary" size="sm" type="submit" loading-label="Publicando…">Devolver à consulta</x-ui.button>
+                                </form>
+                            @else
+                                <form method="POST" action="{{ route('admin.maintenances.hide', $maintenance) }}" class="flex flex-wrap items-center gap-2">
+                                    @csrf
+                                    <x-ui.input name="hidden_reason" placeholder="Motivo (opcional)" maxlength="500" class="text-sm" :aria-label="'Motivo para ocultar a manutenção '.$maintenance->id" />
+                                    <x-ui.button variant="secondary" size="sm" type="submit" loading-label="Ocultando…">Ocultar</x-ui.button>
+                                </form>
+                            @endif
+                        </span>
                     </div>
                 </div>
             </td>

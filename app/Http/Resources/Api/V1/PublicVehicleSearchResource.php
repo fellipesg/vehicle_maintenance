@@ -65,6 +65,8 @@ class PublicVehicleSearchResource extends JsonResource
                     'description' => $maintenance->description,
                     'workshop_name' => $maintenance->displayWorkshopName(),
                     'maintenance_date' => $maintenance->maintenance_date?->toDateString(),
+                    // Só a marca: o texto que o proprietário escreveu não vai para a busca aberta.
+                    'disputed' => $maintenance->isDisputed(),
                     'kilometers' => $maintenance->kilometers,
                     'service_category' => $maintenance->service_category,
                     'is_manufacturer_required' => (bool) $maintenance->is_manufacturer_required,

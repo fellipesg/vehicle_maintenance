@@ -59,6 +59,24 @@ class DevPortalUsersSeederTest extends TestCase
         $this->assertTrue(Hash::check(DevPortalUsersSeeder::PASSWORD, $workshop->password));
     }
 
+    /**
+     * A oficina de desenvolvimento serve para registrar OS e ver o selo sair. Em análise ela só
+     * abriria "Minha oficina" (App\Http\Middleware\EnsureWorkshopApproved), e o banco novo nasce
+     * com a coluna no default 'pending'.
+     */
+    public function test_dev_workshop_and_garage_are_approved_so_both_portals_open(): void
+    {
+        (new DevPortalUsersSeeder)->run();
+
+        $garage = User::where('email', DevPortalUsersSeeder::GARAGE_EMAIL)->firstOrFail();
+        $workshop = User::where('email', DevPortalUsersSeeder::WORKSHOP_EMAIL)->firstOrFail();
+
+        $this->assertTrue($garage->garage->isApproved());
+        $this->assertTrue($workshop->workshop->isApproved());
+
+        $this->actingAs($workshop)->get(route('workshop.maintenances.create'))->assertOk();
+    }
+
     public function test_seeder_does_not_run_in_production_environment(): void
     {
         $originalEnv = app()->environment();

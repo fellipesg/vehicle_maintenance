@@ -132,8 +132,10 @@ class WorkshopSelfSignupTest extends TestCase
     {
         Event::fake([UserRegistered::class]);
 
+        // O cadastro nasce em análise (App\Http\Middleware\EnsureWorkshopApproved), então o
+        // destino é "Minha oficina", não o dashboard.
         $this->post(route('workshops.signup.store'), $this->payload())
-            ->assertRedirect(route('workshop.dashboard'))
+            ->assertRedirect(route('workshop.profile.show'))
             ->assertSessionHas('success')
             ->assertSessionHas('analytics_event', 'sign_up')
             ->assertSessionHas('analytics_method', 'workshop');
@@ -158,7 +160,8 @@ class WorkshopSelfSignupTest extends TestCase
 
         Event::assertDispatched(UserRegistered::class, fn (UserRegistered $event) => $event->user->is($user) && $event->source === RegistrationSource::Web);
 
-        $this->get(route('workshop.dashboard'))->assertOk();
+        $this->get(route('workshop.profile.show'))->assertOk();
+        $this->get(route('workshop.dashboard'))->assertRedirect(route('workshop.profile.show'));
     }
 
     public function test_signup_sends_the_team_alert_marked_as_workshop_and_the_workshop_welcome(): void
@@ -166,7 +169,7 @@ class WorkshopSelfSignupTest extends TestCase
         Mail::fake();
         Notification::fake();
 
-        $this->post(route('workshops.signup.store'), $this->payload())->assertRedirect(route('workshop.dashboard'));
+        $this->post(route('workshops.signup.store'), $this->payload())->assertRedirect(route('workshop.profile.show'));
 
         $user = User::where('email', 'carlos@autocenter.example.com')->firstOrFail();
 
@@ -247,7 +250,7 @@ class WorkshopSelfSignupTest extends TestCase
         $prospect = WorkshopProspect::factory()->sent()->create(['cnpj' => '99999999000191', 'email' => 'outro@mecanica.example.com']);
 
         $this->post(route('workshops.signup.store'), $this->payload(['ref' => $prospect->token]))
-            ->assertRedirect(route('workshop.dashboard'));
+            ->assertRedirect(route('workshop.profile.show'));
 
         $prospect->refresh();
         $this->assertSame(WorkshopProspectStatus::Converted, $prospect->status);
@@ -259,7 +262,7 @@ class WorkshopSelfSignupTest extends TestCase
     {
         $prospect = WorkshopProspect::factory()->sent()->create(['cnpj' => self::CNPJ, 'email' => 'outro@mecanica.example.com']);
 
-        $this->post(route('workshops.signup.store'), $this->payload())->assertRedirect(route('workshop.dashboard'));
+        $this->post(route('workshops.signup.store'), $this->payload())->assertRedirect(route('workshop.profile.show'));
 
         $this->assertSame(WorkshopProspectStatus::Converted, $prospect->fresh()->status);
     }
@@ -268,7 +271,7 @@ class WorkshopSelfSignupTest extends TestCase
     {
         $prospect = WorkshopProspect::factory()->sent()->create(['cnpj' => '99999999000191', 'email' => 'carlos@autocenter.example.com']);
 
-        $this->post(route('workshops.signup.store'), $this->payload())->assertRedirect(route('workshop.dashboard'));
+        $this->post(route('workshops.signup.store'), $this->payload())->assertRedirect(route('workshop.profile.show'));
 
         $this->assertSame(WorkshopProspectStatus::Converted, $prospect->fresh()->status);
     }
@@ -278,7 +281,7 @@ class WorkshopSelfSignupTest extends TestCase
         $other = WorkshopProspect::factory()->sent()->create(['cnpj' => '99999999000191']);
 
         $this->post(route('workshops.signup.store'), $this->payload(['ref' => 'desconhecido']))
-            ->assertRedirect(route('workshop.dashboard'));
+            ->assertRedirect(route('workshop.profile.show'));
 
         $this->assertSame(WorkshopProspectStatus::Sent, $other->fresh()->status);
     }
@@ -365,12 +368,13 @@ class WorkshopSelfSignupTest extends TestCase
         Notification::fake();
         config(['services.google_analytics.measurement_id' => self::MEASUREMENT_ID]);
 
-        $this->post(route('workshops.signup.store'), $this->payload())->assertRedirect(route('workshop.dashboard'));
+        $this->post(route('workshops.signup.store'), $this->payload())->assertRedirect(route('workshop.profile.show'));
 
-        $this->get(route('workshop.dashboard'))
+        // A oficina nova está em análise, então a tela que ela abre é "Minha oficina".
+        $this->get(route('workshop.profile.show'))
             ->assertOk()
             ->assertSee("gtag('event', 'sign_up', { method: 'workshop' })", false);
 
-        $this->get(route('workshop.dashboard'))->assertDontSee('googletagmanager.com', false);
+        $this->get(route('workshop.profile.show'))->assertDontSee('googletagmanager.com', false);
     }
 }

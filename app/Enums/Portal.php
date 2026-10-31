@@ -105,13 +105,15 @@ enum Portal: string
     }
 
     /**
-     * Rota do Início para esta conta. A loja em análise cai em "Minha loja", que é a única tela
-     * que ela abre: sem isto o login a mandaria para um dashboard que o
-     * App\Http\Middleware\EnsureGarageApproved devolve, em círculo.
+     * Rota do Início para esta conta. A loja — ou a oficina — em análise cai no próprio cadastro,
+     * que é a única tela que ela abre: sem isto o login a mandaria para um dashboard que o
+     * App\Http\Middleware\EnsureGarageApproved (ou EnsureWorkshopApproved) devolve, em círculo.
      */
     public function dashboardRouteFor(User $user): string
     {
-        return self::dealerAwaitingApproval($user) ? 'garage.profile.show' : $this->dashboardRoute();
+        return self::awaitingApproval($user)
+            ? (self::profileRouteFor($user) ?? $this->dashboardRoute())
+            : $this->dashboardRoute();
     }
 
     /**
@@ -122,6 +124,42 @@ enum Portal: string
         return $user !== null
             && $user->isGarage()
             && ! ($user->garage?->isApproved() ?? false);
+    }
+
+    /**
+     * Conta de oficina cujo cadastro já existe e ainda não foi aprovado (ou foi recusado). Conta
+     * sem oficina cadastrada fica de fora: ela segue no onboarding, como o
+     * App\Http\Middleware\EnsureWorkshopApproved também deixa.
+     */
+    public static function workshopAwaitingApproval(?User $user): bool
+    {
+        if ($user === null || ! $user->isWorkshop()) {
+            return false;
+        }
+
+        $workshop = $user->workshop;
+
+        return $workshop !== null && ! $workshop->isApproved();
+    }
+
+    /**
+     * Conta presa ao próprio cadastro enquanto a equipe não confere (loja ou oficina).
+     */
+    public static function awaitingApproval(?User $user): bool
+    {
+        return self::dealerAwaitingApproval($user) || self::workshopAwaitingApproval($user);
+    }
+
+    /**
+     * A tela de cadastro que a conta em análise continua abrindo.
+     */
+    private static function profileRouteFor(?User $user): ?string
+    {
+        return match (true) {
+            self::dealerAwaitingApproval($user) => 'garage.profile.show',
+            self::workshopAwaitingApproval($user) => 'workshop.profile.show',
+            default => null,
+        };
     }
 
     /**
@@ -230,7 +268,7 @@ enum Portal: string
      */
     public function primaryActionFor(?User $user): ?array
     {
-        return self::dealerAwaitingApproval($user) ? null : $this->primaryAction();
+        return self::awaitingApproval($user) ? null : $this->primaryAction();
     }
 
     public function primaryAction(): ?array
@@ -255,9 +293,11 @@ enum Portal: string
         $request ??= request();
         $entries = [];
 
-        if (self::dealerAwaitingApproval($request->user())) {
+        if (self::awaitingApproval($request->user())) {
             $profile = self::resolveItem(
-                self::item('Minha loja', 'garage.profile.show', 'building-storefront', ['garage.profile.*']),
+                self::dealerAwaitingApproval($request->user())
+                    ? self::item('Minha loja', 'garage.profile.show', 'building-storefront', ['garage.profile.*'])
+                    : self::item('Minha oficina', 'workshop.profile.show', 'building-storefront', ['workshop.profile.*']),
                 $request,
             );
 

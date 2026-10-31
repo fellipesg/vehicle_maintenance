@@ -42,8 +42,9 @@ class MaintenancePolicy
     }
 
     /**
-     * Oficina: só a OS com o Selo da própria oficina (verified_at e verified_workshop_id dela). Uma
-     * declarada que só cita a oficina (workshop_id) continua de quem declarou. Os demais: só a
+     * Oficina: só a OS que ela mesma registrou (Maintenance::isAuthoredByWorkshopId — com selo é o
+     * verified_workshop_id; sem selo, a que nasceu pendente num carro de terceiro). Uma declarada
+     * que só cita a oficina (workshop_id) continua de quem declarou. Os demais: só a
      * declarada do próprio tenant e só enquanto forem o dono atual do veículo
      * (VehiclePolicy::addMaintenance); quem vendeu o carro não mexe mais no histórico do comprador.
      * A com Selo da oficina ninguém além da oficina altera. Vale para a API e para a web.
@@ -73,11 +74,9 @@ class MaintenancePolicy
     private function canChange(User $user, Maintenance $maintenance): Response
     {
         if ($user->isWorkshop()) {
-            $sealedByThisWorkshop = $user->workshop !== null
-                && $maintenance->isVerified()
-                && (int) $maintenance->verified_workshop_id === (int) $user->workshop->id;
-
-            return $sealedByThisWorkshop ? Response::allow() : Response::deny();
+            return $maintenance->isAuthoredByWorkshopId($user->workshop?->id)
+                ? Response::allow()
+                : Response::deny();
         }
 
         if ($maintenance->isVerified() || $maintenance->tenant_id !== $user->tenant_id) {

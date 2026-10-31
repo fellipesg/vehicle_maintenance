@@ -2,16 +2,23 @@
 
 namespace App\Http\Controllers\Web\Admin;
 
+use App\Enums\WorkshopStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Maintenance;
 use App\Models\Workshop;
+use App\Services\Workshop\WorkshopReview;
 use App\Support\Maintenance\MaintenancePhotoAccess;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class WorkshopController extends Controller
 {
+    public function __construct(
+        private WorkshopReview $review,
+    ) {}
+
     /**
      * Filtro de localização (?localizacao=): valor da URL => rótulo. Vazio mostra todas.
      *
@@ -35,12 +42,17 @@ class WorkshopController extends Controller
     ];
 
     /**
-     * Oficinas da plataforma: busca por nome ou cidade (?q=), situação no mapa (?localizacao=),
-     * quantas manutenções cada uma verificou (Selo da oficina) e ordenação.
+     * Oficinas da plataforma: busca por nome ou cidade (?q=), situação da análise (?filtro=),
+     * situação no mapa (?localizacao=), quantas manutenções cada uma verificou (Selo da oficina) e
+     * ordenação. A aba padrão é a que pede ação, como em admin.garages.
      */
     public function index(Request $request): View
     {
         $search = is_string($request->query('q')) ? trim($request->query('q')) : '';
+        // Padrão "todas": esta página é o diretório de oficinas (busca, mapa, selos) e também a
+        // fila; abrir só as pendentes esconderia o diretório. A aba "Em análise" leva o contador.
+        $filter = $request->query('filtro', 'todas');
+        $status = WorkshopStatus::tryFrom(is_string($filter) ? $filter : '');
         $location = is_string($request->query('localizacao')) && array_key_exists($request->query('localizacao'), self::LOCATIONS)
             ? $request->query('localizacao')
             : '';
@@ -61,6 +73,8 @@ class WorkshopController extends Controller
         $locationCounts = $this->locationCounts(clone $searched);
 
         $workshops = $searched
+            ->with(['user', 'reviewer'])
+            ->when($status !== null, fn (Builder $query) => $query->where('status', $status))
             ->when($location === 'no-mapa', fn (Builder $query) => $query->whereNotNull('latitude')->whereNotNull('longitude'))
             ->when($location === 'sem-coordenadas', fn (Builder $query) => $query->where(
                 fn (Builder $coordinates) => $coordinates->whereNull('latitude')->orWhereNull('longitude')
@@ -70,6 +84,7 @@ class WorkshopController extends Controller
                 ->whereColumn('verified_workshop_id', 'workshops.id')
                 ->whereNotNull('verified_at'),
             ])
+            ->orderByRaw('case when status = ? then 0 else 1 end', [WorkshopStatus::Pending->value])
             ->orderBy(self::SORTS[$sort], $direction)
             ->orderBy('id')
             ->paginate(25)
@@ -80,11 +95,50 @@ class WorkshopController extends Controller
         return view('admin.workshops.index', [
             'workshops' => $workshops,
             'search' => $search,
+            'filter' => $status?->value ?? 'todas',
+            'counts' => $this->statusCounts(),
             'location' => $location,
             'locationCounts' => $locationCounts,
             'sort' => $sort,
             'direction' => $direction,
         ]);
+    }
+
+    public function approve(Request $request, Workshop $workshop): RedirectResponse
+    {
+        $this->review->approve($workshop, $request->user());
+
+        return back()->with('success', "Oficina {$workshop->name} aprovada.");
+    }
+
+    public function reject(Request $request, Workshop $workshop): RedirectResponse
+    {
+        $data = $request->validate(
+            ['review_notes' => ['nullable', 'string', 'max:1000']],
+        );
+
+        $this->review->reject($workshop, $request->user(), $data['review_notes'] ?? null);
+
+        return back()->with('success', "Oficina {$workshop->name} recusada.");
+    }
+
+    /**
+     * Quantidade por situação da análise, para os contadores das abas.
+     *
+     * @return array<string, int>
+     */
+    private function statusCounts(): array
+    {
+        $counts = Workshop::query()
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return [
+            WorkshopStatus::Pending->value => (int) $counts->get(WorkshopStatus::Pending->value, 0),
+            WorkshopStatus::Approved->value => (int) $counts->get(WorkshopStatus::Approved->value, 0),
+            WorkshopStatus::Rejected->value => (int) $counts->get(WorkshopStatus::Rejected->value, 0),
+        ];
     }
 
     /**

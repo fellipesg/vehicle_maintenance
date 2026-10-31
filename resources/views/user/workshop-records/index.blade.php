@@ -1,7 +1,8 @@
 {{--
     "Registros de oficinas": serviços que oficinas registraram nos veículos da conta antes dela
-    chegar ao RevisaLog. Nada entra no histórico sem a escolha do proprietário: vincular, aceitar
-    notas e fotos (só com a propriedade confirmada pelo CRLV-e) e ocultar da consulta pública.
+    chegar ao RevisaLog. Nada entra no histórico sem a escolha do proprietário: vincular e aceitar
+    notas e fotos (só com a propriedade confirmada pelo CRLV-e). Ocultar saiu — no lugar dele há
+    "contestar", que marca o registro sem tirá-lo da consulta pública e não pede o CRLV-e.
     Descrição livre, valores e arquivos não aparecem aqui antes do aceite.
 --}}
 @extends('layouts.app')
@@ -39,6 +40,7 @@
                         $recordWorkshop = $record->displayWorkshopName() ?? 'Oficina';
                         $canAttach = $decisions->canAcceptAttachments(auth()->user(), $record);
                         $canDecide = $decisions->canDecide(auth()->user(), $record);
+                        $canDispute = $decisions->canDispute(auth()->user(), $record);
                         $hasFiles = $record->attachments_status === \App\Models\Maintenance::ATTACHMENTS_PENDING;
                         $statusLabel = match ($record->owner_status) {
                             \App\Models\Maintenance::OWNER_LINKED => 'Vinculado ao seu histórico',
@@ -49,7 +51,42 @@
                     <x-ui.card as="section" heading-level="h2" :title="$record->maintenance_type"
                         :description="trim($recordVehicle->brand.' '.$recordVehicle->model.' '.$recordVehicle->year).' · '.$recordWorkshop.' · '.$record->maintenance_date?->format('d/m/Y').' · '.number_format((int) $record->kilometers, 0, ',', '.').' km'"
                         data-workshop-record="{{ $record->id }}">
-                        <p class="mb-3 text-sm font-medium text-foreground" data-record-status>{{ $statusLabel }}@if ($record->isHiddenFromPublic()) · oculto da consulta pública @endif</p>
+                        {{-- Diretivas coladas (@endif@if) não compilam: o Blade deixa a segunda como texto. --}}
+                        <p class="mb-3 text-sm font-medium text-foreground" data-record-status>{{ $statusLabel }}@if ($record->isHiddenFromPublic()) · oculto pela equipe @endif
+                            @if ($record->isDisputed()) · contestado por você @endif
+                        </p>
+
+                        @if ($record->isDisputed())
+                            <x-ui.alert variant="warning" role="status" class="mb-4" title="Você contestou este registro" data-record-disputed>
+                                O registro continua aparecendo na consulta pública e no histórico do veículo, agora com o aviso de que você contesta — quem for comprar o carro vê as duas versões. Avisamos a oficina, que é quem pode corrigir ou excluir a OS, e a nossa equipe analisa.
+                                @if (filled($record->owner_dispute_reason))
+                                    <span class="mt-1 block">O que você informou: {{ $record->owner_dispute_reason }}</span>
+                                @endif
+                                <x-slot:actions>
+                                    <form method="POST" action="{{ route('user.workshop-records.dispute.withdraw', $record) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <input type="hidden" name="status" value="{{ $showAll ? 'all' : '' }}">
+                                        <x-ui.button variant="secondary" size="sm" type="submit" loading-label="Retirando…">Retirar contestação</x-ui.button>
+                                    </form>
+                                </x-slot:actions>
+                            </x-ui.alert>
+                        @elseif ($canDispute)
+                            <details class="mb-4 rounded-lg border border-border p-3" data-record-dispute-form>
+                                <summary class="cursor-pointer text-sm font-medium text-foreground">Este serviço não foi feito no meu carro</summary>
+                                <form method="POST" action="{{ route('user.workshop-records.dispute', $record) }}" class="mt-3 space-y-3">
+                                    @csrf
+                                    <input type="hidden" name="status" value="{{ $showAll ? 'all' : '' }}">
+                                    <p class="text-sm text-muted-foreground">
+                                        O registro <strong>não sai</strong> do histórico do chassi: ele continua visível para quem consultar o veículo, marcado como contestado por você. Essa é a diferença em relação a esconder — o histórico é o que dá valor ao carro, e suprimi-lo deixaria quem vai comprar sem saber que houve contestação. Avisamos a oficina, que pode corrigir ou excluir, e a nossa equipe analisa. Você não precisa do CRLV-e para isso.
+                                    </p>
+                                    <x-ui.textarea name="reason" :id="'reason-'.$record->id" rows="2" maxlength="500"
+                                        label="O que aconteceu (opcional)"
+                                        placeholder="Ex.: nunca levei o carro nesta oficina." />
+                                    <x-ui.button variant="secondary" type="submit" loading-label="Contestando…">Contestar registro</x-ui.button>
+                                </form>
+                            </details>
+                        @endif
 
                         @if ($record->items->isNotEmpty())
                             <p class="text-sm text-muted-foreground">Itens: {{ $record->items->pluck('name')->implode(', ') }}.</p>
@@ -87,10 +124,6 @@
                             @if ($hasFiles)
                                 <p class="-mt-1 pl-7 text-sm font-medium text-warning" data-record-attach-warning>Se você não aceitar, as notas fiscais e fotos da oficina são apagadas ao salvar.</p>
                             @endif
-                            <x-ui.checkbox name="hide_from_public" :id="'hide-'.$record->id" uncheckedValue="0"
-                                :checked="$record->isHiddenFromPublic()"
-                                label="Ocultar do histórico público"
-                                description="Só a oficina que fez o serviço continua vendo este registro fora da sua conta." />
                             <div class="flex flex-wrap items-center gap-2">
                                 <x-ui.button type="submit" icon="check" loading-label="Salvando…">Salvar escolha</x-ui.button>
                                 @if ($hasFiles && ! $canAttach)

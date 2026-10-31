@@ -26,6 +26,46 @@ GET /api/v1/auth/{provider}/redirect responde 200 com success=false e error_code
 ## Registros de oficinas (contrato com o app)
 GET /api/v1/me/workshop-records?status=pending|all, POST /api/v1/maintenances/{id}/owner-decision {link, attach_files, hide_from_public}, GET /api/v1/workshop/vehicles/lookup?chassis=, POST /api/v1/workshop/vehicles, POST /api/v1/maintenances/{id}/invites/email|whatsapp, e pending_workshop_records_count em GET /api/v1/me. MaintenanceResource ganhou is_ownerless_record, owner_status (null em OS comum), attachments_status (null em OS comum) e hidden_from_public. Erros de decisão e convite voltam 422 com message em pt-BR.
 
+## Contestar substituiu ocultar (contrato com o app)
+`POST /api/v1/maintenances/{id}/dispute` contesta (corpo opcional `reason`, até 500 caracteres) e
+`DELETE` retira, ambos com `ability:maintenances:write`. **Não exigem propriedade verificada**, ao
+contrário de `owner-decision`: é a ação do dono sem CRLV-e, em qualquer OS de oficina, com selo ou
+sem. Em registro que o próprio dono declarou volta 422 com
+`MaintenanceOwnerDecisionService::NOT_DISPUTABLE_MESSAGE`.
+
+**`hide_from_public` saiu de `owner-decision`.** O campo continua **aceito** (`nullable`) porque o app
+ainda o envia — tirá-lo da validação antes de o app parar de mandar quebraria a tela —, mas mandar
+`true` responde **422** com `OwnerDecisionRequest::HIDE_REMOVED_MESSAGE`, apontando a contestação.
+Nunca um 200 que não grava nada, que é a armadilha registrada em "Endereço é da empresa". Ordem de
+implantação: **app primeiro** (trocar o checkbox "ocultar" pela ação "contestar"), backend depois.
+
+`WorkshopRecordResource` ganhou `disputed`, `dispute_reason` e `can_dispute`; `MaintenanceResource` e
+a busca pública ganharam `disputed` (na busca pública **só** o booleano, nunca o texto do dono).
+`hidden_from_public` continua no contrato, agora significando "a equipe ocultou". Atenção ao par:
+`can_dispute` pode ser **true** com `can_decide` **false** — é justamente o caso que a contestação
+atende, então a tela não pode esconder a ação atrás da checagem do CRLV-e.
+
+## can_dispute vem no MaintenanceResource (contrato com o app)
+Num veículo com proprietário cadastrado, a OS da oficina é **manutenção comum do histórico dele**:
+nasce selada, com `owner_status` nulo, e não aparece em `GET /me/workshop-records`. É por isso que
+`MaintenanceResource` carrega `disputed` e `can_dispute` — é ali que o app encontra a ação. A fila de
+`workshop-records` continua existindo para o outro caso: carro que não tinha dono quando a oficina
+registrou.
+
+## O que mais mudou no contrato
+`owner_status`, `is_ownerless_record` e `attachments_status` seguem como eram: não nulos só na OS de
+carro que não tinha proprietário. Em carro com dono a OS da oficina nasce **selada** e sem eles — é
+manutenção comum do histórico do proprietário, não item de fila.
+
+Duas mudanças a conferir no app: (1) `POST`/`PUT /api/v1/maintenances` recusam `maintenance_date`
+futura com 422 (`before_or_equal:today`); (2) chegou o aviso `workshop_record_registered` na central
+de notificações, que é como o dono sabe que uma oficina escreveu no carro dele.
+
+## Oficina em análise só lê pela API (contrato com o app)
+A oficina em análise (`workshops.status`, ver `.ai/rules/garage.md`) responde 403 em qualquer método
+de escrita da API, com `message` em inglês no envelope, igual à loja em análise: o app precisa mostrar
+a espera em vez de parecer quebrado.
+
 ## Endereço é da empresa, não da conta (contrato com o app)
 A conta não tem endereço na web: `/conta` edita só nome, e-mail, senha e telefone, nos quatro
 portais. Quem tem endereço é a loja (`garages`, em "Minha loja") e a oficina (`workshops`, em "Minha

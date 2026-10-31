@@ -26,7 +26,7 @@ class StoreMaintenanceRequest extends ApiFormRequest
             'maintenance_type' => 'required|string|max:100',
             'description' => 'nullable|string',
             'workshop_name' => 'nullable|string|max:255',
-            'maintenance_date' => 'required|date',
+            'maintenance_date' => 'required|date|before_or_equal:today',
             'kilometers' => 'required|integer|min:0|max:9999999',
             'service_category' => ['required', Rule::in(ServiceCategory::values())],
             'is_manufacturer_required' => 'nullable|boolean',

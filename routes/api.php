@@ -66,7 +66,10 @@ Route::prefix('v1')->group(function () {
     // garage.approved:api — loja em análise só lê pela API. Sem isto o portão existiria apenas
     // na web, e o app seria o caminho livre para escrever no histórico de um chassi e mandar
     // convite para terceiros (App\Http\Middleware\EnsureGarageApproved).
-    Route::middleware(['auth:sanctum', 'tenant', 'throttle:api', 'garage.approved:api'])->group(function () {
+    // workshop.approved:api — oficina em análise só lê pela API, pelo mesmo motivo e no mesmo
+    // formato do portão da loja: pelo app ela criaria OS com Selo, moveria o hodômetro de um
+    // veículo e mandaria convite para terceiros (App\Http\Middleware\EnsureWorkshopApproved).
+    Route::middleware(['auth:sanctum', 'tenant', 'throttle:api', 'garage.approved:api', 'workshop.approved:api'])->group(function () {
         // Auth routes
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me'])->middleware('ability:profile:read');
@@ -109,6 +112,9 @@ Route::prefix('v1')->group(function () {
         // OS de oficina em carro sem proprietário: decisão do proprietário e convite do cliente.
         Route::get('/me/workshop-records', [WorkshopRecordController::class, 'index'])->middleware('ability:maintenances:read');
         Route::post('/maintenances/{id}/owner-decision', [WorkshopRecordController::class, 'decide'])->middleware('ability:maintenances:write');
+        // Contestar não exige CRLV-e, ao contrário de owner-decision (MaintenanceOwnerDecisionService::dispute).
+        Route::post('/maintenances/{id}/dispute', [WorkshopRecordController::class, 'dispute'])->middleware('ability:maintenances:write');
+        Route::delete('/maintenances/{id}/dispute', [WorkshopRecordController::class, 'withdrawDispute'])->middleware('ability:maintenances:write');
         Route::post('/maintenances/{id}/invites/email', [MaintenanceInviteController::class, 'email'])->middleware(['ability:maintenances:write', 'throttle:workshop-invites']);
         Route::post('/maintenances/{id}/invites/whatsapp', [MaintenanceInviteController::class, 'whatsapp'])->middleware(['ability:maintenances:write', 'throttle:workshop-invites']);
 

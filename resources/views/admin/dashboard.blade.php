@@ -20,6 +20,14 @@
 
     $pendingItems = collect([
         [
+            'count' => $disputedMaintenanceCount,
+            'icon' => 'exclamation-triangle',
+            'title' => $pluralize($disputedMaintenanceCount, 'OS contestada', 'OS contestadas'),
+            'description' => 'O proprietário diz que o serviço não foi feito no carro dele. Fora da consulta pública enquanto isso.',
+            'href' => route('admin.maintenances.index', ['contestadas' => '1']),
+            'action' => 'Ver contestadas',
+        ],
+        [
             'count' => $workshopsWithoutCoordinatesCount,
             'icon' => 'map-pin',
             'title' => $pluralize($workshopsWithoutCoordinatesCount, 'oficina sem coordenadas', 'oficinas sem coordenadas'),

@@ -22,6 +22,12 @@
     $valueClass = 'mt-1 text-sm font-medium text-foreground';
 @endphp
 <x-ui.container size="sm" padded>
+    @if ($maintenance->isDisputed())
+        <x-ui.alert variant="warning" role="status" class="mb-6" title="O proprietário contesta este registro" data-verification-disputed>
+            O selo é autêntico e foi emitido pela oficina abaixo, mas o proprietário atual do veículo diz que este serviço não foi feito no carro dele. A RevisaLog está analisando. Leve isso em conta.
+        </x-ui.alert>
+    @endif
+
     <x-ui.page-header eyebrow="Verificação pública RevisaLog" title="Selo da oficina confirmado">
         <x-slot:description>
             @if ($workshopName)

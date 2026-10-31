@@ -123,8 +123,10 @@ class OwnerArrivalAndScreenTest extends TestCase
             ->assertSee('Troca de óleo')
             ->assertSee('Filtro de óleo')
             ->assertSee('Vincular este registro ao meu histórico')
-            ->assertSee('Ocultar do histórico público')
             ->assertSee('Aceitar as notas fiscais e fotos da oficina')
+            // No lugar de "Ocultar do histórico público", que saiu: contestar marca, não esconde.
+            ->assertDontSee('Ocultar do histórico público')
+            ->assertSee('Este serviço não foi feito no meu carro')
             ->assertDontSee('CPF 123')
             ->assertDontSee('55,90');
     }
@@ -138,21 +140,45 @@ class OwnerArrivalAndScreenTest extends TestCase
             ->assertDontSee('data-workshop-records-card', false);
     }
 
-    public function test_web_decision_links_attaches_when_verified_and_hides(): void
+    public function test_web_decision_links_and_attaches_when_verified(): void
     {
         $vehicle = $this->ownerlessVehicle();
         $record = $this->withPendingAttachments($this->ownerlessRecord($this->workshopAccount(), $vehicle));
         $owner = $this->ownerOf($vehicle);
 
         $this->actingAs($owner)
-            ->post(route('user.workshop-records.decide', $record), ['link' => '1', 'attach_files' => '1', 'hide_from_public' => '1'])
+            ->post(route('user.workshop-records.decide', $record), ['link' => '1', 'attach_files' => '1'])
             ->assertRedirect()->assertSessionHas('success');
 
         $fresh = $record->fresh();
         $this->assertSame('linked', $fresh->owner_status);
         $this->assertSame('accepted', $fresh->attachments_status);
-        $this->assertNotNull($fresh->hidden_from_public_at);
         $this->assertSame($owner->tenant_id, $fresh->tenant_id);
+        // Ocultar saiu da decisão do proprietário: mesmo mandando o campo, nada é escondido.
+        $this->assertNull($fresh->hidden_from_public_at);
+    }
+
+    /**
+     * O histórico pertence ao chassi: o proprietário não tira mais um registro da consulta pública
+     * pelo formulário. O que ele tem é contestar (OwnerDisputeTest), e esconder virou ação da
+     * equipe (App\Services\Maintenance\MaintenancePublicVisibilityService).
+     */
+    public function test_the_owner_form_can_no_longer_hide_a_record(): void
+    {
+        $vehicle = $this->ownerlessVehicle();
+        $record = $this->ownerlessRecord($this->workshopAccount(), $vehicle);
+        $owner = $this->ownerOf($vehicle);
+
+        $this->actingAs($owner)
+            ->get(route('user.workshop-records.index'))
+            ->assertOk()
+            ->assertDontSee('name="hide_from_public"', escape: false);
+
+        $this->actingAs($owner)
+            ->post(route('user.workshop-records.decide', $record), ['link' => '0', 'hide_from_public' => '1'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertNull($record->fresh()->hidden_from_public_at);
     }
 
     public function test_web_decision_by_a_stranger_is_forbidden(): void

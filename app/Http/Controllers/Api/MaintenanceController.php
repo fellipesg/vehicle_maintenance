@@ -16,6 +16,7 @@ use App\Models\Workshop;
 use App\Services\Invoice\InvoiceUploadProcessor;
 use App\Services\Maintenance\MaintenanceWarrantyApplicator;
 use App\Services\Maintenance\OwnerlessMaintenanceService;
+use App\Services\Maintenance\WorkshopRecordsArrivalNotifier;
 use App\Services\Maintenance\WorkshopReviewService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Support\ApiResponse;
@@ -45,7 +46,9 @@ class MaintenanceController extends Controller
         Gate::authorize('viewAny', Maintenance::class);
 
         $user = $request->user();
-        $query = Maintenance::with(['vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'photos', 'invite']);
+        // verifiedWorkshop entra porque MaintenanceResource expõe provenance_card_label, que o lê:
+        // sem ele é lazy load (exceção fora de produção, uma consulta por registro em produção).
+        $query = Maintenance::with(['vehicle', 'user.workshop', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'verifiedWorkshop', 'photos', 'invite']);
 
         if ($user->isWorkshop() && $user->workshop) {
             $query->where('workshop_id', $user->workshop->id);
@@ -165,11 +168,15 @@ class MaintenanceController extends Controller
                 'is_manufacturer_required' => $isManufacturerRequired,
             ]);
 
-            if ($user->isWorkshop() && app(OwnerlessMaintenanceService::class)->isOwnerless($vehicle)) {
-                app(OwnerlessMaintenanceService::class)->markPending($maintenance);
-            }
+            $maintenance->setRelation('vehicle', $vehicle);
+            $maintenance = app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $user);
 
-            app(\App\Services\Maintenance\MaintenanceVerificationStamper::class)->stamp($maintenance, $user);
+            // Carro sem dono: o registro espera quem assumir o veículo.
+            $ownerless = app(OwnerlessMaintenanceService::class);
+
+            if ($user->isWorkshop() && $ownerless->isOwnerless($vehicle)) {
+                $maintenance = $ownerless->markPending($maintenance)->fresh();
+            }
 
             if ($request->has('items') && is_array($request->items)) {
                 foreach ($request->items as $itemData) {
@@ -216,6 +223,10 @@ class MaintenanceController extends Controller
 
             DB::commit();
 
+            if ($user->isWorkshop()) {
+                app(WorkshopRecordsArrivalNotifier::class)->notifyOwnerOfWorkshopRecord($maintenance);
+            }
+
             $uploadResult = $processor->parseStoredUploads($maintenance, $storedInvoices);
 
             $maintenance->load([
@@ -224,8 +235,9 @@ class MaintenanceController extends Controller
                 'invoices',
                 'checklists',
                 'vehicle',
-                'user',
+                'user.workshop',
                 'workshop',
+                'verifiedWorkshop',
                 'photos',
             ]);
 
@@ -270,13 +282,14 @@ class MaintenanceController extends Controller
     {
         $maintenance = Maintenance::with([
             'vehicle',
-            'user',
+            'user.workshop',
             'items.warranty',
             'generalWarranty',
             'warranties',
             'invoices',
             'checklists',
             'workshop',
+            'verifiedWorkshop',
             'photos',
             'invite',
         ])->findOrFail($id);
@@ -398,7 +411,7 @@ class MaintenanceController extends Controller
             [
                 'success' => true,
                 'data' => new MaintenanceResource($maintenance->fresh([
-                    'vehicle', 'user', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop',
+                    'vehicle', 'user.workshop', 'items.warranty', 'generalWarranty', 'invoices', 'checklists', 'workshop', 'verifiedWorkshop',
                 ])),
                 'message' => $records['failed'] === []
                     ? 'Maintenance updated successfully'

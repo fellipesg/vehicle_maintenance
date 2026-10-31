@@ -7,10 +7,12 @@ use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Workshop;
+use App\Services\Maintenance\MaintenancePublicVisibilityService;
 use App\Support\VehiclePlateSearch;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 /**
@@ -27,6 +29,31 @@ use Illuminate\Http\Request;
  */
 class MaintenanceController extends Controller
 {
+    public function __construct(
+        private MaintenancePublicVisibilityService $visibility,
+    ) {}
+
+    /**
+     * Tira o registro da consulta pública. É o fim da linha de uma contestação que a equipe
+     * confirmou (fraude, chassi errado) ou de um pedido de remoção que a empresa honre — e é só
+     * daqui que isso sai: o proprietário contesta, não oculta.
+     */
+    public function hide(Request $request, Maintenance $maintenance): RedirectResponse
+    {
+        $data = $request->validate(['hidden_reason' => ['nullable', 'string', 'max:500']]);
+
+        $this->visibility->hide($maintenance, $request->user(), $data['hidden_reason'] ?? null);
+
+        return back()->with('success', 'Registro oculto da consulta pública.');
+    }
+
+    public function restore(Maintenance $maintenance): RedirectResponse
+    {
+        $this->visibility->restore($maintenance);
+
+        return back()->with('success', 'Registro de volta na consulta pública.');
+    }
+
     public function index(Request $request): View
     {
         $filters = $this->filtersFrom($request);
@@ -35,7 +62,7 @@ class MaintenanceController extends Controller
         $counts = $this->provenanceCounts(clone $filtered);
 
         $maintenances = $filtered
-            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user'])
+            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user', 'hiddenBy', 'disputedBy'])
             ->when($filters['verified'] === '1', fn (Builder $query) => $query->whereNotNull('verified_at'))
             ->when($filters['verified'] === '0', fn (Builder $query) => $query->whereNull('verified_at'))
             ->orderBy('maintenance_date', $filters['direction'])
@@ -59,7 +86,7 @@ class MaintenanceController extends Controller
     }
 
     /**
-     * @return array{q: string, from: ?CarbonImmutable, to: ?CarbonImmutable, verified: string, user: ?int, vehicle: ?int, workshop: ?int, direction: string}
+     * @return array{q: string, from: ?CarbonImmutable, to: ?CarbonImmutable, verified: string, disputed: bool, user: ?int, vehicle: ?int, workshop: ?int, direction: string}
      */
     private function filtersFrom(Request $request): array
     {
@@ -75,6 +102,7 @@ class MaintenanceController extends Controller
             'from' => $from,
             'to' => $to,
             'verified' => in_array($request->query('verified'), ['1', '0'], true) ? $request->query('verified') : '',
+            'disputed' => $request->query('contestadas') === '1',
             'user' => $this->idFrom($request->query('usuario')),
             'vehicle' => $this->idFrom($request->query('veiculo')),
             'workshop' => $this->idFrom($request->query('oficina')),
@@ -86,11 +114,12 @@ class MaintenanceController extends Controller
      * Todos os filtros menos a procedência, que é o que o segmentado conta.
      *
      * @param  Builder<Maintenance>  $query
-     * @param  array{q: string, from: ?CarbonImmutable, to: ?CarbonImmutable, user: ?int, vehicle: ?int, workshop: ?int}  $filters
+     * @param  array{q: string, from: ?CarbonImmutable, to: ?CarbonImmutable, disputed: bool, user: ?int, vehicle: ?int, workshop: ?int}  $filters
      */
     private function applyFilters(Builder $query, array $filters): void
     {
         $query
+            ->when($filters['disputed'], fn (Builder $builder) => $builder->whereNotNull('owner_disputed_at'))
             ->when($filters['from'] !== null, fn (Builder $builder) => $builder->whereDate('maintenance_date', '>=', $filters['from']->toDateString()))
             ->when($filters['to'] !== null, fn (Builder $builder) => $builder->whereDate('maintenance_date', '<=', $filters['to']->toDateString()))
             ->when($filters['user'] !== null, fn (Builder $builder) => $builder->where('user_id', $filters['user']))
@@ -148,12 +177,16 @@ class MaintenanceController extends Controller
     /**
      * Filtros que vêm de outras telas (conta, veículo, oficina), com o nome para o chip removível.
      *
-     * @param  array{user: ?int, vehicle: ?int, workshop: ?int}  $filters
+     * @param  array{disputed: bool, user: ?int, vehicle: ?int, workshop: ?int}  $filters
      * @return list<array{param: string, label: string}>
      */
     private function contextFilters(array $filters): array
     {
         $chips = [];
+
+        if ($filters['disputed']) {
+            $chips[] = ['param' => 'contestadas', 'label' => 'Contestadas pelo proprietário'];
+        }
 
         if ($filters['user'] !== null) {
             $name = User::query()->whereKey($filters['user'])->value('name');
