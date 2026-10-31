@@ -7,8 +7,10 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Workshop;
 use App\Models\WorkshopMessageDispatch;
+use App\Models\WorkshopMessageOptOut;
 use App\Models\WorkshopMessageTemplate;
 use App\Notifications\WorkshopFollowUpNotification;
+use App\Services\FcmService;
 use App\Services\Workshop\WorkshopMessageTemplateDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -193,5 +195,142 @@ class WorkshopFollowUpDispatcherTest extends TestCase
         $this->artisan('maintenance:check-km-reminders')
             ->expectsOutputToContain('Follow-ups de oficina enviados: 1')
             ->assertExitCode(0);
+    }
+
+    public function test_does_not_send_anything_to_an_owner_opted_out_of_the_workshop(): void
+    {
+        Notification::fake();
+        $this->mock(FcmService::class)->shouldNotReceive('sendToUser');
+
+        ['owner' => $owner, 'workshop' => $workshop] = $this->scheduledFollowUpScenario();
+        WorkshopMessageOptOut::factory()->create([
+            'user_id' => $owner->id,
+            'workshop_id' => $workshop->id,
+        ]);
+
+        $sent = app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps();
+
+        $this->assertSame(0, $sent);
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('workshop_message_dispatches', 0);
+    }
+
+    public function test_global_opt_out_silences_every_workshop(): void
+    {
+        Notification::fake();
+        $this->mock(FcmService::class)->shouldNotReceive('sendToUser');
+
+        ['owner' => $owner] = $this->scheduledFollowUpScenario();
+        WorkshopMessageOptOut::factory()->everyWorkshop()->create(['user_id' => $owner->id]);
+
+        $sent = app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps();
+
+        $this->assertSame(0, $sent);
+        Notification::assertNothingSent();
+        $this->assertDatabaseCount('workshop_message_dispatches', 0);
+    }
+
+    public function test_opt_out_of_another_workshop_does_not_silence_this_one(): void
+    {
+        Mail::fake();
+        $this->mock(FcmService::class)->shouldReceive('sendToUser')->once()->andReturnTrue();
+
+        ['owner' => $owner] = $this->scheduledFollowUpScenario();
+        WorkshopMessageOptOut::factory()->create([
+            'user_id' => $owner->id,
+            'workshop_id' => Workshop::factory()->create()->id,
+        ]);
+
+        $sent = app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps();
+
+        $this->assertSame(1, $sent);
+        $this->assertDatabaseCount('workshop_message_dispatches', 1);
+    }
+
+    public function test_opt_out_of_one_workshop_leaves_another_owner_of_the_same_vehicle_receiving(): void
+    {
+        Mail::fake();
+        $this->mock(FcmService::class)->shouldReceive('sendToUser')->once()->andReturnTrue();
+
+        ['owner' => $owner, 'workshop' => $workshop, 'vehicle' => $vehicle] = $this->scheduledFollowUpScenario();
+        $otherOwner = User::factory()->asUser()->create();
+        $this->attachVehicleToUser($otherOwner, $vehicle);
+
+        WorkshopMessageOptOut::factory()->create([
+            'user_id' => $owner->id,
+            'workshop_id' => $workshop->id,
+        ]);
+
+        $sent = app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps();
+
+        $this->assertSame(1, $sent);
+        $this->assertDatabaseHas('workshop_message_dispatches', ['user_id' => $otherOwner->id]);
+        $this->assertDatabaseMissing('workshop_message_dispatches', ['user_id' => $owner->id]);
+    }
+
+    public function test_corrective_follow_up_also_respects_the_opt_out(): void
+    {
+        Notification::fake();
+        $this->mock(FcmService::class)->shouldNotReceive('sendToUser');
+
+        $owner = User::factory()->asUser()->create();
+        $workshop = Workshop::factory()->create();
+        $vehicle = Vehicle::factory()->create(['current_kilometers' => 55_000]);
+        $this->attachVehicleToUser($owner, $vehicle);
+
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $owner->id,
+            'tenant_id' => $owner->tenant_id,
+            'workshop_id' => $workshop->id,
+            'kilometers' => 50_000,
+            'maintenance_date' => '2026-03-01',
+            'service_category' => 'mechanical',
+        ]);
+
+        WorkshopMessageTemplate::factory()->forWorkshop($workshop)->correctiveFollowUp()->create([
+            'min_days_since_service' => 60,
+        ]);
+
+        WorkshopMessageOptOut::factory()->create([
+            'user_id' => $owner->id,
+            'workshop_id' => $workshop->id,
+        ]);
+
+        $this->assertSame(0, app(WorkshopMessageTemplateDispatcher::class)->dispatchFollowUps());
+        Notification::assertNothingSent();
+    }
+
+    /**
+     * Oficina com template de revisão programada, veículo a 10.000 km da próxima revisão e um dono
+     * atual — o cenário mínimo em que o follow-up sai.
+     *
+     * @return array{owner: User, workshop: Workshop, vehicle: Vehicle}
+     */
+    private function scheduledFollowUpScenario(): array
+    {
+        $owner = User::factory()->asUser()->create();
+        $workshop = Workshop::factory()->create();
+        $vehicle = Vehicle::factory()->create([
+            'current_kilometers' => 70_000,
+            'odometer_at_registration' => 70_000,
+        ]);
+        $this->attachVehicleToUser($owner, $vehicle);
+
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $owner->id,
+            'tenant_id' => $owner->tenant_id,
+            'workshop_id' => $workshop->id,
+            'kilometers' => 80_000,
+            'maintenance_date' => '2025-01-01',
+            'service_category' => 'mechanical',
+        ]);
+
+        WorkshopMessageTemplate::factory()->forWorkshop($workshop)->scheduledRevision()->create([
+            'lead_kilometers' => 2_000,
+        ]);
+
+        return ['owner' => $owner, 'workshop' => $workshop, 'vehicle' => $vehicle];
     }
 }

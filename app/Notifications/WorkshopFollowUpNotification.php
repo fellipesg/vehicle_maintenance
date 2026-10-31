@@ -5,11 +5,18 @@ namespace App\Notifications;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\WorkshopMessageTemplate;
+use App\Support\Workshop\WorkshopMessageConsent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Symfony\Component\Mime\Email;
 
+/**
+ * Mensagem que a oficina manda ao dono atual de um veículo que ela atendeu, com título e corpo
+ * escritos pela oficina. Respeita workshop_message_opt_outs (via WorkshopMessageConsent) em todos
+ * os canais, e o e-mail leva List-Unsubscribe de um clique para a rota assinada de descadastro.
+ */
 class WorkshopFollowUpNotification extends Notification implements ShouldQueue
 {
     use Queueable;
@@ -34,7 +41,19 @@ class WorkshopFollowUpNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        if (! $notifiable instanceof User) {
+            return ['mail', 'database'];
+        }
+
+        $consent = app(WorkshopMessageConsent::class);
+
+        if (! $consent->allows($notifiable->id, $this->template->workshop_id)) {
+            return [];
+        }
+
+        return $consent->allowsEmailTo($notifiable)
+            ? ['mail', 'database']
+            : ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -43,13 +62,46 @@ class WorkshopFollowUpNotification extends Notification implements ShouldQueue
 
         [$replyToAddress, $replyToName] = $this->replyTo();
 
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject($this->renderedTitle)
             ->replyTo($replyToAddress, $replyToName)
             ->greeting("Olá, {$ownerName}!")
             ->line($this->renderedBody)
-            ->action('Ver veículo', $this->vehicleUrl($notifiable))
-            ->salutation('RevisaLog');
+            ->action('Ver veículo', $this->vehicleUrl($notifiable));
+
+        $unsubscribeUrl = $this->unsubscribeUrl($notifiable);
+
+        if ($unsubscribeUrl !== null) {
+            $mail->line($this->disclosure())
+                ->line("Não quer mais mensagens desta oficina? [Descadastrar]({$unsubscribeUrl}).")
+                ->withSymfonyMessage(function (Email $message) use ($unsubscribeUrl): void {
+                    $message->getHeaders()->addTextHeader('List-Unsubscribe', '<'.$unsubscribeUrl.'>');
+                    $message->getHeaders()->addTextHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+                });
+        }
+
+        return $mail->salutation('RevisaLog');
+    }
+
+    /**
+     * Null quando o destinatário não é uma conta (o descadastro é por user_id e oficina).
+     */
+    public function unsubscribeUrl(object $notifiable): ?string
+    {
+        if (! $notifiable instanceof User) {
+            return null;
+        }
+
+        return app(WorkshopMessageConsent::class)
+            ->unsubscribeUrl($notifiable->id, $this->template->workshop_id);
+    }
+
+    private function disclosure(): string
+    {
+        $workshopName = $this->context['workshop_name'] ?? $this->template->workshop?->name;
+
+        return 'Você recebeu esta mensagem porque a oficina '.trim((string) $workshopName)
+            .' registrou um serviço no seu veículo no RevisaLog.';
     }
 
     /**
