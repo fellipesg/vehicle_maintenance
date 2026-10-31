@@ -298,10 +298,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->middleware('throttle:uploads')
             ->name('profile.update');
         Route::get('/manutencoes', [WorkshopMaintenanceController::class, 'index'])->name('maintenances.index');
-        // A etapa 1 busca veículo por placa (?license_plate=) e por chassi (?chassis=): é consulta,
-        // e entra no mesmo balde das outras (/buscar-veiculo, /verificar, /v/{code}).
+        // A etapa 1 busca veículo por placa (?license_plate=) e por chassi (?chassis=): é consulta, e
+        // leva balde próprio pela conta (não o `search`, por IP, que a tela dividiria com o tráfego
+        // anônimo do mesmo NAT — ver App\Providers\AppServiceProvider).
         Route::get('/manutencoes/nova', [WorkshopMaintenanceController::class, 'create'])
-            ->middleware('throttle:search')
+            ->middleware('throttle:workshop-vehicle-search')
             ->name('maintenances.create');
         Route::post('/manutencoes', [WorkshopMaintenanceController::class, 'store'])
             ->middleware('throttle:uploads')

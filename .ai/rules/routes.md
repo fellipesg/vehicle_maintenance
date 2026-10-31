@@ -34,14 +34,27 @@ token do app traz as duas (`App\Support\SanctumMobileToken::ABILITIES`). O certo
 `ApiResourceAbilitiesTest` lê as rotas registradas e trava a ability de cada uma, além de cobrir
 token com uma ability só; recurso novo com ability por método entra no provider dele.
 
-## Rota que busca veículo por identificador entra no balde `search`
+## Rota que busca veículo por identificador é limitada, e tela logada tem balde pela conta
 
 Toda tela que acha veículo a partir de placa, chassi ou RENAVAM é oráculo de enumeração e leva
-`throttle:search` (20/min por IP, `App\Providers\AppServiceProvider`), em qualquer portal — não só
-as públicas. Hoje: `/buscar-veiculo`, `/verificar`, `/v/{code}` e
-`GET /oficina/manutencoes/nova` (a etapa 1 da OS busca por `?license_plate=` e `?chassis=`). O limite
-não basta sozinho: o que cada perfil pode ver do veículo achado está em `.ai/rules/public-lookup.md`.
-A consulta por chassi da oficina na API tem balde próprio (`workshop-chassis-lookup`).
+`throttle`, em qualquer portal — não só as públicas. O balde `search` (20/min **por IP**,
+`App\Providers\AppServiceProvider`) é o das buscas abertas a visitante: `/verificar`, `/v/{code}`,
+`/convite/{token}` e a consignação.
+
+Tela de conta logada não divide esse balde: numa chave por IP a cota é gasta por estranhos, e
+`GET /oficina/manutencoes/nova` levava 429 na tela que registra serviço por causa de tráfego anônimo
+do mesmo NAT (ou de um colega de oficina atrás do mesmo IP). Ela tem balde próprio pela conta,
+`workshop-vehicle-search`, como a consulta por chassi da API já tinha o `workshop-chassis-lookup`:
+20/min por `user()?->id ?: ip()`. O teto continua valendo contra sondagem — conta de oficina é
+exatamente o que o visitante não tem — e um funcionário não cala o outro.
+
+`workshop-vehicle-search` devolve `Limit::none()` sem `license_plate` nem `chassis` no pedido: abrir
+o formulário não acha veículo nenhum, e cobrar ficha por isso fazia F5, "Trocar veículo" e o retorno
+de um erro de validação gastarem cota de consulta.
+
+`/buscar-veiculo` (portal do proprietário e do lojista) segue no `search` embora peça login: é a
+mesma dívida, não paga aqui. O limite não basta sozinho: o que cada perfil pode ver do veículo
+achado está em `.ai/rules/public-lookup.md`.
 
 ## Rota que manda e-mail para o endereço digitado tem balde próprio
 

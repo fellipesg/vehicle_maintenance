@@ -196,6 +196,67 @@ class WorkshopVehicleLookupPrivacyTest extends TestCase
             ->assertStatus(429);
     }
 
+    /**
+     * O balde `search` é só por IP e governa as buscas abertas: dividi-lo com esta tela fazia a
+     * oficina levar 429 por causa de tráfego de terceiro no mesmo NAT, na tela que registra serviço.
+     */
+    public function test_the_os_page_does_not_share_the_bucket_with_the_public_searches(): void
+    {
+        $user = $this->workshopUser();
+        $this->ownedVehicle('SHR1I11');
+
+        // Visitante no mesmo IP esgota o balde das buscas abertas.
+        for ($attempt = 1; $attempt <= 20; $attempt++) {
+            $this->get(route('verification.lookup', ['code' => 'ABC'.$attempt]))->assertOk();
+        }
+
+        $this->get(route('verification.lookup', ['code' => 'ABCX']))->assertStatus(429);
+
+        $this->actingAs($user)
+            ->get(route('workshop.maintenances.create', ['license_plate' => 'SHR1I11']))
+            ->assertOk();
+    }
+
+    /**
+     * Cada conta tem a sua cota: a oficina que sondou não cala a oficina vizinha no mesmo IP.
+     */
+    public function test_each_workshop_account_has_its_own_bucket(): void
+    {
+        $user = $this->workshopUser();
+        $neighbour = $this->workshopUser();
+        $this->ownedVehicle('OWN2J22');
+
+        for ($attempt = 1; $attempt <= 21; $attempt++) {
+            $this->actingAs($user)->get(route('workshop.maintenances.create', ['license_plate' => 'OWN2J'.str_pad((string) $attempt, 2, '0', STR_PAD_LEFT)]));
+        }
+
+        $this->actingAs($user)
+            ->get(route('workshop.maintenances.create', ['license_plate' => 'OWN2J22']))
+            ->assertStatus(429);
+
+        $this->actingAs($neighbour)
+            ->get(route('workshop.maintenances.create', ['license_plate' => 'OWN2J22']))
+            ->assertOk();
+    }
+
+    /**
+     * Abrir o formulário não acha veículo nenhum, então não gasta ficha — era o que fazia um erro de
+     * validação, um "Trocar veículo" ou um F5 custarem cota de consulta.
+     */
+    public function test_opening_the_form_without_an_identifier_costs_no_quota(): void
+    {
+        $user = $this->workshopUser();
+        $this->ownedVehicle('FRM3K33');
+
+        for ($attempt = 1; $attempt <= 25; $attempt++) {
+            $this->actingAs($user)->get(route('workshop.maintenances.create'))->assertOk();
+        }
+
+        $this->actingAs($user)
+            ->get(route('workshop.maintenances.create', ['license_plate' => 'FRM3K33']))
+            ->assertOk();
+    }
+
     public function test_the_chassis_lookup_of_an_owned_vehicle_still_says_nothing_about_the_car(): void
     {
         $user = $this->workshopUser();

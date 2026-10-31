@@ -20,8 +20,8 @@ VehicleIdentifierMask::chassis keeps 3 + 4 characters only on a 17-character VIN
 
 ## A busca de placa da oficina segue o mascaramento público
 `GET /oficina/manutencoes/nova` (etapa 1 da OS) busca veículo por placa e por chassi para qualquer
-conta de oficina, que nasce por autocadastro: a rota leva `throttle:search`, o mesmo balde de
-`/buscar-veiculo`, `/verificar` e `/v/{code}`. Sem vínculo com o veículo — a oficina não registrou
+conta de oficina, que nasce por autocadastro: a rota leva `throttle:workshop-vehicle-search`, balde
+próprio pela conta e não o `search`, que é por IP (`.ai/rules/routes.md`). Sem vínculo com o veículo — a oficina não registrou
 (`workshop_id`) nem selou (`verified_workshop_id`) nenhuma OS dele —
 `App\Support\Workshop\WorkshopVehicleVisibility::showsFullVehicle` devolve false e a tela mostra só
 o que a consulta pública mostra: marca, modelo, ano, cor e capa. Fora ficam **a placa atual** (o card
