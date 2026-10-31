@@ -82,6 +82,40 @@ Toda mudança no que conta recalcula na hora: `dispute`, `withdrawDispute`, `dec
 (MaintenanceOwnerDecisionService) e `hide`/`restore` (MaintenancePublicVisibilityService). Sem isso o
 veículo fica com o km velho até a próxima gravação qualquer.
 
+## Hodômetro: quilometragem implausível é recusada na entrada
+`VehicleMileageService::assertMaintenanceKilometers` não confere só os registros vizinhos: acima
+deles vale o **teto de plausibilidade** derivado do ano do veículo
+(`VehicleMileageService::plausibilityCeiling`, 422 em pt-BR). Ele é o único teto no caso comum — uma
+oficina registrando pela primeira vez, sem OS posterior —, em que antes `max:9999999` deixava passar
+500.000 km num carro 2024. O número não fica só no registro: vira o `current_kilometers` e o piso de
+toda OS seguinte, então um dígito a mais travava o veículo até um admin ocultar o registro
+(`MaintenancePublicVisibilityService`). Recusar na entrada é mais barato que desfazer.
+
+O teto é `PLAUSIBILITY_BASE_KILOMETERS` (50.000 km) + `PLAUSIBILITY_KILOMETERS_PER_YEAR`
+(100.000 km) por ano de vida, com o ano-modelo contando inteiro. A folga é grande de propósito —
+~274 km/dia, todos os dias, contra os 13.000 km/ano da média brasileira
+(`config('maintenance_intervals.average_kilometers_per_year')`) e os 50.000 a 80.000 de um táxi: o
+teto só pega quem digitou um dígito a mais, porque recusar um veículo real é pior que aceitar um
+número alto. **Não aperte a folga sem o caso de uso na mão.**
+
+Dois casos em que o teto **não** recusa um veículo real, os dois com teste
+(`tests/Feature/VehicleMileagePlausibilityTest.php`):
+
+- **veículo sem ano conhecido** (ano zero/nulo): não há teto nenhum — não há de onde derivar, e
+  chutar um ano seria recusar por chute;
+- **veículo que já roda acima do teto derivado do ano**, legitimamente (frota, caminhão, veículo antigo com rodagem
+  alta) ou não (erro ainda não suprimido): o teto fica um ano de folga **acima** do que o veículo já
+  registra (piso da data, `current_kilometers`, `odometer_at_registration`). Parar na leitura atual
+  deixaria a faixa vazia — o veículo não somaria nem um km — e seria exatamente recusar quem roda
+  muito, o que a regra existe para não fazer.
+
+O guard é **uma** implementação no serviço: as quatro superfícies que gravam km
+(`StoreMaintenanceRequest`, `UpdateMaintenanceRequest`, formulário do proprietário e da oficina na
+web) chamam o serviço e não repetem a regra na validação. `max:9999999` continua lá só como limite
+de coluna. O teto entra na faixa que o formulário mostra: `MaintenanceMileageContext` manda o `year`
+e `resources/js/utils/maintenance-kilometers.js` espelha as duas constantes — mude os dois juntos
+(`.ai/rules/js.md`).
+
 ## OS sem proprietário: tenant nulo, estado na própria manutenção
 Uma OS que a oficina registra num veículo sem dono atual nasce com tenant_id nulo (VehicleTenantResolver não decide mais isso; OwnerlessMaintenanceService::tenantIdFor) e owner_status pending. As colunas owner_status (pending|linked|declined), attachments_status (none|pending|accepted|declined|revoked), hidden_from_public_at e owner_decided_* não são fillable: só OwnerlessMaintenanceService e MaintenanceOwnerDecisionService gravam. owner_status nulo = OS comum. Invoice e MaintenancePhoto criados voltam attachments_status a pending (nunca depois de accepted).
 

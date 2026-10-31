@@ -150,12 +150,14 @@ class WorkshopSealOnThirdPartyVehicleTest extends TestCase
 
         [$owner, $vehicle] = $this->ownedVehicle();
 
+        // Alto o bastante para dominar o hodômetro, mas dentro do teto de plausibilidade do ano do
+        // veículo (.ai/rules/models.md): 9.999.999 km agora é recusado na entrada.
         $this->actingAs($this->workshopAccount())
-            ->post('/oficina/manutencoes', $this->payload(['kilometers' => 9_999_999]))
+            ->post('/oficina/manutencoes', $this->payload(['kilometers' => 300_000]))
             ->assertSessionHasNoErrors();
 
         $maintenance = Maintenance::firstOrFail();
-        $this->assertSame(9_999_999, $vehicle->fresh()->current_kilometers);
+        $this->assertSame(300_000, $vehicle->fresh()->current_kilometers);
 
         app(MaintenanceOwnerDecisionService::class)->dispute($maintenance, $owner, 'Nunca levei aqui.');
 
