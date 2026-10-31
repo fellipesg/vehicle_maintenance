@@ -26,6 +26,7 @@ use App\Support\AppStorage;
 use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\WorkshopMaintenanceFilters;
 use App\Support\VehiclePlateSearch;
+use App\Support\Workshop\WorkshopVehicleVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -127,6 +128,12 @@ class MaintenanceController extends Controller
             }
         }
 
+        $vehicleHasOwner = $vehicle !== null && $vehicle->hasCurrentOwner();
+        // Só a consulta exata de 17 caracteres resolve veículo pelo chassi (chassi curto cai em
+        // $chassisInvalid), e veículo com dono já saiu daqui como $chassisOwned: chegar com veículo
+        // por este caminho é a oficina estar com o carro ou com o documento na mão.
+        $foundByFullChassis = $chassis !== '' && $vehicle !== null;
+
         return view('workshop.maintenances.create', array_merge(
             [
                 'workshop' => $workshop,
@@ -137,7 +144,12 @@ class MaintenanceController extends Controller
                 'chassisInvalid' => $chassisInvalid,
                 'creatingVehicle' => $creatingVehicle,
                 'lookup' => $lookup,
-                'vehicleHasOwner' => $vehicle !== null && $vehicle->hasCurrentOwner(),
+                'vehicleHasOwner' => $vehicleHasOwner,
+                'showsFullVehicle' => $vehicle === null || WorkshopVehicleVisibility::showsFullVehicle(
+                    $workshop,
+                    $vehicle,
+                    $foundByFullChassis,
+                ),
             ],
             $this->warrantyTemplateOptions($workshop),
         ));

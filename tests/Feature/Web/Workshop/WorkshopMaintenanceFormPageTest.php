@@ -74,7 +74,10 @@ class WorkshopMaintenanceFormPageTest extends TestCase
     public function test_found_vehicle_shows_the_vehicle_card_and_the_numbered_sections(): void
     {
         $user = $this->workshopUser();
-        $this->ownedVehicle('ABC1D23', ['current_kilometers' => 45000]);
+        // A oficina já atendeu este veículo: o card mostra placa e quilometragem
+        // (WorkshopVehicleLookupPrivacyTest cobre o card de quem não tem vínculo).
+        $vehicle = $this->ownedVehicle('ABC1D23', ['current_kilometers' => 45000]);
+        $this->sealedOrder($user, ['vehicle_id' => $vehicle->id]);
 
         $xpath = $this->page($this->actingAs($user)->get(route('workshop.maintenances.create', ['license_plate' => 'abc1d23'])));
 

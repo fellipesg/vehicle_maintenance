@@ -11,7 +11,9 @@
     use App\Enums\WorkshopMessageTrigger;
     use App\Enums\ServiceCategory;
 
-    $triggerOptions = WorkshopMessageTrigger::options();
+    // Só os gatilhos com rodada no dispatcher: escolher um sem rodada criava modelo que nunca
+    // manda mensagem (WorkshopMessageTrigger::isDispatchable).
+    $triggerOptions = WorkshopMessageTrigger::dispatchableOptions();
     $categoryOptions = collect(ServiceCategory::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all();
 @endphp
 
@@ -61,7 +63,8 @@
         </x-ui.form-section>
 
         <x-ui.form-section title="Status">
-            <x-ui.checkbox name="is_active" value="1" :checked="old('is_active', $template?->is_active ?? true)" label="Modelo ativo" hint="Modelos inativos não disparam mensagens." />
+            <x-ui.switch name="is_active" label="Modelo ativo" :checked="(bool) ($template?->is_active ?? true)"
+                         description="Ativo: entra na rodada diária de mensagens. Inativo: não dispara e não conta no limite do plano." />
         </x-ui.form-section>
 
         <div class="flex gap-3">

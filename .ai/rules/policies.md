@@ -17,6 +17,16 @@ VehiclePolicy::link allows the current owner, and any account when no other tena
 ## OS sem proprietário: oculta e anexos pendentes
 MaintenancePolicy::view nega a OS oculta (hidden_from_public_at) para quem não é a oficina autora nem quem ocultou. InvoicePolicy::view nega a nota enquanto Maintenance::hidesAttachmentsFrom (OS sem dono sem aceite do proprietário), exceto para a oficina autora e para o dono atual com posse comprovada (prévia, ver models.md); o dono sem comprovação continua de fora. Só o dono atual (VehiclePolicy::update) decide (MaintenanceOwnerDecisionService::decide).
 
+## A oficina é da conta: `WorkshopPolicy::view` escopa por tenant
+`WorkshopPolicy::view` compara `tenant_id`, como `update` e `delete` — ele devolvia `true` sem
+checar nada. Os únicos consumidores são `WarrantyTemplateController::index` e `::show`, então era por
+ali que qualquer conta do app lia nome, prazo e termo de garantia de **qualquer** oficina. O
+diretório de oficinas (`GET /api/v1/workshops`, `/api/v1/workshops/{id}`, `/usuario/oficinas`) não
+passa por policy nenhuma e continua aberto; `viewAny` não tem consumidor. A ability não substitui a
+policy: `workshops:read` diz que o token pode ler oficina, a policy diz **qual**. As duas rotas que
+chamam `view` ficam com `ability:workshops:read` (ver a regra de `middlewareFor` em
+`.ai/rules/routes.md`).
+
 ## Fotos: o recurso por conta vem antes de tudo
 MaintenancePhotoPolicy::view/create/delete negam primeiro quando a conta não tem as fotos das manutenções (App\Support\Maintenance\MaintenancePhotoAccess, flag Pennant ligada pelo admin; ver features.md) e só depois seguem a MaintenancePolicy. O envio pela API passa por `create` (StoreMaintenancePhotoRequest). Foto negada nunca ganha URL assinada, e as rotas autorizadas (API e web) respondem 403.
 

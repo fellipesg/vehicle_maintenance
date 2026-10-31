@@ -6,12 +6,17 @@
       convite para o cliente e "Tentar outra placa".
     - Com veículo: card do veículo (role="status") com miniatura, placa, ano, cor e a última
       quilometragem, e "Trocar veículo". Na edição ($readonly) o card não tem troca.
+      Sem $showsFullVehicle (veículo achado pela placa e sem OS desta oficina — com dono ou sem, ver
+      App\Support\Workshop\WorkshopVehicleVisibility) o card fica no que a consulta pública mostra:
+      a placa de volta é a que foi digitada, nunca a atual do veículo, e a quilometragem sai.
 
     Pelo chassi (?chassis=): veículo com proprietário não mostra nada do carro (só manda usar a placa);
-    sem proprietário é reaproveitado; inexistente é criado junto com a OS (marca, modelo e ano).
+    sem proprietário é reaproveitado e aparece inteiro (os 17 caracteres exatos são a posse do carro);
+    inexistente é criado junto com a OS (marca, modelo e ano).
 
     Variáveis: $vehicle, $licensePlate, $chassis, $chassisOwned, $chassisInvalid, $creatingVehicle,
-    $lookup (App\Support\Vehicle\VehicleLookupResult), $vehicleHasOwner e $readonly.
+    $lookup (App\Support\Vehicle\VehicleLookupResult), $vehicleHasOwner, $showsFullVehicle e
+    $readonly. $showsFullVehicle é sempre explícito: quem esquecer recebe o card reduzido.
 --}}
 @php
     use App\Support\Vehicle\VehicleLookupResult;
@@ -22,9 +27,12 @@
     $chassisInvalid = $chassisInvalid ?? false;
     $creatingVehicle = $creatingVehicle ?? false;
     $licensePlate = $licensePlate ?? '';
+    $showsFullVehicle = $showsFullVehicle ?? false;
     $vehicleName = $vehicle ? trim($vehicle->brand.' '.$vehicle->model) : null;
     $vehicleMeta = $vehicle ? collect([$vehicle->year, $vehicle->color])->filter(fn ($part) => filled($part))->implode(' · ') : '';
     $matchedPreviousPlate = ($lookup ?? null)?->matchedBy === VehicleLookupResult::MATCH_PREVIOUS_PLATE;
+    // Sem acesso ao veículo inteiro, a placa que volta é a que a oficina digitou: ela já a conhece.
+    $plateOnCard = $showsFullVehicle ? $vehicle?->license_plate : ($licensePlate !== '' ? $licensePlate : null);
     $inviteText = 'Crie sua conta grátis no RevisaLog e adicione o seu veículo para receber o histórico de manutenção com o Selo da oficina: '.route('register');
 @endphp
 
@@ -39,17 +47,23 @@
                     <p class="text-sm text-muted-foreground">{{ $vehicleMeta }}</p>
                 @endif
                 <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                    @if(filled($vehicle->license_plate))
-                        <span class="rounded-md border border-border-strong bg-surface px-1.5 py-px font-mono text-xs tracking-wider text-foreground"><span class="sr-only">Placa </span>{{ $vehicle->license_plate }}</span>
+                    @if(filled($plateOnCard))
+                        <span class="rounded-md border border-border-strong bg-surface px-1.5 py-px font-mono text-xs tracking-wider text-foreground"><span class="sr-only">Placa </span>{{ $plateOnCard }}</span>
                     @else
                         <span class="text-muted-foreground">Placa não informada</span>
                     @endif
-                    @if($vehicle->current_kilometers !== null)
-                        <span class="text-muted-foreground">Última quilometragem registrada: <span class="font-medium text-foreground tabular-nums">{{ number_format((int) $vehicle->current_kilometers, 0, ',', '.') }} km</span></span>
+                    @if($showsFullVehicle && $vehicle->current_kilometers !== null)
+                        <span class="text-muted-foreground" data-vehicle-kilometers>Última quilometragem registrada: <span class="font-medium text-foreground tabular-nums">{{ number_format((int) $vehicle->current_kilometers, 0, ',', '.') }} km</span></span>
                     @endif
                 </p>
                 @if($matchedPreviousPlate && ! $readonly)
-                    <p class="mt-1 text-sm text-muted-foreground">A placa {{ $licensePlate }} é antiga: o veículo usa hoje a placa {{ $vehicle->license_plate }}.</p>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        @if($showsFullVehicle)
+                            A placa {{ $licensePlate }} é antiga: o veículo usa hoje a placa {{ $vehicle->license_plate }}.
+                        @else
+                            A placa {{ $licensePlate }} é antiga: o veículo usa outra placa hoje.
+                        @endif
+                    </p>
                 @endif
             </div>
             @unless($readonly)

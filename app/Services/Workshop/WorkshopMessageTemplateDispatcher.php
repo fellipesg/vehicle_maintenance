@@ -19,6 +19,20 @@ use Illuminate\Support\Facades\DB;
 
 class WorkshopMessageTemplateDispatcher
 {
+    /**
+     * Veículos (ou OS) por lote na rodada diária.
+     */
+    private const CHUNK = 100;
+
+    /**
+     * Contas que já receberam mensagem de oficina dentro do intervalo mínimo, nesta rodada: a
+     * consulta sai uma vez por conta, e o que esta rodada manda também conta. Zerada no começo de
+     * dispatchFollowUps().
+     *
+     * @var array<int, bool>
+     */
+    private array $messagedRecently = [];
+
     public function __construct(
         private readonly VehicleEstimatedKmService $estimatedKm,
         private readonly VehicleMaintenanceReminderService $reminders,
@@ -29,9 +43,14 @@ class WorkshopMessageTemplateDispatcher
     public function dispatchFollowUps(): int
     {
         $sent = 0;
+        $this->messagedRecently = [];
 
         WorkshopMessageTemplate::query()
             ->where('is_active', true)
+            // Modelo ativo com gatilho sem rodada (WorkshopMessageTrigger::isDispatchable) fica de
+            // fora: ele não tem o que disparar, e no match abaixo derrubava a rodada de todas as
+            // oficinas com UnhandledMatchError.
+            ->whereIn('trigger', WorkshopMessageTrigger::dispatchableValues())
             ->with('workshop')
             ->orderBy('id')
             ->chunkById(50, function (Collection $templates) use (&$sent): void {
@@ -39,6 +58,9 @@ class WorkshopMessageTemplateDispatcher
                     $sent += match ($template->trigger) {
                         WorkshopMessageTrigger::ScheduledRevision => $this->dispatchScheduledTemplate($template),
                         WorkshopMessageTrigger::CorrectiveFollowUp => $this->dispatchCorrectiveTemplate($template),
+                        // Gatilho marcado com rodada antes de a rodada existir: nada sai, mas a
+                        // rodada das outras oficinas continua.
+                        default => 0,
                     };
                 }
             });
@@ -55,45 +77,46 @@ class WorkshopMessageTemplateDispatcher
             ->distinct()
             ->pluck('vehicle_id');
 
-        foreach ($vehicleIds as $vehicleId) {
-            $vehicle = Vehicle::query()
-                ->with('maintenances')
-                ->find($vehicleId);
-
-            if ($vehicle === null) {
-                continue;
-            }
-
-            $estimatedKm = $this->estimatedKm->estimate($vehicle);
-            $summary = $this->reminders->summarizeAtKilometers($vehicle, $estimatedKm);
-            $nextDue = $summary['next_due_kilometers'];
-
-            if ($nextDue === null) {
-                continue;
-            }
-
-            $leadKm = $template->lead_kilometers
-                ?: (int) config('maintenance_intervals.notify_before_kilometers', 2_000);
-
-            if (($summary['kilometers_remaining'] ?? PHP_INT_MAX) > $leadKm) {
-                continue;
-            }
-
-            $owners = $this->currentOwnersForVehicle($vehicle);
-
-            foreach ($owners as $owner) {
-                if ($this->dispatchToOwner(
-                    $template,
-                    $owner,
-                    $vehicle,
-                    (string) $nextDue,
-                    $estimatedKm,
-                    $nextDue,
-                )) {
-                    $sent++;
-                }
-            }
+        if ($vehicleIds->isEmpty()) {
+            return 0;
         }
+
+        $leadKm = $template->lead_kilometers
+            ?: (int) config('maintenance_intervals.notify_before_kilometers', 2_000);
+
+        Vehicle::query()
+            ->with('maintenances')
+            ->whereIn('id', $vehicleIds)
+            ->chunkById(self::CHUNK, function (Collection $vehicles) use ($template, $leadKm, &$sent): void {
+                $ownersByVehicle = $this->currentOwnersByVehicle(new Collection($vehicles->modelKeys()));
+
+                foreach ($vehicles as $vehicle) {
+                    $estimatedKm = $this->estimatedKm->estimate($vehicle);
+                    $summary = $this->reminders->summarizeAtKilometers($vehicle, $estimatedKm);
+                    $nextDue = $summary['next_due_kilometers'];
+
+                    if ($nextDue === null) {
+                        continue;
+                    }
+
+                    if (($summary['kilometers_remaining'] ?? PHP_INT_MAX) > $leadKm) {
+                        continue;
+                    }
+
+                    foreach ($ownersByVehicle[$vehicle->id] ?? [] as $owner) {
+                        if ($this->dispatchToOwner(
+                            $template,
+                            $owner,
+                            $vehicle,
+                            (string) $nextDue,
+                            $estimatedKm,
+                            $nextDue,
+                        )) {
+                            $sent++;
+                        }
+                    }
+                }
+            });
 
         return $sent;
     }
@@ -109,52 +132,102 @@ class WorkshopMessageTemplateDispatcher
             ->whereNotNull('workshop_id')
             ->whereDate('maintenance_date', '<=', $cutoffDate);
 
+        // Sem a janela, uma oficina que liga o modelo hoje dispara para todo o histórico dela de
+        // uma vez: a OS de três anos atrás também está "a mais de minDays do serviço".
+        $windowDays = (int) config('workshop_messages.send_window_days', 60);
+
+        if ($windowDays > 0) {
+            $maintenancesQuery->whereDate(
+                'maintenance_date',
+                '>=',
+                now()->subDays($minDays + $windowDays)->startOfDay(),
+            );
+        }
+
         if ($template->service_category !== null) {
             $maintenancesQuery->where('service_category', $template->service_category);
         }
 
-        $maintenances = $maintenancesQuery
+        $maintenancesQuery
             ->with('vehicle.maintenances')
-            ->orderBy('id')
-            ->get();
+            ->chunkById(self::CHUNK, function (Collection $maintenances) use ($template, &$sent): void {
+                $ownersByVehicle = $this->currentOwnersByVehicle(
+                    $maintenances->pluck('vehicle_id')->filter()->unique()->values(),
+                );
 
-        foreach ($maintenances as $maintenance) {
-            $vehicle = $maintenance->vehicle;
+                foreach ($maintenances as $maintenance) {
+                    $vehicle = $maintenance->vehicle;
 
-            if ($vehicle === null) {
-                continue;
-            }
+                    if ($vehicle === null) {
+                        continue;
+                    }
 
-            $estimatedKm = $this->estimatedKm->estimate($vehicle);
-            $owners = $this->currentOwnersForVehicle($vehicle);
+                    $estimatedKm = $this->estimatedKm->estimate($vehicle);
 
-            foreach ($owners as $owner) {
-                if ($this->dispatchToOwner(
-                    $template,
-                    $owner,
-                    $vehicle,
-                    (string) $maintenance->id,
-                    $estimatedKm,
-                    null,
-                    $maintenance,
-                )) {
-                    $sent++;
+                    foreach ($ownersByVehicle[$vehicle->id] ?? [] as $owner) {
+                        if ($this->dispatchToOwner(
+                            $template,
+                            $owner,
+                            $vehicle,
+                            (string) $maintenance->id,
+                            $estimatedKm,
+                            null,
+                            $maintenance,
+                        )) {
+                            $sent++;
+                        }
+                    }
                 }
-            }
-        }
+            });
 
         return $sent;
     }
 
     /**
-     * @return Collection<int, User>
+     * Donos atuais de um lote de veículos, em duas consultas: a rodada diária fazia uma por veículo
+     * por template. O filtro é o mesmo de User::currentVehicles() — que não pode ser carregado em
+     * lote, porque lê o tenant_id de uma conta só.
+     *
+     * @param  Collection<int, int|string>  $vehicleIds
+     * @return array<int, list<User>>
      */
-    private function currentOwnersForVehicle(Vehicle $vehicle): Collection
+    private function currentOwnersByVehicle(Collection $vehicleIds): array
     {
-        return User::query()
-            ->whereIn('user_type', ['user', 'garage'])
-            ->whereHas('currentVehicles', fn ($query) => $query->where('vehicles.id', $vehicle->id))
-            ->get();
+        if ($vehicleIds->isEmpty()) {
+            return [];
+        }
+
+        // Postgres rejects "boolean = 1"; use a SQL boolean literal.
+        $links = DB::table('user_vehicles')
+            ->join('users', 'users.id', '=', 'user_vehicles.user_id')
+            ->whereIn('user_vehicles.vehicle_id', $vehicleIds)
+            ->whereRaw('user_vehicles.is_current_owner = true')
+            ->whereIn('users.user_type', ['user', 'garage'])
+            ->whereRaw('(users.tenant_id is null or users.tenant_id = user_vehicles.tenant_id)')
+            ->orderBy('users.id')
+            ->get(['user_vehicles.vehicle_id', 'user_vehicles.user_id']);
+
+        if ($links->isEmpty()) {
+            return [];
+        }
+
+        $owners = User::query()
+            ->whereIn('id', $links->pluck('user_id')->unique()->values())
+            ->get()
+            ->keyBy('id');
+
+        $byVehicle = [];
+
+        foreach ($links as $link) {
+            $owner = $owners->get((int) $link->user_id);
+
+            if ($owner !== null) {
+                // A chave do dono evita repetir a conta que tem duas linhas para o mesmo veículo.
+                $byVehicle[(int) $link->vehicle_id][(int) $link->user_id] = $owner;
+            }
+        }
+
+        return array_map(array_values(...), $byVehicle);
     }
 
     private function dispatchToOwner(
@@ -171,6 +244,12 @@ class WorkshopMessageTemplateDispatcher
         }
 
         if ($this->alreadyDispatched($template, $owner, $vehicle, $dedupeKey)) {
+            return false;
+        }
+
+        // Fora do intervalo mínimo o envio não acontece e nada é gravado: a próxima rodada tenta de
+        // novo, porque o dedupe desta oportunidade continua livre.
+        if ($this->isWithinQuietPeriod($owner)) {
             return false;
         }
 
@@ -207,9 +286,33 @@ class WorkshopMessageTemplateDispatcher
             ));
         });
 
+        $this->messagedRecently[$owner->id] = true;
+
         $this->sendPushNotification($owner, $template, $vehicle, $title, $body, $nextDueKm, $sourceMaintenance?->id);
 
         return true;
+    }
+
+    /**
+     * O cliente recebeu mensagem de oficina há pouco?
+     *
+     * O intervalo mínimo (config('workshop_messages.min_days_between_messages_per_user')) vale
+     * somando todas as oficinas e todos os modelos: duas oficinas que atenderam o mesmo carro, ou
+     * dois modelos da mesma oficina, não falam com a pessoa na mesma semana. A coluna sent_at tem
+     * índice com user_id para esta consulta. Zero ou menos desliga a guarda.
+     */
+    private function isWithinQuietPeriod(User $owner): bool
+    {
+        $minDays = (int) config('workshop_messages.min_days_between_messages_per_user', 7);
+
+        if ($minDays <= 0) {
+            return false;
+        }
+
+        return $this->messagedRecently[$owner->id] ??= WorkshopMessageDispatch::query()
+            ->where('user_id', $owner->id)
+            ->where('sent_at', '>=', now()->subDays($minDays))
+            ->exists();
     }
 
     private function alreadyDispatched(

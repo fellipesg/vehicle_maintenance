@@ -12,9 +12,16 @@ class WorkshopPolicy
         return true;
     }
 
-    public function view(?User $user, Workshop $workshop): bool
+    /**
+     * A oficina é da conta: só o mesmo tenant lê o cadastro dela. Sem a condição, qualquer conta
+     * autenticada com a ability workshops:read lia nome, prazo e termo de garantia de qualquer
+     * oficina pelos dois únicos consumidores deste método (WarrantyTemplateController::index e
+     * ::show). O diretório de oficinas (GET /api/v1/workshops e /usuario/oficinas) não passa por
+     * policy e continua aberto.
+     */
+    public function view(User $user, Workshop $workshop): bool
     {
-        return true;
+        return $workshop->tenant_id === $user->tenant_id;
     }
 
     public function create(User $user): bool
