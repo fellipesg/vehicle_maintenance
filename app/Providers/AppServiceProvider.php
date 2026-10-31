@@ -106,22 +106,23 @@ class AppServiceProvider extends ServiceProvider
             'workshop-chassis|'.($request->user()?->id ?: $request->ip()),
         ));
 
-        // A etapa 1 da OS acha veículo por placa e por chassi, então é oráculo de enumeração como as
-        // buscas públicas — mas é tela de conta logada, e no balde `search` (só por IP) a oficina
-        // levava 429 por tráfego de terceiro: dois funcionários atrás do mesmo NAT se atrapalhavam, e
+        // Busca de veículo por identificador em tela que exige login (`?identifier=` do
+        // /buscar-veiculo, `?license_plate=` e `?chassis=` da etapa 1 da OS): é oráculo de
+        // enumeração como as buscas abertas, mas o balde `search` é só por IP, e ali a cota de quem
+        // tem conta era gasta por estranhos — dois funcionários atrás do mesmo NAT se atrapalhavam, e
         // qualquer pessoa na mesma rede usando /verificar ou /v/{code} esgotava a cota da tela que
-        // registra serviço. Balde próprio pela conta, como o da consulta por chassi: quem sonda
-        // responde pela conta, que é o que a oficina tem e o visitante não.
-        RateLimiter::for('workshop-vehicle-search', function (Request $request) {
-            // Abrir o formulário vazio não acha veículo nenhum: só gasta ficha quem manda
-            // identificador. (Depois de um erro de validação o old input repete uma placa que a
-            // própria conta já enviou, então isso não abre caminho de sondagem.)
-            if (! $request->filled('license_plate') && ! $request->filled('chassis')) {
+        // registra serviço. A chave é a conta: quem sonda responde por ela, que é o que o visitante
+        // não tem. O IP fica só de reserva, para o caso de a rota perder o `auth`.
+        RateLimiter::for('account-vehicle-search', function (Request $request) {
+            // Formulário abrindo vazio não acha veículo nenhum: só gasta ficha quem manda
+            // identificador. (Depois de um erro de validação o old input repete um identificador que
+            // a própria conta já enviou, então isso não abre caminho de sondagem.)
+            if (! $request->anyFilled(['identifier', 'license_plate', 'chassis'])) {
                 return Limit::none();
             }
 
             return Limit::perMinute(20)->by(
-                'workshop-vehicle-search|'.($request->user()?->id ?: $request->ip()),
+                'account-vehicle-search|'.($request->user()?->id ?: $request->ip()),
             );
         });
 
