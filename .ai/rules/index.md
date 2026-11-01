@@ -39,12 +39,13 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
 | app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php,app/Services/Vehicle/VehicleMileageService.php,app/Services/Maintenance/MaintenancePublicVisibilityService.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
+| app/Services/Workshop/WorkshopMessageTemplateDispatcher.php,app/Enums/WorkshopMessageTrigger.php,app/Enums/WorkshopPlan.php,app/Support/Workshop/WorkshopPlanLimits.php,app/Support/WorkshopMessageTemplateRenderer.php,config/workshop_messages.php,resources/views/workshop/message-templates/** | .ai/rules/workshop-messages.md |
 | resources/views/pdfs/vehicle_maintenance_export.blade.php,app/Services/Vehicle/VehiclePdfMaintenancePhotos.php,app/Services/Vehicle/VehicleMaintenancePdfExporter.php,app/Services/Vehicle/VehiclePdfExportService.php,app/Http/Controllers/Api/VehiclePdfExportController.php,app/Http/Controllers/Web/User/VehiclePdfExportDownloadController.php,app/Console/Commands/CleanupVehiclePdfExports.php | .ai/rules/pdfs.md |
 | app/Policies/** | .ai/rules/policies.md |
 | routes/*.php | .ai/rules/routes.md |
 | bootstrap/app.php,app/Support/PortalAccess.php,app/Support/FriendlyHttpErrors.php,app/Http/Controllers/Web/Auth/**,app/Http/Controllers/Web/AuthController.php | .ai/rules/portal-access.md |
 | resources/views/layouts/**,app/Enums/Portal.php | .ai/rules/portal-shell.md |
-| app/Http/Controllers/Web/Public*,resources/views/public/**,app/Http/Resources/Api/V1/**,app/Support/Vehicle/VehicleIdentifierVisibility.php,app/Support/Vehicle/VehicleIdentifierMask.php | .ai/rules/public-lookup.md |
+| app/Http/Controllers/Web/Public*,resources/views/public/**,app/Http/Resources/Api/V1/**,app/Support/Vehicle/VehicleIdentifierVisibility.php,app/Support/Vehicle/VehicleIdentifierMask.php,app/Support/Workshop/WorkshopVehicleVisibility.php,app/Http/Controllers/Web/Workshop/MaintenanceController.php,resources/views/workshop/maintenances/** | .ai/rules/public-lookup.md |
 | scripts/crop-brand-assets.php | .ai/rules/scripts.md |
 | app/Support/DemoWorkshopLogoGenerator.php | .ai/rules/support.md |
 | resources/css/provenance.css | .ai/rules/theme.md |

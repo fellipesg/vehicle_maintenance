@@ -143,8 +143,10 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth', 'tenant'])->group(function () {
+    // Busca por identificador de quem está logado: mesmo balde da etapa 1 da OS, pela conta. No
+    // `search` (por IP) a cota do portal era gasta por visitante da mesma rede.
     Route::get('/buscar-veiculo', [PublicVehicleController::class, 'search'])
-        ->middleware('throttle:search')
+        ->middleware('throttle:account-vehicle-search')
         ->name('vehicle.search');
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -312,7 +314,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
             ->middleware('throttle:uploads')
             ->name('profile.update');
         Route::get('/manutencoes', [WorkshopMaintenanceController::class, 'index'])->name('maintenances.index');
-        Route::get('/manutencoes/nova', [WorkshopMaintenanceController::class, 'create'])->name('maintenances.create');
+        // A etapa 1 busca veículo por placa (?license_plate=) e por chassi (?chassis=): é consulta, e
+        // leva o balde das buscas de conta logada, não o `search`, que é por IP
+        // (App\Providers\AppServiceProvider).
+        Route::get('/manutencoes/nova', [WorkshopMaintenanceController::class, 'create'])
+            ->middleware('throttle:account-vehicle-search')
+            ->name('maintenances.create');
         Route::post('/manutencoes', [WorkshopMaintenanceController::class, 'store'])
             ->middleware('throttle:uploads')
             ->name('maintenances.store');

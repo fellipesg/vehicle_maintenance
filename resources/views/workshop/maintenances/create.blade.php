@@ -44,7 +44,9 @@
                     <form method="POST" action="{{ route('workshop.maintenances.store') }}" enctype="multipart/form-data" class="space-y-6" data-maintenance-os-form>
                         @csrf
                         @if($vehicle && filled($vehicle->license_plate) && $chassis === '')
-                            <input type="hidden" name="license_plate" value="{{ $vehicle->license_plate }}">
+                            {{-- Sem acesso ao veículo inteiro vai a placa digitada: VehiclePlateSearch::findByPlate
+                                 resolve o veículo pela placa antiga igual, e a atual não entra no HTML. --}}
+                            <input type="hidden" name="license_plate" value="{{ $showsFullVehicle ? $vehicle->license_plate : $licensePlate }}">
                         @else
                             <input type="hidden" name="chassis" value="{{ $chassis !== '' ? $chassis : $vehicle->chassis }}">
                         @endif
@@ -64,6 +66,7 @@
                             'vehicle' => $vehicle,
                             'existingPhotos' => collect(),
                             'editable' => false,
+                            'showsFullVehicle' => $showsFullVehicle,
                         ])
 
                         <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-sm max-sm:*:grow sm:-mx-6 sm:px-6" data-slot="form-actions">

@@ -241,6 +241,59 @@ class PublicVehicleSearchTest extends TestCase
             ->assertSee('Muitas tentativas seguidas');
     }
 
+    /**
+     * O balde `search` é só por IP e governa as buscas abertas a visitante: dividi-lo com esta tela
+     * fazia a cota de quem tem conta ser gasta por estranhos na mesma rede.
+     */
+    public function test_the_portal_search_does_not_share_the_bucket_with_the_public_searches(): void
+    {
+        $user = User::factory()->asUser()->create();
+
+        for ($attempt = 1; $attempt <= 20; $attempt++) {
+            $this->get(route('verification.lookup', ['code' => 'ABC'.$attempt]))->assertOk();
+        }
+
+        $this->get(route('verification.lookup', ['code' => 'ABCX']))->assertTooManyRequests();
+
+        $this->actingAs($user)
+            ->get(route('vehicle.search', ['identifier' => 'ABC1D23']))
+            ->assertOk();
+    }
+
+    public function test_each_account_has_its_own_search_bucket(): void
+    {
+        $user = User::factory()->asUser()->create();
+        $neighbour = User::factory()->asUser()->create();
+
+        for ($attempt = 1; $attempt <= 21; $attempt++) {
+            $this->actingAs($user)->get(route('vehicle.search', ['identifier' => 'AAA'.str_pad((string) $attempt, 4, '0', STR_PAD_LEFT)]));
+        }
+
+        $this->actingAs($user)
+            ->get(route('vehicle.search', ['identifier' => 'ZZZ9999']))
+            ->assertTooManyRequests();
+
+        $this->actingAs($neighbour)
+            ->get(route('vehicle.search', ['identifier' => 'ZZZ9999']))
+            ->assertOk();
+    }
+
+    /**
+     * Abrir o campo de busca não consulta nada, então não gasta cota de consulta.
+     */
+    public function test_opening_the_search_without_an_identifier_costs_no_quota(): void
+    {
+        $user = User::factory()->asUser()->create();
+
+        for ($attempt = 1; $attempt <= 25; $attempt++) {
+            $this->actingAs($user)->get(route('vehicle.search'))->assertOk();
+        }
+
+        $this->actingAs($user)
+            ->get(route('vehicle.search', ['identifier' => 'ABC1D23']))
+            ->assertOk();
+    }
+
     public function test_guest_is_sent_to_login(): void
     {
         $this->get(route('vehicle.search', ['identifier' => 'ABC1D23']))->assertRedirect(route('login'));

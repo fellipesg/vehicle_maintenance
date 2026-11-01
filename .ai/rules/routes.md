@@ -38,6 +38,42 @@ de até 4 MB). O balde existe contra a conta comum que repete upload; atrás do 
 passa um punhado de contas nossas, e a importação de prospecção é feita em lote por uma pessoa, que
 10/min atrapalharia. Se um dia o /admin abrir para fora dessas contas, as três voltam para o balde.
 
+## Ability por método de um resource vai em `->middlewareFor()`
+
+`Route::apiResource(...)->middleware(['index' => 'ability:a', 'store' => 'ability:b'])` **ignora as
+chaves**: `PendingResourceRegistration::middleware()` só faz `Arr::wrap` e aplica todas as entradas
+em todas as rotas do recurso. Era assim nos dois `apiResource` de oficina
+(`workshops.message-templates` e `workshops.warranty-templates`), que acabavam exigindo
+`workshops:read` *e* `workshops:write` em cada rota — nenhum teste de comportamento pegava, porque o
+token do app traz as duas (`App\Support\SanctumMobileToken::ABILITIES`). O certo é
+`->middlewareFor(['index', 'show'], 'ability:workshops:read')` por grupo de métodos.
+`ApiResourceAbilitiesTest` lê as rotas registradas e trava a ability de cada uma, além de cobrir
+token com uma ability só; recurso novo com ability por método entra no provider dele.
+
+## Rota que busca veículo por identificador é limitada, e tela logada tem balde pela conta
+
+Toda tela que acha veículo a partir de placa, chassi ou RENAVAM é oráculo de enumeração e leva
+`throttle`, em qualquer portal — não só as públicas. O balde `search` (20/min **por IP**,
+`App\Providers\AppServiceProvider`) é o das buscas abertas a visitante: `/verificar`, `/v/{code}`,
+`/convite/{token}` e a consignação.
+
+Tela que exige login não divide esse balde: numa chave por IP a cota de quem tem conta é gasta por
+estranhos, e `GET /oficina/manutencoes/nova` levava 429 na tela que registra serviço por causa de
+tráfego anônimo do mesmo NAT (ou de um colega de oficina atrás do mesmo IP). Essas vão para
+`account-vehicle-search`, 20/min por `user()?->id ?: ip()`: hoje `GET /oficina/manutencoes/nova`
+(`?license_plate=`, `?chassis=`) e `/buscar-veiculo` (`?identifier=`), o portal do proprietário e do
+lojista. Um balde só para as duas de propósito — é a mesma política, e enumerar por duas telas não dá
+duas cotas. A consulta por chassi da API tem o `workshop-chassis-lookup`, com a mesma forma de chave.
+O teto continua valendo contra sondagem — conta é exatamente o que o visitante não tem — e uma conta
+não cala a outra.
+
+`account-vehicle-search` devolve `Limit::none()` quando o pedido não traz `identifier`,
+`license_plate` nem `chassis`: formulário abrindo vazio não acha veículo nenhum, e cobrar ficha por
+isso fazia F5, "Trocar veículo" e o retorno de um erro de validação gastarem cota de consulta.
+
+O limite não basta sozinho: o que cada perfil pode ver do veículo achado está em
+`.ai/rules/public-lookup.md`.
+
 ## Rota que manda e-mail para o endereço digitado tem balde próprio
 
 Além do `throttle` por IP, essa rota precisa de um teto por destinatário, e nunca divide o balde com

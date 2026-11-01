@@ -149,25 +149,20 @@ Route::prefix('v1')->group(function () {
         Route::put('/workshops/{id}', [WorkshopController::class, 'update'])->middleware('ability:workshops:write');
         Route::delete('/workshops/{id}', [WorkshopController::class, 'destroy'])->middleware('ability:workshops:write');
 
+        // Ability por método vai em ->middlewareFor(): ->middleware() com as chaves 'index',
+        // 'store'... aplica TODAS as entradas em TODAS as rotas do recurso (as chaves são
+        // ignoradas), e os dois recursos abaixo acabavam exigindo workshops:read *e*
+        // workshops:write em cada rota. Só não apareceu porque o token do app traz as duas
+        // (App\Support\SanctumMobileToken::ABILITIES). Ver ApiResourceAbilitiesTest.
         Route::apiResource('workshops.message-templates', WorkshopMessageTemplateController::class)
             ->scoped()
-            ->middleware([
-                'index' => 'ability:workshops:read',
-                'show' => 'ability:workshops:read',
-                'store' => 'ability:workshops:write',
-                'update' => 'ability:workshops:write',
-                'destroy' => 'ability:workshops:write',
-            ]);
+            ->middlewareFor(['index', 'show'], 'ability:workshops:read')
+            ->middlewareFor(['store', 'update', 'destroy'], 'ability:workshops:write');
 
         Route::apiResource('workshops.warranty-templates', WarrantyTemplateController::class)
             ->scoped()
-            ->middleware([
-                'index' => 'ability:workshops:read',
-                'show' => 'ability:workshops:read',
-                'store' => 'ability:workshops:write',
-                'update' => 'ability:workshops:write',
-                'destroy' => 'ability:workshops:write',
-            ]);
+            ->middlewareFor(['index', 'show'], 'ability:workshops:read')
+            ->middlewareFor(['store', 'update', 'destroy'], 'ability:workshops:write');
 
         // Notificações da conta (sino). Usa as abilities de perfil, que todo token do app já tem.
         Route::get('/notifications', [NotificationController::class, 'index'])->middleware('ability:profile:read');

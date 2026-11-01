@@ -45,6 +45,8 @@
                 'licensePlate' => $vehicle?->license_plate ?? '',
                 'lookup' => null,
                 'vehicleHasOwner' => true,
+                // A edição só abre para a oficina que selou a OS: o vínculo com o veículo existe.
+                'showsFullVehicle' => true,
                 'readonly' => true,
             ])
 
@@ -63,6 +65,8 @@
                     'vehicle' => $vehicle,
                     'existingPhotos' => $existingPhotos,
                     'editable' => true,
+                    // A edição só abre para a oficina que selou a OS.
+                    'showsFullVehicle' => true,
                 ])
 
                 <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-sm max-sm:*:grow sm:-mx-6 sm:px-6" data-slot="form-actions">

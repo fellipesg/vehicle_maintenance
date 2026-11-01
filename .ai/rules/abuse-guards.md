@@ -41,6 +41,16 @@ IP chega perto); IPs iguais com e-mails diferentes provam o teto por IP. Compara
 (cadastrado × inexistente) pelos mesmos IPs, afirmando status, destino e corpo idênticos, é o teste
 que trava o oráculo (`tests/Feature/Web/AccountDeletionTest.php`).
 
+## A chave do balde é quem responde pela rota
+
+O mesmo defeito aparece na chave, não só no balde compartilhado: num balde por IP, tela que exige
+login tem a cota gasta por estranhos. `GET /oficina/manutencoes/nova` e `/buscar-veiculo` dividiam o
+`search` (20/min por IP) com as buscas abertas e levavam 429 por tráfego anônimo do mesmo NAT — a
+primeira é a tela que registra serviço — até as duas irem para `account-vehicle-search` pela conta.
+Rota que exige login usa `$request->user()?->id ?: $request->ip()`, como `uploads`, `vehicle-link`,
+`workshop-invites` e `workshop-chassis-lookup` já fazem; o IP fica para quem não tem conta. Rota que
+não consulta nada — formulário abrindo vazio — devolve `Limit::none()` em vez de gastar ficha.
+
 ## Captcha do /contato é obrigatório em produção
 
 `StoreContactRequest` exige `cf-turnstile-response` sempre que `App::isProduction()`, **mesmo sem**

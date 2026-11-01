@@ -33,6 +33,23 @@ enum WorkshopMessageTrigger: string
     }
 
     /**
+     * O gatilho tem rodada no WorkshopMessageTemplateDispatcher.
+     *
+     * Os outros dois existem no enum e nos planos do config, mas nada os dispara. Enquanto isso,
+     * eles não são oferecidos nem aceitos num modelo: um modelo ativo com gatilho sem rodada não
+     * manda mensagem nenhuma e, no `match` do dispatcher, levava a rodada diária de todas as
+     * oficinas com um UnhandledMatchError. Implementar um deles é acrescentar a rodada e trocar
+     * o false por true aqui.
+     */
+    public function isDispatchable(): bool
+    {
+        return match ($this) {
+            self::ScheduledRevision, self::CorrectiveFollowUp => true,
+            self::WarrantyExpiring, self::Reactivation => false,
+        };
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function options(): array
@@ -44,5 +61,37 @@ enum WorkshopMessageTrigger: string
         }
 
         return $options;
+    }
+
+    /**
+     * Os gatilhos que a oficina pode escolher hoje: só os que têm rodada.
+     *
+     * @return array<string, string>
+     */
+    public static function dispatchableOptions(): array
+    {
+        $options = [];
+
+        foreach (self::dispatchableCases() as $case) {
+            $options[$case->value] = $case->label();
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return list<self>
+     */
+    public static function dispatchableCases(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $case): bool => $case->isDispatchable()));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function dispatchableValues(): array
+    {
+        return array_map(fn (self $case): string => $case->value, self::dispatchableCases());
     }
 }
