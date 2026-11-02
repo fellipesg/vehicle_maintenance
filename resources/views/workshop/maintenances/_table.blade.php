@@ -40,7 +40,7 @@
             $rowPhotos = \App\Support\Maintenance\MaintenancePhotoAccess::allows(auth()->user()) ? (int) ($maintenance->photos_count ?? 0) : 0;
             $rowCategory = \App\Enums\ServiceCategory::labelFor($maintenance->service_category);
         @endphp
-        <tr data-maintenance-row="{{ $maintenance->id }}" data-verified="{{ $maintenance->isVerified() ? '1' : '0' }}">
+        <tr data-maintenance-row="{{ $maintenance->id }}" data-verified="{{ $maintenance->isVerified() ? '1' : '0' }}" @if($maintenance->isDisputed()) data-disputed @endif>
             <td class="whitespace-nowrap">
                 <span class="flex flex-col items-end md:items-start">
                     @if($maintenance->maintenance_date)
@@ -74,6 +74,10 @@
                     @unless($maintenance->isVerified())
                         <x-ui.badge variant="declared" size="sm">{{ $maintenance->provenance_label }}</x-ui.badge>
                     @endunless
+                    @if($maintenance->isDisputed())
+                        {{-- A OS não sai do histórico; quem resolve é esta oficina, então a lista precisa achá-la. --}}
+                        <x-ui.badge variant="warning" size="sm" dot>Contestada</x-ui.badge>
+                    @endif
                 </span>
             </th>
             <td class="text-right whitespace-nowrap">

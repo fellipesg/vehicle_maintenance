@@ -14,6 +14,15 @@ use Illuminate\Support\Str;
  * (MaintenanceOwnerDecisionService::dispute). Vai para a conta da oficina porque ela é a única que
  * pode corrigir ou excluir o registro — sem este aviso a contestação ficaria invisível para quem
  * tem o poder de resolvê-la.
+ *
+ * O texto tem de dizer o que a contestação **faz**: ela marca, não esconde (ver
+ * `.ai/rules/public-lookup.md`, "OS contestada aparece marcada, não sai"). Este e-mail já afirmou o
+ * contrário — que a OS saía da consulta pública — e isso é pior do que impreciso: a oficina autora
+ * pode excluir a OS dela mesmo depois do selo (MaintenancePolicy::canChange), então dizer que o
+ * registro foi suprimido e emendar com "corrija ou exclua" empurra quem tem NF-e e serviço feito a
+ * apagar um registro legítimo — exatamente a remoção unilateral que o fluxo recusa dar ao
+ * proprietário. Por isso a mensagem separa os dois casos: engano de digitação se corrige, serviço
+ * que aconteceu não se toca.
  */
 class MaintenanceDisputedNotification extends Notification implements ShouldQueue
 {
@@ -54,7 +63,8 @@ class MaintenanceDisputedNotification extends Notification implements ShouldQueu
         }
 
         return $message
-            ->line('Enquanto a contestação estiver aberta, esta OS não aparece na consulta pública nem no histórico de terceiros. Se foi engano de digitação (chassi ou placa de outro veículo), corrija ou exclua a OS.')
+            ->line('A OS continua na consulta pública e no histórico do chassi, agora com a ressalva "Contestada pelo proprietário", e o Selo da oficina não é revogado. O que muda é a quilometragem: ela deixa de contar para o hodômetro do veículo enquanto a contestação estiver aberta.')
+            ->line('Se foi engano de digitação (chassi ou placa de outro veículo), corrija ou exclua a OS. Se o serviço foi feito mesmo, não altere nada: guarde a nota fiscal e a ordem de serviço, porque é com elas que a nossa equipe analisa o caso.')
             ->action('Abrir a OS', route('workshop.maintenances.show', $this->maintenance))
             ->salutation('RevisaLog');
     }

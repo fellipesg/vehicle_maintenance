@@ -87,6 +87,20 @@ class DashboardController extends Controller
     {
         $items = [];
 
+        // Primeira da fila: a contestação não esconde a OS, então ela não se denuncia sozinha em
+        // nenhuma tela — e a oficina autora é a única que pode corrigir ou excluir o registro.
+        $disputed = $workshop->maintenances()->whereNotNull('owner_disputed_at')->count();
+        if ($disputed > 0) {
+            $items[] = [
+                'key' => 'contestadas',
+                'count' => $disputed,
+                'label' => $disputed === 1 ? '1 OS contestada pelo proprietário' : "{$disputed} OS contestadas pelo proprietário",
+                'description' => 'A OS continua no histórico com a ressalva. Corrija ou exclua se foi engano de digitação; se o serviço foi feito, guarde a NF-e para a análise.',
+                'url' => route('workshop.maintenances.index', ['situacao' => 'contestadas']),
+                'action' => 'Ver OS contestadas',
+            ];
+        }
+
         $awaitingReview = $workshop->maintenancesAwaitingReview()->count();
         if ($awaitingReview > 0) {
             $items[] = [

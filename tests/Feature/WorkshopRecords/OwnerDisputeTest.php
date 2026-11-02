@@ -518,6 +518,99 @@ class OwnerDisputeTest extends TestCase
     }
 
     /**
+     * A tela da OS mostra a contestação (teste acima), mas só para quem já chegou nela pelo e-mail.
+     * Quem abre o portal direto precisa achar a OS: na lista ela vem marcada, e o Início aponta.
+     */
+    public function test_the_order_list_marks_the_disputed_record(): void
+    {
+        Notification::fake();
+
+        [$owner, $workshopUser, $record] = $this->workshopRecordOnOwnedCar();
+
+        // 'Contestada' sozinho casaria com a opção "Contestadas pelo proprietário" do filtro, que
+        // está na página sempre: o que marca a linha é o data-disputed.
+        $this->actingAs($workshopUser)
+            ->get(route('workshop.maintenances.index'))
+            ->assertOk()
+            ->assertDontSee('data-disputed', escape: false);
+
+        app(MaintenanceOwnerDecisionService::class)->dispute($record, $owner);
+
+        $this->actingAs($workshopUser)
+            ->get(route('workshop.maintenances.index'))
+            ->assertOk()
+            ->assertSee('data-disputed', escape: false)
+            ->assertSee('>Contestada<', escape: false);
+    }
+
+    public function test_the_order_list_filters_by_disputed(): void
+    {
+        Notification::fake();
+
+        [$owner, $workshopUser, $record, $vehicle] = $this->workshopRecordOnOwnedCar();
+
+        $untouched = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'workshop_id' => $workshopUser->workshop->id,
+            'registered_by_type' => 'workshop',
+            'maintenance_type' => 'Troca de correia',
+        ]);
+
+        app(MaintenanceOwnerDecisionService::class)->dispute($record, $owner);
+
+        $this->actingAs($workshopUser)
+            ->get(route('workshop.maintenances.index', ['situacao' => 'contestadas']))
+            ->assertOk()
+            ->assertSee($record->maintenance_type)
+            ->assertDontSee($untouched->maintenance_type);
+    }
+
+    public function test_the_dashboard_lists_the_dispute_as_a_pending_item(): void
+    {
+        Notification::fake();
+
+        [$owner, $workshopUser, $record] = $this->workshopRecordOnOwnedCar();
+
+        $this->actingAs($workshopUser)
+            ->get(route('workshop.dashboard'))
+            ->assertOk()
+            ->assertDontSee('contestada');
+
+        app(MaintenanceOwnerDecisionService::class)->dispute($record, $owner);
+
+        $this->actingAs($workshopUser)
+            ->get(route('workshop.dashboard'))
+            ->assertOk()
+            ->assertSee('1 OS contestada pelo proprietário')
+            // O aviso tem de levar à lista filtrada, senão a oficina volta a caçar na mão.
+            ->assertSee(route('workshop.maintenances.index', ['situacao' => 'contestadas']), escape: false);
+    }
+
+    /**
+     * Retirar a contestação devolve a lista e o Início ao estado anterior: o aviso some.
+     */
+    public function test_withdrawing_the_dispute_clears_the_workshop_warnings(): void
+    {
+        Notification::fake();
+
+        [$owner, $workshopUser, $record] = $this->workshopRecordOnOwnedCar();
+
+        $decisions = app(MaintenanceOwnerDecisionService::class);
+        $decisions->dispute($record, $owner);
+        $decisions->withdrawDispute($record->fresh(), $owner);
+
+        $this->actingAs($workshopUser)
+            ->get(route('workshop.dashboard'))
+            ->assertOk()
+            ->assertDontSee('contestada');
+
+        $this->actingAs($workshopUser)
+            ->get(route('workshop.maintenances.index'))
+            ->assertOk()
+            ->assertDontSee('data-disputed', escape: false);
+    }
+
+    /**
      * Regressão: MaintenanceResource expõe provenance_card_label, que lê verifiedWorkshop. A
      * listagem da API não carregava a relação, e qualquer OS SELADA de oficina na lista virava
      * lazy load — exceção fora de produção, consulta por registro em produção. Nenhum teste

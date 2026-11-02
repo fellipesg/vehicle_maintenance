@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
  * - categoria: App\Enums\ServiceCategory;
  * - verified: '1' (Selo da oficina), '0' (declaradas por clientes que citaram a oficina) ou '';
  * - anexos: com-nfe | sem-nfe | sem-fotos-depois (as duas últimas são pendências do Início);
+ * - situacao: contestadas (owner_disputed_at, também pendência do Início);
  * - garantia: vigente | vencendo (vence nos próximos 30 dias);
  * - ordenar / direcao: data (o padrão, mais recente primeiro) ou km, asc | desc.
  *
@@ -37,6 +38,16 @@ final class WorkshopMaintenanceFilters
         'com-nfe' => 'Com NF-e',
         'sem-nfe' => 'Sem NF-e',
         'sem-fotos-depois' => 'Sem fotos de depois',
+    ];
+
+    /**
+     * A contestação do proprietário **marca** o registro e não o esconde (`.ai/rules/models.md`),
+     * então ela não é um estado que a oficina descobre percorrendo a lista: precisa de filtro.
+     *
+     * @var array<string, string>
+     */
+    public const SITUATION_OPTIONS = [
+        'contestadas' => 'Contestadas pelo proprietário',
     ];
 
     /**
@@ -62,6 +73,7 @@ final class WorkshopMaintenanceFilters
         public readonly ?string $category = null,
         public readonly string $verified = VehicleMaintenanceHistory::FILTER_ALL,
         public readonly ?string $attachments = null,
+        public readonly ?string $situation = null,
         public readonly ?string $warranty = null,
         public readonly string $sort = 'data',
         public readonly string $direction = 'desc',
@@ -71,6 +83,7 @@ final class WorkshopMaintenanceFilters
     {
         $category = self::scalar($request->query('categoria'));
         $attachments = self::scalar($request->query('anexos'));
+        $situation = self::scalar($request->query('situacao'));
         $warranty = self::scalar($request->query('garantia'));
         $sort = self::scalar($request->query('ordenar'));
         $direction = self::scalar($request->query('direcao'));
@@ -83,6 +96,7 @@ final class WorkshopMaintenanceFilters
             category: ServiceCategory::tryFrom($category)?->value,
             verified: VehicleMaintenanceHistory::normalizeFilter($request->query('verified')),
             attachments: array_key_exists($attachments, self::ATTACHMENT_OPTIONS) ? $attachments : null,
+            situation: array_key_exists($situation, self::SITUATION_OPTIONS) ? $situation : null,
             warranty: array_key_exists($warranty, self::WARRANTY_OPTIONS) ? $warranty : null,
             sort: $sort,
             direction: in_array($direction, ['asc', 'desc'], true) ? $direction : ($sort === 'km' ? 'asc' : 'desc'),
@@ -135,6 +149,7 @@ final class WorkshopMaintenanceFilters
                 'photos',
                 fn (Builder $photos) => $photos->where('stage', MaintenancePhoto::STAGE_AFTER),
             ))
+            ->when($this->situation === 'contestadas', fn (Builder|Relation $builder) => $builder->whereNotNull('owner_disputed_at'))
             ->when($this->warranty === 'vigente', fn (Builder|Relation $builder) => $builder->whereHas(
                 'warranties',
                 fn (Builder $warranties) => $warranties->whereDate('ends_at', '>=', $today->toDateString()),
@@ -156,7 +171,7 @@ final class WorkshopMaintenanceFilters
     }
 
     /**
-     * Filtros ativos no painel "Filtros" (placa, período, categoria, anexos e garantia). A
+     * Filtros ativos no painel "Filtros" (placa, período, categoria, anexos, situação e garantia). A
      * procedência tem o próprio controle e fica de fora.
      */
     public function activeFilterCount(): int
@@ -166,6 +181,7 @@ final class WorkshopMaintenanceFilters
             $this->from !== null || $this->until !== null,
             $this->category !== null,
             $this->attachments !== null,
+            $this->situation !== null,
             $this->warranty !== null,
         ]));
     }

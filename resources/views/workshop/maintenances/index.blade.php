@@ -94,6 +94,10 @@
                             <x-ui.select id="filtro-anexos" :options="WorkshopMaintenanceFilters::ATTACHMENT_OPTIONS" :value="$filters->attachments" placeholder="Todos" />
                         </x-ui.field>
 
+                        <x-ui.field name="situacao" label="Situação">
+                            <x-ui.select id="filtro-situacao" :options="WorkshopMaintenanceFilters::SITUATION_OPTIONS" :value="$filters->situation" placeholder="Todas" />
+                        </x-ui.field>
+
                         <x-ui.field name="garantia" label="Garantia">
                             <x-ui.select id="filtro-garantia" :options="WorkshopMaintenanceFilters::WARRANTY_OPTIONS" :value="$filters->warranty" placeholder="Todas" />
                         </x-ui.field>
