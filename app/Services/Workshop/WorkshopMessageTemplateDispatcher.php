@@ -13,6 +13,7 @@ use App\Services\FcmService;
 use App\Services\Vehicle\VehicleEstimatedKmService;
 use App\Services\Vehicle\VehicleMaintenanceReminderService;
 use App\Support\Workshop\WorkshopMessageConsent;
+use App\Support\Workshop\WorkshopPlanLimits;
 use App\Support\WorkshopMessageTemplateRenderer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +56,17 @@ class WorkshopMessageTemplateDispatcher
             ->orderBy('id')
             ->chunkById(50, function (Collection $templates) use (&$sent): void {
                 foreach ($templates as $template) {
+                    $workshop = $template->workshop;
+
+                    // Quem troca de plano é o admin, e o modelo fica no banco com o gatilho que
+                    // tinha: a validação só guarda a transição
+                    // (EnforcesWorkshopMessageTemplateLimit), então o recorte de gatilhos do plano
+                    // no disparo é este. Nada é gravado ao barrar, igual ao intervalo mínimo: se a
+                    // oficina voltar ao plano que inclui o gatilho, a oportunidade continua livre.
+                    if ($workshop !== null && ! WorkshopPlanLimits::allowsTrigger($workshop, $template->trigger)) {
+                        continue;
+                    }
+
                     $sent += match ($template->trigger) {
                         WorkshopMessageTrigger::ScheduledRevision => $this->dispatchScheduledTemplate($template),
                         WorkshopMessageTrigger::CorrectiveFollowUp => $this->dispatchCorrectiveTemplate($template),

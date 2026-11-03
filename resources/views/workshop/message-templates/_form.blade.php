@@ -8,12 +8,14 @@
     - isEdit: bool.
 --}}
 @php
-    use App\Enums\WorkshopMessageTrigger;
     use App\Enums\ServiceCategory;
+    use App\Support\Workshop\WorkshopPlanLimits;
 
-    // Só os gatilhos com rodada no dispatcher: escolher um sem rodada criava modelo que nunca
-    // manda mensagem (WorkshopMessageTrigger::isDispatchable).
-    $triggerOptions = WorkshopMessageTrigger::dispatchableOptions();
+    // Os gatilhos com rodada no dispatcher, recortados pelo plano da oficina: escolher um sem
+    // rodada criava modelo que nunca manda mensagem (WorkshopMessageTrigger::isDispatchable), e
+    // oferecer um fora do plano daria uma opção que a validação recusa. O gatilho que o modelo já
+    // tem entra mesmo fora do plano, senão o edit abriria em branco (WorkshopPlanLimits::triggerOptions).
+    $triggerOptions = WorkshopPlanLimits::triggerOptions($workshop, $template);
     $categoryOptions = collect(ServiceCategory::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all();
 @endphp
 

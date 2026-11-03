@@ -40,6 +40,7 @@ class StoreMessageTemplateRequest extends FormRequest
 
         if ($workshop !== null) {
             $this->addActiveMessageTemplateLimitRule($validator, $workshop);
+            $this->addMessageTemplateTriggerPlanRule($validator, $workshop);
         }
     }
 }

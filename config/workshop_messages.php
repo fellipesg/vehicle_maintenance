@@ -33,7 +33,11 @@ return [
     'return_window_days' => 60,
 
     /*
-    | Limites por plano (App\Enums\WorkshopPlan). active_templates nulo = sem limite.
+    | Limites por plano (App\Enums\WorkshopPlan), lidos por App\Support\Workshop\WorkshopPlanLimits.
+    | active_templates nulo = sem limite. `triggers` só estreita os gatilhos que já têm rodada no
+    | dispatcher (WorkshopMessageTrigger::isDispatchable), nunca amplia: por isso warranty_expiring
+    | e reactivation continuam indisponíveis no Pro até terem rodada. Plano sem a chave `triggers`
+    | fica sem recorte.
     */
     'plans' => [
         'free' => [

@@ -2,16 +2,21 @@
 
 namespace App\Http\Requests\Concerns;
 
+use App\Enums\WorkshopMessageTrigger;
 use App\Models\Workshop;
 use App\Models\WorkshopMessageTemplate;
 use App\Support\Workshop\WorkshopPlanLimits;
 use Illuminate\Validation\Validator;
 
 /**
- * Teto de modelos de mensagem ativos do plano (App\Support\Workshop\WorkshopPlanLimits), nas quatro
- * superfícies que criam ou ativam um modelo: a web e a API, no store e no update. O teto vale na
- * *transição* para ativo — criar ativo, ou ligar um modelo que estava desligado. Editar um modelo
- * que já estava ativo, e continua, passa sempre, porque não acrescenta nenhum ativo.
+ * Limites de plano sobre os modelos de mensagem (App\Support\Workshop\WorkshopPlanLimits), nas
+ * quatro superfícies que criam ou alteram um modelo: a web e a API, no store e no update.
+ *
+ * São dois limites e os dois valem na *transição*, nunca no estado. O teto de ativos vale ao criar
+ * ativo ou ligar um modelo desligado; o recorte de gatilhos vale ao escolher um gatilho diferente
+ * do que o modelo já tem. Editar um modelo como ele está passa sempre, porque o plano é trocado
+ * pelo admin: uma oficina pode ter herdado um ativo a mais ou um gatilho melhor sem burlar nada, e
+ * trancá-la trancaria a tela onde ela desativa ou corrige o que tem.
  */
 trait EnforcesWorkshopMessageTemplateLimit
 {
@@ -39,6 +44,37 @@ trait EnforcesWorkshopMessageTemplateLimit
             }
 
             $validator->errors()->add('is_active', WorkshopPlanLimits::activeTemplateLimitMessage($workshop));
+        });
+    }
+
+    /**
+     * Recorte de gatilhos do plano (config('workshop_messages.plans.*.triggers')), em cima da regra
+     * do campo, que já recusa gatilho sem rodada.
+     */
+    protected function addMessageTemplateTriggerPlanRule(
+        Validator $validator,
+        Workshop $workshop,
+        ?WorkshopMessageTemplate $template = null,
+    ): void {
+        $validator->after(function (Validator $validator) use ($workshop, $template): void {
+            $trigger = WorkshopMessageTrigger::tryFrom((string) $this->input('trigger'));
+
+            // Gatilho ausente (o update da API aceita payload parcial) ou fora do enum: a regra do
+            // campo já cuida, e aqui não há plano a conferir.
+            if ($trigger === null) {
+                return;
+            }
+
+            // O gatilho que o modelo já tem passa mesmo fora do plano: é o estado, não a transição.
+            if (($template?->exists ?? false) && $trigger === $template->trigger) {
+                return;
+            }
+
+            if (WorkshopPlanLimits::allowsTrigger($workshop, $trigger)) {
+                return;
+            }
+
+            $validator->errors()->add('trigger', WorkshopPlanLimits::triggerPlanMessage($workshop, $trigger));
         });
     }
 }

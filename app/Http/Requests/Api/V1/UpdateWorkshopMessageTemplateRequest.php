@@ -46,6 +46,7 @@ class UpdateWorkshopMessageTemplateRequest extends ApiFormRequest
 
         if ($workshop instanceof Workshop && $template instanceof WorkshopMessageTemplate) {
             $this->addActiveMessageTemplateLimitRule($validator, $workshop, $template);
+            $this->addMessageTemplateTriggerPlanRule($validator, $workshop, $template);
         }
     }
 }
