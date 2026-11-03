@@ -6,17 +6,24 @@
  * - piso: a maior quilometragem registrada até a data do serviço; a partir da data do cadastro,
  *   também o hodômetro do cadastro;
  * - teto: a menor quilometragem registrada depois da data; antes da data do cadastro, também o
- *   hodômetro do cadastro.
+ *   hodômetro do cadastro; e sempre o teto de plausibilidade derivado do ano do veículo
+ *   (PLAUSIBILITY_BASE_KILOMETERS + PLAUSIBILITY_KILOMETERS_PER_YEAR por ano de vida, e nunca menos
+ *   de um ano de folga acima do que o veículo já registra), que é o único teto quando não há
+ *   registro posterior. Veículo sem ano conhecido não tem esse teto.
  *
  * Datas no formato AAAA-MM-DD (comparadas como texto, como o whereDate do servidor).
  *
  * @typedef {{ date: string, kilometers: number }} MileageRecord
- * @typedef {{ registration_kilometers: number|null, registered_on: string|null, records: MileageRecord[] }} MileageVehicle
- * @typedef {{ type: 'record'|'registration', date: string|null }} BoundSource
+ * @typedef {{ year: number|null, current_kilometers: number|null, registration_kilometers: number|null, registered_on: string|null, records: MileageRecord[] }} MileageVehicle
+ * @typedef {{ type: 'record'|'registration'|'plausibility', date: string|null, year?: number }} BoundSource
  * @typedef {{ floor: number, floorSource: BoundSource|null, ceiling: number|null, ceilingSource: BoundSource|null }} KilometerBounds
  */
 
 const NUMBER_FORMAT = new Intl.NumberFormat('pt-BR');
+
+// Espelham VehicleMileageService::PLAUSIBILITY_BASE_KILOMETERS e ::PLAUSIBILITY_KILOMETERS_PER_YEAR.
+const PLAUSIBILITY_BASE_KILOMETERS = 50_000;
+const PLAUSIBILITY_KILOMETERS_PER_YEAR = 100_000;
 
 /**
  * @param {string|null|undefined} value
@@ -42,6 +49,34 @@ export function formatDate(date) {
  */
 export function formatKilometers(kilometers) {
     return `${NUMBER_FORMAT.format(kilometers)} km`;
+}
+
+/**
+ * Espelha VehicleMileageService::plausibilityCeiling(): null quando o ano é desconhecido, e sempre
+ * um ano de folga acima do que o veículo já registra.
+ *
+ * @param {MileageVehicle} vehicle
+ * @param {number} floor
+ * @returns {number|null}
+ */
+function plausibilityCeiling(vehicle, floor) {
+    const year = Number(vehicle?.year);
+
+    if (!Number.isFinite(year) || year < 1900) {
+        return null;
+    }
+
+    const yearsOfLife = Math.max(0, new Date().getFullYear() - year) + 1;
+    const alreadyRun = Math.max(
+        floor,
+        Number(vehicle?.current_kilometers) || 0,
+        Number(vehicle?.registration_kilometers) || 0,
+    );
+
+    return Math.max(
+        PLAUSIBILITY_BASE_KILOMETERS + (yearsOfLife * PLAUSIBILITY_KILOMETERS_PER_YEAR),
+        alreadyRun + PLAUSIBILITY_KILOMETERS_PER_YEAR,
+    );
 }
 
 /**
@@ -101,6 +136,13 @@ export function kilometerBounds(vehicle, maintenanceDate) {
         }
     }
 
+    const plausibility = plausibilityCeiling(vehicle, floor);
+
+    if (plausibility !== null && (ceiling === null || plausibility < ceiling)) {
+        ceiling = plausibility;
+        ceilingSource = { type: 'plausibility', date: null, year: Number(vehicle.year) };
+    }
+
     return { floor, floorSource, ceiling, ceilingSource };
 }
 
@@ -111,6 +153,10 @@ export function kilometerBounds(vehicle, maintenanceDate) {
 function describeSource(source) {
     if (source === null) {
         return '';
+    }
+
+    if (source.type === 'plausibility') {
+        return `máximo plausível para um veículo ${source.year}`;
     }
 
     if (source.type === 'registration') {
