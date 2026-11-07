@@ -44,7 +44,10 @@ class OwnerPortalScriptsTest extends TestCase
     public function test_kilometer_bounds_match_the_server_validation(): void
     {
         $owner = User::factory()->asUser()->create()->refresh();
+        // Ano fixo: dele sai o teto de plausibilidade (VehicleMileageService::plausibilityCeiling),
+        // que entra na faixa quando não há registro posterior à data.
         $vehicle = Vehicle::factory()->create([
+            'year' => 2024,
             'created_at' => '2026-01-10 12:00:00',
             'odometer_at_registration' => 50_000,
             'current_kilometers' => 60_000,
@@ -96,12 +99,11 @@ class OwnerPortalScriptsTest extends TestCase
                 $this->assertFalse($accepts($case['floor'] - 1, $case['date']), "{$label}: abaixo do piso o servidor recusa.");
             }
 
-            if ($case['ceiling'] !== null) {
-                $this->assertTrue($accepts($case['ceiling'], $case['date']), "{$label}: o teto {$case['ceiling']} precisa passar no servidor.");
-                $this->assertFalse($accepts($case['ceiling'] + 1, $case['date']), "{$label}: acima do teto o servidor recusa.");
-            } else {
-                $this->assertTrue($accepts(9_999_999, $case['date']), "{$label}: sem teto, qualquer valor acima do piso passa.");
-            }
+            // Veículo com ano conhecido sempre tem teto, mesmo sem registro posterior à data: na
+            // falta de vizinho vale o de plausibilidade.
+            $this->assertNotNull($case['ceiling'], "{$label}: era esperado um teto.");
+            $this->assertTrue($accepts($case['ceiling'], $case['date']), "{$label}: o teto {$case['ceiling']} precisa passar no servidor.");
+            $this->assertFalse($accepts($case['ceiling'] + 1, $case['date']), "{$label}: acima do teto o servidor recusa.");
         }
 
         $byDate = collect($output)->keyBy(fn (array $case): string => $case['date'] ?? 'sem-data');
@@ -109,7 +111,7 @@ class OwnerPortalScriptsTest extends TestCase
         $this->assertSame('Entre 40.000 km (registro de 01/08/2025) e 50.000 km (hodômetro no cadastro, em 10/01/2026).', $byDate['2025-09-01']['text']);
         $this->assertSame('Entre 50.000 km (hodômetro no cadastro, em 10/01/2026) e 55.000 km (registro de 15/03/2026).', $byDate['2026-02-01']['text']);
         $this->assertSame('Entre 55.000 km (registro de 15/03/2026) e 60.000 km (registro de 12/06/2026).', $byDate['2026-04-01']['text']);
-        $this->assertSame('A partir de 60.000 km (registro de 12/06/2026).', $byDate['2026-07-01']['text']);
+        $this->assertSame('Entre 60.000 km (registro de 12/06/2026) e 350.000 km (máximo plausível para um veículo 2024).', $byDate['2026-07-01']['text']);
     }
 
     public function test_pdf_link_is_a_relative_same_site_path_ending_in_pdf(): void
