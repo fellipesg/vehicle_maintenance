@@ -57,7 +57,17 @@ trait EnforcesWorkshopMessageTemplateLimit
         ?WorkshopMessageTemplate $template = null,
     ): void {
         $validator->after(function (Validator $validator) use ($workshop, $template): void {
-            $trigger = WorkshopMessageTrigger::tryFrom((string) $this->input('trigger'));
+            $raw = $this->input('trigger');
+
+            // Só string interessa: o gatilho é enum de string, e qualquer outro tipo a regra do
+            // campo já recusa. A guarda não é zelo: castar o valor para string fazia `trigger`
+            // vindo como array emitir "Array to string conversion", que o HandleExceptions lança
+            // como ErrorException — o 422 da validação virava 500 nas quatro rotas.
+            if (! is_string($raw)) {
+                return;
+            }
+
+            $trigger = WorkshopMessageTrigger::tryFrom($raw);
 
             // Gatilho ausente (o update da API aceita payload parcial) ou fora do enum: a regra do
             // campo já cuida, e aqui não há plano a conferir.

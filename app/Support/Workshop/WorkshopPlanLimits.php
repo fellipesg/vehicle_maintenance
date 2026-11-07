@@ -60,7 +60,8 @@ final class WorkshopPlanLimits
      * no `match` do dispatcher, derrubava a rodada diária de *todas* as oficinas.
      *
      * Plano sem a chave, ou com algo que não é lista, fica sem recorte — mesma convenção de
-     * active_templates null.
+     * active_templates null. Cada item da lista pode ser a string ou o próprio enum; o que não
+     * casar com nenhum gatilho é ignorado.
      *
      * @return list<WorkshopMessageTrigger>
      */
@@ -73,9 +74,18 @@ final class WorkshopPlanLimits
             return $dispatchable;
         }
 
+        // A config pode escrever o gatilho como string ou como o próprio enum, que é o tipo que o
+        // resto do código usa. Comparar só com a string deixava uma lista de enums não casar com
+        // nada, e o efeito era silencioso e total: nenhuma oficina do plano criava modelo nem
+        // recebia disparo, sem erro nem log em lugar nenhum.
+        $allowedValues = array_map(
+            fn (mixed $value): mixed => $value instanceof WorkshopMessageTrigger ? $value->value : $value,
+            $allowed,
+        );
+
         return array_values(array_filter(
             $dispatchable,
-            fn (WorkshopMessageTrigger $trigger): bool => in_array($trigger->value, $allowed, true),
+            fn (WorkshopMessageTrigger $trigger): bool => in_array($trigger->value, $allowedValues, true),
         ));
     }
 

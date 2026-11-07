@@ -6,6 +6,8 @@
     - method: GET (implícito) — o form usa POST + @method('PUT') no edit.
     - template: WorkshopMessageTemplate existente (edit) ou null (create).
     - isEdit: bool.
+    - workshop: a oficina da conta autenticada, nunca outra — as opções de gatilho saem do plano
+      dela (WorkshopPlanLimits::triggerOptions).
 --}}
 @php
     use App\Enums\ServiceCategory;

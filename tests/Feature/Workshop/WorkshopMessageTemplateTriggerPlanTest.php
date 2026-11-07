@@ -178,6 +178,60 @@ class WorkshopMessageTemplateTriggerPlanTest extends TestCase
         $this->assertSame(WorkshopMessageTrigger::CorrectiveFollowUp, $template->fresh()->trigger);
     }
 
+    /**
+     * O recorte lê o campo cru, antes de a regra do campo ter dito se ele presta. Castar esse
+     * valor para string fazia `trigger` vindo como array emitir "Array to string conversion", que
+     * o HandleExceptions do Laravel lança como ErrorException: a resposta de validação virava 500.
+     */
+    public function test_a_trigger_sent_as_an_array_is_refused_and_not_a_server_error(): void
+    {
+        $user = $this->workshopOnPlan(WorkshopPlan::Free);
+
+        $this->actingAs($user)
+            ->post(route('workshop.message-templates.store'), $this->payload(['trigger' => ['corrective_follow_up']]))
+            ->assertStatus(302)
+            ->assertSessionHasErrors('trigger');
+
+        Sanctum::actingAs($user, ['workshops:read', 'workshops:write']);
+
+        $this->postJson("/api/v1/workshops/{$user->workshop->id}/message-templates", $this->payload([
+            'trigger' => ['corrective_follow_up'],
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('trigger');
+
+        $this->assertSame(0, $user->workshop->messageTemplates()->count());
+    }
+
+    /**
+     * O gatilho é enum no resto do código, então a config vai acabar escrito assim. Comparando só
+     * com a string, a lista de enums não casava com nada e o plano ficava sem gatilho nenhum — em
+     * silêncio, o que é pior do que um erro.
+     */
+    public function test_the_plan_list_also_accepts_the_enum_itself_in_the_config(): void
+    {
+        $user = $this->workshopOnPlan(WorkshopPlan::Free);
+        config(['workshop_messages.plans.free.triggers' => [WorkshopMessageTrigger::CorrectiveFollowUp]]);
+
+        $this->assertSame(
+            [WorkshopMessageTrigger::CorrectiveFollowUp],
+            WorkshopPlanLimits::triggers($user->workshop),
+        );
+
+        $this->actingAs($user)
+            ->post(route('workshop.message-templates.store'), $this->payload())
+            ->assertSessionHasNoErrors();
+
+        // E continua estreitando: o que ficou fora da lista segue recusado.
+        $this->actingAs($user)
+            ->post(route('workshop.message-templates.store'), $this->payload([
+                'trigger' => WorkshopMessageTrigger::ScheduledRevision->value,
+            ]))
+            ->assertSessionHasErrors('trigger');
+
+        $this->assertSame(1, $user->workshop->messageTemplates()->count());
+    }
+
     public function test_a_plan_without_the_triggers_key_keeps_every_trigger_with_a_round(): void
     {
         $user = $this->workshopOnPlan(WorkshopPlan::Free);
