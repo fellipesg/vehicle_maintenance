@@ -151,7 +151,8 @@ class WorkshopSealOnThirdPartyVehicleTest extends TestCase
         [$owner, $vehicle] = $this->ownedVehicle();
 
         // Alto o bastante para dominar o hodômetro, mas dentro do teto de plausibilidade do ano do
-        // veículo (.ai/rules/models.md): 9.999.999 km agora é recusado na entrada.
+        // veículo (.ai/rules/models.md): 9.999.999 km agora é recusado na entrada. O ano sai fixo de
+        // ownedVehicle() para esse teto não depender do sorteio do factory.
         $this->actingAs($this->workshopAccount())
             ->post('/oficina/manutencoes', $this->payload(['kilometers' => 300_000]))
             ->assertSessionHasNoErrors();
@@ -242,6 +243,12 @@ class WorkshopSealOnThirdPartyVehicleTest extends TestCase
         $vehicle = Vehicle::factory()->create([
             'license_plate' => self::PLATE,
             'chassis' => '9BWZZZ377VT004999',
+            // O ano decide o teto de plausibilidade do hodômetro (VehicleMileageService) e o factory
+            // o sorteia entre 2010 e o ano corrente: sem fixar, o teto deste veículo ia de 150.000 a
+            // 1.750.000 km, e o teste da contestação, que grava 300.000, era recusado nos dois anos
+            // mais novos do sorteio — intermitente em ~12% das rodadas. Dois anos atrás = três anos
+            // de vida = teto de 350.000 km, a mesma convenção de VehicleMileagePlausibilityTest.
+            'year' => now()->year - 2,
             'current_kilometers' => 10_000,
             'odometer_at_registration' => 10_000,
         ]);
