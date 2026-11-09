@@ -116,6 +116,13 @@ de coluna. O teto entra na faixa que o formulário mostra: `MaintenanceMileageCo
 e `resources/js/utils/maintenance-kilometers.js` espelha as duas constantes — mude os dois juntos
 (`.ai/rules/js.md`).
 
+Teste que grava km alto **fixa o ano do veículo**. `VehicleFactory` sorteia
+`year` entre 2010 e o ano corrente, e o teto sai desse ano: com 300.000 km o teste passava no
+sorteio velho e era recusado em 2025 e 2026, ou seja, quebrava em ~12% das rodadas — foi assim que
+`WorkshopSealOnThirdPartyVehicleTest` ficou intermitente depois de o teto entrar. Fixe
+`'year' => now()->year - N` no factory (relativo, para não vencer com o calendário) ou mantenha o km
+abaixo de 150.000, que é o teto do pior sorteio.
+
 ## OS sem proprietário: tenant nulo, estado na própria manutenção
 Uma OS que a oficina registra num veículo sem dono atual nasce com tenant_id nulo (VehicleTenantResolver não decide mais isso; OwnerlessMaintenanceService::tenantIdFor) e owner_status pending. As colunas owner_status (pending|linked|declined), attachments_status (none|pending|accepted|declined|revoked), hidden_from_public_at e owner_decided_* não são fillable: só OwnerlessMaintenanceService e MaintenanceOwnerDecisionService gravam. owner_status nulo = OS comum. Invoice e MaintenancePhoto criados voltam attachments_status a pending (nunca depois de accepted).
 
