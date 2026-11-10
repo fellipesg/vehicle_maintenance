@@ -123,6 +123,30 @@ sorteio velho e era recusado em 2025 e 2026, ou seja, quebrava em ~12% das rodad
 `'year' => now()->year - N` no factory (relativo, para não vencer com o calendário) ou mantenha o km
 abaixo de 150.000, que é o teto do pior sorteio.
 
+## Garantia emitida só acaba por escolha explícita e válida
+`MaintenanceWarrantyApplicator` resolve o modelo pedido **antes** de apagar a garantia que a OS já
+tem, e não ao contrário. Apagar primeiro fazia um modelo que não resolve (`resolveTemplate` exige
+`workshop_id` + escopo + `is_active`, enquanto a validação só exige `exists:warranty_templates,id`)
+deixar a OS **sem garantia nenhuma**, com "OS atualizada." e sem erro: basta a oficina desativar o
+modelo em outra aba e salvar a OS com ele selecionado. Garantia é promessa ao cliente — encerrar uma
+só vale por escolha explícita e válida ("Sem garantia", ou outro modelo que existe).
+
+Com garantia emitida em jogo, modelo que não resolve agora é 422 (`refuseWhenIssued`, chave
+`general_warranty_template_id` ou `items`). Sem nada emitido, o pedido impossível continua ignorado
+em silêncio e a OS fica sem garantia: é o que
+`test_deactivated_general_template_cannot_be_linked_to_a_new_os` descreve, e recusar ali derrubaria a
+criação inteira da OS, na web e na API (as duas chamam o applicator dentro da transação). As
+garantias por item são resolvidas todas antes de qualquer gravação, porque `MaintenanceController::update`
+não roda em transação: resolver linha por linha deixava a OS pela metade quando a última falhava.
+
+Modelo de garantia não se edita enquanto a oficina tem garantia vigente
+(`ValidatesWarrantyTemplateImmutability`, `Workshop::hasActiveWarranties`), e a comparação só aceita
+valor escalar: castar para string o que veio na requisição fazia um campo travado chegando como array
+emitir "Array to string conversion", que o `HandleExceptions` lança como `ErrorException` — 500 em vez
+de 422, na web e na API. Mesma armadilha do recorte de gatilho por plano
+(`.ai/rules/workshop-messages.md`): `after()` roda mesmo com a regra do campo já reprovada, então
+nada antes dele barra o array.
+
 ## OS sem proprietário: tenant nulo, estado na própria manutenção
 Uma OS que a oficina registra num veículo sem dono atual nasce com tenant_id nulo (VehicleTenantResolver não decide mais isso; OwnerlessMaintenanceService::tenantIdFor) e owner_status pending. As colunas owner_status (pending|linked|declined), attachments_status (none|pending|accepted|declined|revoked), hidden_from_public_at e owner_decided_* não são fillable: só OwnerlessMaintenanceService e MaintenanceOwnerDecisionService gravam. owner_status nulo = OS comum. Invoice e MaintenancePhoto criados voltam attachments_status a pending (nunca depois de accepted).
 

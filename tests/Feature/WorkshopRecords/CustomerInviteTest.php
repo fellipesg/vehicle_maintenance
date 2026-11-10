@@ -195,6 +195,30 @@ class CustomerInviteTest extends TestCase
             ->assertRedirectContains('https://wa.me/5511987654321');
     }
 
+    /**
+     * Telefone em branco: o erro tem de cair no bag que o formulário lê (_invite-card.blade.php,
+     * bag="inviteWhatsapp"). Pelo bag default a página recarregava sem dizer nada, porque
+     * App\Support\FormField::error não cai para o default.
+     */
+    public function test_the_whatsapp_invite_says_why_the_phone_was_refused(): void
+    {
+        $workshop = $this->workshopAccount();
+        $record = $this->ownerlessRecord($workshop, $this->ownerlessVehicle());
+
+        $this->actingAs($workshop)
+            ->post(route('workshop.maintenances.invite.whatsapp', $record), ['phone' => ''])
+            ->assertSessionHasErrors(['phone'], null, 'inviteWhatsapp');
+
+        // from(): sem referer o back() cai na home, que não tem o cartão do convite.
+        $this->withoutVite()
+            ->actingAs($workshop)
+            ->from(route('workshop.maintenances.show', $record))
+            ->followingRedirects()
+            ->post(route('workshop.maintenances.invite.whatsapp', $record), ['phone' => ''])
+            ->assertOk()
+            ->assertSee('Digite o telefone do cliente com DDD.');
+    }
+
     public function test_invite_page_is_public_minimal_and_noindex(): void
     {
         $workshop = $this->workshopAccount();

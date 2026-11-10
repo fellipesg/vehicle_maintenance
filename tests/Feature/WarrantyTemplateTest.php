@@ -7,6 +7,7 @@ use App\Models\Maintenance;
 use App\Models\MaintenanceWarranty;
 use App\Models\User;
 use App\Models\WarrantyTemplate;
+use App\Models\Workshop;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -177,6 +178,66 @@ class WarrantyTemplateTest extends TestCase
             ->assertSessionHasErrors('template');
 
         $this->assertDatabaseHas('warranty_templates', ['id' => $template->id]);
+    }
+
+    /**
+     * Campo travado chegando como array: 422/erro de validação, nunca 500. Castar o valor para
+     * string no after() da trava emitia "Array to string conversion", que o HandleExceptions lança
+     * como ErrorException (ValidatesWarrantyTemplateImmutability).
+     */
+    public function test_a_locked_field_sent_as_an_array_is_refused_and_not_a_server_error(): void
+    {
+        [$user, $workshop] = $this->workshopUser();
+        $template = WarrantyTemplate::factory()->forWorkshop($workshop)->create(['name' => 'Original']);
+        $this->issueVigenteWarrantyFor($workshop);
+
+        $this->actingAs($user)
+            ->put(route('workshop.warranty-templates.update', $template), [
+                'name' => ['Alterado'],
+                'body' => $template->body,
+                'duration_days' => $template->duration_days,
+                'scope' => $template->scope->value,
+            ])
+            ->assertStatus(302)
+            ->assertSessionHasErrors('name');
+
+        $this->assertSame('Original', $template->fresh()->name);
+    }
+
+    public function test_api_a_locked_field_sent_as_an_array_is_refused_and_not_a_server_error(): void
+    {
+        $user = $this->actingAsApiUser(User::factory()->asWorkshop()->create());
+        $workshop = $user->workshop;
+        $template = WarrantyTemplate::factory()->forWorkshop($workshop)->create([
+            'name' => 'Original',
+            'duration_days' => 30,
+        ]);
+        $this->issueVigenteWarrantyFor($workshop);
+
+        $this->putJson("/api/v1/workshops/{$workshop->id}/warranty-templates/{$template->id}", [
+            'name' => ['Alterado'],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['name']);
+
+        $this->putJson("/api/v1/workshops/{$workshop->id}/warranty-templates/{$template->id}", [
+            'duration_days' => ['dias' => 60],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['duration_days']);
+
+        $template->refresh();
+        $this->assertSame('Original', $template->name);
+        $this->assertSame(30, $template->duration_days);
+    }
+
+    /**
+     * Garantia vigente da oficina, que é o que tranca os modelos (Workshop::hasActiveWarranties).
+     */
+    private function issueVigenteWarrantyFor(Workshop $workshop): void
+    {
+        $maintenance = Maintenance::factory()->create([
+            'workshop_id' => $workshop->id,
+            'maintenance_date' => now()->subDays(5),
+        ]);
+
+        MaintenanceWarranty::factory()->forMaintenance($maintenance)->create(['duration_days' => 90]);
     }
 
     public function test_api_cannot_update_locked_fields_while_vigente(): void
