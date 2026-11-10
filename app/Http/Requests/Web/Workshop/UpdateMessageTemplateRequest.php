@@ -42,6 +42,7 @@ class UpdateMessageTemplateRequest extends FormRequest
 
         if ($workshop !== null && $template instanceof WorkshopMessageTemplate) {
             $this->addActiveMessageTemplateLimitRule($validator, $workshop, $template);
+            $this->addMessageTemplateTriggerPlanRule($validator, $workshop, $template);
         }
     }
 }

@@ -40,6 +40,12 @@ enum WorkshopMessageTrigger: string
      * manda mensagem nenhuma e, no `match` do dispatcher, levava a rodada diária de todas as
      * oficinas com um UnhandledMatchError. Implementar um deles é acrescentar a rodada e trocar
      * o false por true aqui.
+     *
+     * Trocar para true não libera o gatilho para todo mundo: em cima disto vem o recorte por plano
+     * (App\Support\Workshop\WorkshopPlanLimits::triggers, de
+     * config('workshop_messages.plans.*.triggers')), que é quem decide, por exemplo, que
+     * `warranty_expiring` é do Pro. Daí o select do formulário sair de
+     * WorkshopPlanLimits::triggerOptions() e não de uma lista deste enum.
      */
     public function isDispatchable(): bool
     {
@@ -57,22 +63,6 @@ enum WorkshopMessageTrigger: string
         $options = [];
 
         foreach (self::cases() as $case) {
-            $options[$case->value] = $case->label();
-        }
-
-        return $options;
-    }
-
-    /**
-     * Os gatilhos que a oficina pode escolher hoje: só os que têm rodada.
-     *
-     * @return array<string, string>
-     */
-    public static function dispatchableOptions(): array
-    {
-        $options = [];
-
-        foreach (self::dispatchableCases() as $case) {
             $options[$case->value] = $case->label();
         }
 
