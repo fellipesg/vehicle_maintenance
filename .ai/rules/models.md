@@ -169,6 +169,25 @@ MaintenanceRedactor::redact/redactAll devolve um clone sem descrição, valores,
 ## Arquivos enviados nunca usam o nome original no caminho
 O nome que o cliente envia pode conter nome de pessoa ou CPF (LGPD). O caminho guardado no storage é aleatório (`invoices/<Str::random(40)>.pdf`, via InvoiceUploadProcessor::storeFile), só com extensão minúscula da lista permitida (pdf, xml) ou a extensão deduzida. O nome original fica apenas nas colunas `file_name`/`original_name` para exibir a quem tem acesso. Nunca monte caminho com getClientOriginalName().
 
+**A extensão também não é do cliente: ela sai do conteúdo.** Logo, capa e avatar passam por
+`App\Support\UploadedImageExtension::for`, que lê `guessExtension()` (finfo) e aceita só jpg, jpeg,
+png e webp — a mesma lista do `->types([...])` das regras —, caindo em `jpg` fora dela. Use em qualquer
+upload novo que monte caminho: `WorkshopLogoService`, `VehicleCoverService` (landscape e portrait),
+`BlogCoverService` e `Api\ProfileController::uploadAvatar` foram os quatro que usavam
+`getClientOriginalExtension() ?: 'jpg'`.
+
+O motivo não é estética: esses caminhos são públicos e servidos direto pelo servidor web
+(`asset('storage/...')`) ou pelo CDN do bucket, e nos dois a **extensão** decide o Content-Type.
+`File::image()` confere o conteúdo e deixa o nome passar, então um PNG de verdade chamado
+`payload.html` era aceito e gravado como `workshop-logos/1_123.html` — medido, 302 e sem erro de
+validação. Servido como `text/html`, e um PNG carrega texto arbitrário depois do IEND, o navegador
+executava o que estivesse lá; com a disk local isso é na origem do app, com a sessão do visitante.
+`.svg` tinha o mesmo caminho. Só `.php` e parentes eram barrados, e não por nós: é o
+`shouldBlockPhpUpload` que o Laravel aplica dentro de `mimes`. Testes:
+`UploadedImageExtensionTest` (Feature, as quatro superfícies; Unit, o fallback).
+
+Caminhos gravados antes disso mantêm a extensão antiga — a correção é só para frente.
+
 ## Prévia do proprietário: dono atual com posse comprovada vê os anexos antes de aceitar
 `Maintenance::hidesAttachmentsFrom` não esconde mais notas e fotos de uma OS sem dono do dono atual do
 veículo com a posse comprovada (`isVerifiedCurrentOwner`: `user_vehicles.is_current_owner` e
