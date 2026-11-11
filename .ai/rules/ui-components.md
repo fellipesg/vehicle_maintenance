@@ -42,5 +42,13 @@ Vehicle page, lists and maintenance detail are the same in every portal: <x-vehi
 ## Estado liga/desliga vai em x-ui.switch, nunca num checkbox sem uncheckedValue
 Campo booleano de formulário (is_active e afins) usa <x-ui.switch>: ele já desenha o hidden com o mesmo name e valor '0' antes da caixa, então "desligado" chega ao servidor. <x-ui.checkbox> não desenha esse hidden sem uncheckedValue="0" — desmarcada ela não envia nada, e aí o store cria com o default da coluna e o update com regra `sometimes` nem toca no campo: desligar fica impossível pela tela, sem nenhum erro aparecer. Checkbox é para aceite, para listas ("services[]") e para marcar uma ação de um envio só (remember, remove_cover) — ou então o controller lê o campo com $request->boolean('x'), que devolve false quando nada chegou (é assim que "Revisão obrigatória do fabricante" desliga nas telas de OS). O texto de apoio dessas duas é description=; hint= só existe no <x-ui.field>, e num checkbox ou switch ele vai calado para o atributo do <input>.
 
+## Bag nomeado não cai para o default
+`x-ui.field` com `bag="meuBag"` lê só esse bag (`App\Support\FormField::error`), sem queda para o
+default. Então o controller que valida um formulário desses erra com
+`withErrors($validator, 'meuBag')` (ou `validateWithBag`), nunca com `$request->validate()`: a
+mensagem iria para o default e o campo não mostraria nada. Foi o que aconteceu com o telefone do
+convite ao cliente (`MaintenanceInviteController::whatsapp`): a página recarregava calada. Duas
+formas na mesma página — o convite por WhatsApp e o por e-mail — são a razão dos bags nomeados ali.
+
 ## Texto livre da OS
 Campos de texto livre da OS da oficina (descrição e descrição do item) trazem a dica "Não inclua nome, CPF, telefone ou placa do cliente."

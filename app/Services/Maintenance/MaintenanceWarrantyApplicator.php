@@ -20,7 +20,9 @@ class MaintenanceWarrantyApplicator
      * An issued warranty is kept as is when the request keeps its template (or
      * leaves the field out), even if that template was deactivated later, so a
      * trivial edit never drops a warranty already promised to the customer.
-     * New links only accept active templates of the workshop.
+     * New links only accept active templates of the workshop; when the template asked
+     * for no longer resolves and there is an issued warranty to lose, the request is
+     * refused with 422 instead of leaving the OS with no warranty (refuseWhenIssued).
      */
     public function sync(Maintenance $maintenance, Request $request, ?Workshop $workshop): void
     {
@@ -57,13 +59,19 @@ class MaintenanceWarrantyApplicator
             return;
         }
 
-        $issued?->delete();
+        // Resolver antes de apagar: ver refuseWhenIssued.
+        $template = $requestedTemplateId === null
+            ? null
+            : $this->resolveTemplate($workshop, $requestedTemplateId, WarrantyScope::Order);
 
-        if ($requestedTemplateId === null) {
+        if ($requestedTemplateId !== null && $template === null) {
+            $this->refuseWhenIssued($issued, 'general_warranty_template_id');
+
             return;
         }
 
-        $template = $this->resolveTemplate($workshop, $requestedTemplateId, WarrantyScope::Order);
+        $issued?->delete();
+
         if ($template === null) {
             return;
         }
@@ -83,15 +91,19 @@ class MaintenanceWarrantyApplicator
             ]);
         }
 
-        $maintenance->warranties()
-            ->where('scope', WarrantyScope::Item)
-            ->where(function ($query) use ($items) {
-                $query->whereNull('maintenance_item_id')
-                    ->orWhereNotIn('maintenance_item_id', $items->modelKeys());
-            })
-            ->delete();
+        $pairs = $this->pairRowsWithItems($requestItems, $items);
 
-        foreach ($this->pairRowsWithItems($requestItems, $items) as [$row, $item]) {
+        // Duas passadas, e a primeira não grava nada: resolver todos os modelos pedidos antes de
+        // apagar qualquer garantia emitida (ver refuseWhenIssued). Resolver linha por linha deixava
+        // a OS pela metade quando a última linha recusava. As duas passadas continuam valendo agora
+        // que os dois update rodam em transação: elas garantem que a recusa sobe antes de qualquer
+        // delete, então o applicator não depende de quem o chama ter aberto transação.
+        //
+        // A chave é o id do item; null planejado = encerrar a garantia do item, chave ausente =
+        // não mexer na dele.
+        $planned = [];
+
+        foreach ($pairs as [$row, $item]) {
             if (! array_key_exists('warranty_template_id', $row)) {
                 continue;
             }
@@ -103,13 +115,40 @@ class MaintenanceWarrantyApplicator
                 continue;
             }
 
-            $issued?->delete();
-
             if ($requestedTemplateId === null) {
+                $planned[$item->id] = null;
+
                 continue;
             }
 
             $template = $this->resolveTemplate($workshop, $requestedTemplateId, WarrantyScope::Item);
+
+            if ($template === null) {
+                $this->refuseWhenIssued($issued, 'items');
+
+                continue;
+            }
+
+            $planned[$item->id] = $template;
+        }
+
+        $maintenance->warranties()
+            ->where('scope', WarrantyScope::Item)
+            ->where(function ($query) use ($items) {
+                $query->whereNull('maintenance_item_id')
+                    ->orWhereNotIn('maintenance_item_id', $items->modelKeys());
+            })
+            ->delete();
+
+        foreach ($pairs as [$row, $item]) {
+            if (! array_key_exists($item->id, $planned)) {
+                continue;
+            }
+
+            $item->warranty?->delete();
+
+            $template = $planned[$item->id];
+
             if ($template === null) {
                 continue;
             }
@@ -194,6 +233,33 @@ class MaintenanceWarrantyApplicator
         return array_values(array_filter($items, function ($item) {
             return is_array($item) && ! empty($item['name']);
         }));
+    }
+
+    /**
+     * Modelo pedido que não serve mais (desativado entre abrir o formulário e salvar, apagado, ou de
+     * outra oficina): 422 quando há garantia emitida para perder, silêncio quando não há.
+     *
+     * Antes daqui o código apagava a garantia emitida e só então resolvia o modelo, então um modelo
+     * que não resolvia deixava a OS **sem garantia nenhuma**, com "OS atualizada." e sem erro.
+     * Medido: OS com a garantia do modelo A, a oficina desativa o modelo B em outra aba, salva a OS
+     * com B selecionado — a garantia de A ia embora. Garantia é promessa ao cliente: encerrar uma só
+     * pode acontecer por escolha explícita e válida ("Sem garantia", ou outro modelo que existe),
+     * nunca por efeito colateral de uma página velha.
+     *
+     * Sem nada emitido, o pedido impossível continua sendo ignorado em silêncio e a OS nasce (ou
+     * continua) sem garantia — é o que `test_deactivated_general_template_cannot_be_linked_to_a_new_os`
+     * descreve, e recusar ali derrubaria a criação inteira da OS, na web e na API. Mudar isso é
+     * decisão de produto, não desta correção.
+     */
+    private function refuseWhenIssued(?MaintenanceWarranty $issued, string $errorKey): void
+    {
+        if ($issued === null) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $errorKey => 'O modelo de garantia escolhido não está mais disponível. Recarregue a página e escolha de novo; a garantia já emitida foi mantida.',
+        ]);
     }
 
     private function resolveTemplate(Workshop $workshop, int $templateId, WarrantyScope $scope): ?WarrantyTemplate

@@ -27,12 +27,21 @@ class MaintenanceInviteController extends Controller
             return $redirect;
         }
 
-        $data = $request->validate(
-            ['phone' => ['required', 'string', 'max:30']],
-            ['phone.required' => 'Digite o telefone do cliente com DDD.'],
-        );
+        // Validator na mão, como no email() abaixo, para o erro cair no bag que o formulário lê
+        // (_invite-card.blade.php, bag="inviteWhatsapp"). Com $request->validate() a mensagem ia
+        // para o bag default e App\Support\FormField::error não cai para ele: telefone em branco
+        // recarregava a página sem dizer nada.
+        $validator = validator($request->all(), [
+            'phone' => ['required', 'string', 'max:30'],
+        ], [
+            'phone.required' => 'Digite o telefone do cliente com DDD.',
+        ]);
 
-        $result = $this->invites->whatsappUrl($maintenance, $request->user()->workshop, $data['phone']);
+        if ($validator->fails()) {
+            return back()->withInput()->withErrors($validator, 'inviteWhatsapp');
+        }
+
+        $result = $this->invites->whatsappUrl($maintenance, $request->user()->workshop, (string) $validator->validated()['phone']);
 
         if ($result === null) {
             return back()->withInput()->withErrors(['phone' => 'Telefone inválido. Digite o DDD e o número, por exemplo (11) 91234-5678.'], 'inviteWhatsapp');

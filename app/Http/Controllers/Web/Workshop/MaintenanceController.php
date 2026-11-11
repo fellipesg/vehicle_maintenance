@@ -397,25 +397,40 @@ class MaintenanceController extends Controller
 
         $previousDate = $maintenance->maintenance_date?->toDateString();
 
-        $maintenance->update([
-            'maintenance_type' => $data['maintenance_type'],
-            'description' => $data['description'] ?? null,
-            'maintenance_date' => $data['maintenance_date'],
-            'kilometers' => (int) $data['kilometers'],
-            'service_category' => $data['service_category'],
-            'is_manufacturer_required' => $request->boolean('is_manufacturer_required'),
-            'workshop_id' => $workshop->id,
-            'workshop_name' => $workshop->name,
-        ]);
+        // OS, itens, garantias e recomputação das datas numa transação só. O sync de garantias
+        // recusa com 422 quando o modelo pedido não resolve mais e há garantia emitida para perder
+        // (MaintenanceWarrantyApplicator::refuseWhenIssued), e fora da transação a data nova já
+        // estava gravada quando a recusa subia: a garantia ficava com as datas calculadas da data
+        // antiga e salvar de novo não consertava, porque $previousDate já era igual à data salva —
+        // a janela da garantia ficava permanentemente fora da data do serviço que a OS mostra ao
+        // cliente. Medido: OS de 31/10 com 90 dias (31/10 → 29/01), edição para 07/11 com o modelo
+        // desativado em outra aba, 422 e maintenance_date 07/11 com a garantia ainda em 29/01.
+        //
+        // Notas fiscais e fotos continuam fora daqui, de propósito: o insert da nota fora de
+        // transação é decisão registrada (.ai/rules/invoices.md, commit eaf94f0 — pooler do Neon, e
+        // a transação ficaria aberta durante o I/O do storage), e nenhuma das duas chega a rodar
+        // quando a recusa sobe.
+        DB::transaction(function () use ($maintenance, $data, $request, $workshop, $previousDate): void {
+            $maintenance->update([
+                'maintenance_type' => $data['maintenance_type'],
+                'description' => $data['description'] ?? null,
+                'maintenance_date' => $data['maintenance_date'],
+                'kilometers' => (int) $data['kilometers'],
+                'service_category' => $data['service_category'],
+                'is_manufacturer_required' => $request->boolean('is_manufacturer_required'),
+                'workshop_id' => $workshop->id,
+                'workshop_name' => $workshop->name,
+            ]);
 
-        app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
+            app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
 
-        $this->syncMaintenanceItems($maintenance, $request);
-        $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
+            $this->syncMaintenanceItems($maintenance, $request);
+            $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
 
-        if ($previousDate !== $maintenance->maintenance_date?->toDateString()) {
-            $this->recomputeMaintenanceWarrantyDates($maintenance->fresh(['warranties']));
-        }
+            if ($previousDate !== $maintenance->maintenance_date?->toDateString()) {
+                $this->recomputeMaintenanceWarrantyDates($maintenance->fresh(['warranties']));
+            }
+        });
 
         // Depois dos itens: com a lista vazia, os itens da NF-e preenchem a OS.
         $invoiceResult = $this->processMaintenanceInvoices($request, $maintenance);

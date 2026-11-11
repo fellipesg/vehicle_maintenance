@@ -157,6 +157,73 @@ class WorkshopMaintenanceWarrantyPreservationTest extends TestCase
         $this->assertNull($maintenance->generalWarranty);
     }
 
+    /**
+     * Modelo desativado entre abrir o formulário e salvar: a OS é recusada e a garantia já emitida
+     * fica. Antes a garantia emitida era apagada antes de o modelo pedido ser resolvido, e a OS
+     * terminava sem garantia nenhuma, com "OS atualizada." e sem erro
+     * (MaintenanceWarrantyApplicator::refuseWhenIssued).
+     */
+    public function test_choosing_a_general_template_deactivated_meanwhile_keeps_the_issued_warranty(): void
+    {
+        $issuedTemplate = $this->orderTemplate(['name' => 'Garantia A', 'duration_days' => 90]);
+        $other = $this->orderTemplate(['name' => 'Garantia B', 'duration_days' => 30]);
+        $maintenance = $this->createMaintenance(['general_warranty_template_id' => $issuedTemplate->id]);
+        $issued = $maintenance->generalWarranty;
+        $this->assertNotNull($issued);
+
+        // A oficina desativa B em outra aba; o formulário da OS já estava aberto com B na lista.
+        $other->update(['is_active' => false]);
+
+        $this->actingAs($this->workshopUser)
+            ->put(route('workshop.maintenances.update', $maintenance), $this->osPayload([
+                'general_warranty_template_id' => $other->id,
+            ]))
+            ->assertSessionHasErrors('general_warranty_template_id');
+
+        $kept = $maintenance->fresh()->generalWarranty;
+        $this->assertNotNull($kept);
+        $this->assertSame($issued->id, $kept->id);
+        $this->assertSame('Garantia A', $kept->name);
+    }
+
+    public function test_choosing_an_item_template_deactivated_meanwhile_keeps_the_issued_warranty(): void
+    {
+        $issuedTemplate = WarrantyTemplate::factory()->forWorkshop($this->workshopUser->workshop)->itemScope()->create([
+            'name' => 'Garantia da peça 1 ano',
+            'duration_days' => 365,
+        ]);
+        $other = WarrantyTemplate::factory()->forWorkshop($this->workshopUser->workshop)->itemScope()->create([
+            'name' => 'Garantia da peça 90 dias',
+            'duration_days' => 90,
+        ]);
+        $maintenance = $this->createMaintenance(['items' => [
+            ['name' => 'Amortecedor dianteiro', 'quantity' => 2, 'warranty_template_id' => $issuedTemplate->id],
+        ]]);
+        $item = $maintenance->items()->firstOrFail();
+        $issued = $item->warranty;
+        $this->assertNotNull($issued);
+
+        $other->update(['is_active' => false]);
+
+        $this->actingAs($this->workshopUser)
+            ->put(route('workshop.maintenances.update', $maintenance), $this->osPayload([
+                'items' => [
+                    [
+                        'id' => $item->id,
+                        'name' => 'Amortecedor dianteiro',
+                        'quantity' => 2,
+                        'warranty_template_id' => $other->id,
+                    ],
+                ],
+            ]))
+            ->assertSessionHasErrors('items');
+
+        $item->refresh();
+        $this->assertNotNull($item->warranty);
+        $this->assertSame($issued->id, $item->warranty->id);
+        $this->assertSame('Garantia da peça 1 ano', $item->warranty->name);
+    }
+
     public function test_editing_os_keeps_item_warranty_whose_template_was_deactivated(): void
     {
         $template = WarrantyTemplate::factory()->forWorkshop($this->workshopUser->workshop)->itemScope()->create([
@@ -225,6 +292,64 @@ class WorkshopMaintenanceWarrantyPreservationTest extends TestCase
         $this->assertNull($tyre->fresh()->warranty);
         $valve = $maintenance->items()->where('name', 'Válvula')->firstOrFail();
         $this->assertSame($template->id, $valve->warranty?->warranty_template_id);
+    }
+
+    /**
+     * A recusa acontece dentro da transação: nada da edição fica gravado. Sem a transação, a OS já
+     * estava salva com a data nova quando o 422 subia e a garantia ficava com as datas da data
+     * antiga — e salvar de novo não consertava, porque $previousDate já era igual à data salva, então
+     * a recomputação não rodava. A janela da garantia ficava permanentemente fora da data do serviço.
+     */
+    public function test_a_refused_edit_rolls_back_the_os_and_a_new_save_still_recomputes_the_warranty(): void
+    {
+        $issuedTemplate = $this->orderTemplate(['name' => 'Garantia A', 'duration_days' => 90]);
+        $other = $this->orderTemplate(['name' => 'Garantia B', 'duration_days' => 30]);
+        $maintenance = $this->createMaintenance(['general_warranty_template_id' => $issuedTemplate->id]);
+        $issued = $maintenance->generalWarranty;
+        $this->assertNotNull($issued);
+
+        $originalDate = $maintenance->maintenance_date->toDateString();
+        $originalEndsAt = $issued->ends_at->toDateString();
+        $newDate = now()->subDays(3)->toDateString();
+        $this->assertNotSame($originalDate, $newDate);
+
+        $other->update(['is_active' => false]);
+
+        // A mesma requisição muda a data e acrescenta um item; a garantia é que recusa. As duas
+        // gravações vinham antes do 422 na ordem do controller.
+        $this->actingAs($this->workshopUser)
+            ->put(route('workshop.maintenances.update', $maintenance), $this->osPayload([
+                'maintenance_date' => $newDate,
+                'general_warranty_template_id' => $other->id,
+                'items' => [
+                    ['name' => 'Bieleta', 'quantity' => 2, 'warranty_template_id' => ''],
+                ],
+            ]))
+            ->assertSessionHasErrors('general_warranty_template_id');
+
+        $maintenance->refresh();
+        $this->assertSame($originalDate, $maintenance->maintenance_date->toDateString());
+        $this->assertSame(0, $maintenance->items()->count());
+        $this->assertSame($originalEndsAt, $maintenance->generalWarranty->ends_at->toDateString());
+
+        // Agora com o modelo que resolve e a mesma data nova: a recomputação roda, porque a data
+        // gravada ainda é a antiga.
+        $this->actingAs($this->workshopUser)
+            ->put(route('workshop.maintenances.update', $maintenance), $this->osPayload([
+                'maintenance_date' => $newDate,
+                'general_warranty_template_id' => $issuedTemplate->id,
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $maintenance->refresh();
+        $this->assertSame($newDate, $maintenance->maintenance_date->toDateString());
+        $warranty = $maintenance->generalWarranty;
+        $this->assertNotNull($warranty);
+        $this->assertSame($newDate, $warranty->starts_at->toDateString());
+        $this->assertSame(
+            now()->subDays(3)->addDays(90)->toDateString(),
+            $warranty->ends_at->toDateString(),
+        );
     }
 
     /**
