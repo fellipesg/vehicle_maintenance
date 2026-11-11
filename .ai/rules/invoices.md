@@ -62,6 +62,15 @@ sem linha. A OS editada nunca volta atrás: a nota que não entrou sai em `invoi
 arquivos) e a `message` passa a dizer que algo não foi anexado, que é o equivalente do flash `error` da
 web. Não troque isso por 500 nem por rollback.
 
+**A edição tem transação; a nota, não.** Os dois `update` (web e API) passaram a envolver OS + itens +
+garantias + recomputação das datas das garantias num `DB::transaction`, porque a recusa de garantia
+deixava a OS gravada pela metade (`.ai/rules/models.md`, "Garantia emitida só acaba por escolha
+explícita e válida"). Isso **não** mudou nada do que está acima: as linhas das notas entram depois do
+bloco, já commitado, e seguem sem transação. Na web o upload acontece depois; na API os arquivos sobem
+antes do bloco e o `catch (\Throwable)` em volta dele descarta todos quando a transação volta atrás —
+nenhuma linha de nota existe ainda. Não mova `createInvoiceRecordsOrDiscard` nem `parseStoredUploads`
+para dentro da transação.
+
 Mensagens da API seguem em inglês (ver `.ai/rules/locale.md`); as da web, em pt-BR.
 
 ## Onde o resto da nota fiscal está registrado

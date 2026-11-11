@@ -350,35 +350,45 @@ class MaintenanceController extends Controller
         }
 
         try {
-            $maintenance->update($data);
+            // OS, itens, garantias e recomputação das datas numa transação só, como no store.
+            // O sync de garantias recusa com 422 quando o modelo pedido não resolve mais e há
+            // garantia emitida para perder (MaintenanceWarrantyApplicator::refuseWhenIssued), e
+            // fora da transação a data nova já estava gravada quando a recusa subia: a garantia
+            // ficava com as datas calculadas da data antiga e salvar de novo não consertava,
+            // porque $previousDate já era igual à data salva. As linhas das notas continuam fora
+            // daqui (criadas depois do try, de propósito: .ai/rules/invoices.md), então a
+            // transação não abraça I/O de storage nenhum.
+            DB::transaction(function () use ($maintenance, $data, $request, $previousWorkshopId, $previousDate): void {
+                $maintenance->update($data);
 
-            if (! $request->user()->isWorkshop()) {
-                app(WorkshopReviewService::class)->syncAfterDeclaration($maintenance->fresh(), $previousWorkshopId);
-            }
-
-            if (isset($data['kilometers'])) {
-                app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
-            }
-
-            // Mesma ordem do portal web: itens primeiro, para que as garantias
-            // casem com os itens que ficaram. Sem a chave `items` a lista fica como
-            // está — um PUT parcial não deve zerar os itens da OS.
-            if ($request->has('items')) {
-                $this->syncMaintenanceItems($maintenance, $request);
-
-                // Garantia é promessa da oficina, então só o portal dela aplica
-                // template. Item removido já leva a garantia junto: a FK
-                // maintenance_warranties.maintenance_item_id é cascadeOnDelete.
-                $workshop = $request->user()->isWorkshop() ? $request->user()->workshop : null;
-
-                if ($workshop !== null) {
-                    $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
+                if (! $request->user()->isWorkshop()) {
+                    app(WorkshopReviewService::class)->syncAfterDeclaration($maintenance->fresh(), $previousWorkshopId);
                 }
-            }
 
-            if ($previousDate !== $maintenance->maintenance_date?->toDateString()) {
-                $this->recomputeMaintenanceWarrantyDates($maintenance->fresh(['warranties']));
-            }
+                if (isset($data['kilometers'])) {
+                    app(VehicleMileageService::class)->refreshCurrentKilometers($maintenance->vehicle->fresh());
+                }
+
+                // Mesma ordem do portal web: itens primeiro, para que as garantias
+                // casem com os itens que ficaram. Sem a chave `items` a lista fica como
+                // está — um PUT parcial não deve zerar os itens da OS.
+                if ($request->has('items')) {
+                    $this->syncMaintenanceItems($maintenance, $request);
+
+                    // Garantia é promessa da oficina, então só o portal dela aplica
+                    // template. Item removido já leva a garantia junto: a FK
+                    // maintenance_warranties.maintenance_item_id é cascadeOnDelete.
+                    $workshop = $request->user()->isWorkshop() ? $request->user()->workshop : null;
+
+                    if ($workshop !== null) {
+                        $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
+                    }
+                }
+
+                if ($previousDate !== $maintenance->maintenance_date?->toDateString()) {
+                    $this->recomputeMaintenanceWarrantyDates($maintenance->fresh(['warranties']));
+                }
+            });
         } catch (\Throwable $e) {
             // Nenhuma linha de nota existe ainda, então todos os arquivos podem ir embora:
             // sem isso um 422 do sync de garantias deixaria o objeto órfão no S3/R2.

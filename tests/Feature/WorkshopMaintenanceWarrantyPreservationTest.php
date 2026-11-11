@@ -295,6 +295,64 @@ class WorkshopMaintenanceWarrantyPreservationTest extends TestCase
     }
 
     /**
+     * A recusa acontece dentro da transação: nada da edição fica gravado. Sem a transação, a OS já
+     * estava salva com a data nova quando o 422 subia e a garantia ficava com as datas da data
+     * antiga — e salvar de novo não consertava, porque $previousDate já era igual à data salva, então
+     * a recomputação não rodava. A janela da garantia ficava permanentemente fora da data do serviço.
+     */
+    public function test_a_refused_edit_rolls_back_the_os_and_a_new_save_still_recomputes_the_warranty(): void
+    {
+        $issuedTemplate = $this->orderTemplate(['name' => 'Garantia A', 'duration_days' => 90]);
+        $other = $this->orderTemplate(['name' => 'Garantia B', 'duration_days' => 30]);
+        $maintenance = $this->createMaintenance(['general_warranty_template_id' => $issuedTemplate->id]);
+        $issued = $maintenance->generalWarranty;
+        $this->assertNotNull($issued);
+
+        $originalDate = $maintenance->maintenance_date->toDateString();
+        $originalEndsAt = $issued->ends_at->toDateString();
+        $newDate = now()->subDays(3)->toDateString();
+        $this->assertNotSame($originalDate, $newDate);
+
+        $other->update(['is_active' => false]);
+
+        // A mesma requisição muda a data e acrescenta um item; a garantia é que recusa. As duas
+        // gravações vinham antes do 422 na ordem do controller.
+        $this->actingAs($this->workshopUser)
+            ->put(route('workshop.maintenances.update', $maintenance), $this->osPayload([
+                'maintenance_date' => $newDate,
+                'general_warranty_template_id' => $other->id,
+                'items' => [
+                    ['name' => 'Bieleta', 'quantity' => 2, 'warranty_template_id' => ''],
+                ],
+            ]))
+            ->assertSessionHasErrors('general_warranty_template_id');
+
+        $maintenance->refresh();
+        $this->assertSame($originalDate, $maintenance->maintenance_date->toDateString());
+        $this->assertSame(0, $maintenance->items()->count());
+        $this->assertSame($originalEndsAt, $maintenance->generalWarranty->ends_at->toDateString());
+
+        // Agora com o modelo que resolve e a mesma data nova: a recomputação roda, porque a data
+        // gravada ainda é a antiga.
+        $this->actingAs($this->workshopUser)
+            ->put(route('workshop.maintenances.update', $maintenance), $this->osPayload([
+                'maintenance_date' => $newDate,
+                'general_warranty_template_id' => $issuedTemplate->id,
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $maintenance->refresh();
+        $this->assertSame($newDate, $maintenance->maintenance_date->toDateString());
+        $warranty = $maintenance->generalWarranty;
+        $this->assertNotNull($warranty);
+        $this->assertSame($newDate, $warranty->starts_at->toDateString());
+        $this->assertSame(
+            now()->subDays(3)->addDays(90)->toDateString(),
+            $warranty->ends_at->toDateString(),
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     private function orderTemplate(array $attributes = []): WarrantyTemplate

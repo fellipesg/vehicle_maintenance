@@ -95,8 +95,9 @@ class MaintenanceWarrantyApplicator
 
         // Duas passadas, e a primeira não grava nada: resolver todos os modelos pedidos antes de
         // apagar qualquer garantia emitida (ver refuseWhenIssued). Resolver linha por linha deixava
-        // a OS pela metade quando a última linha recusava — aqui não há transação (o update do
-        // MaintenanceController grava OS, itens, notas e fotos fora de uma).
+        // a OS pela metade quando a última linha recusava. As duas passadas continuam valendo agora
+        // que os dois update rodam em transação: elas garantem que a recusa sobe antes de qualquer
+        // delete, então o applicator não depende de quem o chama ter aberto transação.
         //
         // A chave é o id do item; null planejado = encerrar a garantia do item, chave ausente =
         // não mexer na dele.

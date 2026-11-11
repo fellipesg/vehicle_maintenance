@@ -136,8 +136,18 @@ Com garantia emitida em jogo, modelo que não resolve agora é 422 (`refuseWhenI
 em silêncio e a OS fica sem garantia: é o que
 `test_deactivated_general_template_cannot_be_linked_to_a_new_os` descreve, e recusar ali derrubaria a
 criação inteira da OS, na web e na API (as duas chamam o applicator dentro da transação). As
-garantias por item são resolvidas todas antes de qualquer gravação, porque `MaintenanceController::update`
-não roda em transação: resolver linha por linha deixava a OS pela metade quando a última falhava.
+garantias por item são resolvidas todas antes de qualquer gravação: resolver linha por linha deixava a
+OS pela metade quando a última falhava.
+
+A recusa só é segura porque a edição também roda em transação, na web
+(`Web\Workshop\MaintenanceController::update`) e na API (`Api\MaintenanceController::update`): OS,
+itens, garantias e a recomputação das datas num bloco só. Fora da transação o 422 chegava com a OS já
+gravada — a data nova salva e a garantia com as datas calculadas da data antiga — e **salvar de novo não
+consertava**, porque `$previousDate` já era igual à data salva e a recomputação não rodava: a janela da
+garantia ficava permanentemente fora da data do serviço mostrada ao cliente. Notas fiscais e fotos
+continuam **fora** da transação (decisão própria, em `.ai/rules/invoices.md`), e nenhuma das duas chega a
+rodar quando a recusa sobe. Testes: `test_a_refused_edit_rolls_back_the_os_and_a_new_save_still_recomputes_the_warranty`
+e `ApiMaintenanceWarrantyTest::test_a_refused_update_rolls_back_the_maintenance`.
 
 Modelo de garantia não se edita enquanto a oficina tem garantia vigente
 (`ValidatesWarrantyTemplateImmutability`, `Workshop::hasActiveWarranties`), e a comparação só aceita
