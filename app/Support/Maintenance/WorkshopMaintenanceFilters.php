@@ -4,6 +4,7 @@ namespace App\Support\Maintenance;
 
 use App\Enums\ServiceCategory;
 use App\Models\MaintenancePhoto;
+use App\Models\User;
 use App\Support\Vehicle\VehicleMaintenanceHistory;
 use App\Support\VehiclePlateSearch;
 use Carbon\CarbonImmutable;
@@ -38,6 +39,30 @@ final class WorkshopMaintenanceFilters
         'sem-nfe' => 'Sem NF-e',
         'sem-fotos-depois' => 'Sem fotos de depois',
     ];
+
+    /**
+     * Opções do select "Anexos", sem a de fotos quando a conta não tem o recurso.
+     *
+     * As fotos das manutenções são ligadas conta a conta pelo admin (App\Features\MaintenancePhotos,
+     * `.ai/rules/features.md`) e vêm desligadas por padrão. Sem o recurso o formulário da OS não tem
+     * campo de foto nenhum (`partials/workshop-maintenance-form.blade.php`), então oferecer
+     * "Sem fotos de depois" manda a oficina atrás de um trabalho que a tela não deixa fazer.
+     *
+     * A chave continua sendo aceita em fromRequest(): quem digitar `?anexos=sem-fotos-depois` na URL
+     * só filtra, não vaza nada. O que sai é a oferta.
+     *
+     * @return array<string, string>
+     */
+    public static function attachmentOptions(?User $user): array
+    {
+        $options = self::ATTACHMENT_OPTIONS;
+
+        if (! MaintenancePhotoAccess::allows($user)) {
+            unset($options['sem-fotos-depois']);
+        }
+
+        return $options;
+    }
 
     /**
      * @var array<string, string>

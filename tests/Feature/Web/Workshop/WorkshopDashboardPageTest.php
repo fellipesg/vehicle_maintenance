@@ -60,6 +60,10 @@ class WorkshopDashboardPageTest extends TestCase
 
     public function test_pending_items_count_and_link_to_the_next_action(): void
     {
+        // A pendência de fotos só existe para quem tem o recurso, e este caso semeia uma foto: sem
+        // ligar, o cenário não se sustenta (conta sem o recurso não envia foto nenhuma). Quem guarda
+        // as duas direções do recorte é WorkshopDashboardPhotoPendencyTest.
+        $this->enableMaintenancePhotosForEveryone();
         $user = $this->workshopUser();
         $vehicle = $this->ownedVehicle('PEN1A23');
         $withEverything = $this->sealedOrder($user, ['vehicle_id' => $vehicle->id]);
