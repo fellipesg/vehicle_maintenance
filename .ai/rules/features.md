@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'app/Features/**,app/Support/Maintenance/MaintenancePhotoAccess.php,app/Http/Controllers/Web/Admin/MaintenancePhotosFeatureController.php,app/Http/Requests/Web/Admin/**,resources/views/components/admin/maintenance-photos-toggle.blade.php,config/pennant.php'
+  - 'app/Features/**,app/Support/Maintenance/MaintenancePhotoAccess.php,app/Http/Controllers/Web/Admin/MaintenancePhotosFeatureController.php,app/Http/Requests/Web/Admin/**,resources/views/components/admin/maintenance-photos-toggle.blade.php,config/pennant.php,app/Http/Controllers/Web/Workshop/DashboardController.php,app/Support/Maintenance/WorkshopMaintenanceFilters.php'
 ---
 
 # Feature flags (Pennant)
@@ -14,3 +14,19 @@ Envio, visualização e fotos no PDF do histórico. O admin liga em um destes es
 O Pennant grava a linha `features` (nome `maintenance-photos`, escopo `Model|id`) na primeira consulta, com `false`. Desligar não apaga foto nenhuma: elas ficam guardadas e voltam quando o recurso for religado. Quem mudou fica no log (`admin_id`, `scope_type`, `scope_id`, `enabled`); a tabela guarda só o estado atual.
 
 Admin: `PUT admin/usuarios/{user}|oficinas/{workshop}|lojas/{garage}/fotos-manutencao` (`MaintenancePhotosFeatureController`, `UpdateMaintenancePhotosFeatureRequest`, `enabled` booleano, só `is_admin`). Interruptor `<x-admin.maintenance-photos-toggle>` no detalhe do usuário (conta, oficina e loja vinculadas) e nos cartões de loja; selo "Fotos" na lista de usuários e coluna na de oficinas. Onde o recurso é aplicado: ver `policies.md`, `api.md`, `pdfs.md` e `views.md`. A busca pública por placa e o cartão público de procedência são exceção documentada e seguem mostrando as fotos públicas (veículo, depois), com ou sem o recurso.
+
+## Sem o recurso, a tela não oferece o que ele não deixa fazer
+Esconder o envio não basta: a oferta tem de sair junto. O formulário da OS da oficina já confere
+`MaintenancePhotoAccess::allows(auth()->user())` antes de desenhar qualquer campo de foto
+(`partials/workshop-maintenance-form.blade.php`), mas o Início e a lista de OS não conferiam nada —
+medido, com o recurso desligado (o padrão) o Início mostrava "1 OS sem fotos de depois", a descrição
+"A foto do resultado é a prova que o cliente vê na ficha do veículo." e o botão "Ver OS sem fotos", e
+o select "Anexos" ainda oferecia "Sem fotos de depois". A oficina clicava, chegava à OS filtrada e não
+tinha o que anexar: beco sem saída na tela principal, para a maioria das contas.
+
+Agora a pendência sai de `DashboardController::pendingItems` e a opção sai de
+`WorkshopMaintenanceFilters::attachmentOptions(?User)`, as duas pela mesma pergunta. A chave
+`sem-fotos-depois` continua aceita em `fromRequest()` de propósito: quem a digitar na URL só filtra, e
+recusar ali não protegeria nada. Ao acrescentar recurso novo, varra também os lugares que *sugerem* a
+ação — pendência, filtro, dica, item de menu —, não só o que a executa.
+`tests/Feature/Workshop/WorkshopDashboardPhotoPendencyTest.php` guarda as duas direções.
