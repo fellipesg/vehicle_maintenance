@@ -41,4 +41,40 @@ class WorkshopMessageTemplateRendererTest extends TestCase
 
         $this->assertSame('123.456 /  / ', $rendered);
     }
+
+    /**
+     * TAGS é a lista que o formulário mostra e que App\Rules\KnownMessageTemplateTags cobra. Se ela
+     * e o `render()` divergirem, a tela passa a prometer uma variável que chega literal ao cliente
+     * (ou a validação recusa uma que funcionaria).
+     */
+    public function test_every_listed_tag_is_one_the_render_actually_replaces(): void
+    {
+        $template = collect(array_keys(WorkshopMessageTemplateRenderer::TAGS))
+            ->map(fn (string $tag): string => '{{'.$tag.'}}')
+            ->implode('|');
+
+        $rendered = (new WorkshopMessageTemplateRenderer)->render($template, [
+            'workshop_name' => 'Oficina',
+            'customer_name' => 'João',
+            'vehicle' => 'Fiat Argo',
+            'estimated_km' => 1000,
+            'next_due_km' => 2000,
+            'days_since_service' => 30,
+            'last_service' => '01/01/2026',
+        ]);
+
+        $this->assertStringNotContainsString('{{', $rendered, 'Alguma variável de TAGS não é trocada pelo render().');
+        $this->assertStringNotContainsString('}}', $rendered);
+    }
+
+    public function test_the_rendered_text_keeps_a_variable_that_does_not_exist(): void
+    {
+        $rendered = (new WorkshopMessageTemplateRenderer)->render(
+            'Olá {{cliente}} e {{ customer_name }}.',
+            ['customer_name' => 'João'],
+        );
+
+        // É por isto que a validação recusa as duas formas: elas chegam ao cliente como estão.
+        $this->assertSame('Olá {{cliente}} e {{ customer_name }}.', $rendered);
+    }
 }
