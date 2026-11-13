@@ -10,6 +10,30 @@ use App\Models\Workshop;
 class WorkshopMessageTemplateRenderer
 {
     /**
+     * As variáveis que o texto do modelo aceita: nome => o que sai no lugar, na ordem em que o
+     * formulário as mostra.
+     *
+     * Fonte única das três pontas: `render()` troca exatamente estas, o formulário da oficina as
+     * lista (`workshop/message-templates/_form.blade.php`) e `App\Rules\KnownMessageTemplateTags`
+     * recusa qualquer outra. Antes não havia lista em tela nenhuma, então a oficina inventava o
+     * nome e o `strtr` entregava `{{cliente}}` literal ao cliente, sem aviso em lugar nenhum.
+     *
+     * Acrescentar uma variável é acrescentar aqui, em `render()` e em `buildContext()`;
+     * `WorkshopMessageTemplateRendererTest` falha se a lista e o `render()` divergirem.
+     *
+     * @var array<string, string>
+     */
+    public const TAGS = [
+        'workshop_name' => 'o nome da sua oficina',
+        'customer_name' => 'o primeiro nome do cliente',
+        'vehicle' => 'marca e modelo do veículo',
+        'estimated_km' => 'a quilometragem estimada hoje',
+        'next_due_km' => 'a quilometragem da próxima revisão',
+        'days_since_service' => 'quantos dias se passaram desde o serviço',
+        'last_service' => 'a data do último serviço',
+    ];
+
+    /**
      * @param  array{
      *     workshop_name?: string,
      *     customer_name?: string,
