@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Http\UploadedFile;
+use Symfony\Component\Mime\MimeTypes;
 
 /**
  * Extensão do arquivo gravado no storage, decidida pelo conteúdo e nunca pelo nome que o cliente
@@ -39,5 +40,35 @@ class UploadedImageExtension
         $extension = strtolower((string) $file->guessExtension());
 
         return in_array($extension, self::ALLOWED, true) ? $extension : self::FALLBACK;
+    }
+
+    /**
+     * A extensão do conteúdo que já está no storage, ou null quando ele não é uma das quatro.
+     *
+     * Serve ao `storage:fix-image-extensions`, que conserta os caminhos gravados antes de a extensão
+     * passar a sair do conteúdo. Aqui **não** existe o fallback de `for()`: renomear um objeto que não
+     * se consegue identificar seria chutar, então o comando relata e não mexe.
+     */
+    public static function forBytes(string $bytes): ?string
+    {
+        if ($bytes === '') {
+            return null;
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+
+        if (! is_string($mime) || $mime === '') {
+            return null;
+        }
+
+        foreach (MimeTypes::getDefault()->getExtensions($mime) as $extension) {
+            $extension = strtolower($extension);
+
+            if (in_array($extension, self::ALLOWED, true)) {
+                return $extension;
+            }
+        }
+
+        return null;
     }
 }
