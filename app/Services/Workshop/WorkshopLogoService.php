@@ -4,13 +4,14 @@ namespace App\Services\Workshop;
 
 use App\Models\Workshop;
 use App\Support\AppStorage;
+use App\Support\UploadedImageExtension;
 use Illuminate\Http\UploadedFile;
 
 class WorkshopLogoService
 {
     public function store(Workshop $workshop, UploadedFile $file): Workshop
     {
-        $extension = $file->getClientOriginalExtension() ?: 'jpg';
+        $extension = UploadedImageExtension::for($file);
         $fileName = $workshop->id.'_'.time().'.'.$extension;
         $filePath = AppStorage::WORKSHOP_LOGOS_PREFIX.$fileName;
 

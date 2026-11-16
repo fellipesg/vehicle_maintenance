@@ -4,6 +4,7 @@ namespace App\Services\Vehicle;
 
 use App\Models\Vehicle;
 use App\Support\AppStorage;
+use App\Support\UploadedImageExtension;
 use Illuminate\Http\UploadedFile;
 
 class VehicleCoverService
@@ -17,7 +18,7 @@ class VehicleCoverService
 
     public function storeLandscape(Vehicle $vehicle, UploadedFile $file): Vehicle
     {
-        $extension = $file->getClientOriginalExtension() ?: 'jpg';
+        $extension = UploadedImageExtension::for($file);
         $fileName = $vehicle->id.'_landscape_'.time().'.'.$extension;
         $filePath = AppStorage::COVERS_PREFIX.$fileName;
         $bytes = (string) file_get_contents($file->getRealPath());
@@ -38,7 +39,7 @@ class VehicleCoverService
 
     public function storePortrait(Vehicle $vehicle, UploadedFile $file): Vehicle
     {
-        $extension = $file->getClientOriginalExtension() ?: 'jpg';
+        $extension = UploadedImageExtension::for($file);
         $fileName = $vehicle->id.'_portrait_'.time().'.'.$extension;
         $filePath = AppStorage::COVERS_PREFIX.$fileName;
         $bytes = (string) file_get_contents($file->getRealPath());

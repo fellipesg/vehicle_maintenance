@@ -11,6 +11,7 @@ use App\Http\Resources\Api\V1\UserResource;
 use App\Services\User\DeleteUserAccount;
 use App\Support\ApiResponse;
 use App\Support\AppStorage;
+use App\Support\UploadedImageExtension;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +38,7 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $file = $request->file('avatar');
-        $extension = $file->getClientOriginalExtension() ?: 'jpg';
+        $extension = UploadedImageExtension::for($file);
         $fileName = $user->id.'_'.time().'.'.$extension;
         $filePath = $file->storeAs('avatars', $fileName, AppStorage::diskName());
 
