@@ -91,7 +91,7 @@
                         </x-ui.field>
 
                         <x-ui.field name="anexos" label="Anexos">
-                            <x-ui.select id="filtro-anexos" :options="WorkshopMaintenanceFilters::ATTACHMENT_OPTIONS" :value="$filters->attachments" placeholder="Todos" />
+                            <x-ui.select id="filtro-anexos" :options="WorkshopMaintenanceFilters::attachmentOptions(auth()->user())" :value="$filters->attachments" placeholder="Todos" />
                         </x-ui.field>
 
                         <x-ui.field name="garantia" label="Garantia">

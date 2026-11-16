@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Web\Workshop;
 
 use App\Http\Controllers\Controller;
 use App\Models\MaintenancePhoto;
+use App\Models\User;
 use App\Models\Workshop;
+use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\WorkshopMaintenanceFilters;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
@@ -61,7 +63,7 @@ class DashboardController extends Controller
         return view('workshop.dashboard', [
             'workshop' => $workshop,
             'stats' => $stats,
-            'pendingItems' => $this->pendingItems($workshop),
+            'pendingItems' => $this->pendingItems($workshop, $request->user()),
             'recentMaintenances' => $recentMaintenances,
         ]);
     }
@@ -83,7 +85,7 @@ class DashboardController extends Controller
      *
      * @return list<array{key: string, count: int|null, label: string, description: string, url: string, action: string}>
      */
-    private function pendingItems(Workshop $workshop): array
+    private function pendingItems(Workshop $workshop, ?User $user): array
     {
         $items = [];
 
@@ -111,9 +113,17 @@ class DashboardController extends Controller
             ];
         }
 
-        $withoutAfterPhotos = $this->sealedOrders($workshop)
-            ->whereDoesntHave('photos', fn ($photos) => $photos->where('stage', MaintenancePhoto::STAGE_AFTER))
-            ->count();
+        // As fotos das manutenções são ligadas conta a conta pelo admin (App\Features\MaintenancePhotos,
+        // `.ai/rules/features.md`) e vêm desligadas por padrão, que é o estado da maioria das oficinas.
+        // Sem o recurso o formulário da OS não tem campo de foto nenhum
+        // (`partials/workshop-maintenance-form.blade.php` confere o mesmo acesso), e o envio é barrado
+        // no servidor: a pendência mandava a oficina para uma lista filtrada e de lá para uma OS onde
+        // não havia o que anexar.
+        $withoutAfterPhotos = MaintenancePhotoAccess::allows($user)
+            ? $this->sealedOrders($workshop)
+                ->whereDoesntHave('photos', fn ($photos) => $photos->where('stage', MaintenancePhoto::STAGE_AFTER))
+                ->count()
+            : 0;
         if ($withoutAfterPhotos > 0) {
             $items[] = [
                 'key' => 'sem-fotos-depois',
