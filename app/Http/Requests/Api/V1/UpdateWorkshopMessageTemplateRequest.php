@@ -7,6 +7,7 @@ use App\Enums\WorkshopMessageTrigger;
 use App\Http\Requests\Concerns\EnforcesWorkshopMessageTemplateLimit;
 use App\Models\Workshop;
 use App\Models\WorkshopMessageTemplate;
+use App\Rules\KnownMessageTemplateTags;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -28,11 +29,14 @@ class UpdateWorkshopMessageTemplateRequest extends ApiFormRequest
      */
     public function rules(): array
     {
+        $template = $this->route('message_template');
+        $stored = $template instanceof WorkshopMessageTemplate ? $template : null;
+
         return [
             'trigger' => ['sometimes', 'required', Rule::enum(WorkshopMessageTrigger::class)->only(WorkshopMessageTrigger::dispatchableCases())],
             'service_category' => ['nullable', Rule::in(ServiceCategory::values())],
-            'title' => 'sometimes|required|string|max:255',
-            'body' => 'sometimes|required|string|max:5000',
+            'title' => ['sometimes', 'required', 'string', 'max:255', new KnownMessageTemplateTags($stored?->title)],
+            'body' => ['sometimes', 'required', 'string', 'max:5000', new KnownMessageTemplateTags($stored?->body)],
             'lead_kilometers' => 'nullable|integer|min:0|max:50000',
             'min_days_since_service' => 'nullable|integer|min:1|max:3650',
             'is_active' => 'sometimes|boolean',
