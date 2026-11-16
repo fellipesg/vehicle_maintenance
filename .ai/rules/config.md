@@ -19,6 +19,9 @@ config/mail.php markdown.theme reads MAIL_MARKDOWN_THEME with default 'revisalog
 ## Google Analytics follows the privacy policy
 GA4 (x-analytics, GA_MEASUREMENT_ID in Laravel Cloud) loads only on public pages and sets analytics_storage 'granted' with every ad signal denied (ad_storage, ad_user_data, ad_personalization, Google signals). That is legitimate interest disclosed in privacy sections 2, 3, 6 and 10 (privacy_version 2026-10-10). Measuring a portal page, turning on ad signals or adding another tracker changes the policy: update config/legal.php and bump privacy_version in the same change.
 
+## AdSense only on the blog, personalization only with consent
+Google AdSense (x-adsense, x-ads.unit, x-ads.consent-banner; ADSENSE_CLIENT_ID and ADSENSE_SLOT_* in Laravel Cloud) loads only on blog.index, blog.category and blog.show (App\Support\GoogleAdsense::ROUTES); /ads.txt answers 404 without the client. Ad signals start denied and become granted only after "Aceitar" in the blog cookie notice (cookie rl_ads_consent, resources/js/ad-consent.js) and never with Global Privacy Control; otherwise requestNonPersonalizedAds = 1. Disclosed in privacy sections 2, 3, 6 and 10 (privacy_version 2026-11-15). Putting ads on another page (landing, portals, /buscar-veiculo, /v/) changes the policy and ROUTES together.
+
 ## Textos para registros de oficinas
 config/legal.php (terms 6. Oficinas; privacy 5. Registros de oficinas em veículos sem conta) descreve dado mínimo, base legal, anexos pendentes de 90 dias, escolhas do proprietário e convite por hash. Mudar o que o fluxo guarda ou o prazo exige atualizar o texto e a versão juntos. As chaves maintenance.invite_email_daily_limit e maintenance.pending_attachments_retention_days ficam em config/maintenance.php.
 

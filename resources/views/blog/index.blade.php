@@ -82,6 +82,8 @@
             @endforeach
         </ul>
 
+        <x-ads.unit placement="blog_index" class="mt-10" />
+
         @if($posts->hasPages())
             <div class="mt-10">
                 {{ $posts->onEachSide(1)->links() }}

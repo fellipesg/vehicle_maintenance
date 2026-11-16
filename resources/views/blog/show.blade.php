@@ -116,6 +116,10 @@
         {!! Str::markdown($post->content) !!}
     </div>
 
+    @if($post->isPublished())
+        <x-ads.unit placement="blog_article" class="{{ $readingColumn }} mt-12" />
+    @endif
+
     <aside aria-labelledby="blog-cta-titulo" class="{{ $readingColumn }} mt-12 rounded-card border border-accent-border bg-accent p-6 sm:p-8" data-slot="blog-post-cta">
         <h2 id="blog-cta-titulo" class="text-lg font-semibold text-balance text-foreground">Guarde o histórico do seu carro no RevisaLog</h2>
         <p class="mt-2 text-base leading-7 text-muted-foreground">
