@@ -7,6 +7,7 @@ use App\Models\VehicleConsignment;
 use App\Support\VehiclePlateSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 
 /**
@@ -26,6 +27,11 @@ use Illuminate\Http\Request;
  */
 final class DealerStock
 {
+    /**
+     * @var list<int>|null
+     */
+    private ?array $visibleHistoryVehicleIds = null;
+
     public const FILTER_ALL = '';
 
     public const FILTER_SEALED = 'selo';
@@ -159,12 +165,19 @@ final class DealerStock
     public function query(): BelongsToMany
     {
         $query = $this->applyFilter($this->searched(), $this->filter)
-            ->with('provenanceStripMaintenances')
+            // A faixa de procedência desenha um ponto por manutenção, com a data e se tem selo no
+            // title/aria-label — e, com href, um link para o registro. Carregada crua, ela entregava
+            // o histórico anterior de um veículo em consignação sem liberação, em resumo.
+            ->with(['provenanceStripMaintenances' => fn (Builder|Relation $maintenances) => $this->visibleMaintenances($maintenances)])
+            // Os agregados contam só o que este lojista pode ler. Sem o recorte, a coluna "Última
+            // manutenção" (card e tabela) trazia a data do serviço anterior de um veículo em
+            // consignação sem liberação — medido —, bem ao lado do aviso "Só o que você registrou",
+            // e a ordenação por essa coluna ordenava o estoque inteiro por ela.
             ->withCount([
-                'maintenances',
-                'maintenances as verified_maintenances_count' => fn (Builder $maintenances) => $maintenances->whereNotNull('verified_at'),
+                'maintenances' => fn (Builder $maintenances) => $this->visibleMaintenances($maintenances),
+                'maintenances as verified_maintenances_count' => fn (Builder $maintenances) => $this->visibleMaintenances($maintenances)->whereNotNull('verified_at'),
             ])
-            ->withMax('maintenances', 'maintenance_date');
+            ->withMax(['maintenances' => fn (Builder $maintenances) => $this->visibleMaintenances($maintenances)], 'maintenance_date');
 
         return $this->applySort($query);
     }
@@ -231,6 +244,36 @@ final class DealerStock
                 ->whereRaw('user_vehicles.is_current_owner = false'),
             default => $query,
         };
+    }
+
+    /**
+     * O mesmo recorte de `Vehicle::maintenancesVisibleTo`, aplicado aos agregados do estoque: o
+     * scope de visibilidade mais a restrição de tenant para o veículo cujo histórico anterior ainda
+     * não foi liberado. É a regra que `Maintenance::isVisibleInHistoryTo` descreve — a listagem e a
+     * autorização de um registro têm de responder a mesma coisa, e um agregado é listagem.
+     */
+    private function visibleMaintenances(Builder|Relation $maintenances): Builder|Relation
+    {
+        return $maintenances
+            ->visibleInHistoryTo($this->user)
+            ->where(function (Builder $query): void {
+                $query->where('maintenances.tenant_id', $this->user->tenant_id)
+                    ->orWhereIn('maintenances.vehicle_id', $this->vehicleIdsWithVisibleHistory());
+            });
+    }
+
+    /**
+     * Ids do estoque cujo histórico anterior este lojista pode ler, numa consulta só e memoizados:
+     * a mesma condição de `withVisibleHistory`, para não existirem duas versões da regra.
+     *
+     * @return list<int>
+     */
+    private function vehicleIdsWithVisibleHistory(): array
+    {
+        return $this->visibleHistoryVehicleIds ??= $this->withVisibleHistory($this->user->stockVehicles())
+            ->pluck('vehicles.id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
     }
 
     /**

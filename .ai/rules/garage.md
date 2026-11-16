@@ -2,12 +2,35 @@
 paths:
   - 'resources/views/garage/**'
   - 'app/Http/Controllers/Web/Garage/**'
+  - 'app/Support/Vehicle/DealerStock.php'
 ---
 
 # Garage
 
 ## Stock screens authorize with canViewStockVehicleHistory
 Garage vehicle and maintenance screens authorize with User::canViewStockVehicleHistory (stock of this dealer: current owner, or consignment with an approved power of attorney). Editing and registering a maintenance need the current owner (VehiclePolicy::update / addMaintenance); consignment is read-only. The stock list goes through App\Support\Vehicle\DealerStock (search, filters, order and view in the query string).
+
+## Agregado e faixa de procedência também são listagem
+O que o lojista não pode ler não entra em contagem, em data nem em ponto da faixa. `DealerStock`
+carrega `maintenances_count`, `verified_maintenances_count`, `maintenances_max_maintenance_date` e
+`provenanceStripMaintenances` pelo recorte de `Vehicle::maintenancesVisibleTo` (scope
+`visibleInHistoryTo` + tenant de quem não tem o histórico liberado), num método só —
+`DealerStock::visibleMaintenances` — alimentado por uma consulta memoizada dos ids com histórico
+visível, que reusa a condição de `withVisibleHistory` para não existirem duas versões da regra.
+
+Crus, eles vazavam o histórico anterior de um veículo em consignação **sem** liberação, na mesma tela
+em que a coluna "Procedência" dizia "Só o que você registrou": medido, o card trazia "Última
+manutenção em 15/03/2026" (serviço do proprietário) e a faixa desenhava um ponto por manutenção com
+data e selo no `title`/`aria-label` — e, com `href`, um link para o registro. É o mesmo buraco que o
+docblock de `Maintenance::isVisibleInHistoryTo` descreve para registro individual: **um agregado é
+listagem**, e listagem e autorização têm de responder a mesma coisa.
+`tests/Feature/Garage/DealerStockHistoryVisibilityTest.php` guarda os dois lados (fecha sem liberação
+e com contestação; abre com o proprietário liberando e no estoque próprio).
+
+O Início do Lojista (`Garage\DashboardController`) escapa por construção, não por cuidado: ele só
+lista `$historyVehicles`, filtrado por `canViewStockVehicleHistory`. Mas carrega
+`provenanceStripMaintenances` cru para **todo** o estoque — medido, hoje não vaza; no dia em que
+alguém desenhar um card a partir de `$vehicles`, vaza. Carregue com o mesmo recorte antes.
 
 ## Maintenance form returns to the vehicle
 Coming from the vehicle page (?vehicle_id=), the maintenance form sends return_to=vehicle and saving redirects to the vehicle page with #manutencao-{id}; initVehicleDetails (resources/js/vehicle-timeline-portal.js) opens the tab that holds it and scrolls to it. Kilometers are never prefilled with today's odometer nor get min: the form shows the accepted range for the date (data-mileage from App\Support\Vehicle\MaintenanceMileageContext, resources/js/garage-maintenance-form.js), and VehicleMileageService validates on the server.
