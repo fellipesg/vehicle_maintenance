@@ -7,6 +7,8 @@ use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use App\Services\Blog\BlogCoverService;
 use App\Support\BlogCoverArt;
+use App\Support\DisplayTime;
+use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -180,9 +182,20 @@ class BlogPostController extends Controller
             'publish_mode' => ['nullable', Rule::in(self::PUBLISH_MODES)],
             'status' => ['required_without:publish_mode', 'nullable', 'in:'.BlogPost::STATUS_DRAFT.','.BlogPost::STATUS_PUBLISHED],
             'published_at' => $mode === 'schedule'
-                ? ['required', 'date', 'after:now']
+                ? ['required', 'date', $this->futureInDisplayTimezone(...)]
                 : ['nullable', 'date'],
         ]);
+    }
+
+    /**
+     * O campo datetime-local chega no horário de Brasília (DisplayTime), não em UTC: "after:now" do
+     * Laravel compararia em UTC e aceitaria agendar até três horas no passado.
+     */
+    private function futureInDisplayTimezone(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (is_string($value) && strtotime($value) !== false && DisplayTime::fromLocalInput($value)->lessThanOrEqualTo(now())) {
+            $fail('Escolha uma data de publicação no futuro.');
+        }
     }
 
     /**
@@ -230,11 +243,11 @@ class BlogPostController extends Controller
         }
 
         if ($mode === 'schedule') {
-            return [BlogPost::STATUS_PUBLISHED, $data['published_at']];
+            return [BlogPost::STATUS_PUBLISHED, DisplayTime::fromLocalInput($data['published_at'])];
         }
 
         $status = $data['status'];
-        $publishedAt = $data['published_at'] ?? null;
+        $publishedAt = isset($data['published_at']) ? DisplayTime::fromLocalInput($data['published_at']) : null;
 
         if ($status === BlogPost::STATUS_PUBLISHED && $publishedAt === null) {
             $publishedAt = now();
