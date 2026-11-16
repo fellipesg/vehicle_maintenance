@@ -26,6 +26,7 @@ import { initAdminMaintenancesFilters } from './admin-maintenances-filters';
 import { initAdmin } from './admin';
 import { initLanding } from './landing';
 import { initAnalytics } from './analytics';
+import { initAdConsent } from './ad-consent';
 import { initMaintenanceItems } from './maintenance-items';
 import { initGarageMaintenanceForms } from './garage-maintenance-form';
 import { initWorkshopAddressCep } from './workshop-address-cep';
@@ -47,6 +48,7 @@ import { initWorkshopAddressCep } from './workshop-address-cep';
 function initApp() {
     initPreline();
     initAnalytics();
+    initAdConsent();
     initDialogs();
     initConfirm();
     initToasts();

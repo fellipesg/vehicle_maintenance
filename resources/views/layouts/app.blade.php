@@ -19,6 +19,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />
     <x-analytics />
+    <x-adsense />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
@@ -44,6 +45,7 @@
     {{-- Uma vez por layout: toasts (session('toast') e window.revisalogToast) e o diálogo usado por data-confirm. --}}
     <x-ui.toaster />
     <x-ui.confirm-dialog />
+    <x-ads.consent-banner />
 
     @include('layouts.partials.shell-script')
     @stack('scripts')

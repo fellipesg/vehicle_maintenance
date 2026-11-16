@@ -80,6 +80,14 @@ return [
         'measurement_id' => env('GA_MEASUREMENT_ID'),
     ],
 
+    'google_adsense' => [
+        'client' => env('ADSENSE_CLIENT_ID'),
+        'slots' => [
+            'blog_article' => env('ADSENSE_SLOT_BLOG_ARTICLE'),
+            'blog_index' => env('ADSENSE_SLOT_BLOG_INDEX'),
+        ],
+    ],
+
     'sentry_webhook' => [
         'client_secret' => env('SENTRY_WEBHOOK_CLIENT_SECRET'),
     ],

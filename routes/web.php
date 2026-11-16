@@ -16,6 +16,7 @@ use App\Http\Controllers\Web\Admin\VehicleBrandController as AdminVehicleBrandCo
 use App\Http\Controllers\Web\Admin\VehicleController as AdminVehicleController;
 use App\Http\Controllers\Web\Admin\VehicleModelController as AdminVehicleModelController;
 use App\Http\Controllers\Web\Admin\WorkshopController as AdminWorkshopController;
+use App\Http\Controllers\Web\AdsTxtController;
 use App\Http\Controllers\Web\Auth\PasswordResetController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BlogController;
@@ -64,6 +65,7 @@ Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
 // Webhook do Sentry (Internal Integration): autenticado pela assinatura HMAC, sem CSRF.
 Route::post('/webhooks/sentry', SentryWebhookController::class)->middleware('throttle:60,1')->name('webhooks.sentry');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('/ads.txt', AdsTxtController::class)->name('ads.txt');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
 Route::get('/para-oficinas', WorkshopLandingController::class)->name('workshops.landing');
 Route::get('/o/{token}', [OutreachController::class, 'click'])->middleware('throttle:search')->name('outreach.click');
