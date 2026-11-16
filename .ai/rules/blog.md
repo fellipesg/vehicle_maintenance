@@ -14,6 +14,9 @@ paths:
 ## Publicação é status + published_at
 Post público exige `status = published` E `published_at` no passado (scope `published`). Rascunho sempre zera `published_at`; data futura mantém o post agendado (fora da listagem, feed e sitemap). Só admin vê rascunho em /blog/{slug}, com aviso de pré-visualização.
 
+## Agendamento é no horário de Brasília e não precisa de cron
+O campo "Data de publicação" (datetime-local) é lido no fuso de exibição com `DisplayTime::fromLocalInput` e gravado em UTC; o editor e a lista do admin mostram com `DisplayTime::local`. A validação de data futura compara depois da conversão (não usar `after:now`, que compara em UTC). O post agendado entra no ar sozinho quando `published_at` passa, porque o scope `published` filtra por `now()`: não há comando nem job de publicação, e não se deve criar um.
+
 ## Conteúdo é Markdown renderizado na view
 `content` é gravado como Markdown e renderizado com `Str::markdown` dentro de `.blog-content` (estilos em resources/css/app.css, o projeto não usa @tailwindcss/typography). Não gravar HTML pronto no banco nem adicionar plugin de tipografia.
 

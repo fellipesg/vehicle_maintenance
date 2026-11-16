@@ -4,6 +4,7 @@ namespace Tests\Feature\Web;
 
 use App\Models\BlogPost;
 use App\Models\User;
+use App\Support\DisplayTime;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\Feature\Web\Concerns\InspectsAdminPages;
@@ -69,12 +70,12 @@ class AdminBlogEditorTest extends TestCase
         $liveXpath = $this->adminPage($this->actingAs($admin)->get(route('admin.blog.edit', $live)));
         $this->assertTrue($this->adminElement($liveXpath, '//input[@name="publish_mode"][@value="now"]')->hasAttribute('checked'));
         $this->assertStringStartsWith('Publicado', $this->adminText($this->adminElement($liveXpath, '//label[@for="publish_mode_now"]')));
-        $this->assertSame('No ar desde 01/09/2026 às 08:30.', $this->adminText($this->adminElement($liveXpath, '//*[@id="publish_mode_now-description"]')));
+        $this->assertSame('No ar desde 01/09/2026 às 05:30.', $this->adminText($this->adminElement($liveXpath, '//*[@id="publish_mode_now-description"]')));
         $this->assertStringContainsString('Ver no site', $this->adminText($this->adminElement($liveXpath, '//header[@data-slot="page-header"]//a[@target="_blank"]')));
 
         $scheduledXpath = $this->adminPage($this->actingAs($admin)->get(route('admin.blog.edit', $scheduled)));
         $this->assertTrue($this->adminElement($scheduledXpath, '//input[@name="publish_mode"][@value="schedule"]')->hasAttribute('checked'));
-        $this->assertSame($scheduled->published_at->format('Y-m-d\TH:i'), $this->adminElement($scheduledXpath, '//input[@name="published_at"]')->getAttribute('value'));
+        $this->assertSame(DisplayTime::local($scheduled->published_at)->format('Y-m-d\TH:i'), $this->adminElement($scheduledXpath, '//input[@name="published_at"]')->getAttribute('value'));
 
         $draftXpath = $this->adminPage($this->actingAs($admin)->get(route('admin.blog.edit', $draft)));
         $this->assertTrue($this->adminElement($draftXpath, '//input[@name="publish_mode"][@value="draft"]')->hasAttribute('checked'));
@@ -94,7 +95,7 @@ class AdminBlogEditorTest extends TestCase
         $this->actingAs($admin)->put(route('admin.blog.update', $post), [...$payload, 'publish_mode' => 'schedule', 'published_at' => '2026-10-01T09:00'])->assertSessionHasNoErrors();
         $post->refresh();
         $this->assertSame(BlogPost::STATUS_PUBLISHED, $post->status);
-        $this->assertSame('2026-10-01 09:00', $post->published_at->format('Y-m-d H:i'));
+        $this->assertSame('2026-10-01 12:00', $post->published_at->utc()->format('Y-m-d H:i'), '09:00 de Brasília é gravado como 12:00 UTC.');
         $this->assertFalse($post->isPublished());
 
         $this->actingAs($admin)->put(route('admin.blog.update', $post), [...$payload, 'publish_mode' => 'now'])->assertSessionHasNoErrors();
@@ -105,6 +106,39 @@ class AdminBlogEditorTest extends TestCase
         $this->travel(2)->days();
         $this->actingAs($admin)->put(route('admin.blog.update', $post), [...$payload, 'publish_mode' => 'now'])->assertSessionHasNoErrors();
         $this->assertSame('2026-09-15 10:00', $post->fresh()->published_at->format('Y-m-d H:i'), 'Artigo já no ar mantém a data original.');
+    }
+
+    public function test_schedule_is_read_and_shown_in_brasilia_time(): void
+    {
+        $admin = $this->adminUser();
+
+        // Agora são 10:00 UTC, 07:00 em Brasília: 08:00 ainda está no futuro para quem digita.
+        $this->actingAs($admin)
+            ->post(route('admin.blog.store'), ['title' => 'Bateria', 'content' => 'Texto.', 'publish_mode' => 'schedule', 'published_at' => '2026-09-15T08:00'])
+            ->assertSessionHasNoErrors();
+
+        $post = BlogPost::firstWhere('title', 'Bateria');
+        $this->assertSame('2026-09-15 11:00', $post->published_at->utc()->format('Y-m-d H:i'));
+        $this->assertFalse($post->isPublished());
+
+        $editXpath = $this->adminPage($this->actingAs($admin)->get(route('admin.blog.edit', $post)));
+        $this->assertSame('2026-09-15T08:00', $this->adminElement($editXpath, '//input[@name="published_at"]')->getAttribute('value'));
+
+        $this->actingAs($admin)->get(route('admin.blog.index'))->assertSee('Agendado para 15/09/2026 08:00');
+
+        $this->travelTo(Carbon::parse('2026-09-15 10:59:00'));
+        $this->assertFalse($post->fresh()->isPublished(), 'Não entra no ar antes do horário de Brasília escolhido.');
+
+        $this->travelTo(Carbon::parse('2026-09-15 11:00:00'));
+        $this->assertTrue($post->fresh()->isPublished());
+        $this->get(route('blog.index'))->assertSee('Bateria');
+    }
+
+    public function test_scheduling_rejects_a_time_already_past_in_brasilia(): void
+    {
+        $this->actingAs($this->adminUser())
+            ->post(route('admin.blog.store'), ['title' => 'Atrasado', 'content' => 'Texto.', 'publish_mode' => 'schedule', 'published_at' => '2026-09-15T06:30'])
+            ->assertSessionHasErrors(['published_at' => 'Escolha uma data de publicação no futuro.']);
     }
 
     public function test_scheduling_needs_a_future_date(): void

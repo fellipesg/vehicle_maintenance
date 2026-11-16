@@ -36,7 +36,7 @@
         'draft' => ['label' => 'Rascunho', 'description' => 'Só o admin vê. Fica fora do blog, do feed e do sitemap.', 'icon' => 'pencil-square'],
         'now' => [
             'label' => $postIsLive ? 'Publicado' : 'Publicar agora',
-            'description' => $postIsLive ? 'No ar desde '.$post->published_at->format('d/m/Y').' às '.$post->published_at->format('H:i').'.' : 'Entra no blog assim que você salvar.',
+            'description' => $postIsLive ? 'No ar desde '.\App\Support\DisplayTime::local($post->published_at)->format('d/m/Y').' às '.\App\Support\DisplayTime::local($post->published_at)->format('H:i').'.' : 'Entra no blog assim que você salvar.',
             'icon' => 'globe-alt',
         ],
         'schedule' => ['label' => 'Agendar', 'description' => 'Entra no blog, no feed e no sitemap na data escolhida.', 'icon' => 'calendar-days'],
@@ -98,8 +98,8 @@
             </x-ui.fieldset>
 
             <div class="mt-3" data-admin-blog-schedule>
-                <x-ui.field name="published_at" label="Data de publicação" hint="Usada só em Agendar.">
-                    <x-ui.input type="datetime-local" :value="$postIsScheduled ? $post->published_at->format('Y-m-d\TH:i') : null" />
+                <x-ui.field name="published_at" label="Data de publicação" hint="Usada só em Agendar. Horário de Brasília.">
+                    <x-ui.input type="datetime-local" :value="$postIsScheduled ? \App\Support\DisplayTime::local($post->published_at)->format('Y-m-d\TH:i') : null" />
                 </x-ui.field>
             </div>
 

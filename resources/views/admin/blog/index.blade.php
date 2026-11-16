@@ -89,9 +89,9 @@
                 <td class="text-muted-foreground">{{ $post->category?->name ?? 'Sem categoria' }}</td>
                 <td class="whitespace-nowrap text-muted-foreground">
                     @if($postIsScheduled && $post->published_at)
-                        <time datetime="{{ $post->published_at->toIso8601String() }}">Agendado para {{ $post->published_at->format('d/m/Y H:i') }}</time>
+                        <time datetime="{{ $post->published_at->toIso8601String() }}">Agendado para {{ \App\Support\DisplayTime::local($post->published_at)->format('d/m/Y H:i') }}</time>
                     @elseif($post->published_at)
-                        <time datetime="{{ $post->published_at->toIso8601String() }}">{{ $post->published_at->format('d/m/Y H:i') }}</time>
+                        <time datetime="{{ $post->published_at->toIso8601String() }}">{{ \App\Support\DisplayTime::local($post->published_at)->format('d/m/Y H:i') }}</time>
                     @else
                         Não publicado
                     @endif
