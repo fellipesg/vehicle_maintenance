@@ -28,6 +28,7 @@ use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceCo
 use App\Http\Controllers\Web\Garage\ProfileController as GarageProfileController;
 use App\Http\Controllers\Web\Garage\VehicleController as GarageVehicleController;
 use App\Http\Controllers\Web\HomeController;
+use App\Http\Controllers\Web\InspectionReportController;
 use App\Http\Controllers\Web\InvoiceDownloadController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\MaintenanceInviteController;
@@ -44,6 +45,7 @@ use App\Http\Controllers\Web\User\VehiclePdfExportDownloadController;
 use App\Http\Controllers\Web\User\WorkshopDirectoryController;
 use App\Http\Controllers\Web\User\WorkshopRecordController as UserWorkshopRecordController;
 use App\Http\Controllers\Web\Workshop\DashboardController as WorkshopDashboardController;
+use App\Http\Controllers\Web\Workshop\InspectionController as WorkshopInspectionController;
 use App\Http\Controllers\Web\Workshop\MaintenanceController as WorkshopMaintenanceController;
 use App\Http\Controllers\Web\Workshop\MaintenanceInviteController as WorkshopMaintenanceInviteController;
 use App\Http\Controllers\Web\Workshop\MessageTemplateController as WorkshopMessageTemplateController;
@@ -158,6 +160,13 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/notas-fiscais/{invoice}', InvoiceDownloadController::class)
         ->whereNumber('invoice')
         ->name('invoices.show');
+
+    // PDF do laudo de uma vistoria cautelar: mesma rota para Proprietário, Lojista e Oficina; quem
+    // pode abrir é a VehicleInspectionPolicy::viewReport (= showsFullReportTo, a mesma pergunta da
+    // redação), não quem tiver o link do arquivo.
+    Route::get('/laudos/{inspection}', InspectionReportController::class)
+        ->whereNumber('inspection')
+        ->name('inspections.report');
 
     // Foto de uma manutenção: mesma rota para Proprietário, Lojista e Oficina; quem pode abrir é a
     // MaintenancePhotoPolicy::view, não quem tiver o link do arquivo.
@@ -346,6 +355,29 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::delete('/manutencoes/{maintenance}', [WorkshopMaintenanceController::class, 'destroy'])
             ->whereNumber('maintenance')
             ->name('maintenances.destroy');
+        // Vistoria cautelar. A etapa 1 busca veículo por placa (?license_plate=) e por chassi
+        // (?chassis=), igual à Nova OS: mesmo balde da conta logada, não o `search`, que é por IP.
+        Route::get('/vistorias', [WorkshopInspectionController::class, 'index'])->name('inspections.index');
+        Route::get('/vistorias/nova', [WorkshopInspectionController::class, 'create'])
+            ->middleware('throttle:account-vehicle-search')
+            ->name('inspections.create');
+        // O laudo em PDF vem no formulário, então store e update entram no balde de upload.
+        Route::post('/vistorias', [WorkshopInspectionController::class, 'store'])
+            ->middleware('throttle:uploads')
+            ->name('inspections.store');
+        Route::get('/vistorias/{inspection}', [WorkshopInspectionController::class, 'show'])
+            ->whereNumber('inspection')
+            ->name('inspections.show');
+        Route::get('/vistorias/{inspection}/editar', [WorkshopInspectionController::class, 'edit'])
+            ->whereNumber('inspection')
+            ->name('inspections.edit');
+        Route::put('/vistorias/{inspection}', [WorkshopInspectionController::class, 'update'])
+            ->whereNumber('inspection')
+            ->middleware('throttle:uploads')
+            ->name('inspections.update');
+        Route::delete('/vistorias/{inspection}', [WorkshopInspectionController::class, 'destroy'])
+            ->whereNumber('inspection')
+            ->name('inspections.destroy');
         Route::get('/validacoes', [WorkshopReviewController::class, 'index'])->name('reviews.index');
         Route::post('/validacoes/{maintenance}/confirmar', [WorkshopReviewController::class, 'confirm'])
             ->whereNumber('maintenance')

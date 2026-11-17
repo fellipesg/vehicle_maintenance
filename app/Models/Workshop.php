@@ -148,6 +148,16 @@ class Workshop extends Model
         return $this->hasMany(Service::class);
     }
 
+    /**
+     * Laudos de vistoria cautelar emitidos por esta oficina (App\Models\VehicleInspection). É a
+     * lista que /oficina/vistorias mostra: laudo pertence a quem o assinou, e é por aqui que a
+     * oficina alcança o próprio laudo mesmo sem vínculo com o veículo (.ai/rules/inspections.md).
+     */
+    public function inspections(): HasMany
+    {
+        return $this->hasMany(VehicleInspection::class);
+    }
+
     public function messageTemplates(): HasMany
     {
         return $this->hasMany(WorkshopMessageTemplate::class);

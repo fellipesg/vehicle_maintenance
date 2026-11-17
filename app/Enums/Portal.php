@@ -3,6 +3,7 @@
 namespace App\Enums;
 
 use App\Models\User;
+use App\Support\Inspection\InspectionAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -204,11 +205,22 @@ enum Portal: string
 
     /**
      * Destinos do menu principal, na ordem Início, objeto principal, registros e perfil. O Admin
-     * agrupa os itens (sidebar); os portais têm no máximo 5 itens soltos.
+     * agrupa os itens (sidebar).
+     *
+     * O teto dos portais é de **largura**, não de gosto: a topbar é uma linha só (logo · destinos ·
+     * ação principal · busca · sino · conta) com `flex-nowrap`, e em 1024px (o lg, onde ela aparece)
+     * sobram 557px para os destinos. Medido: os cinco itens antigos da oficina ocupavam 590px —
+     * "Minha oficina" já passava por cima da área do botão —, e com "Ordens de serviço" encurtado
+     * para "OS" (a palavra que o produto usa: "Nova OS", "OS registrada") os seis itens ocupam
+     * 574px. Antes de somar item, meça; rótulo longo custa mais que item.
+     *
+     * $user decide os itens que dependem da conta: Vistorias só aparece para quem pode emitir laudo
+     * (App\Support\Inspection\InspectionAccess), porque menu que leva a um 403 é oferta falsa
+     * (.ai/rules/features.md).
      *
      * @return list<array{label: string, route: string, icon: string, activePatterns: list<string>, fragment?: string}|array{label: string, items: list<array{label: string, route: string, icon: string, activePatterns: list<string>, fragment?: string}>}>
      */
-    public function navigation(): array
+    public function navigation(?User $user = null): array
     {
         return match ($this) {
             self::Owner => [
@@ -223,13 +235,16 @@ enum Portal: string
                 self::item('Manutenções', 'garage.maintenances.index', 'wrench-screwdriver', ['garage.maintenances.*']),
                 self::item('Minha loja', 'garage.profile.show', 'building-storefront', ['garage.profile.*']),
             ],
-            self::Workshop => [
+            self::Workshop => array_values(array_filter([
                 self::item('Início', 'workshop.dashboard', 'home', ['workshop.dashboard']),
-                self::item('Ordens de serviço', 'workshop.maintenances.index', 'clipboard-document', ['workshop.maintenances.*']),
+                self::item('OS', 'workshop.maintenances.index', 'clipboard-document', ['workshop.maintenances.*']),
+                InspectionAccess::allowsIssuing($user)
+                    ? self::item('Vistorias', 'workshop.inspections.index', 'document-text', ['workshop.inspections.*'])
+                    : null,
                 self::item('Validações', 'workshop.reviews.index', 'check-circle', ['workshop.reviews.*']),
                 self::item('Modelos de garantia', 'workshop.warranty-templates.index', 'shield-check', ['workshop.warranty-templates.*']),
                 self::item('Minha oficina', 'workshop.profile.show', 'building-storefront', ['workshop.profile.*']),
-            ],
+            ])),
             self::Admin => [
                 self::item('Visão geral', 'admin.dashboard', 'chart-bar', ['admin.dashboard']),
                 // Mapa é outra forma de ver um cadastro, não um destino do menu: a troca Lista | Mapa
@@ -304,7 +319,7 @@ enum Portal: string
             return $profile === null ? [] : [$profile];
         }
 
-        foreach ($this->navigation() as $entry) {
+        foreach ($this->navigation($request->user()) as $entry) {
             if (isset($entry['items'])) {
                 $groupItems = array_values(array_filter(array_map(
                     fn (array $item): ?array => self::resolveItem($item, $request),

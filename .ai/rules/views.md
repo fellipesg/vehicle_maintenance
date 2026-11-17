@@ -52,5 +52,15 @@ arquivo abre sem login e, no S3/R2, a URL assinada é compartilhável. A rota se
 (Content-Disposition inline); XML e o resto baixam, com nosniff e CSP sandbox, porque o arquivo é do
 cliente.
 
+## Laudo de vistoria nunca pelo caminho do storage
+O link do PDF do laudo (tela da oficina, e o que vier depois) aponta para
+`route('inspections.report', $inspection)` — `App\Http\Controllers\Web\InspectionReportController`,
+atrás de `auth` e da `VehicleInspectionPolicy::viewReport`. A policy responde a **mesma** pergunta de
+`VehicleInspection::showsFullReportTo`, que é a usada por `App\Support\Inspection\InspectionRedactor`
+para tirar o PDF, o resumo e as observações de quem não tem o laudo inteiro: rota de arquivo mais
+frouxa que a tela devolveria por download exatamente o que a tela escondeu. Só PDF, inline, com
+nosniff, CSP sandbox e `setPrivate()` no objeto de resposta (o `Cache-Control` do array é
+descartado, como na foto).
+
 ## Fotos só aparecem para quem tem o recurso ligado
 Telas de portal não mostram foto, contagem de fotos nem etapa de envio quando a conta não tem as fotos das manutenções (MaintenancePhotoAccess, features.md): MaintenanceRedactor tira `photos` e zera `photos_count` (parâmetro `publicLookup` só na busca pública), `x-provenance-card` esconde a contagem de quem está logado sem o recurso (a consulta pública, `expandable`, não muda), o formulário da oficina não inclui `partials.maintenance-photos-form` e o servidor responde 403 a um envio forjado. A busca pública por placa continua com as fotos públicas.

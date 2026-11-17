@@ -21,7 +21,8 @@ ficam com os dois baldes: `throttle:api` do grupo e `throttle:uploads` por cima.
 
 Hoje estão no balde: CRLV-e (importar e vincular nos dois portais do dono do veículo, mais importar
 na edição, que só existe no do proprietário), store de OS (proprietário, lojista, oficina, API),
-update de OS (proprietário, oficina, API), capas e edição de veículo (nos dois portais), consignação
+update de OS (proprietário, oficina, API), store e update da vistoria cautelar da oficina (o
+formulário traz o laudo em PDF), capas e edição de veículo (nos dois portais), consignação
 (procuração em PDF, nos dois portais), cadastro e edição da oficina (logo),
 `POST /api/v1/me/avatar`, `POST /api/v1/vehicles/{id}/cover`,
 `POST /api/v1/maintenances/{maintenance}/photos` e `POST /api/v1/invoices/upload`. A lista de
@@ -60,9 +61,10 @@ Toda tela que acha veículo a partir de placa, chassi ou RENAVAM é oráculo de 
 Tela que exige login não divide esse balde: numa chave por IP a cota de quem tem conta é gasta por
 estranhos, e `GET /oficina/manutencoes/nova` levava 429 na tela que registra serviço por causa de
 tráfego anônimo do mesmo NAT (ou de um colega de oficina atrás do mesmo IP). Essas vão para
-`account-vehicle-search`, 20/min por `user()?->id ?: ip()`: hoje `GET /oficina/manutencoes/nova`
-(`?license_plate=`, `?chassis=`) e `/buscar-veiculo` (`?identifier=`), o portal do proprietário e do
-lojista. Um balde só para as duas de propósito — é a mesma política, e enumerar por duas telas não dá
+`account-vehicle-search`, 20/min por `user()?->id ?: ip()`: hoje `GET /oficina/manutencoes/nova` e
+`GET /oficina/vistorias/nova` (as duas com `?license_plate=` e `?chassis=`, pela mesma
+`App\Support\Workshop\WorkshopVehicleStep`) e `/buscar-veiculo` (`?identifier=`), o portal do
+proprietário e do lojista. Um balde só para todas de propósito — é a mesma política, e enumerar por duas telas não dá
 duas cotas. A consulta por chassi da API tem o `workshop-chassis-lookup`, com a mesma forma de chave.
 O teto continua valendo contra sondagem — conta é exatamente o que o visitante não tem — e uma conta
 não cala a outra.
