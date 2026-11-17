@@ -1,8 +1,9 @@
 # Plano: internacionalização para os EUA (app e portal)
 
 Status: **rascunho para revisão** — nada implementado. Decisões em aberto na seção 7.  
-Data: 2026-11-15 · revisado em 2026-11-16, com a revisão incorporada no corpo (seções 1, 2, 3, 5 e 7).  
-Afirmações de código reconferidas no `main` em d6e152e; onde o número mudou, está corrigido aqui.  
+Data: 2026-11-15 · revisado em 2026-11-16, em duas passadas, com a revisão incorporada no corpo
+(seções 1, 2, 3, 5 e 7).  
+Afirmações de código reconferidas no `main` em d44ee31; onde o número mudou, está corrigido aqui.  
 Escopo: backend (API + portais web) e app Flutter (`vehicle_maintenance_frontend`).
 
 O histórico já é do chassi (VIN), não do dono, e isso é o que torna a exportação viável. O que muda nos
@@ -35,7 +36,7 @@ decisão de infraestrutura por instância — região do banco, do bucket e do d
 vira item explícito de F0, não subproduto desta seção.
 
 Também saiu "evita migrar `unique(license_plate)` para `unique(country, state, plate)` no banco BR": ver
-os custos abaixo, onde essa migração reaparece como a opção recomendada.
+os custos abaixo. O banco BR ganha uma migração de índice pequena, e em troca o schema não diverge.
 
 O que continua por registro: a **jurisdição da placa** no veículo (estado nos EUA) e `locale`/`timezone`
 no usuário (há 4+ fusos nos EUA).
@@ -55,20 +56,27 @@ instância US:
 
 ### Dois custos que a escolha cria
 
-**Um schema por mercado saindo de uma pasta de migrações só.** Se a instância US tem
-`unique(state, plate)` e a BR mantém `unique(license_plate)`, alguma migração vai ter
-`if (config('app.market') === 'us')` dentro — o mesmo `if ($market)` que esta seção quer evitar, agora no
-lugar menos reversível do sistema. Três saídas:
+**Um schema por mercado saindo de uma pasta de migrações só.** O BR precisa de placa única; a US **não
+pode ter**. Na maioria dos estados a placa segue o dono: sai do carro vendido e vai para o seguinte. Se
+ninguém atualizou o carro antigo no app, o dono do novo recebe "placa já cadastrada" —
+`VehiclePlateHistoryService::changePlate` encerra a placa só no próprio veículo, não a libera em outro — e
+qualquer pessoa consegue "reservar" uma placa que não é dela. Nos EUA a placa é atributo pesquisável com
+datas; identidade é só o VIN.
+
+Resolver isso com `if (config('app.market') === 'us')` dentro de migração é o mesmo `if ($market)` que esta
+seção quer evitar, no lugar menos reversível do sistema. Três saídas:
 
 | Saída | O que custa |
 | --- | --- |
-| Migração condicional por mercado | O `if` fica concentrado em poucas migrações, mas o schema real passa a depender do `.env`: o `migrate:fresh` de cada dev reproduz o mercado dele, e a suíte cobre um dos dois |
-| **Mesmo schema nos dois, unicidade por (jurisdição, placa)** | Uma pasta, um schema, nenhum `if`. Exige, no BR, o índice que esta seção queria evitar — com a jurisdição preenchida por constante, a unicidade da placa continua valendo igual |
-| Duas pastas (comum + por mercado) | Explícito e honesto; exige caminho de migração por instância e disciplina para não duplicar o comum |
+| Migração condicional por mercado | O schema real passa a depender do `.env`: o `migrate:fresh` de cada dev reproduz o mercado dele, e a suíte cobre um dos dois |
+| **Mesmo schema, índice único parcial** | Coluna `plate_jurisdiction` + `unique(license_plate) WHERE plate_jurisdiction = 'BR'`. Uma migração, igual nos dois bancos, nenhum `if`: no banco BR toda linha é BR e a unicidade continua valendo; no banco US nenhuma linha entra no índice |
+| Duas pastas (comum + por mercado) | Explícito; exige caminho de migração por instância e disciplina para não duplicar o comum |
 
-Recomendada: a segunda. A migração temida é um índice único trocado com backfill de valor constante —
-criar o novo índice, derrubar o velho — não uma migração de dados sujos, e paga uma vez para não ter
-schema divergente para sempre. A primeira é a que parece mais barata e é a que mais machuca depois.
+Recomendada: a segunda. O comportamento muda pelo **dado**, não pelo código. O repositório já tem o
+padrão, com o tratamento por driver para SQLite e Postgres, em
+`2026_09_13_150614_create_maintenance_warranties_table.php:32`. No banco BR custa uma migração — coluna
+nova com backfill constante, índice parcial criado, índice antigo derrubado —, não migração de dados
+sujos. A primeira saída é a que parece mais barata e é a que mais machuca depois.
 
 **O app é um binário; a loja é uma listagem.** Duas instâncias no backend não dizem como o Flutter
 escolhe a sua, e localizar a ficha da loja não cria um segundo app. Duas saídas:
@@ -95,7 +103,8 @@ escolhe a sua, e localizar a ficha da loja não cria um segundo app. Duas saída
 Consequências no modelo:
 
 - Placa passa a ser **(estado, placa)** em `vehicles` e `vehicle_plates`; a mesma placa pode aparecer em
-  vários veículos ao longo do tempo.
+  vários veículos ao longo do tempo — e, por dado desatualizado, em dois ao mesmo tempo. Por isso a placa
+  americana não é única no banco (seção 1, "Dois custos que a escolha cria").
 - Busca principal **pelo VIN**; placa + estado vira atalho secundário.
 - Hoje a web **recusa qualquer placa não brasileira**:
   `app/Http/Controllers/Web/Concerns/RegistersVehicleWithOwnership.php` (regex Mercosul, mensagem
@@ -135,15 +144,56 @@ Consequência na instância US, sem CRLV-e: **ninguém recebe a marca**, nenhum 
 (`config/maintenance.pending_attachments_retention_days`) — sem erro em tela. Contestar continua
 funcionando, e de propósito: `canDispute` não pede a marca.
 
-Duas saídas, e a escolha é parte da decisão 4:
+**O gate não pode simplesmente afrouxar.** Trocar o predicado por "ser dono atual" (como `canDispute`)
+entrega as notas e fotos — nota fiscal traz nome e endereço do cliente — a quem cadastrou o carro com um
+VIN lido pelo para-brisa. O docblock de `Maintenance::hidesAttachmentsFrom` diz por que o gate existe:
+"dono sem comprovação" não vê nada. Gravar `ownership_verified_at` no cadastro tem o mesmo efeito, e ainda
+faz a coluna mentir no nome.
 
-| Saída | Efeito |
-| --- | --- |
-| O cadastro grava `ownership_verified_at` | Anexos e decisão voltam a funcionar de imediato; a coluna deixa de significar "documento conferido" e passa a significar "dono declarado", e o selo "Verified owner" precisa de campo próprio |
-| O gate de anexos passa a outro predicado — ser dono atual, como `canDispute` | A coluna continua significando documento conferido; é mudança em `MaintenanceOwnerDecisionService`, com teste nos dois mercados |
+**O predicado que funciona sem documento já existe e não é usado: o convite da oficina.** Toda OS sem dono
+pode ter um convite em `maintenance_invites`, com `token` único por OS, e o convite por e-mail grava
+`email_hash`. Hoje o token não vale nada: abrir `/convite/{token}` só leva ao cadastro
+(`Web\MaintenanceInviteController::show`). Proposta para a US: quem chega pelo convite daquela OS — e, no
+convite por e-mail, com o e-mail da conta igual ao `email_hash` — fica verificado **para aquele
+registro**, e pode decidir sobre ele e aceitar seus anexos. É a oficina como verificadora, registro a
+registro, sem documento e sem OCR.
 
-Recomendada: a segunda. A primeira resolve mais rápido e mente no nome da coluna, que é o tipo de dívida
-que ninguém encontra seis meses depois.
+Não pesa sobre quem faz a própria manutenção: o gate só vale para registro de oficina sem dono
+(`isOwnerlessRecord`, `owner_status` preenchido); o que o dono declara não passa por ele. Três ressalvas:
+
+- `MaintenanceInviteService::canInvite` exige que o veículo não tenha dono atual. Na US, o convite tem de
+  continuar possível com um dono **não verificado** no carro, senão quem ocupa o carro desliga o convite
+  (ver o conflito abaixo).
+- O convite por WhatsApp não guarda telefone: vale só pelo token, que pode ser repassado. É mais fraco
+  que o de e-mail.
+- Nos EUA o convite tende a virar SMS, e aí entra a TCPA (F3).
+
+#### Conflito: duas contas, o mesmo VIN
+
+No BR o CRLV-e faz duas coisas: dá a marca de posse e **decide os conflitos**.
+`VehicleOwnershipService::claimExisting` só tira o carro de outro dono atual se o CPF/CNPJ do documento
+for o da conta (`.ai/rules/vehicles-entry.md`, "Claiming an existing vehicle needs proof"). "Cadastro sem
+gate" substitui a primeira função e deixa a segunda sem ninguém.
+
+Na US, quem digita o VIN primeiro fica com o carro — e o VIN se lê do lado de fora. O que essa pessoa
+consegue fazer, no código de hoje:
+
+| Ação | Hoje | Efeito na US |
+| --- | --- | --- |
+| Bloquear o convite da oficina | `canInvite` exige veículo sem dono atual | A oficina não consegue mais convidar o cliente de verdade |
+| Contestar o histórico | `canDispute` pede só ser dono atual | Toda OS de oficina do carro pode sair marcada como contestada; a marca aparece em 24 pontos de `app/` e `resources/`, inclusive nas superfícies públicas |
+| Esconder ou aceitar registros | `decide()` exige `ownershipVerified` (`MaintenanceOwnerDecisionService.php:201`) | Não consegue — isso segura |
+
+E o dono de verdade, chegando depois, não tem como tomar o carro de volta sem documento. Proposta:
+
+- **"Verified owner" é obrigatório no conflito e opcional no resto.** Uma reivindicação verificada desloca
+  um vínculo não verificado, com o aviso que já existe (`VehicleClaimedByAnotherAccountNotification`).
+- **Na US, contestar fica com dono verificado ou com quem chegou pelo convite.** Lá ocupar um carro não
+  custa nada, e contestar é a única ação que o ocupante tem sobre o histórico dos outros.
+
+Achado lateral: o docblock de `VehicleOwnershipService::claimUnclaimedWorkshopVehicle` diz que o dono não
+verificado "pode vincular ou recusar o registro mínimo e ocultá-lo", mas `decide()` recusa tudo isso.
+O código está certo e o comentário está velho — justamente na peça de que o fluxo US de posse vai depender.
 
 O que o selo exige além de schema: alguém para analisar os envios, e retenção curta de um documento que
 traz nome e endereço — o dado que a seção 3 manda não guardar. Fica gravado o **resultado** da
@@ -259,22 +309,74 @@ F0, porque muda a ordem das fases.
 
 ### F0 — Fundação (sem mudança visível no BR)
 
-- `APP_MARKET` e config por instância: locale, fuso padrão, catálogo, intervalos, rotas, textos legais.
-- Interface por mercado para os módulos da tabela da seção 1; instância BR registra os atuais.
+- `APP_MARKET`, config por mercado e interfaces por mercado, com as garantias de que nenhum ponto ficou
+  assumindo Brasil — desenho em "Como cada parte do sistema sabe em que mercado está", logo abaixo.
+  Instância BR registra os módulos atuais.
 - `users.locale` e `users.timezone`.
 - **Códigos de erro estáveis na API** e remoção das comparações de texto no Flutter
   (`lib/views/auth/login_page.dart:125` compara "Este portal", `two_factor_challenge_page.dart:88`
   compara "Invalid authentication code"). Pré-requisito para localizar a API sem quebrar o login.
-- **Como o schema fica igual nos dois mercados** (seção 1, "Dois custos que a escolha cria"): a
-  unicidade da placa por (jurisdição, placa) nos dois bancos, para não haver migração condicional por
-  mercado. É mudança no banco BR e entra aqui, não em F1.
+- **Como o schema fica igual nos dois mercados** (seção 1, "Dois custos que a escolha cria"):
+  `plate_jurisdiction` e o índice único parcial `WHERE plate_jurisdiction = 'BR'`, para não haver
+  migração condicional por mercado. É mudança no banco BR e entra aqui, não em F1.
 - **Residência de dados, se for requisito**: região do banco, do bucket e do deploy por instância. Hoje o
   disco `r2` usa `region => 'auto'` e o bucket legado tem `us-east-2` como default.
 
+#### Como cada parte do sistema sabe em que mercado está
+
+Operar dois bancos é a parte fácil. A difícil é cada parte do sistema saber onde está. Hoje não existe
+conceito de mercado: nenhum `APP_MARKET` ou equivalente em `config/`, e o Brasil está assumido como
+constante — `America/Sao_Paulo` em 5 arquivos, `'pt_BR'` em 7, `'Brasil'` em 8, `wa.me` em 7,
+`BrazilianStates` em 6 (em `app/`, `config/`, `routes/`, `resources/views`, `resources/js` e migrações). E
+`config/app.php` cai em `pt_BR` quando falta `APP_LOCALE`.
+
+Princípio: **o código não pergunta "estou nos EUA?"; pergunta o valor de que precisa.** O `if` por mercado
+existe, num lugar só.
+
+1. **Uma fonte de verdade.** `APP_MARKET` lido uma vez, um enum `Market` e dois arquivos lado a lado,
+   `config/markets/br.php` e `config/markets/us.php`, com tudo o que é *valor*: locale, fuso padrão, moeda,
+   unidade do odômetro, papel do PDF, formatos de telefone, endereço e data, intervalos de manutenção,
+   horários dos agendamentos, nomes de rota, textos legais. O código lê `config('market.currency')`; os
+   dois arquivos juntos são o inventário completo do que muda entre os países.
+2. **Comportamento diferente vira interface, escolhida num provider.** Placa, VIN, documento, endereço,
+   nota fiscal, prova de posse (a tabela de módulos da seção 1). Um `MarketServiceProvider` liga a
+   implementação do mercado; o resto do código só conhece a interface.
+3. **O que não existe num mercado não é registrado.** Rotas de lojista e consignação, prospecção pela
+   Receita, a janela de outreach em `America/Sao_Paulo`, itens do admin: registrados ou não no boot.
+   **Não usar o Pennant para isso.** Ele está instalado e é tentador, mas é flag de liberação gradual — por
+   escopo, guardada no banco, mutável em tempo de execução. Mercado é jurisdição, constante do deploy;
+   misturar os dois abre a porta para "ligar o Brasil" para um usuário americano.
+4. **O que sai do banco leva o mercado na linha.** Moeda, jurisdição da placa e unidade do odômetro ficam
+   gravadas no registro mesmo com bancos separados. Regra: se o valor viaja (PDF, exportação, API), carrega
+   o mercado; se só governa o comportamento da instância, é config.
+5. **O app pergunta ao servidor.** Hoje o Flutter fixa o formato brasileiro
+   (`NumberFormat.simpleCurrency(locale: 'pt_BR')`). Em vez de dois caminhos no app, a API informa o
+   mercado na inicialização (locale, moeda, unidade, formato de placa) e o app monta as telas com isso.
+
+O mecanismo sozinho não basta: o risco são os lugares que continuam assumindo Brasil sem ninguém ver. Por
+isso a F0 entrega também as garantias:
+
+- **Suíte rodando duas vezes no CI**, com `APP_MARKET=br` e `APP_MARKET=us` (matriz em
+  `.github/workflows/ci.yml`). Teste que só vale para o BR leva `#[Group('market-br')]` e é pulado na
+  rodada US; todo o resto passa nas duas. É a garantia mais forte, e é o que dá sentido à conversão de
+  asserções da F2.
+- **Teste de arquitetura** que varre `app/` e falha com `America/Sao_Paulo`, `'pt_BR'`, `'BRL'`, `wa.me` ou
+  `BrazilianStates` fora do módulo BR. Pega a suposição nova no PR, antes de virar dívida.
+- **Paridade das configs**: os dois arquivos de mercado com as mesmas chaves — o mesmo teste das chaves de
+  tradução.
+- **Sem default silencioso**: `APP_MARKET` ausente ou inválido, a aplicação não sobe. Hoje uma instância US
+  configurada pela metade subiria em português, sem erro.
+- **O banco sabe de que mercado é.** Com schema idêntico, apontar a instância US para o banco BR (um
+  `DATABASE_URL` copiado errado) funciona sem erro nenhum — o pior acidente possível, e um risco que só
+  existe com duas instâncias. O mercado é gravado no próprio banco, numa linha escrita na criação, e conferido no
+  boot e no health check.
+
 ### F1 — Destraves pequenos e dados do veículo (MVP)
 
-- Placa com estado; a unicidade por (jurisdição, placa) vem de F0, nos dois bancos; tirar a regex
-  Mercosul da web e o detector de `command.js` na US; busca por VIN e por placa + estado.
+- Placa com estado (o índice parcial vem de F0: só placa BR é única); tirar a regex Mercosul da web e o
+  detector de `command.js` na US; busca por VIN e por placa + estado. As validações
+  `unique:vehicles,license_plate` de `StoreVehicleRequest`, `UpdateVehicleRequest` e
+  `RegistersVehicleWithOwnership` passam a valer só para placa BR.
 - **Catálogo de marcas/modelos por mercado** — menos caro do que parece, e não é a lacuna mais cara.
   Não é fechado no schema nem na validação: marcas e modelos são tabelas (`VehicleBrand`, `VehicleModel`)
   com CRUD de admin (`VehicleBrandController`, `VehicleModelController`), semeadas de
@@ -288,7 +390,8 @@ F0, porque muda a ordem das fases.
 - Decodificação de VIN pela vPIC no cadastro.
 - `odometer_unit` no veículo + constantes da seção 2 por mercado.
 - Regra de VIN US (corte 1981, dígito verificador como aviso).
-- Prova de posse por mercado (BR: placa + RENAVAM; US: sem gate + "Verified owner").
+- Prova de posse por mercado (BR: placa + RENAVAM; US: cadastro sem gate, convite da oficina como
+  verificação por registro e "Verified owner" para o conflito — seção 2).
 - **Consulta pública US**: o gate é no **identificador**, não na placa. `VehiclePlateSearch::findByIdentifier`
   tenta chassi primeiro, e nos EUA o VIN é a chave principal — e legível pelo para-brisa, da calçada.
   Trancar só a busca por placa deixa aberta justamente a porta que vai ser usada. Exigir login na busca
@@ -332,6 +435,13 @@ F0, porque muda a ordem das fases.
   **Decisão:** ao extrair os textos de uma área, converter as asserções daquela área para
   `assertSee(__('chave'))` no mesmo passo. O mesmo teste passa a valer nos dois locales, os arquivos já
   vão estar abertos, e deixar para depois é fazer a varredura duas vezes. Hoje são 0 `assertSee(__(`.
+  **A conversão precisa de uma trava**, senão vira teste que passa sempre: quando a chave não existe, o
+  `__()` devolve a própria chave na view e no teste, e a tela mostra `vehicle.plate_label` com a suíte
+  verde. O framework instalado tem a trava: `Lang::handleMissingKeysUsing()`, registrado no `TestCase`
+  para lançar exceção em chave faltando. Junto, um teste de paridade: `lang/pt_BR` e `lang/en` com as
+  mesmas chaves. É isso que faz a rodada `APP_MARKET=us` do CI (F0) cobrir o texto de verdade.
+  Orçamento: parte dos 861 `assertSee` confere dado (placa, nome, número), não texto de interface, e não
+  precisa de conversão — o custo real fica mais perto dos 304 com acento do que dos 861.
 - Reescrever `.ai/rules/locale.md` (hoje proíbe inglês no código web).
 - Flutter: `flutter_localizations` + `gen-l10n` (ARB), `supportedLocales` no `MaterialApp`, enviar
   `Accept-Language`, `intl` na versão exigida pelo SDK (hoje `^0.18.1`), trocar `DateFormat`/
@@ -390,12 +500,15 @@ dentro do app nas lojas.
    quatro de volta — é a mesma fase com o dobro do tamanho.
 3. **Estados piloto**: quais 1–2? CA e FL são candidatos por terem registro público de oficinas.
 4. **Prova de posse**: cadastro sem gate + "Verified owner" opcional pelo registration card, ou
-   comprovação obrigatória desde o início? Em qualquer das duas, dizer **qual predicado libera anexo e
-   decisão** na instância US, porque hoje quem libera é `ownership_verified_at`, e só o CRLV-e a grava
-   (seção 2). Sem essa escolha, anexo pendente nos EUA morre na purga de 90 dias.
+   comprovação obrigatória desde o início? Em qualquer das duas, decidir três coisas (seção 2): **o que
+   libera anexo e decisão** na US (hoje é `ownership_verified_at`, que só o CRLV-e grava; a proposta é o
+   convite da oficina, por registro); **quem ganha um conflito** pelo mesmo VIN (proposta: "Verified
+   owner" obrigatório no conflito); e **quem pode contestar** (proposta: dono verificado ou quem chegou
+   pelo convite). Sem a primeira, anexo pendente nos EUA morre na purga de 90 dias.
 5. **Critério de sucesso do piloto e lugar da cobrança na fila** (seção 5, "Antes das fases"): o que
    precisa acontecer para seguir, o que faz parar, e se receita é uma das medidas — porque hoje nada no
    plano cobra, e o piloto mediria só uso.
-6. **Unicidade da placa**: schema igual nos dois mercados, com (jurisdição, placa) também no BR, ou
-   migração condicional por mercado? A primeira custa um índice trocado em produção no BR, uma vez; a
-   segunda custa schema dependente do `.env` para sempre (seção 1).
+6. **Unicidade da placa**: schema igual nos dois mercados com índice único parcial (só placa BR é
+   única), ou migração condicional por mercado? A primeira custa uma migração de índice em produção no BR,
+   uma vez; a segunda custa schema dependente do `.env` para sempre (seção 1). Nas duas, a placa
+   americana não é única.
