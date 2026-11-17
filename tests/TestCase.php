@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Features\MaintenancePhotos;
+use App\Features\VehicleInspections;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\Maintenance\MaintenancePhotoImageProcessor;
@@ -91,6 +92,16 @@ abstract class TestCase extends BaseTestCase
     protected function enableMaintenancePhotosForEveryone(): void
     {
         Feature::define((new MaintenancePhotos)->name, fn (): bool => true);
+    }
+
+    /**
+     * Liga a emissão de laudo de vistoria cautelar para todas as contas do teste
+     * (App\Features\VehicleInspections, desligada por padrão). Quem testa a liberação por conta usa
+     * Feature::for($conta)->activate(VehicleInspections::class).
+     */
+    protected function enableVehicleInspectionsForEveryone(): void
+    {
+        Feature::define((new VehicleInspections)->name, fn (): bool => true);
     }
 
     protected function fakeCoversDisk(string $disk = 'covers'): void

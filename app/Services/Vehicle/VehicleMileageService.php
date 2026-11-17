@@ -72,6 +72,55 @@ class VehicleMileageService
         }
     }
 
+    /**
+     * Hodômetro lido numa vistoria cautelar. **Não** é a mesma regra da OS, e a diferença é o ponto
+     * principal: `assertMaintenanceKilometers` impõe monotonicidade (piso em
+     * `minimumAllowedKilometers`), e a vistoria é o único ator com licença para quebrá-la. Leitura
+     * abaixo do já registrado é exatamente o achado que a cautelar existe para encontrar —
+     * adulteração de hodômetro —, e recusá-la proibiria o laudo de relatar o que viu.
+     *
+     * Sobra o que pega erro de digitação sem calar o vistoriador: negativo e o teto de
+     * plausibilidade derivado do ano do veículo.
+     *
+     * @throws ValidationException
+     */
+    public function assertInspectionKilometers(Vehicle $vehicle, int $kilometers): void
+    {
+        if ($kilometers < 0) {
+            throw ValidationException::withMessages([
+                'odometer_km' => 'A quilometragem deve ser zero ou maior.',
+            ]);
+        }
+
+        $plausible = $this->plausibilityCeiling($vehicle, 0);
+
+        if ($plausible !== null && $kilometers > $plausible) {
+            throw ValidationException::withMessages([
+                'odometer_km' => "A quilometragem deve ser no máximo {$plausible} km: é o teto plausível para um veículo {$vehicle->year}. Confira se não sobrou um dígito.",
+            ]);
+        }
+    }
+
+    /**
+     * A OS que conta para o hodômetro com a maior quilometragem **acima** desta leitura, ou null
+     * quando a leitura é coerente com o histórico.
+     *
+     * É o detector de hodômetro rodado para trás: quem lê 40.000 num carro com OS de 90.000 está
+     * diante de um indício, não de um erro. O formulário da vistoria usa isto para mostrar o
+     * registro que a leitura contradiz, e VehicleInspectionService para recusar um "sem
+     * apontamento" no eixo do hodômetro.
+     */
+    public function countedMaintenanceAbove(Vehicle $vehicle, int $kilometers): ?Maintenance
+    {
+        return $vehicle->maintenances()
+            ->countsTowardOdometer()
+            ->whereNotNull('kilometers')
+            ->where('kilometers', '>', $kilometers)
+            ->orderByDesc('kilometers')
+            ->orderByDesc('maintenance_date')
+            ->first();
+    }
+
     public function registerOdometer(Vehicle $vehicle, int $kilometers): void
     {
         $vehicle->update([
