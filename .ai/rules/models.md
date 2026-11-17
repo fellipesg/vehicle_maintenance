@@ -186,7 +186,15 @@ executava o que estivesse lá; com a disk local isso é na origem do app, com a 
 `shouldBlockPhpUpload` que o Laravel aplica dentro de `mimes`. Testes:
 `UploadedImageExtensionTest` (Feature, as quatro superfícies; Unit, o fallback).
 
-Caminhos gravados antes disso mantêm a extensão antiga — a correção é só para frente.
+Caminhos gravados antes disso mantêm a extensão antiga: a correção na gravação não alcança o que já
+está no storage, e um `.html` lá continua saindo como `text/html`. Quem limpa é
+`php artisan storage:fix-image-extensions [--dry-run] [--limit=N]`, que lê os bytes de cada caminho,
+deduz a extensão com `UploadedImageExtension::forBytes` e, quando difere, grava no caminho corrigido,
+confere, aponta a coluna e só então apaga o antigo — nessa ordem, para que uma falha no meio deixe a
+coluna apontando para um objeto que existe. É seguro rodar de novo, não toca no que não consegue
+identificar, ignora `users.avatar` com URL de provedor e nada fora do prefixo da família. Como o
+backfill de variantes de foto (`.ai/rules/jobs.md`), é manual e não faz parte do deploy.
+`cover_photo_thumb_path` fica de fora: a miniatura sempre nasceu `.jpg`.
 
 ## Prévia do proprietário: dono atual com posse comprovada vê os anexos antes de aceitar
 `Maintenance::hidesAttachmentsFrom` não esconde mais notas e fotos de uma OS sem dono do dono atual do
