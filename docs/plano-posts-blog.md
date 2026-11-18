@@ -1,6 +1,6 @@
 # Plano: série de posts do blog para atrair visitas
 
-Status: **plano** — nenhum post escrito ainda.  
+Status: **escrito** — os 22 posts estão em `database/data/blog_series/` e entram pelo `BlogSeriesSeeder`.  
 Data: 2026-11-15  
 Onde publicar: Admin → Blog → Novo artigo, com **Agendar** (horário de Brasília; o post entra no ar
 sozinho na hora marcada, sem comando nem cron — ver `.ai/rules/blog.md`).
