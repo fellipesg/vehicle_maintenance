@@ -5,7 +5,7 @@
     - $emailTaken: o envio anterior parou em "Este e-mail já está cadastrado.". A tela oferece entrar
       ou redefinir a senha, em vez de levar a um segundo cadastro.
     - $intendedNotice: 'search' quando o visitante veio da busca de veículo (depois do cadastro ele
-      volta para ela), 'protected' ou null.
+      volta para ela), 'comment' (veio de um artigo do blog), 'protected' ou null.
 
     CPF/CNPJ e telefone ficam num bloco recolhido e opcional, aberto quando já têm valor ou erro. Os
     dois aceitam pontuação (o controller guarda só os dígitos), então colar "(11) 99999-9999" não
@@ -30,6 +30,10 @@
     @if($intendedNotice === 'search')
         <x-ui.alert variant="info" icon="magnifying-glass" class="mb-6">
             Depois do cadastro, levamos você direto para a busca de veículo.
+        </x-ui.alert>
+    @elseif($intendedNotice === 'comment')
+        <x-ui.alert variant="info" icon="chat-bubble-left-right" class="mb-6">
+            Depois do cadastro, levamos você de volta ao artigo para comentar.
         </x-ui.alert>
     @endif
 
