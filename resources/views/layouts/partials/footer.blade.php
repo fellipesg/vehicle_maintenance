@@ -12,7 +12,7 @@
             ['label' => 'Como funciona', 'href' => route('home').'#como-funciona'],
             ['label' => 'Procedência', 'href' => route('home').'#procedencia'],
             ['label' => 'Linha do tempo, busca e PDF', 'href' => route('home').'#produto'],
-            ['label' => 'Conferir selo da oficina', 'href' => route('verification.lookup')],
+            ['label' => 'Conferir selo ou laudo', 'href' => route('verification.lookup')],
             ['label' => 'App', 'href' => route('home').'#app'],
             ['label' => 'Preço', 'href' => route('home').'#preco'],
             ['label' => 'Perguntas frequentes', 'href' => route('home').'#faq'],

@@ -300,7 +300,7 @@ class AppShellTest extends TestCase
             ->assertOk()
             ->assertSee(route('login.lojista'), false)
             ->assertSee(config('legal.support_email'))
-            ->assertSeeInOrder(['Conferir selo da oficina', route('blog.index')], false)
+            ->assertSeeInOrder(['Conferir selo ou laudo', route('blog.index')], false)
             ->assertSee('href="'.route('verification.lookup').'"', false);
 
         $this->actingAs($owner)
