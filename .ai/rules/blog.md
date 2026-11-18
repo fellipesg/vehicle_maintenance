@@ -46,3 +46,6 @@ A capa do post vira og:image e twitter:image por `@section('og_image')` e `@sect
 
 ## SEO acompanha o post
 Alterações em blog.show devem manter canonical, og:*, JSON-LD BlogPosting e o link do feed. O sitemap (/sitemap.xml) e o feed (/blog/feed) listam só posts publicados.
+
+## Série de posts vem de arquivo, e o seeder só cria
+`BlogSeriesSeeder` publica a série de `database/data/blog_series.php` (metadados, `publish_at` no horário de Brasília) com o corpo em `database/data/blog_series/{slug}.md`. Todo post entra como publicado com a data do calendário: data passada já aparece, data futura fica agendada (regra acima). O seeder usa `firstOrCreate` pelo slug e não sobrescreve post existente, para não desfazer edição feita no admin; corrigir texto já publicado é pelo admin. Link interno de um post só pode apontar para post de data anterior, porque o agendado responde 404 (`BlogSeriesSeederTest` confere). Não usar lista de tarefas (`- [ ]`) no Markdown: o conversor GFM vira checkbox desabilitado ao lado do marcador da lista.
