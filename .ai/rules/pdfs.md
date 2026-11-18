@@ -65,3 +65,31 @@ storage.
 arquivo: roda de hora em hora (era diário) só para encurtar a brecha da URL assinada que o status
 entregou pouco antes do vencimento (`download_url_expiry_minutes`, 60 min) e que resolve enquanto o
 arquivo existir.
+
+## A vistoria cautelar tem a própria página, e fica fora das contas da capa
+O PDF é o arquivo que o proprietário manda para quem está comprando, e é onde o laudo vale mais: ele
+chega a quem não tem conta e não vai abrir `/laudo/{código}`. A capa ganha o bloco **Vistorias
+cautelares** (uma linha por laudo: data · veredito · emissor) e, depois das OS, vem **uma página por
+laudo** — timbre do emissor, faixa `Vistoria cautelar`, faixa do veredito com o código e a conferência
+pública, cartão de dados (emissor, data, validade, hodômetro lido, resumo) e a tabela dos **oito
+eixos**, inclusive os "Não avaliado": aqui é o documento, e o que a vistoria não olhou é informação.
+
+Os laudos **não** entram em conta nenhuma de manutenção — nem no contador `.prov-counter`, nem na
+linha de pontos (um ponto por manutenção) —, pela razão de sempre: carro com três laudos e zero
+serviços não pode ler como "3 serviços" (`.ai/rules/inspections.md`).
+
+A página do laudo **não usa** o contrato visual de procedência: sem `.prov-*`, sem o teal `#0f766e` e
+sem o âmbar `#92400e`. As três cores do veredito são as do badge da web (`success #166534`,
+`warning #78350f`, `danger #b91c1c`), nenhuma delas um dos dois tokens (`.ai/rules/theme.md`).
+
+**A view não decide quem vê o quê.** `$inspections` chega do
+`VehicleMaintenancePdfExporter::inspectionsForPdf`, que passa por `Vehicle::inspectionsVisibleTo`
+(a consignação sem liberação de histórico não leva o laudo de terceiro, como não leva as OS) e por
+`InspectionRedactor::redactAll`. Sem `viewer` (o comando de demonstração) vale a forma mínima. A
+coluna **Observação** só é desenhada quando algum eixo tem observação: na forma mínima ela sairia
+como uma coluna de travessões.
+
+Dois detalhes de layout que o Dompdf cobra: `cover-document--only` (sem quebra depois da capa) agora
+exige **nem OS nem laudo**, senão o laudo começaria colado na capa; e o corpo do laudo respira menos
+que o da OS (`.meta-line` 3px, `.findings-table` 8,5pt) porque a página é cheia — com o espaçamento
+da OS, o `.doc-footer` encosta no "Página X de Y" que o exporter carimba na margem.

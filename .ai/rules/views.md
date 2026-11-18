@@ -6,6 +6,14 @@ paths:
 
 # Views
 
+## Comentário de CSS numa Blade não protege `<x-...>`
+O compilador de componentes varre o arquivo inteiro: um `<x-ui.badge>` escrito dentro de
+`/* ... */` no `<style>` vira chamada de componente e o arquivo compilado quebra com "unexpected end
+of file, expecting elseif/else/endif", que não aponta para a linha do comentário. Em comentário de
+CSS, escreva o nome sem os sinais de maior e menor (`x-ui.badge`). Comentário Blade (`{{-- --}}`) é
+removido antes e não tem esse problema. Pelo mesmo motivo, `@endif` colado numa palavra
+(`vencido@endif`) não é diretiva: o `\B` da regex exige a fronteira, então deixe um espaço antes.
+
 ## Brand assets via CDN brandUrl
 Static RevisaLog brand images (favicon, apple-touch-icon, lockups, app-icon, og-image) must use AppStorage::brandUrl() or the brand-head-icons component so production serves them from the R2 CDN (cdn.revisalog.com.br). Do not use asset() for files under images/brand/ or public favicon paths.
 

@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'app/Models/VehicleInspection.php,app/Services/Inspection/**,app/Support/Inspection/**,app/Enums/Inspection*,app/Policies/VehicleInspectionPolicy.php,app/Features/VehicleInspections.php,app/Support/Maintenance/VerificationCode.php,app/Http/Controllers/Web/Workshop/InspectionController.php,app/Http/Controllers/Web/InspectionReportController.php,app/Http/Requests/Web/Workshop/*VehicleInspectionRequest.php,app/Http/Requests/Concerns/ValidatesVehicleInspection.php,resources/views/workshop/inspections/**'
+  - 'app/Models/VehicleInspection.php,app/Services/Inspection/**,app/Support/Inspection/**,app/Enums/Inspection*,app/Policies/VehicleInspectionPolicy.php,app/Features/VehicleInspections.php,app/Support/Maintenance/VerificationCode.php,app/Http/Controllers/Web/Workshop/InspectionController.php,app/Http/Controllers/Web/InspectionReportController.php,app/Http/Requests/Web/Workshop/*VehicleInspectionRequest.php,app/Http/Requests/Concerns/ValidatesVehicleInspection.php,resources/views/workshop/inspections/**,resources/views/components/inspection/**,app/Services/Vehicle/VehicleMaintenancePdfExporter.php'
 ---
 
 # Vistoria cautelar (laudo)
@@ -208,10 +208,24 @@ que agora **rejeita** o que o leitor não pode ver antes de redigir o resto — 
 aparecer na forma mínima, que é justamente o que a supressão existe para impedir. A relação já
 carregada manda (`Vehicle::restrictHistoryTo` pode tê-la limitado); sem ela, a ficha consulta.
 
+## O laudo no PDF do histórico é onde ele vale mais
+O PDF que o proprietário exporta e manda para quem está comprando leva o laudo: bloco na capa e uma
+página por vistoria, depois das OS. É a superfície que alcança quem não tem conta e não vai abrir
+`/laudo/{código}` — e, como o arquivo circula fora do RevisaLog, é também a que mais pede a régua de
+quem pediu: `VehicleMaintenancePdfExporter::inspectionsForPdf` passa por
+`Vehicle::inspectionsVisibleTo` **e** por `InspectionRedactor::redactAll`, nessa ordem, e sem
+`viewer` vale a forma mínima. O desenho, as cores e as armadilhas de quebra de página estão em
+`.ai/rules/pdfs.md`.
+
+O PDF **do laudo** (`report_path`) continua fora: o arquivo do vistoriador não é mesclado no
+histórico como a nota fiscal da OS. O teto de tamanho existe porque o e-mail anexa o histórico
+(`.ai/rules/pdfs.md`), e um laudo de 10 MB estouraria isso sozinho; quem tem acesso baixa o arquivo
+pela rota `inspections.report`, que responde a mesma pergunta da redação.
+
 ## O que ainda não existe
 **Não** existe ainda: recurso de API, serviço de contestação e de supressão (as colunas existem e as
 telas já as desenham, quem *escreve* não), marcador na faixa de procedência, selo no estoque do
-lojista, laudo no PDF do histórico, o cartão "Este carro é seu?" na página pública (hoje só `/v/`,
+lojista, o cartão "Este carro é seu?" na página pública (hoje só `/v/`,
 porque `verification.claim` nasce de uma OS) e interruptor do admin para a flag (hoje a liberação é
 por `tinker`/seed, com `App\Support\Inspection\InspectionAccess::set`). Ao acrescentar qualquer um,
 varra também os lugares que *sugerem* a ação — pendência, filtro, dica, item de menu —, não só o que
