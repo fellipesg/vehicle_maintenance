@@ -51,6 +51,7 @@ anonimizada.
 Além de `users`, tokens, FCM, pivôs de veículo, contato de consignação e nome do tenant, a mesma
 transação apaga:
 - `notifications` da pessoa (canal `database`): o texto cita nome, veículo e placa;
+- `blog_comments` dela: o nome (primeiro nome e inicial) aparece neles, e como a conta é anonimizada em vez de apagada o cascade de `user_id` não dispara;
 - `vehicle_pdf_exports` dela **e os arquivos**. O `vehicle-pdf-exports:cleanup` só passa quando
   `expires_at` vence, até 24 h depois — tarde demais para uma exclusão de conta.
 

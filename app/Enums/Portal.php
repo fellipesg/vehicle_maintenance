@@ -247,6 +247,7 @@ enum Portal: string
                 ['label' => 'Conteúdo', 'items' => [
                     self::item('Artigos do blog', 'admin.blog.index', 'newspaper', ['admin.blog.index', 'admin.blog.create', 'admin.blog.edit']),
                     self::item('Categorias do blog', 'admin.blog.categories.index', 'tag', ['admin.blog.categories.*']),
+                    self::item('Comentários do blog', 'admin.blog.comments.index', 'chat-bubble-left-right', ['admin.blog.comments.*']),
                 ]],
                 ['label' => 'Catálogo', 'items' => [
                     self::item('Marcas e modelos', 'admin.brands.index', 'squares-2x2', ['admin.brands.*']),

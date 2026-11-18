@@ -20,6 +20,7 @@
         'datePublished' => $post->published_at?->toIso8601String(),
         'dateModified' => $post->updated_at?->toIso8601String(),
         'image' => $post->cover_photo_url,
+        'commentCount' => $publishedCommentCount,
         'mainEntityOfPage' => route('blog.show', $post),
         'publisher' => [
             '@type' => 'Organization',
@@ -132,6 +133,81 @@
             <x-ui.button variant="secondary" :href="route('home')">Conhecer a plataforma</x-ui.button>
         </div>
     </aside>
+
+    {{-- Comentários (.ai/rules/blog.md): depois do texto, do anúncio e do convite; nunca dentro de .blog-content. --}}
+    <section id="comentarios" aria-labelledby="comentarios-titulo" class="{{ $readingColumn }} mt-12 scroll-mt-24 border-t border-border pt-10" data-slot="blog-comments">
+        <h2 id="comentarios-titulo" class="text-xl font-semibold text-foreground">Comentários ({{ $publishedCommentCount }})</h2>
+
+        @if($comments->isEmpty())
+            <p class="mt-4 text-base text-muted-foreground" data-slot="blog-comments-empty">Ainda não há comentários. Seja a primeira pessoa a comentar.</p>
+        @else
+            <ul role="list" class="mt-6 space-y-4">
+                @foreach($comments as $comment)
+                    @php $commentAuthorIsStaff = $comment->user?->isAdmin() === true; @endphp
+                    <li class="rounded-card border border-border bg-surface p-4" data-slot="blog-comment" id="comentario-{{ $comment->id }}">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                            <span class="font-medium text-foreground" data-slot="blog-comment-author">{{ $comment->author_display_name }}</span>
+                            @if($commentAuthorIsStaff)
+                                <x-ui.badge variant="primary" size="sm">Equipe RevisaLog</x-ui.badge>
+                            @endif
+                            @if($comment->isPending())
+                                <x-ui.badge variant="warning" size="sm" icon="clock">Aguardando moderação</x-ui.badge>
+                            @endif
+                            <span aria-hidden="true" class="text-muted-foreground">·</span>
+                            <time class="text-muted-foreground" datetime="{{ $comment->created_at->toIso8601String() }}">{{ \App\Support\DisplayTime::local($comment->created_at)->format('d/m/Y \à\s H:i') }}</time>
+                        </div>
+                        <p class="mt-2 text-base leading-7 break-words whitespace-pre-line text-foreground" data-slot="blog-comment-body">{{ $comment->body }}</p>
+                        @can('delete', $comment)
+                            <form method="POST" action="{{ route('blog.comments.destroy', $comment) }}" class="mt-3"
+                                  data-confirm="Seu comentário será excluído do artigo. Não é possível desfazer."
+                                  data-confirm-title="Excluir o comentário?"
+                                  data-confirm-action-label="Excluir comentário"
+                                  data-confirm-variant="danger">
+                                @csrf
+                                @method('DELETE')
+                                <x-ui.button type="submit" variant="ghost" size="sm" icon="trash">Excluir<span class="sr-only"> meu comentário</span></x-ui.button>
+                            </form>
+                        @endcan
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+
+        <div class="mt-8" data-slot="blog-comment-form">
+            @if(! $post->comments_enabled)
+                <x-ui.alert variant="info" role="status">Os comentários estão fechados neste artigo.</x-ui.alert>
+            @elseif(! $post->isPublished())
+                <x-ui.alert variant="info" role="status">Os comentários abrem quando o artigo for publicado.</x-ui.alert>
+            @elseif(auth()->check())
+                <form method="POST" action="{{ route('blog.comments.store', $post) }}" class="relative grid gap-4">
+                    @csrf
+
+                    {{-- Armadilha para robôs: fora da tela, sem foco e escondida do leitor de tela. --}}
+                    <div class="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
+                        <label for="comment-website">Website</label>
+                        <input type="text" name="website" id="comment-website" tabindex="-1" autocomplete="off">
+                    </div>
+
+                    <x-ui.field name="body" label="Seu comentário" hint="Até 2.000 caracteres. Comentários com link são revisados antes de aparecer.">
+                        <x-ui.textarea rows="4" maxlength="2000" counter required />
+                    </x-ui.field>
+
+                    <div>
+                        <x-ui.button type="submit" icon="chat-bubble-left-right" loading-label="Publicando…">Publicar comentário</x-ui.button>
+                    </div>
+                </form>
+            @else
+                <div class="rounded-card border border-border bg-surface-muted p-5" data-slot="blog-comment-guest-cta">
+                    <p class="text-base font-medium text-foreground">Entre para comentar</p>
+                    <p class="mt-1 text-sm text-muted-foreground">Só quem tem conta no RevisaLog comenta. É grátis e você volta direto para este artigo.</p>
+                    <div class="mt-4 flex flex-wrap gap-3 max-sm:*:grow">
+                        <x-ui.button :href="route('blog.comments.enter', [$post, 'entrar'])">Entre para comentar</x-ui.button>
+                        <x-ui.button variant="secondary" :href="route('blog.comments.enter', [$post, 'criar-conta'])">Criar conta</x-ui.button>
+                    </div>
+                </div>
+            @endif
+        </div>
+    </section>
 
     @if($related->isNotEmpty())
         <x-ui.section id="leia-tambem" title="Leia também" class="mt-16 border-t border-border pt-10">

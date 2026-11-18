@@ -3,7 +3,8 @@
 
     Variáveis (AuthController::showLoginHub):
     - $portalOptions: [slug, label, description, icon, url] de Proprietário, Lojista e Oficina.
-    - $intendedNotice: 'search' (o visitante tentou abrir a busca de veículo), 'protected' (outra
+    - $intendedNotice: 'search' (o visitante tentou abrir a busca de veículo), 'comment' (veio de um artigo do blog
+      para comentar), 'protected' (outra
       página que exige conta) ou null.
 --}}
 @extends('layouts.guest')
@@ -16,6 +17,10 @@
     @if($intendedNotice === 'search')
         <x-ui.alert variant="info" icon="magnifying-glass" title="A busca de veículo exige uma conta." class="mb-6">
             Para consultar o histórico de um veículo, entre ou crie sua conta grátis de proprietário. Depois, levamos você direto para a busca.
+        </x-ui.alert>
+    @elseif($intendedNotice === 'comment')
+        <x-ui.alert variant="info" icon="chat-bubble-left-right" title="Entre para comentar." class="mb-6">
+            Depois de entrar ou criar sua conta grátis, levamos você de volta ao artigo.
         </x-ui.alert>
     @elseif($intendedNotice === 'protected')
         <x-ui.alert variant="info" icon="lock-closed" class="mb-6">

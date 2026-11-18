@@ -179,6 +179,7 @@ class BlogPostController extends Controller
             'cover_art' => ['nullable', 'string', Rule::in(array_keys(BlogCoverArt::SCENES))],
             'meta_title' => ['nullable', 'string', 'max:160'],
             'meta_description' => ['nullable', 'string', 'max:255'],
+            'comments_enabled' => ['nullable', 'boolean'],
             'publish_mode' => ['nullable', Rule::in(self::PUBLISH_MODES)],
             'status' => ['required_without:publish_mode', 'nullable', 'in:'.BlogPost::STATUS_DRAFT.','.BlogPost::STATUS_PUBLISHED],
             'published_at' => $mode === 'schedule'
@@ -215,6 +216,9 @@ class BlogPostController extends Controller
             'cover_art' => $data['cover_art'] ?? null,
             'meta_title' => $data['meta_title'] ?? null,
             'meta_description' => $data['meta_description'] ?? null,
+            'comments_enabled' => $request->has('comments_enabled')
+                ? $request->boolean('comments_enabled')
+                : ($post->comments_enabled ?? true),
             'status' => $status,
             'published_at' => $publishedAt,
         ];
