@@ -180,12 +180,43 @@ para ela, como `/v/`; código que não existe cai em `public.verification-invali
 dois documentos. O que a página mostra e esconde está em `.ai/rules/public-lookup.md`, com o campo
 único de `/verificar`.
 
+## O laudo na ficha do veículo é a outra metade do histórico, e não entra nas contas dele
+`<x-vehicle.detail>` ganhou a aba **Vistorias** (`#vistorias`), com um `<x-inspection.card>` por
+laudo, da mais recente à mais antiga. Vale para os quatro portais e a busca de uma vez, porque a
+ficha é uma só (`.ai/rules/domain-components.md`). Antes dela o laudo existia e ninguém o via: a
+oficina emitia, `/laudo/{código}` respondia a quem tinha o código na mão, e o proprietário não
+encontrava em tela nenhuma o laudo do próprio carro.
+
+Os laudos ficam **fora** de toda conta de manutenção — do badge da aba Histórico, do `x-ui.stat`
+"Procedência", da faixa de pontos e do filtro Todas/Selo/Declaradas. É a razão de a vistoria ser
+tabela própria: carro com três laudos e zero serviços não pode ler como "3 serviços". Por isso a
+faixa de procedência continua com um ponto por manutenção e **sem** um terceiro termo visual.
+
+O card **não usa** nada de `.prov-*` nem `<x-provenance-marker>`, pelo mesmo motivo da página
+pública: o trilho e o anel teal afirmam "eu fiz este serviço". Quem carrega o significado é o
+veredito, com a variante de badge do enum. O card mostra só os eixos **com algo a dizer** (atenção e
+reprovado); a lista dos oito, com "Não avaliado" item por item, é o corpo de `/laudo/{código}`, não
+de um card de lista.
+
+**A aba só existe quando há laudo.** Vazia em quase todo veículo, ela ensinaria a ignorar as abas, e
+não há ação a oferecer no estado vazio: vistoria é algo que o comprador encomenda, não algo que se
+registra por essa tela.
+
+Quem monta a listagem passa a coleção por `App\Support\Inspection\InspectionRedactor::redactAll`,
+que agora **rejeita** o que o leitor não pode ver antes de redigir o resto — o mesmo contrato de
+`MaintenanceRedactor::redactAll`. Confiar só na redação deixaria o laudo suprimido pela equipe
+aparecer na forma mínima, que é justamente o que a supressão existe para impedir. A relação já
+carregada manda (`Vehicle::restrictHistoryTo` pode tê-la limitado); sem ela, a ficha consulta.
+
 ## O que ainda não existe
 **Não** existe ainda: recurso de API, serviço de contestação e de supressão (as colunas existem e as
 telas já as desenham, quem *escreve* não), marcador na faixa de procedência, selo no estoque do
-lojista, laudo no PDF do histórico, laudo na ficha do veículo do proprietário, o cartão "Este carro
-é seu?" na página pública (hoje só `/v/`, porque `verification.claim` nasce de uma OS) e interruptor
-do admin para a flag (hoje a liberação é por `tinker`/seed, com
-`App\Support\Inspection\InspectionAccess::set`). Ao acrescentar qualquer um, varra também os lugares
-que *sugerem* a ação — pendência, filtro, dica, item de menu —, não só o que a executa
-(`.ai/rules/features.md`).
+lojista, laudo no PDF do histórico, o cartão "Este carro é seu?" na página pública (hoje só `/v/`,
+porque `verification.claim` nasce de uma OS) e interruptor do admin para a flag (hoje a liberação é
+por `tinker`/seed, com `App\Support\Inspection\InspectionAccess::set`). Ao acrescentar qualquer um,
+varra também os lugares que *sugerem* a ação — pendência, filtro, dica, item de menu —, não só o que
+a executa (`.ai/rules/features.md`).
+
+A API espera o serviço de contestação de propósito, e não por tamanho: expor laudo no aplicativo
+antes de existir contestação publicaria no celular de todo mundo uma afirmação sobre o carro que o
+proprietário não tem como contradizer.

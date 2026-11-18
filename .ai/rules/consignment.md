@@ -21,11 +21,16 @@ procuração obrigatória: foi exatamente o que impedia a loja de trabalhar.
 devolve null para não-lojista. Conta de proprietário com consignação não é cenário válido.
 
 ## Restringir histórico pré-carrega a relação, não filtra em maintenances()
-`Vehicle::restrictHistoryTo` grava a relação `maintenances` já limitada, e `VehicleTimelineBuilder`
+`Vehicle::restrictHistoryTo` grava **as duas metades** do histórico já limitadas — `maintenances` e
+`inspections` (os laudos de vistoria cautelar) —, e `VehicleTimelineBuilder`
 usa `loadMissing` (nunca `load`) para não desfazer isso. Filtrar dentro de `maintenances()` **não
 funciona**: o eager loading do Eloquent resolve a relação num `newInstance()` do model e perde
 qualquer estado guardado na instância — o vazamento volta silencioso pelo builder e por
 `<x-vehicle.detail>`.
+
+As duas metades entram na **mesma** chamada de propósito. Limitar só uma deixaria a ficha da
+consignação sem liberação mostrando as manutenções da própria loja e, logo abaixo, na aba Vistorias,
+o laudo de um carro cujo histórico o portão está protegendo.
 
 ## Contato de proprietário com conta nunca vai para o navegador
 Quando o veículo já é de uma conta, o formulário da consignação não pede nem envia e-mail/telefone: a
