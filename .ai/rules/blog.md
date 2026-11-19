@@ -5,6 +5,9 @@ paths:
   - 'resources/views/components/blog/**'
   - 'app/Http/Controllers/Web/Admin/BlogPostController.php'
   - 'app/Models/BlogPost.php'
+  - 'app/Models/BlogComment.php'
+  - 'app/Http/Controllers/Web/BlogCommentController.php'
+  - 'app/Http/Controllers/Web/Admin/BlogCommentController.php'
   - 'resources/views/blog/**'
   - 'resources/views/admin/blog/**'
 ---
@@ -46,3 +49,21 @@ A capa do post vira og:image e twitter:image por `@section('og_image')` e `@sect
 
 ## SEO acompanha o post
 Alterações em blog.show devem manter canonical, og:*, JSON-LD BlogPosting e o link do feed. O sitemap (/sitemap.xml) e o feed (/blog/feed) listam só posts publicados.
+
+## Série de posts vem de arquivo, e o seeder só cria
+`BlogSeriesSeeder` publica a série de `database/data/blog_series.php` (metadados, `publish_at` no horário de Brasília) com o corpo em `database/data/blog_series/{slug}.md`. Todo post entra como publicado com a data do calendário: data passada já aparece, data futura fica agendada (regra acima). O seeder usa `firstOrCreate` pelo slug e não sobrescreve post existente, para não desfazer edição feita no admin; corrigir texto já publicado é pelo admin. Link interno de um post só pode apontar para post de data anterior, porque o agendado responde 404 (`BlogSeriesSeederTest` confere). Não usar lista de tarefas (`- [ ]`) no Markdown: o conversor GFM vira checkbox desabilitado ao lado do marcador da lista.
+
+## Comentários: só conta logada, um nível, texto puro
+Comenta quem está logado, de qualquer perfil (proprietário, lojista, oficina, admin); visitante lê os publicados e vê "Entre para comentar" / "Criar conta" (`blog.comments.enter`, que grava o artigo em `url.intended` e leva ao hub ou ao cadastro; por isso `blog` está em `PortalAccess::PUBLIC_INTENDED_SEGMENTS`). Sem resposta, curtida nem edição; o autor exclui o próprio (`BlogCommentPolicy::delete`: autor ou admin). Corpo de 2 a 2.000 caracteres depois do trim, impresso escapado com `whitespace-pre-line`: sem Markdown, HTML nem link automático. A seção `#comentarios` fica depois do anúncio e do convite, nunca dentro de `.blog-content`. Comentários não entram no feed nem no sitemap; o JSON-LD leva `commentCount` (só publicados).
+
+## Moderação é por link
+Texto com `http://`, `https://`, `www.` ou formato de domínio (`site.com.br`, ver `BlogComment::containsLink`) é gravado `pending`; o resto sai `published`. Situações: `published`, `pending`, `hidden`. O autor vê o próprio pendente com o selo "Aguardando moderação"; ninguém mais vê pendente nem oculto. O admin aprova, oculta ou exclui em `admin.blog.comments.index` (filtros Todos/Pendentes/Publicados/Ocultos); os pendentes entram nas Pendências da visão geral. Comentário de admin leva o selo "Equipe RevisaLog".
+
+## Nome público é primeiro nome + inicial
+`BlogComment::author_display_name` calcula na hora ("Felipe G."; nome de uma palavra sai como está). Nunca nome completo nem e-mail na página pública (o admin vê os dois). Nada é gravado: mudar o nome na conta muda o comentário.
+
+## Abuso e interruptor por artigo
+POST com `throttle:blog-comments` (5/min e 30/dia por conta, `AppServiceProvider`), honeypot `website` (finge sucesso e não grava, como o /contato) e só em post publicado (rascunho e agendado dão 404). `blog_posts.comments_enabled` (padrão true, switch "Permitir comentários" no editor; ausente no envio, mantém o valor): desligado, os publicados continuam visíveis, o formulário vira "Os comentários estão fechados neste artigo." e o POST é recusado.
+
+## Exclusão de conta apaga os comentários
+`DeleteUserAccount` apaga os `blog_comments` da pessoa na mesma transação: a conta é anonimizada, não removida, então o cascade de `user_id` não dispara. Está na política de privacidade (seções 2 e 7) e nos termos (seção "Comentários no blog"), versão 2026-11-18.

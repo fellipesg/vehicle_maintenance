@@ -38,7 +38,7 @@ class AdminBlogEditorTest extends TestCase
             fn ($section): string => $this->adminText($this->adminElement($xpath, '//*[@id="'.$section->getAttribute('aria-labelledby').'"]')),
             $this->adminElements($xpath, './/section[@aria-labelledby]', $form),
         );
-        $this->assertSame(['Texto do artigo', 'Publicação', 'Endereço', 'Categoria', 'Capa'], $sections);
+        $this->assertSame(['Texto do artigo', 'Publicação', 'Comentários', 'Endereço', 'Categoria', 'Capa'], $sections);
 
         $modes = [];
         foreach ($this->adminElements($xpath, './/input[@type="radio"][@name="publish_mode"]', $form) as $radio) {

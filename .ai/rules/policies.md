@@ -36,3 +36,6 @@ A OS contestada pelo proprietário (`owner_disputed_at`) **não** entra nessa re
 não esconde, então `hiddenFrom` e o scope `visibleInHistoryTo` continuam olhando só
 `hidden_from_public_at`, que hoje apenas a equipe escreve (ver models.md, "O proprietário contesta;
 esconder é da equipe"). Quem vê a OS contestada vê a marca, não a ausência.
+
+## Comentário do blog: autor ou admin
+`BlogCommentPolicy::delete` deixa o autor apagar o próprio comentário e o admin apagar qualquer um; qualquer outra conta recebe 403. Ver blog.md.

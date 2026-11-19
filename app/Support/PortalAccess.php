@@ -10,8 +10,8 @@ use Illuminate\Http\Request;
  * Qual área do site cada conta pode abrir e para onde mandar quem cai na área errada.
  *
  * Áreas restritas (primeiro segmento da URL): /usuario (proprietário), /garagem (lojista),
- * /oficina (oficina) e /admin (administrador). /buscar-veiculo, /notificacoes e /conta servem a
- * qualquer conta logada. Usada pelo login (url.intended só vale para área da conta), pelo
+ * /oficina (oficina) e /admin (administrador). /buscar-veiculo, /notificacoes e /conta servem a qualquer conta logada.
+ * O login também segue /blog/... como url.intended (volta ao artigo depois de entrar para comentar). Usada pelo login (url.intended só vale para área da conta), pelo
  * redirecionamento de visitante para o login do portal certo e pelo 403 de perfil errado, que
  * vira redirecionamento ao Início da conta.
  */
@@ -47,6 +47,14 @@ class PortalAccess
      * @var list<string>
      */
     private const SHARED_SEGMENTS = ['buscar-veiculo', 'notificacoes', 'conta'];
+
+    /**
+     * Primeiros segmentos de página pública que o login pode seguir como url.intended (o artigo do
+     * blog de onde a pessoa saiu para entrar e comentar). Não entram em canAccessPath().
+     *
+     * @var list<string>
+     */
+    private const PUBLIC_INTENDED_SEGMENTS = ['blog'];
 
     /**
      * Área restrita do caminho ('usuario', 'garagem', 'oficina' ou 'admin'), ou null.
@@ -101,7 +109,10 @@ class PortalAccess
             return false;
         }
 
-        return self::canAccessPath($user, (string) ($parts['path'] ?? '/'));
+        $path = (string) ($parts['path'] ?? '/');
+
+        return self::canAccessPath($user, $path)
+            || in_array(self::firstSegment($path), self::PUBLIC_INTENDED_SEGMENTS, true);
     }
 
     /**

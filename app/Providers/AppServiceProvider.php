@@ -3,12 +3,14 @@
 namespace App\Providers;
 
 use App\Database\PostgresConnection;
+use App\Models\BlogComment;
 use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
 use App\Models\Vehicle;
 use App\Models\VehicleInspection;
 use App\Models\Workshop;
+use App\Policies\BlogCommentPolicy;
 use App\Policies\InvoicePolicy;
 use App\Policies\MaintenancePhotoPolicy;
 use App\Policies\MaintenancePolicy;
@@ -171,6 +173,13 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(5)->by('account-deletion-email|'.hash('sha256', Str::lower((string) $request->input('email', '')))),
         ]);
 
+        // Comentário do blog: quem responde pelo texto é a conta, não o IP (NAT, rede da oficina).
+        // 5 por minuto contra rajada e 30 por dia contra quem espalha spam devagar.
+        RateLimiter::for('blog-comments', fn (Request $request) => [
+            Limit::perMinute(5)->by('blog-comments|'.($request->user()?->id ?: $request->ip())),
+            Limit::perDay(30)->by('blog-comments-daily|'.($request->user()?->id ?: $request->ip())),
+        ]);
+
         if ($this->app->runningInConsole()) {
             $this->describeAbuseGuards();
         }
@@ -181,6 +190,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Workshop::class, WorkshopPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
         Gate::policy(VehicleInspection::class, VehicleInspectionPolicy::class);
+        Gate::policy(BlogComment::class, BlogCommentPolicy::class);
 
         Storage::extend('s3', fn ($app, array $config) => $app['filesystem']->createS3Driver(
             StorageEndpointResolver::apply($config)
