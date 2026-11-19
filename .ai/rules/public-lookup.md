@@ -52,11 +52,33 @@ reimplementá-la pela metade. Note que o POST ainda revela o piso do hodômetro 
 `VehicleMileageService::assertMaintenanceKilometers`, com o custo de `throttle:uploads` e de uma
 tentativa de OS.
 
+## A conferência pública tem dois documentos, e um campo só
+`/verificar` é o único campo público de código, e o produto tem dois: `RVL`, o Selo da oficina
+(`/v/{código}`), e `LDO`, o laudo de vistoria cautelar (`/laudo/{código}`,
+`App\Http\Controllers\Web\PublicInspectionController`, mesmo balde `search`). Com prefixo não há
+dúvida e a página de destino é que responde se existe. **Sem** prefixo o código é ambíguo — seis
+caracteres servem aos dois —, e aí `PublicVerificationController::resolveTypedCode` desempata pela
+existência, na ordem de `VerificationCode::prefixes()`: selo, depois laudo; nenhum dos dois cai na
+página de código não encontrado, que é compartilhada.
+
+A página do laudo mostra marca, modelo, ano e o **chassi mascarado**, nunca a placa, e o hodômetro
+que sai é o **lido na vistoria**, não `vehicles.current_kilometers` (que soma registros que a
+consulta pública não lista). Quem não tem o histórico do veículo recebe a forma mínima de
+`App\Support\Inspection\InspectionRedactor` — sem resumo, sem observação de eixo, sem PDF e sem o
+texto da contestação —, e **com** os oito status: é o que serve a quem está comprando. A página diz
+que a prosa existe e com quem ela fica, em vez de fingir que o laudo não tem nada.
+
 ## OS contestada aparece marcada, não sai
 Registro que o proprietário contestou (`owner_disputed_at`, ver models.md) **continua** na busca
 pública, no histórico, no PDF e em `/v/{código}`, com o aviso "Contestada pelo proprietário" — a busca
 pública leva só o booleano `disputed`, nunca o texto que o dono escreveu. O selo não é revogado por
 uma contestação: em `/v/` a página segue dizendo que o selo é autêntico e acrescenta a ressalva.
+
+Laudo contestado segue a mesma regra — `/laudo/{código}` continua respondendo, com o aviso e sem o
+texto que o dono escreveu —, e laudo **vencido** também: aparece marcado, porque histórico pertence
+ao chassi. Laudo suprimido pela equipe sai para o mundo e **continua respondendo para a oficina que
+o assinou** (`VehicleInspection::hiddenFrom`, não `scopePubliclyVisible`): é ela quem corrige, e
+trancá-la fora trancaria a correção.
 
 Sair da consulta pública é só com `hidden_from_public_at`, que agora **apenas a equipe** escreve
 (`MaintenancePublicVisibilityService`, via `admin.maintenances.hide`). O proprietário perdeu essa

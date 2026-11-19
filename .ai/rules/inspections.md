@@ -166,11 +166,26 @@ para os três portais, como a nota fiscal e a foto (`.ai/rules/views.md`).
 a equipe ligar. A lista continua mostrando os laudos já emitidos: desligar a funcionalidade não
 apaga laudo nenhum, como nas fotos (`.ai/rules/features.md`).
 
+## A página pública do laudo não é o Selo da oficina
+`GET /laudo/{código}` (`App\Http\Controllers\Web\PublicInspectionController`, nome
+`inspections.public`, `throttle:search`) é irmã de `/v/{código}` e **não usa o contrato visual de
+procedência**: `.prov-seal`, `.prov-verified` e `<x-provenance-marker>` dizem "Selo da oficina", que
+é a afirmação "eu fiz este serviço". O laudo afirma outra coisa, e emprestar o anel teal diluiria a
+única primitiva de confiança do produto (`.ai/rules/theme.md`). Quem carrega o significado aqui é o
+veredito, com a variante de badge do próprio enum.
+
+A view recebe o laudo **já redigido** e não decide nada: `InspectionRedactor::redact` roda no
+controller, e `showsFullReport` diz se a prosa veio. Código fora da forma canônica redireciona 301
+para ela, como `/v/`; código que não existe cai em `public.verification-invalid`, a mesma página dos
+dois documentos. O que a página mostra e esconde está em `.ai/rules/public-lookup.md`, com o campo
+único de `/verificar`.
+
 ## O que ainda não existe
-**Não** existe ainda: página pública `/laudo/{código}`, recurso de API, serviço de contestação e de
-supressão (as colunas existem, quem escreve não), marcador na faixa de procedência, selo no estoque
-do lojista, laudo no PDF do histórico, laudo na ficha do veículo do proprietário e interruptor do
-admin para a flag (hoje a liberação é por `tinker`/seed, com
+**Não** existe ainda: recurso de API, serviço de contestação e de supressão (as colunas existem e as
+telas já as desenham, quem *escreve* não), marcador na faixa de procedência, selo no estoque do
+lojista, laudo no PDF do histórico, laudo na ficha do veículo do proprietário, o cartão "Este carro
+é seu?" na página pública (hoje só `/v/`, porque `verification.claim` nasce de uma OS) e interruptor
+do admin para a flag (hoje a liberação é por `tinker`/seed, com
 `App\Support\Inspection\InspectionAccess::set`). Ao acrescentar qualquer um, varra também os lugares
 que *sugerem* a ação — pendência, filtro, dica, item de menu —, não só o que a executa
 (`.ai/rules/features.md`).

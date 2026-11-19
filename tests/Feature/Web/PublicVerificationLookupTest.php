@@ -25,11 +25,12 @@ class PublicVerificationLookupTest extends TestCase
     {
         $page = $this->page($this->get(route('verification.lookup'))
             ->assertOk()
-            ->assertSee('<title>Conferir selo da oficina · RevisaLog</title>', false));
+            ->assertSee('<title>Conferir selo ou laudo · RevisaLog</title>', false));
 
         $this->assertCount(1, $page->querySelectorAll('h1'));
-        $this->assertSame('Conferir selo da oficina', $this->text($this->element($page, 'h1')));
-        $this->assertSame('Selo da oficina', $this->text($this->element($page, '[data-slot="page-header-eyebrow"]')));
+        $this->assertSame('Conferir selo ou laudo', $this->text($this->element($page, 'h1')));
+        // O campo é um só para os dois documentos com código: RVL (selo) e LDO (laudo).
+        $this->assertSame('Verificação pública RevisaLog', $this->text($this->element($page, '[data-slot="page-header-eyebrow"]')));
 
         $form = $this->element($page, 'form[data-verification-lookup-form]');
         $this->assertSame('GET', strtoupper($form->getAttribute('method')));
@@ -58,7 +59,7 @@ class PublicVerificationLookupTest extends TestCase
     {
         $page = $this->page($this->get(route('verification.lookup', ['codigo' => 'abc']))
             ->assertUnprocessable()
-            ->assertSee('Digite o código no formato RVL-XXXX-XX, como aparece no relatório.'));
+            ->assertSee('Digite o código no formato RVL-XXXX-XX ou LDO-XXXX-XX, como aparece no relatório ou no laudo.'));
 
         $input = $this->element($page, '#codigo');
         $this->assertSame('true', $input->getAttribute('aria-invalid'));
@@ -133,7 +134,7 @@ class PublicVerificationLookupTest extends TestCase
         $this->actingAs(User::factory()->asWorkshop()->create())
             ->get(route('verification.lookup'))
             ->assertOk()
-            ->assertSee('Conferir selo da oficina');
+            ->assertSee('Conferir selo ou laudo');
     }
 
     public function test_lookup_and_verification_are_throttled(): void

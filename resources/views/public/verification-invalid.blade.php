@@ -11,7 +11,7 @@
     <x-ui.page-header
         eyebrow="Verificação pública RevisaLog"
         title="Código não encontrado"
-        description="Nenhum Selo da oficina corresponde a este código. Confira se ele foi digitado como aparece no relatório ou no QR code, no formato RVL-XXXX-XX."
+        description="Nenhum Selo da oficina e nenhum laudo de vistoria corresponde a este código. Confira se ele foi digitado como aparece no relatório, no laudo ou no QR code: RVL-XXXX-XX ou LDO-XXXX-XX."
     />
 
     <div class="space-y-6">
@@ -27,6 +27,7 @@
             <ul role="list" class="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
                 <li>Erro de digitação: o código não usa as letras I e O nem os números 0 e 1.</li>
                 <li>O serviço foi declarado pelo proprietário ou pelo lojista. Só serviços registrados por uma oficina cadastrada recebem o Selo da oficina e o código.</li>
+                <li>O prefixo é o do outro documento: RVL é o Selo da oficina, LDO é o laudo de vistoria cautelar. Um não abre no lugar do outro.</li>
                 <li>O link foi copiado pela metade. Abra pelo QR code do relatório ou digite o código acima.</li>
             </ul>
             <x-slot:footer class="border-t border-border pt-4">

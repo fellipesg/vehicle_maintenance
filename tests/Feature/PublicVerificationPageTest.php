@@ -124,7 +124,7 @@ class PublicVerificationPageTest extends TestCase
         $this->get('/v/RVL-NADA-00')
             ->assertNotFound()
             ->assertSee('Código não encontrado')
-            ->assertSee('Nenhum Selo da oficina corresponde a este código.')
+            ->assertSee('Nenhum Selo da oficina e nenhum laudo de vistoria corresponde a este código.')
             ->assertDontSee('registro verificado')
             ->assertSee('<meta name="robots" content="noindex">', false)
             ->assertSee('href="'.route('home').'#procedencia"', false);

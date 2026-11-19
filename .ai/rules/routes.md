@@ -56,7 +56,8 @@ token com uma ability só; recurso novo com ability por método entra no provide
 Toda tela que acha veículo a partir de placa, chassi ou RENAVAM é oráculo de enumeração e leva
 `throttle`, em qualquer portal — não só as públicas. O balde `search` (20/min **por IP**,
 `App\Providers\AppServiceProvider`) é o das buscas abertas a visitante: `/verificar`, `/v/{code}`,
-`/convite/{token}` e a consignação.
+`/laudo/{code}` (a conferência pública do laudo de vistoria cautelar), `/convite/{token}` e a
+consignação.
 
 Tela que exige login não divide esse balde: numa chave por IP a cota de quem tem conta é gasta por
 estranhos, e `GET /oficina/manutencoes/nova` levava 429 na tela que registra serviço por causa de

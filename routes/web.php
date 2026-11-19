@@ -133,6 +133,12 @@ Route::get('/v/{code}/sou-o-dono', [\App\Http\Controllers\Web\PublicVerification
     ->middleware('throttle:search')
     ->name('verification.claim');
 
+// Conferência pública do laudo de vistoria cautelar. Irmã de /v/{código} e com o mesmo balde: é o
+// que o comprador abre com o carro na frente. O código entra pelo mesmo campo (/verificar).
+Route::get('/laudo/{code}', [\App\Http\Controllers\Web\PublicInspectionController::class, 'show'])
+    ->middleware('throttle:search')
+    ->name('inspections.public');
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginHub'])->name('login');
     Route::get('/login/admin', fn () => app(AuthController::class)->showLogin('admin'))->name('login.admin');
