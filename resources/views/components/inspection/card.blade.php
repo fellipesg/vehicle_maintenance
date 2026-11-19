@@ -23,6 +23,11 @@
       detalhe que existe para quem não é a oficina emissora, e é a mesma que o comprador abre.
       Passe :href="false" para o card não virar link.
     - anchor: id="vistoria-{id}" (o padrão), para a ficha poder linkar um laudo.
+    - dispute-url: rota de contestação deste laudo (POST contesta, DELETE retira). Passe só para
+      quem pode contestar — o dono atual do veículo, respondido por
+      App\Services\Inspection\InspectionDisputeService::canDispute. Null (o padrão) não desenha
+      ação nenhuma; a marca "Contestado pelo proprietário" continua aparecendo para todo mundo,
+      porque ela é informação de quem está comprando, não uma ação.
 
     Ex.: <x-inspection.card :inspection="$inspection" as="li" heading-level="h3" />
 --}}
@@ -32,6 +37,7 @@
     'headingLevel' => 'p',
     'href' => null,
     'anchor' => true,
+    'disputeUrl' => null,
 ])
 
 @php
@@ -141,12 +147,63 @@
             <p class="mt-3 max-w-prose text-sm whitespace-pre-line text-muted-foreground" data-inspection-summary>{{ $inspection->summary }}</p>
         @endif
 
-        @if (filled($inspection->report_path))
+        @if (filled($inspection->report_path) || $disputeUrl)
+            {{--
+                Rodapé, e não corpo: o card com href desenha um link esticado por cima de tudo
+                (<x-ui.card>), e só os slots action e footer ficam clicáveis acima dele. Formulário
+                no corpo seria coberto por esse link.
+            --}}
             <x-slot:footer class="mt-3">
-                {{-- Nunca pelo caminho do storage: a rota responde a mesma pergunta que a redação (.ai/rules/views.md). --}}
-                <x-ui.link :href="route('inspections.report', $inspection)" icon="document-text" class="break-all" data-inspection-report>
-                    {{ filled($inspection->report_original_name) ? $inspection->report_original_name : 'Abrir o laudo em PDF' }}
-                </x-ui.link>
+                <div class="w-full space-y-3">
+                    @if (filled($inspection->report_path))
+                        {{-- Nunca pelo caminho do storage: a rota responde a mesma pergunta que a redação (.ai/rules/views.md). --}}
+                        <x-ui.link :href="route('inspections.report', $inspection)" icon="document-text" class="break-all" data-inspection-report>
+                            {{ filled($inspection->report_original_name) ? $inspection->report_original_name : 'Abrir o laudo em PDF' }}
+                        </x-ui.link>
+                    @endif
+
+                    @if ($disputeUrl && $inspection->isDisputed())
+                        <x-ui.alert variant="warning" role="status" title="Você contestou este laudo" data-inspection-dispute-alert>
+                            O laudo continua no histórico do veículo e na conferência pública, agora com o aviso de que
+                            você discorda — quem for comprar o carro vê as duas versões. Avisamos a oficina que o
+                            emitiu, que é quem pode corrigir ou excluir, e a nossa equipe analisa.
+                            @if (filled($inspection->owner_dispute_reason))
+                                <span class="mt-1 block">O que você informou: {{ $inspection->owner_dispute_reason }}</span>
+                            @endif
+                            <x-slot:actions>
+                                <form method="POST" action="{{ $disputeUrl }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <x-ui.button variant="secondary" size="sm" type="submit" loading-label="Retirando…">Retirar contestação</x-ui.button>
+                                </form>
+                            </x-slot:actions>
+                        </x-ui.alert>
+                    @elseif ($disputeUrl)
+                        <details class="rounded-lg border border-border p-3" data-inspection-dispute-form>
+                            <summary class="cursor-pointer text-sm font-medium text-foreground">Não concordo com este laudo</summary>
+                            <form method="POST" action="{{ $disputeUrl }}" class="mt-3 space-y-3">
+                                @csrf
+                                <p class="text-sm text-muted-foreground">
+                                    O laudo <strong>não sai</strong> do histórico: ele continua à vista de quem consultar
+                                    o veículo, marcado como contestado por você. Essa é a diferença em relação a
+                                    esconder — quem vai comprar precisa saber que houve contestação, e não encontrar um
+                                    carro sem laudo nenhum. Avisamos a oficina que emitiu, que é quem pode corrigir ou
+                                    excluir, e a nossa equipe analisa. Você não precisa do CRLV-e para isso.
+                                </p>
+                                {{-- O rótulo vem do x-ui.field: x-ui.textarea não tem prop label. --}}
+                                <x-ui.field name="reason" label="O que você contesta" optional>
+                                    <x-ui.textarea
+                                        :id="'inspection-dispute-reason-'.$inspection->id"
+                                        rows="2"
+                                        maxlength="500"
+                                        placeholder="Ex.: o chassi do laudo não é o do meu carro."
+                                    />
+                                </x-ui.field>
+                                <x-ui.button variant="secondary" type="submit" loading-label="Contestando…">Contestar laudo</x-ui.button>
+                            </form>
+                        </details>
+                    @endif
+                </div>
             </x-slot:footer>
         @endif
     </x-ui.card>

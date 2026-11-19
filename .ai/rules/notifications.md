@@ -32,3 +32,15 @@ MaintenanceDisputedNotification (mail + database, type maintenance_disputed) vai
 **oficina** quando o proprietário contesta uma OS dela (`MaintenanceOwnerDecisionService::dispute`).
 É de propósito: a oficina é a única que pode corrigir ou excluir o registro, e sem o aviso a
 contestação ficaria invisível para quem resolve. O payload leva maintenance_id, vehicle_id e reason.
+
+O texto **não** pode prometer que a OS sai de circulação enquanto a contestação está aberta: ela não
+sai, e o e-mail dizia isso até 19/11/2026 (o mesmo erro estava no cartão de Pendências do admin).
+Contestar marca e não esconde (.ai/rules/models.md); quem tira é a equipe.
+
+## inspection_disputed
+VehicleInspectionDisputedNotification (mail + database, type inspection_disputed) é a irmã da de
+cima para a vistoria cautelar: vai para a conta da **oficina emissora** quando o proprietário
+contesta um laudo dela (`App\Services\Inspection\InspectionDisputeService::dispute`), porque é ela
+quem corrige ou exclui o que assinou. O payload leva inspection_id, vehicle_id e reason, e o texto
+diz o que de fato acontece: o laudo continua no histórico e na conferência pública, com a
+contestação à vista.

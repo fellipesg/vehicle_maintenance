@@ -258,6 +258,7 @@ enum Portal: string
                 ['label' => 'Frota', 'items' => [
                     self::item('Veículos', 'admin.vehicles.index', 'truck', ['admin.vehicles.*']),
                     self::item('Manutenções', 'admin.maintenances.index', 'wrench-screwdriver', ['admin.maintenances.*']),
+                    self::item('Vistorias', 'admin.inspections.index', 'clipboard-document', ['admin.inspections.*']),
                 ]],
                 ['label' => 'Conteúdo', 'items' => [
                     self::item('Artigos do blog', 'admin.blog.index', 'newspaper', ['admin.blog.index', 'admin.blog.create', 'admin.blog.edit']),

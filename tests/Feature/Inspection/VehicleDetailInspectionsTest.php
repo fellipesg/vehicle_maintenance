@@ -148,7 +148,11 @@ class VehicleDetailInspectionsTest extends TestCase
             ->assertDontSee('data-inspection-card', false);
     }
 
-    public function test_a_disputed_report_is_marked_without_the_owners_words(): void
+    /**
+     * A marca é de todo mundo; o texto da contestação é só de quem o escreveu — ele precisa relê-lo
+     * para decidir se retira. Para os outros portais o dado é "o dono discorda", não a prosa.
+     */
+    public function test_a_disputed_report_is_marked_and_only_the_owner_reads_their_own_words(): void
     {
         $owner = User::factory()->asUser()->create();
         $vehicle = Vehicle::factory()->create();
@@ -162,7 +166,14 @@ class VehicleDetailInspectionsTest extends TestCase
             ->get(route('user.vehicles.show', $vehicle))
             ->assertOk()
             ->assertSee('Contestado pelo proprietário')
-            // O card não desenha owner_dispute_reason em portal nenhum: o aviso é o dado, o texto não.
+            ->assertSee('Você contestou este laudo')
+            ->assertSee('Não reconheço esta vistoria.');
+
+        $this->actingAs(User::factory()->asUser()->asAdmin()->create())
+            ->get(route('admin.vehicles.show', $vehicle))
+            ->assertOk()
+            ->assertSee('Contestado pelo proprietário')
+            ->assertDontSee('Você contestou este laudo')
             ->assertDontSee('Não reconheço esta vistoria.');
     }
 

@@ -23,9 +23,19 @@
             'count' => $disputedMaintenanceCount,
             'icon' => 'exclamation-triangle',
             'title' => $pluralize($disputedMaintenanceCount, 'OS contestada', 'OS contestadas'),
-            'description' => 'O proprietário diz que o serviço não foi feito no carro dele. Fora da consulta pública enquanto isso.',
+            // Contestar marca, não esconde: a OS continua na consulta pública com a contestação à
+            // vista (.ai/rules/models.md). Quem tira de circulação é a equipe, aqui do lado.
+            'description' => 'O proprietário diz que o serviço não foi feito no carro dele. A OS segue à vista, com a contestação junto.',
             'href' => route('admin.maintenances.index', ['contestadas' => '1']),
             'action' => 'Ver contestadas',
+        ],
+        [
+            'count' => $disputedInspectionCount,
+            'icon' => 'exclamation-triangle',
+            'title' => $pluralize($disputedInspectionCount, 'laudo contestado', 'laudos contestados'),
+            'description' => 'O proprietário discorda da vistoria cautelar. O laudo segue à vista, com a contestação junto.',
+            'href' => route('admin.inspections.index', ['contestadas' => '1']),
+            'action' => 'Ver contestados',
         ],
         [
             'count' => $workshopsWithoutCoordinatesCount,

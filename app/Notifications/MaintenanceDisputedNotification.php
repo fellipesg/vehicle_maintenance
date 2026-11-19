@@ -54,7 +54,10 @@ class MaintenanceDisputedNotification extends Notification implements ShouldQueu
         }
 
         return $message
-            ->line('Enquanto a contestação estiver aberta, esta OS não aparece na consulta pública nem no histórico de terceiros. Se foi engano de digitação (chassi ou placa de outro veículo), corrija ou exclua a OS.')
+            // Contestar marca e não esconde (.ai/rules/models.md): a OS continua em todas as
+            // superfícies, com a contestação à vista. O texto anterior prometia que ela saía de
+            // circulação — descrevia um produto que o RevisaLog deliberadamente não é.
+            ->line('A OS continua no histórico do veículo e na consulta pública, agora com a contestação à vista de quem a abrir. Se foi engano de digitação (chassi ou placa de outro veículo), corrija ou exclua a OS.')
             ->action('Abrir a OS', route('workshop.maintenances.show', $this->maintenance))
             ->salutation('RevisaLog');
     }

@@ -123,6 +123,25 @@
     );
     $detailInspectionCount = $detailInspections->count();
 
+    // Contestar um laudo é do dono atual, e só na área dele: o lojista em consignação, a oficina e
+    // o admin veem a marca "Contestado pelo proprietário", que é informação de quem está comprando,
+    // mas não a ação. Quem responde é o serviço (InspectionDisputeService::canDispute), com o
+    // veículo já na mão para não consultar de novo por card — e ele confere tudo outra vez ao
+    // gravar, porque tela não autoriza nada.
+    $detailDisputeUrls = [];
+    $detailViewer = auth()->user();
+    if ($detailPortal === \App\Enums\Portal::Owner && $detailViewer !== null && $detailInspectionCount > 0) {
+        $detailDisputes = app(\App\Services\Inspection\InspectionDisputeService::class);
+
+        foreach ($detailInspections as $detailInspection) {
+            $detailInspection->setRelation('vehicle', $vehicle);
+
+            if ($detailDisputes->canDispute($detailViewer, $detailInspection)) {
+                $detailDisputeUrls[$detailInspection->id] = route('user.inspections.dispute', $detailInspection);
+            }
+        }
+    }
+
     $detailHistory = VehicleMaintenanceHistory::inTimelineOrder($detailMaintenances);
     $detailById = $detailHistory->keyBy('id');
     $detailTotal = $detailHistory->count();
@@ -380,7 +399,12 @@
                 >
                     <ol role="list" class="space-y-3" aria-label="Vistorias cautelares, da mais recente à mais antiga" data-inspection-list>
                         @foreach ($detailInspections as $inspection)
-                            <x-inspection.card :inspection="$inspection" as="li" :heading-level="$detailCardHeading" />
+                            <x-inspection.card
+                                :inspection="$inspection"
+                                as="li"
+                                :heading-level="$detailCardHeading"
+                                :dispute-url="$detailDisputeUrls[$inspection->id] ?? null"
+                            />
                         @endforeach
                     </ol>
                 </x-ui.section>
