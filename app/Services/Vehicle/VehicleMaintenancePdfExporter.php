@@ -6,13 +6,16 @@ use App\Models\Invoice;
 use App\Models\MaintenancePhoto;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\VehicleInspection;
 use App\Support\AppStorage;
+use App\Support\Inspection\InspectionRedactor;
 use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\MaintenanceRedactor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Adapter\CPDF;
 use Dompdf\Dompdf;
 use Dompdf\FontMetrics;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use setasign\Fpdi\Fpdi;
 use Symfony\Component\HttpFoundation\Response;
@@ -100,6 +103,8 @@ class VehicleMaintenancePdfExporter
             MaintenanceRedactor::redactAll($vehicle->maintenances, $viewer)->sortByDesc('maintenance_date')->values()
         );
 
+        $inspections = $this->inspectionsForPdf($vehicle, $viewer);
+
         $temps = [];
 
         try {
@@ -110,6 +115,7 @@ class VehicleMaintenancePdfExporter
 
             $pathsToFetch = array_values(array_unique([
                 ...$this->collectAssetPaths($vehicle),
+                ...$this->inspectionLogoPaths($inspections),
                 ...$this->maintenancePhotos->paths($photoSelection),
             ]));
             $copies = AppStorage::localCopies($pathsToFetch);
@@ -132,6 +138,19 @@ class VehicleMaintenancePdfExporter
                 );
             }
 
+            $inspectionWorkshopLogos = [];
+            foreach ($inspections as $inspection) {
+                $logoPath = $inspection->workshop?->logo_path;
+                if (! is_string($logoPath) || $logoPath === '') {
+                    continue;
+                }
+
+                $inspectionWorkshopLogos[$inspection->id] = $this->workshopLogoSrcFromCopy(
+                    $copies[$logoPath] ?? null,
+                    $temps,
+                );
+            }
+
             $coverPath = $vehicle->coverPathForPdf();
             $coverImageSrc = is_string($coverPath) && $coverPath !== ''
                 ? $this->coverImageSrcFromCopy($copies[$coverPath] ?? null, $temps)
@@ -141,6 +160,8 @@ class VehicleMaintenancePdfExporter
 
             $pdf = Pdf::loadView('pdfs.vehicle_maintenance_export', [
                 'vehicle' => $vehicle,
+                'inspections' => $inspections,
+                'inspectionWorkshopLogos' => $inspectionWorkshopLogos,
                 'maintenancePhotos' => $maintenancePhotos,
                 'identifiersMasked' => $maskIdentifiers,
                 'coverImageSrc' => $coverImageSrc,
@@ -269,6 +290,47 @@ class VehicleMaintenancePdfExporter
     /**
      * @return list<string>
      */
+    /**
+     * Vistorias cautelares que este PDF pode mostrar, da mais recente à mais antiga.
+     *
+     * Passa pela consulta limitada (Vehicle::inspectionsVisibleTo) e não pela relação crua, porque o
+     * PDF é o histórico inteiro e circula fora do RevisaLog: o laudo de um carro cujo histórico o
+     * leitor não tem — a consignação sem liberação — não pode entrar por aqui. Depois pelo
+     * InspectionRedactor, que rejeita o laudo suprimido pela equipe e, de quem só vê a forma mínima,
+     * tira a prosa (resumo, observações de cada eixo e o PDF do laudo), mantendo veredito, data,
+     * hodômetro, validade, emissor, código e o status de cada eixo (.ai/rules/inspections.md).
+     *
+     * Sem viewer (o comando de demonstração) vale a forma mínima e só o que não foi suprimido.
+     *
+     * @return Collection<int, VehicleInspection>
+     */
+    private function inspectionsForPdf(Vehicle $vehicle, ?User $viewer): Collection
+    {
+        $query = $viewer !== null
+            ? $vehicle->inspectionsVisibleTo($viewer)
+            : $vehicle->inspections()->publiclyVisible();
+
+        return InspectionRedactor::redactAll($query->with('workshop')->get(), $viewer);
+    }
+
+    /**
+     * @param  Collection<int, VehicleInspection>  $inspections
+     * @return list<string>
+     */
+    private function inspectionLogoPaths(Collection $inspections): array
+    {
+        $paths = [];
+
+        foreach ($inspections as $inspection) {
+            $logoPath = $inspection->workshop?->logo_path;
+            if (is_string($logoPath) && $logoPath !== '') {
+                $paths[] = $logoPath;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
     private function collectAssetPaths(Vehicle $vehicle): array
     {
         $paths = [];

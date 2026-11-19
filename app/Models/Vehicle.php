@@ -270,9 +270,18 @@ class Vehicle extends Model
         return blank($this->license_plate) && blank($this->renavam) && ! $this->hasCurrentOwner();
     }
 
+    /**
+     * Pré-carrega o histórico já limitado ao que este leitor pode ler — as duas metades dele.
+     *
+     * Os laudos entram junto, e não numa chamada separada, porque é a ficha inteira que fica
+     * desalinhada quando só uma metade é limitada: a consignação sem liberação mostraria as
+     * manutenções da própria loja e, logo abaixo, a vistoria cautelar de um carro cujo histórico
+     * ela não tem (ver .ai/rules/garage.md e .ai/rules/inspections.md).
+     */
     public function restrictHistoryTo(User $viewer): static
     {
         $this->setRelation('maintenances', $this->maintenancesVisibleTo($viewer)->get());
+        $this->setRelation('inspections', $this->inspectionsVisibleTo($viewer)->with('workshop')->get());
 
         return $this;
     }

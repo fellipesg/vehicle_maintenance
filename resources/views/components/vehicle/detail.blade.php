@@ -7,11 +7,17 @@
     2. Capa hero (x-vehicle-cover, foto inteira).
     3. Resumo em x-ui.stat: Km atual, Próxima revisão (com barra), Procedência e Total em itens. O
        chassi não se repete aqui.
-    4. Abas (x-ui.tabs, com #linha-do-tempo, #historico e #documentos na URL):
+    4. Abas (x-ui.tabs, com #linha-do-tempo, #historico, #vistorias e #documentos na URL):
        - Linha do tempo: x-vehicle-timeline e, abaixo dela, os pontos de procedência e o filtro
          Todas / Selo da oficina / Declaradas (.ai/rules/theme.md e provenance.md).
        - Histórico: as manutenções na MESMA ordem da linha do tempo (da mais antiga para a mais
          recente), com o mesmo filtro; cada card leva ao detalhe da manutenção no portal.
+       - Vistorias: os laudos de vistoria cautelar (x-inspection.card), da mais recente à mais
+         antiga. A aba só existe quando há laudo: vazia em quase todo veículo, ela ensinaria a
+         ignorar as abas, e não há ação a oferecer no estado vazio — vistoria é algo que o
+         comprador encomenda, não algo que se registra por esta tela. Os laudos ficam fora das
+         contas de manutenção: um carro com três laudos e zero serviços não pode ler como "3
+         serviços" (.ai/rules/inspections.md).
        - Documentos: placa, RENAVAM, CRV, motor e o histórico de placas (x-ui.table empilhada).
 
     Filtro de procedência: botões com aria-pressed num <form method="get"> (x-ui.segmented
@@ -105,6 +111,17 @@
     // pelo proprietário saem (App\Support\Maintenance\MaintenanceRedactor). Nos portais, quem não tem as
     // fotos das manutenções ligadas não as recebe; a busca pública (sem portal) segue com as públicas.
     $detailMaintenances = \App\Support\Maintenance\MaintenanceRedactor::redactAll($detailMaintenances, auth()->user(), publicLookup: $detailPortal === null);
+
+    // Vistorias cautelares: metade do histórico, e fora das contas de manutenção de propósito — um
+    // carro com três laudos e zero serviços não pode ler como "3 serviços" (.ai/rules/inspections.md).
+    // Mesma forma da coleção de cima: relação já carregada manda (Vehicle::restrictHistoryTo pode
+    // tê-la limitado), senão consulta aqui; e o redator tira o suprimido pela equipe e a prosa de
+    // quem não tem o histórico deste veículo.
+    $detailInspections = \App\Support\Inspection\InspectionRedactor::redactAll(
+        $vehicle->relationLoaded('inspections') ? $vehicle->inspections : $vehicle->inspections()->with('workshop')->get(),
+        auth()->user(),
+    );
+    $detailInspectionCount = $detailInspections->count();
 
     $detailHistory = VehicleMaintenanceHistory::inTimelineOrder($detailMaintenances);
     $detailById = $detailHistory->keyBy('id');
@@ -244,6 +261,9 @@
         <x-slot:tabs>
             <x-ui.tab target="linha-do-tempo" :active="true" icon="clock">Linha do tempo</x-ui.tab>
             <x-ui.tab target="historico" icon="wrench-screwdriver" :badge="$detailTotal" badge-label="manutenções">Histórico</x-ui.tab>
+            @if ($detailInspectionCount > 0)
+                <x-ui.tab target="vistorias" icon="clipboard-document" :badge="$detailInspectionCount" badge-label="vistorias">Vistorias</x-ui.tab>
+            @endif
             @if ($showDocuments)
                 <x-ui.tab target="documentos" icon="document-text">Documentos</x-ui.tab>
             @endif
@@ -349,6 +369,23 @@
                 @endif
             </x-ui.section>
         </x-ui.tab-panel>
+
+        @if ($detailInspectionCount > 0)
+            <x-ui.tab-panel id="vistorias">
+                <x-ui.section
+                    id="vistorias-cautelares"
+                    title="Vistorias cautelares"
+                    description="Da mais recente para a mais antiga. A vistoria afirma a condição do carro num dia; a manutenção registra o que foi feito nele."
+                    :heading-level="$detailSectionHeading"
+                >
+                    <ol role="list" class="space-y-3" aria-label="Vistorias cautelares, da mais recente à mais antiga" data-inspection-list>
+                        @foreach ($detailInspections as $inspection)
+                            <x-inspection.card :inspection="$inspection" as="li" :heading-level="$detailCardHeading" />
+                        @endforeach
+                    </ol>
+                </x-ui.section>
+            </x-ui.tab-panel>
+        @endif
 
         @if ($showDocuments)
             <x-ui.tab-panel id="documentos" class="space-y-6">

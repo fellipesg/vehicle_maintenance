@@ -41,12 +41,24 @@ final class InspectionRedactor
     }
 
     /**
-     * @param  Collection<int, VehicleInspection>  $inspections
+     * Lista redigida, já **sem** os laudos que este leitor não pode ver.
+     *
+     * O reject vem antes do map de propósito, e é o mesmo de
+     * App\Support\Maintenance\MaintenanceRedactor::redactAll: quem monta uma listagem passa a coleção
+     * por aqui e não precisa lembrar de filtrar o suprimido pela equipe. Esquecer o filtro e
+     * confiar só na redação deixaria o laudo suprimido aparecer na forma mínima, que é justamente o
+     * que a supressão existe para impedir — e a oficina emissora continua vendo o próprio
+     * (VehicleInspection::hiddenFrom).
+     *
+     * @param  iterable<int, VehicleInspection>  $inspections
      * @return Collection<int, VehicleInspection>
      */
-    public static function redactAll(Collection $inspections, ?User $viewer): Collection
+    public static function redactAll(iterable $inspections, ?User $viewer): Collection
     {
-        return $inspections->map(fn (VehicleInspection $inspection): VehicleInspection => self::redact($inspection, $viewer))->values();
+        return Collection::make($inspections)
+            ->reject(fn (VehicleInspection $inspection): bool => $inspection->hiddenFrom($viewer))
+            ->map(fn (VehicleInspection $inspection): VehicleInspection => self::redact($inspection, $viewer))
+            ->values();
     }
 
     /**

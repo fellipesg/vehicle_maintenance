@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'resources/views/components/{vehicle,maintenance}/**'
+  - 'resources/views/components/{vehicle,maintenance,inspection}/**'
   - 'resources/views/maintenances/**'
   - 'resources/views/components/provenance-*.blade.php'
 ---
@@ -9,6 +9,9 @@ paths:
 
 ## One vehicle page, one list, one maintenance detail for every portal
 Vehicle page, lists and maintenance detail use x-vehicle.detail, x-vehicle.card, x-maintenance.list and maintenances/_detail in Proprietário, Lojista, Oficina, Admin and the vehicle search. The portal (App\Enums\Portal) picks links and actions; the controller filters with App\Support\Maintenance\MaintenanceListFilters and paginates on the server. No HTML built in JS for these screens: the old renderVehicleTimeline/renderProvenanceStrip/renderMaintenanceHistoryList renderers are gone and PortalTimelineHtmlEscapingTest keeps them out.
+
+## A aba Vistorias da ficha é do laudo, e fica fora das contas de manutenção
+x-vehicle.detail tem quatro abas: Linha do tempo, Histórico, **Vistorias** (#vistorias, só quando o veículo tem laudo) e Documentos. A aba lista x-inspection.card, da mais recente à mais antiga, e os laudos não entram em nenhuma conta de manutenção — nem no badge do Histórico, nem no x-ui.stat "Procedência", nem na faixa de pontos, nem no filtro Todas/Selo/Declaradas. O card não usa .prov-* nem x-provenance-marker: o trilho e o anel teal afirmam "eu fiz este serviço", e o laudo afirma "eu examinei e atesto o que encontrei" (.ai/rules/inspections.md e theme.md). A coleção passa por App\Support\Inspection\InspectionRedactor::redactAll, que rejeita o laudo suprimido antes de redigir o resto.
 
 ## "Manutenções" lists: provenance cards by month; OS and admin tables are the exception
 Proprietário (user.maintenances.index) and Lojista (garage.maintenances.index) show the same thing: x-maintenance.list with group-by-month and heading-level="h2" (provenance cards, the month title sticky at top-16 below the h-16 navbar), then x-provenance-legend. Do not switch them back to layout="table". Two work queues keep their own x-ui.table on purpose, because they need columns the card does not have: Oficina "Ordens de serviço" (workshop/maintenances/_table: Itens / Total, Anexos, Código do selo, sortable Data) and Admin "Manutenções" (admin/maintenances/_results: Registrada por, AJAX filters). x-provenance-legend has no props: it always explains OF Selo da oficina, PR Declarada pelo proprietário and LJ Declarada pelo lojista, since any list can hold both kinds of declared record.
