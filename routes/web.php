@@ -14,6 +14,7 @@ use App\Http\Controllers\Web\Admin\OutreachController as AdminOutreachController
 use App\Http\Controllers\Web\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Web\Admin\VehicleBrandController as AdminVehicleBrandController;
 use App\Http\Controllers\Web\Admin\VehicleController as AdminVehicleController;
+use App\Http\Controllers\Web\Admin\VehicleInspectionController as AdminVehicleInspectionController;
 use App\Http\Controllers\Web\Admin\VehicleModelController as AdminVehicleModelController;
 use App\Http\Controllers\Web\Admin\WorkshopController as AdminWorkshopController;
 use App\Http\Controllers\Web\AdsTxtController;
@@ -39,6 +40,7 @@ use App\Http\Controllers\Web\PublicVehicleController;
 use App\Http\Controllers\Web\SentryWebhookController;
 use App\Http\Controllers\Web\SitemapController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
+use App\Http\Controllers\Web\User\InspectionDisputeController as UserInspectionDisputeController;
 use App\Http\Controllers\Web\User\MaintenanceController as UserMaintenanceController;
 use App\Http\Controllers\Web\User\VehicleController as UserVehicleController;
 use App\Http\Controllers\Web\User\VehiclePdfExportDownloadController;
@@ -270,6 +272,16 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::delete('/registros-de-oficinas/{maintenance}/contestar', [UserWorkshopRecordController::class, 'withdrawDispute'])
             ->whereNumber('maintenance')
             ->name('workshop-records.dispute.withdraw');
+
+        // Contestar um laudo é a resposta do dono a uma afirmação sobre o carro dele, e sai da aba
+        // Vistorias da ficha — é lá que ele encontra o laudo. Como na OS, não exige CRLV-e
+        // (App\Services\Inspection\InspectionDisputeService).
+        Route::post('/vistorias/{inspection}/contestar', [UserInspectionDisputeController::class, 'store'])
+            ->whereNumber('inspection')
+            ->name('inspections.dispute');
+        Route::delete('/vistorias/{inspection}/contestar', [UserInspectionDisputeController::class, 'destroy'])
+            ->whereNumber('inspection')
+            ->name('inspections.dispute.withdraw');
     });
 
     Route::prefix('garagem')->middleware(['user.type:garage', 'garage.approved'])->name('garage.')->group(function () {
@@ -419,6 +431,15 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/manutencoes/{maintenance}/publicar', [AdminMaintenanceController::class, 'restore'])
             ->whereNumber('maintenance')
             ->name('maintenances.restore');
+        Route::get('/vistorias', [AdminVehicleInspectionController::class, 'index'])->name('inspections.index');
+        // Suprimir um laudo é ação da equipe, nunca do proprietário, que contesta: ver
+        // App\Services\Inspection\InspectionPublicVisibilityService.
+        Route::post('/vistorias/{inspection}/suprimir', [AdminVehicleInspectionController::class, 'hide'])
+            ->whereNumber('inspection')
+            ->name('inspections.hide');
+        Route::post('/vistorias/{inspection}/publicar', [AdminVehicleInspectionController::class, 'restore'])
+            ->whereNumber('inspection')
+            ->name('inspections.restore');
         Route::get('/oficinas', [AdminWorkshopController::class, 'index'])->name('workshops.index');
         Route::put('/oficinas/{workshop}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'workshop'])->name('workshops.maintenance-photos');
         Route::post('/oficinas/{workshop}/aprovar', [AdminWorkshopController::class, 'approve'])->name('workshops.approve');

@@ -27,3 +27,19 @@ aqui: `POST admin/manutencoes/{maintenance}/ocultar` (motivo opcional) e `.../pu
 recusando OS nova abaixo dele. Suprimir um registro é tirar de circulação o ativo do produto: tem que ter nome e
 motivo. Use para fraude confirmada e erro de chassi, não para acalmar um proprietário incomodado — é
 exatamente por isso que a alavanca saiu da mão dele.
+
+## Laudo contestado tem filtro, pendência e é aqui que se suprime
+`admin.inspections.index` (`/admin/vistorias`, menu Frota) é a lista de vistorias da plataforma
+inteira, com `?contestadas=1`, `?suprimidas=1` e busca por código, placa, chassi ou emissor. O
+caminho até ela é o cartão de Pendências da visão geral ("laudos contestados"), como nas OS.
+
+É a **única** tela que mostra o laudo suprimido: a consulta é direta, sem
+`Vehicle::inspectionsVisibleTo` e sem `InspectionRedactor`, porque quem suprimiu precisa continuar
+vendo o que tirou para poder devolver. A ficha do veículo, o PDF e `/laudo/{código}` seguem sem ele.
+
+Contestar é do proprietário e só marca; suprimir é daqui, por
+`App\Services\Inspection\InspectionPublicVisibilityService`, que grava `hidden_by_user_id` e
+`hidden_reason` (ver .ai/rules/inspections.md). Diferente da OS, **não há hodômetro para
+recalcular**: a leitura da vistoria nunca alimentou `vehicles.current_kilometers`. Use para fraude
+confirmada e chassi trocado, não para acalmar um proprietário incomodado — é por isso que a alavanca
+não é dele.

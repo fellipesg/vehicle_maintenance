@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'app/Models/VehicleInspection.php,app/Services/Inspection/**,app/Support/Inspection/**,app/Enums/Inspection*,app/Policies/VehicleInspectionPolicy.php,app/Features/VehicleInspections.php,app/Support/Maintenance/VerificationCode.php,app/Http/Controllers/Web/Workshop/InspectionController.php,app/Http/Controllers/Web/InspectionReportController.php,app/Http/Requests/Web/Workshop/*VehicleInspectionRequest.php,app/Http/Requests/Concerns/ValidatesVehicleInspection.php,resources/views/workshop/inspections/**,resources/views/components/inspection/**,app/Services/Vehicle/VehicleMaintenancePdfExporter.php'
+  - 'app/Models/VehicleInspection.php,app/Services/Inspection/**,app/Support/Inspection/**,app/Enums/Inspection*,app/Policies/VehicleInspectionPolicy.php,app/Features/VehicleInspections.php,app/Support/Maintenance/VerificationCode.php,app/Http/Controllers/Web/Workshop/InspectionController.php,app/Http/Controllers/Web/InspectionReportController.php,app/Http/Requests/Web/Workshop/*VehicleInspectionRequest.php,app/Http/Requests/Concerns/ValidatesVehicleInspection.php,resources/views/workshop/inspections/**,resources/views/components/inspection/**,app/Services/Vehicle/VehicleMaintenancePdfExporter.php,app/Http/Controllers/Web/User/InspectionDisputeController.php,app/Http/Controllers/Web/Admin/VehicleInspectionController.php,resources/views/admin/inspections/**'
 ---
 
 # Vistoria cautelar (laudo)
@@ -222,9 +222,36 @@ histórico como a nota fiscal da OS. O teto de tamanho existe porque o e-mail an
 (`.ai/rules/pdfs.md`), e um laudo de 10 MB estouraria isso sozinho; quem tem acesso baixa o arquivo
 pela rota `inspections.report`, que responde a mesma pergunta da redação.
 
+## Contestar é do dono e marca; suprimir é da equipe e tira
+As duas escritas existem agora, e são serviços separados de propósito:
+`App\Services\Inspection\InspectionDisputeService` (contestar / retirar) e
+`App\Services\Inspection\InspectionPublicVisibilityService` (suprimir / devolver). São as **únicas**
+escritas de `owner_disputed_*` e `hidden_*`, que não são fillable, como o veredito e os achados.
+
+**Contestar marca e não esconde.** O laudo contestado continua na ficha, no PDF e na conferência
+pública, com a marca à vista: quem compra vê o laudo *e* vê que o dono discorda. Sumir com ele seria
+a alavanca que o produto tirou da mão do proprietário nas manutenções (.ai/rules/models.md). A ação
+é do dono atual (`VehiclePolicy::update`), **não pede CRLV-e** — é o que ele tem sem o documento — e
+sai da aba Vistorias da ficha (`POST|DELETE /usuario/vistorias/{inspection}/contestar`). A oficina
+emissora é avisada (`inspection_disputed`), porque é a única que pode corrigir ou excluir o laudo.
+
+**Contestar não mexe no hodômetro, e isso é a armadilha da simetria.**
+`MaintenanceOwnerDecisionService::dispute` recalcula `vehicles.current_kilometers`, porque a OS
+contestada sai da conta. Aqui não há conta de onde sair: a leitura da vistoria nunca alimentou essa
+coluna (a regra do hodômetro, acima). Chamar o `VehicleMileageService` daqui "por simetria" seria a
+porta dos fundos dela — um teste guarda isso.
+
+**Suprimir é da equipe**, com nome (`hidden_by_user_id`) e motivo, e só de `/admin/vistorias`: tira o
+laudo da ficha, do PDF e de `/laudo/{código}`, e serve para chassi trocado, fraude confirmada e
+pedido de remoção que a empresa honre. Quem continua vendo é a oficina emissora
+(`VehicleInspection::hiddenFrom`) e a tela do admin, que consulta direto.
+
+**As duas colunas são independentes.** Suprimir não retira a contestação e devolver não a apaga —
+senão republicar um laudo apagaria em silêncio que o dono discordou dele. Laudo suprimido também não
+é contestável: contestar o que não se vê não faz sentido.
+
 ## O que ainda não existe
-**Não** existe ainda: recurso de API, serviço de contestação e de supressão (as colunas existem e as
-telas já as desenham, quem *escreve* não), marcador na faixa de procedência, selo no estoque do
+**Não** existe ainda: recurso de API, marcador na faixa de procedência, selo no estoque do
 lojista, o cartão "Este carro é seu?" na página pública (hoje só `/v/`,
 porque `verification.claim` nasce de uma OS) e interruptor do admin para a flag (hoje a liberação é
 por `tinker`/seed, com `App\Support\Inspection\InspectionAccess::set`). Ao acrescentar qualquer um,
