@@ -8,11 +8,13 @@ use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
 use App\Models\Vehicle;
+use App\Models\VehicleInspection;
 use App\Models\Workshop;
 use App\Policies\BlogCommentPolicy;
 use App\Policies\InvoicePolicy;
 use App\Policies\MaintenancePhotoPolicy;
 use App\Policies\MaintenancePolicy;
+use App\Policies\VehicleInspectionPolicy;
 use App\Policies\VehiclePolicy;
 use App\Policies\WorkshopPolicy;
 use App\Services\Maintenance\MaintenanceOwnerDecisionService;
@@ -187,6 +189,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(MaintenancePhoto::class, MaintenancePhotoPolicy::class);
         Gate::policy(Workshop::class, WorkshopPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
+        Gate::policy(VehicleInspection::class, VehicleInspectionPolicy::class);
         Gate::policy(BlogComment::class, BlogCommentPolicy::class);
 
         Storage::extend('s3', fn ($app, array $config) => $app['filesystem']->createS3Driver(

@@ -167,6 +167,38 @@ class Vehicle extends Model
         return $relation;
     }
 
+    /**
+     * Vistorias cautelares deste veículo (laudos). Relação própria, e não um tipo de manutenção: o
+     * laudo afirma algo *sobre* o carro, e contá-lo como serviço inflaria o histórico que o produto
+     * vende (ver .ai/rules/inspections.md).
+     *
+     * @return HasMany<VehicleInspection, Vehicle>
+     */
+    public function inspections(): HasMany
+    {
+        return $this->hasMany(VehicleInspection::class)
+            ->orderByDesc('inspected_at')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * Consulta dos laudos limitada ao que o usuário pode ler, pela mesma regra do histórico de
+     * manutenções: VehicleInspection::isVisibleInHistoryTo é esta regra resolvida em memória, para
+     * um laudo só, e é por ela que a policy autoriza. Mudar uma pede mudar a outra.
+     *
+     * @return HasMany<VehicleInspection, Vehicle>
+     */
+    public function inspectionsVisibleTo(User $viewer): HasMany
+    {
+        $relation = $this->inspections()->visibleInHistoryTo($viewer);
+
+        if (! Gate::forUser($viewer)->allows('viewFullHistory', $this)) {
+            $relation->where('vehicle_inspections.tenant_id', $viewer->tenant_id);
+        }
+
+        return $relation;
+    }
+
     public function plates(): HasMany
     {
         return $this->hasMany(VehiclePlate::class);

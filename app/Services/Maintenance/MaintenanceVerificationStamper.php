@@ -5,12 +5,11 @@ namespace App\Services\Maintenance;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Services\Workshop\WorkshopLeadRecorder;
+use App\Support\Maintenance\VerificationCode;
 use Illuminate\Support\Facades\DB;
 
 class MaintenanceVerificationStamper
 {
-    private const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
     public function stamp(Maintenance $maintenance, User $actor): Maintenance
     {
         if ($maintenance->verified_at !== null) {
@@ -109,7 +108,7 @@ class MaintenanceVerificationStamper
     private function generateUniqueCode(): string
     {
         for ($attempt = 0; $attempt < 30; $attempt++) {
-            $code = 'RVL-'.$this->randomSegment(4).'-'.$this->randomSegment(2);
+            $code = VerificationCode::random();
 
             if (! DB::table('maintenances')->where('verification_code', $code)->exists()) {
                 return $code;
@@ -117,16 +116,5 @@ class MaintenanceVerificationStamper
         }
 
         throw new \RuntimeException('Não foi possível gerar código de verificação único.');
-    }
-
-    private function randomSegment(int $length): string
-    {
-        $out = '';
-        $max = strlen(self::CODE_ALPHABET) - 1;
-        for ($i = 0; $i < $length; $i++) {
-            $out .= self::CODE_ALPHABET[random_int(0, $max)];
-        }
-
-        return $out;
     }
 }
