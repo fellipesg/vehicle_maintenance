@@ -109,6 +109,10 @@
             </x-slot:footer>
         </x-ui.card>
 
+        <x-ui.card as="section" title="Comentários" heading-level="h2">
+            <x-ui.switch name="comments_enabled" label="Permitir comentários" description="Desligado, os comentários já publicados continuam no artigo e o formulário some." :checked="(bool) ($post->comments_enabled ?? true)" />
+        </x-ui.card>
+
         <x-ui.card as="section" title="Endereço" heading-level="h2">
             <x-ui.field name="slug" label="Slug" hint="Em branco, é gerado a partir do título." optional>
                 <x-ui.input :value="$post->slug ?? ''" maxlength="180" autocomplete="off" placeholder="quando-trocar-o-oleo" />

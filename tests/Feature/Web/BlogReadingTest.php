@@ -275,7 +275,7 @@ class BlogReadingTest extends TestCase
     {
         $post = BlogPost::factory()->create(['cover_photo_path' => 'blog-covers/capa.jpg', 'cover_photo_alt' => 'Painel do carro']);
 
-        $sections = view('blog.show', ['post' => $post->load('category', 'author'), 'related' => collect()])->renderSections();
+        $sections = view('blog.show', ['post' => $post->load('category', 'author'), 'related' => collect(), 'comments' => collect(), 'publishedCommentCount' => 0])->renderSections();
 
         $this->assertSame(e($post->cover_photo_url), $sections['og_image'] ?? null);
         $this->assertSame('Painel do carro', $sections['og_image_alt'] ?? null);
@@ -285,7 +285,7 @@ class BlogReadingTest extends TestCase
     {
         $post = BlogPost::factory()->create(['cover_photo_path' => null]);
 
-        $sections = view('blog.show', ['post' => $post->load('category', 'author'), 'related' => collect()])->renderSections();
+        $sections = view('blog.show', ['post' => $post->load('category', 'author'), 'related' => collect(), 'comments' => collect(), 'publishedCommentCount' => 0])->renderSections();
 
         $this->assertArrayNotHasKey('og_image', $sections);
     }
