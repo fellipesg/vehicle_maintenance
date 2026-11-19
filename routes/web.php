@@ -3,6 +3,7 @@
 use App\Http\Controllers\Web\AccountController;
 use App\Http\Controllers\Web\AccountDeletionController;
 use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryController;
+use App\Http\Controllers\Web\Admin\BlogCommentController as AdminBlogCommentController;
 use App\Http\Controllers\Web\Admin\BlogPostController as AdminBlogPostController;
 use App\Http\Controllers\Web\Admin\ConsignmentController as AdminConsignmentController;
 use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\Web\Admin\WorkshopController as AdminWorkshopController
 use App\Http\Controllers\Web\AdsTxtController;
 use App\Http\Controllers\Web\Auth\PasswordResetController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\BlogCommentController;
 use App\Http\Controllers\Web\BlogController;
 use App\Http\Controllers\Web\BlogFeedController;
 use App\Http\Controllers\Web\ConsignmentOwnerController;
@@ -66,6 +68,15 @@ Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
 Route::get('/blog/feed', BlogFeedController::class)->name('blog.feed');
 Route::get('/blog/categoria/{category}', [BlogController::class, 'category'])->name('blog.category');
 Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
+Route::get('/blog/{post}/comentar/{destination}', [BlogCommentController::class, 'enter'])
+    ->whereIn('destination', ['entrar', 'criar-conta'])
+    ->name('blog.comments.enter');
+Route::post('/blog/{post}/comentarios', [BlogCommentController::class, 'store'])
+    ->middleware(['auth', 'throttle:blog-comments'])
+    ->name('blog.comments.store');
+Route::delete('/blog/comentarios/{comment}', [BlogCommentController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('blog.comments.destroy');
 // Webhook do Sentry (Internal Integration): autenticado pela assinatura HMAC, sem CSRF.
 Route::post('/webhooks/sentry', SentryWebhookController::class)->middleware('throttle:60,1')->name('webhooks.sentry');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
@@ -477,6 +488,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::get('/blog/novo', [AdminBlogPostController::class, 'create'])->name('blog.create');
         Route::post('/blog', [AdminBlogPostController::class, 'store'])->name('blog.store');
         Route::post('/blog/pre-visualizacao', [AdminBlogPostController::class, 'preview'])->name('blog.preview');
+        Route::get('/blog/comentarios', [AdminBlogCommentController::class, 'index'])->name('blog.comments.index');
+        Route::post('/blog/comentarios/{comment}/aprovar', [AdminBlogCommentController::class, 'approve'])->name('blog.comments.approve');
+        Route::post('/blog/comentarios/{comment}/ocultar', [AdminBlogCommentController::class, 'hide'])->name('blog.comments.hide');
+        Route::delete('/blog/comentarios/{comment}', [AdminBlogCommentController::class, 'destroy'])->name('blog.comments.destroy');
         Route::get('/blog/categorias', [AdminBlogCategoryController::class, 'index'])->name('blog.categories.index');
         Route::post('/blog/categorias', [AdminBlogCategoryController::class, 'store'])->name('blog.categories.store');
         Route::put('/blog/categorias/{category}', [AdminBlogCategoryController::class, 'update'])->name('blog.categories.update');

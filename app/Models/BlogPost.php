@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class BlogPost extends Model
@@ -38,12 +39,14 @@ class BlogPost extends Model
         'meta_description',
         'status',
         'published_at',
+        'comments_enabled',
     ];
 
     protected function casts(): array
     {
         return [
             'published_at' => 'datetime',
+            'comments_enabled' => 'boolean',
         ];
     }
 
@@ -60,6 +63,11 @@ class BlogPost extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_id');
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(BlogComment::class);
     }
 
     /**

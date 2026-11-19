@@ -261,7 +261,7 @@ class AuthController extends Controller
 
     /**
      * Por que o visitante está no hub ou no cadastro: 'search' quando o link protegido era a busca
-     * de veículo, 'protected' para qualquer outra página que exige conta e null quando ele veio
+     * de veículo, 'comment' quando era um artigo do blog (entrar para comentar), 'protected' para qualquer outra página que exige conta e null quando ele veio
      * direto.
      */
     private function intendedNotice(Request $request): ?string
@@ -274,7 +274,11 @@ class AuthController extends Controller
 
         $path = '/'.ltrim((string) parse_url($intendedUrl, PHP_URL_PATH), '/');
 
-        return str_starts_with($path, '/buscar-veiculo') ? 'search' : 'protected';
+        return match (true) {
+            str_starts_with($path, '/buscar-veiculo') => 'search',
+            str_starts_with($path, '/blog/') => 'comment',
+            default => 'protected',
+        };
     }
 
     /**

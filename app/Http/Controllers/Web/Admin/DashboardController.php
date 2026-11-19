@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\BlogComment;
 use App\Models\BlogPost;
 use App\Models\Maintenance;
 use App\Models\User;
@@ -52,6 +53,7 @@ class DashboardController extends Controller
             'disputedMaintenanceCount' => Maintenance::query()->whereNotNull('owner_disputed_at')->count(),
             'disputedInspectionCount' => VehicleInspection::query()->whereNotNull('owner_disputed_at')->count(),
             'scheduledPostCount' => BlogPost::query()->scheduled()->count(),
+            'pendingCommentCount' => BlogComment::query()->pending()->count(),
             'draftPostCount' => BlogPost::query()->where('status', BlogPost::STATUS_DRAFT)->count(),
             'recentUsers' => User::query()->latest()->latest('id')->limit(5)->get(),
             'monthlySeries' => $monthlySeries->lastMonths(12),

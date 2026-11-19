@@ -15,14 +15,14 @@ class BlogSeeder extends Seeder
     {
         $categories = [];
 
-        foreach ($this->categories() as $category) {
+        foreach (self::categories() as $category) {
             $categories[$category['slug']] = BlogCategory::updateOrCreate(
                 ['slug' => $category['slug']],
                 $category + ['is_active' => true],
             );
         }
 
-        foreach ($this->posts() as $index => $post) {
+        foreach (self::posts() as $index => $post) {
             BlogPost::updateOrCreate(
                 ['slug' => $post['slug']],
                 [
@@ -42,7 +42,7 @@ class BlogSeeder extends Seeder
     /**
      * @return list<array{name: string, slug: string, description: string}>
      */
-    private function categories(): array
+    public static function categories(): array
     {
         return [
             [
@@ -71,7 +71,7 @@ class BlogSeeder extends Seeder
     /**
      * @return list<array{slug: string, art: string, category: string, title: string, excerpt: string, content: string}>
      */
-    private function posts(): array
+    public static function posts(): array
     {
         return [
             [
