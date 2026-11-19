@@ -36,6 +36,14 @@
             'action' => 'Ver oficinas',
         ],
         [
+            'count' => $pendingCommentCount,
+            'icon' => 'chat-bubble-left-right',
+            'title' => $pluralize($pendingCommentCount, 'comentário pendente', 'comentários pendentes'),
+            'description' => 'Comentários com link no texto só aparecem no blog depois de aprovados.',
+            'href' => route('admin.blog.comments.index', ['status' => \App\Models\BlogComment::STATUS_PENDING]),
+            'action' => 'Ver pendentes',
+        ],
+        [
             'count' => $scheduledPostCount,
             'icon' => 'clock',
             'title' => $pluralize($scheduledPostCount, 'artigo agendado', 'artigos agendados'),
@@ -144,7 +152,7 @@
 
             <x-ui.section id="pendencias" title="Pendências" description="O que precisa de uma ação do admin.">
                 @if($pendingItems->isEmpty())
-                    <x-ui.empty-state icon="check-circle" title="Nada pendente" description="Todas as oficinas estão no mapa e o blog não tem rascunhos nem artigos agendados." />
+                    <x-ui.empty-state icon="check-circle" title="Nada pendente" description="Todas as oficinas estão no mapa e o blog não tem rascunhos, artigos agendados nem comentários pendentes." />
                 @else
                     <ul role="list" class="divide-y divide-border rounded-card border border-border bg-surface" data-slot="pending-items">
                         @foreach($pendingItems as $pendingItem)

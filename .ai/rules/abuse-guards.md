@@ -74,3 +74,6 @@ faltando em produção desliga a guarda e nada avisa. Quem depende de segredo fa
 rastro — `SentryWebhookController` responde 503 sem `services.sentry_webhook.client_secret`, e
 `Api\AuthController::redirectToProvider` responde 500 sem as credenciais do provedor. Guarda nova
 que leia segredo do ambiente segue os três.
+
+## Comentário do blog tem balde pela conta
+`POST /blog/{post}/comentarios` usa `throttle:blog-comments` (`AppServiceProvider`): 5/min e 30/dia, chave `user()?->id ?: ip()` (a rota exige login; o IP é reserva), mais o honeypot `website` do formulário. Balde próprio, nunca dividido com `contact`. Ver blog.md.
