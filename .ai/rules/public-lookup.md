@@ -7,7 +7,12 @@ paths:
   - 'app/Support/Vehicle/VehicleIdentifierMask.php'
   - 'app/Support/Workshop/WorkshopVehicleVisibility.php'
   - 'app/Http/Controllers/Web/Workshop/MaintenanceController.php'
+  - 'app/Http/Controllers/Web/Workshop/InspectionController.php'
+  - 'app/Support/Workshop/WorkshopVehicleStep.php'
+  - 'app/Http/Controllers/Web/Concerns/ResolvesWorkshopVehicle.php'
   - 'resources/views/workshop/maintenances/**'
+  - 'resources/views/workshop/inspections/**'
+  - 'resources/views/workshop/_vehicle-step.blade.php'
 ---
 
 # Public Lookup
@@ -19,8 +24,9 @@ Vehicle search and /v/: chassis and RENAVAM go through App\Support\Vehicle\Vehic
 VehicleIdentifierMask::chassis keeps 3 + 4 characters only on a 17-character VIN; a shorter (pre-1990) chassis shows at most 40% of it, at the end ("BA1234567" -> "••••••567"), so the public search (exact chassis match) is not a guessing oracle. The same Gate update rule masks the web vehicle pages (garage.vehicles.show and user.vehicles.show pass identifiersMasked to x-vehicle.detail) and the history PDF (the export and e-mail jobs decide with VehicleIdentifierVisibility::showsFullIdentifiers for the requester).
 
 ## A busca de placa da oficina segue o mascaramento público
-`GET /oficina/manutencoes/nova` (etapa 1 da OS) busca veículo por placa e por chassi para qualquer
-oficina **aprovada** (o prefixo leva `workshop.approved`): a rota leva
+`GET /oficina/manutencoes/nova` (etapa 1 da OS) e `GET /oficina/vistorias/nova` (etapa 1 do laudo,
+mesma conta de `App\Support\Workshop\WorkshopVehicleStep`) buscam veículo por placa e por chassi
+para qualquer oficina **aprovada** (o prefixo leva `workshop.approved`): a rota leva
 `throttle:account-vehicle-search`, balde pela conta e não o `search`, que é por IP
 (`.ai/rules/routes.md`). Aprovação é cadastro conferido, não vínculo com carro nenhum — uma oficina
 aprovada do outro lado do país não tem mais direito ao histórico deste veículo do que um visitante —,
@@ -39,8 +45,10 @@ oficinas registram OS de carro não reivindicado. O que libera o card sem víncu
 consulta exata de 17 caracteres (`?chassis=`), o fluxo em que a oficina está com o carro e cadastra
 o veículo —, nunca a falta de conta do proprietário; chassi de veículo com dono não mostra nada do
 carro, e chassi curto nem resolve veículo. `$showsFullVehicle` é sempre explícito nos includes
-(`_vehicle-step.blade.php`, `partials/workshop-maintenance-form.blade.php`): quem esquecer recebe o
-card reduzido. Note que o POST ainda revela o piso do hodômetro na mensagem de erro de
+(`resources/views/workshop/_vehicle-step.blade.php`, compartilhado pela OS e pelo laudo via
+`$context`, e `partials/workshop-maintenance-form.blade.php`): quem esquecer recebe o card reduzido.
+A conta em si mora em um lugar só, `WorkshopVehicleStep::resolve`, justamente para a tela nova não
+reimplementá-la pela metade. Note que o POST ainda revela o piso do hodômetro na mensagem de erro de
 `VehicleMileageService::assertMaintenanceKilometers`, com o custo de `throttle:uploads` e de uma
 tentativa de OS.
 

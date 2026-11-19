@@ -40,7 +40,8 @@
                 </x-ui.alert>
             @endif
 
-            @include('workshop.maintenances._vehicle-step', [
+            @include('workshop._vehicle-step', [
+                'context' => 'maintenance',
                 'vehicle' => $vehicle,
                 'licensePlate' => $vehicle?->license_plate ?? '',
                 'lookup' => null,

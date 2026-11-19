@@ -78,7 +78,9 @@ class PortalTest extends TestCase
 
         $this->assertSame(['Início', 'Meus veículos', 'Manutenções', 'Oficinas'], $labels(Portal::Owner));
         $this->assertSame(['Início', 'Estoque', 'Manutenções', 'Minha loja'], $labels(Portal::Dealer));
-        $this->assertSame(['Início', 'Ordens de serviço', 'Validações', 'Modelos de garantia', 'Minha oficina'], $labels(Portal::Workshop));
+        // Sem conta, o menu da oficina é este. O sexto item (Vistorias) depende da funcionalidade
+        // ligada na conta e é coberto em tests/Feature/Inspection/WorkshopInspectionScreenTest.php.
+        $this->assertSame(['Início', 'OS', 'Validações', 'Modelos de garantia', 'Minha oficina'], $labels(Portal::Workshop));
 
         foreach ([Portal::Owner, Portal::Dealer, Portal::Workshop] as $portal) {
             $this->assertLessThanOrEqual(5, count($portal->navigation()));

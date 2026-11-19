@@ -38,7 +38,7 @@
             <div class="space-y-6">
                 <x-ui.form-errors :ids="$formErrorTargets" :threshold="$summaryThreshold" />
 
-                @include('workshop.maintenances._vehicle-step', ['readonly' => false])
+                @include('workshop._vehicle-step', ['context' => 'maintenance', 'readonly' => false])
 
                 @if($showsForm)
                     <form method="POST" action="{{ route('workshop.maintenances.store') }}" enctype="multipart/form-data" class="space-y-6" data-maintenance-os-form>

@@ -106,9 +106,14 @@ class VehicleMileageService
      * quando a leitura é coerente com o histórico.
      *
      * É o detector de hodômetro rodado para trás: quem lê 40.000 num carro com OS de 90.000 está
-     * diante de um indício, não de um erro. O formulário da vistoria usa isto para mostrar o
-     * registro que a leitura contradiz, e VehicleInspectionService para recusar um "sem
-     * apontamento" no eixo do hodômetro.
+     * diante de um indício, não de um erro. Quem usa isto é o VehicleInspectionService, para recusar
+     * um "sem apontamento" no eixo do hodômetro.
+     *
+     * A **tela** da vistoria não mostra o registro contradito, de propósito: o número e a data de
+     * uma OS de outra oficina são exatamente o que o mascaramento esconde de quem não tem vínculo
+     * com o veículo (.ai/rules/public-lookup.md). Ele só aparece na mensagem da recusa, que custa
+     * uma tentativa de gravação com `throttle:uploads` — a mesma exceção consciente que o piso do
+     * hodômetro já tem na OS.
      */
     public function countedMaintenanceAbove(Vehicle $vehicle, int $kilometers): ?Maintenance
     {

@@ -7,13 +7,12 @@ use App\Enums\WarrantyScope;
 use App\Http\Controllers\Concerns\SyncsMaintenanceItems;
 use App\Http\Controllers\Concerns\SyncsMaintenanceWarranties;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Web\Concerns\ResolvesWorkshopVehicle;
 use App\Http\Controllers\Web\Concerns\StoresMaintenanceInvoices;
 use App\Models\Maintenance;
 use App\Models\MaintenancePhoto;
 use App\Models\User;
-use App\Models\Vehicle;
 use App\Models\Workshop;
-use App\Rules\Chassis;
 use App\Rules\InvoiceFile;
 use App\Services\Maintenance\MaintenanceInviteService;
 use App\Services\Maintenance\MaintenancePhotoService;
@@ -25,8 +24,7 @@ use App\Services\Vehicle\WorkshopVehicleRegistrar;
 use App\Support\AppStorage;
 use App\Support\Maintenance\MaintenancePhotoAccess;
 use App\Support\Maintenance\WorkshopMaintenanceFilters;
-use App\Support\VehiclePlateSearch;
-use App\Support\Workshop\WorkshopVehicleVisibility;
+use App\Support\Workshop\WorkshopVehicleStep;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -39,6 +37,7 @@ use Illuminate\View\View;
 
 class MaintenanceController extends Controller
 {
+    use ResolvesWorkshopVehicle;
     use StoresMaintenanceInvoices;
     use SyncsMaintenanceItems;
     use SyncsMaintenanceWarranties;
@@ -93,64 +92,18 @@ class MaintenanceController extends Controller
     /**
      * Nova OS em duas etapas na mesma página: a placa (GET ?license_plate=) ou o chassi
      * (GET ?chassis=) confirma o veículo e só então o resto do formulário aparece. Pelo chassi o
-     * veículo que ainda não existe é criado ali mesmo (marca, modelo e ano). Depois de um erro de
-     * validação, o dado enviado (old input) vale quando a URL não traz nada.
+     * veículo que ainda não existe é criado ali mesmo (marca, modelo e ano).
+     *
+     * A etapa 1 — inclusive o mascaramento de quem não tem vínculo com o veículo — é
+     * App\Support\Workshop\WorkshopVehicleStep, compartilhada com a vistoria cautelar.
      */
     public function create(Request $request): View
     {
         $workshop = $request->user()->workshop;
-        $chassisInput = $request->query('chassis');
-        $chassisInput = is_scalar($chassisInput) && (string) $chassisInput !== '' ? (string) $chassisInput : (string) $request->old('chassis', '');
-        $chassis = substr(Vehicle::normalizeChassis($chassisInput), 0, 17);
-
-        $plateInput = $request->query('license_plate');
-        $plateInput = is_scalar($plateInput) && (string) $plateInput !== '' ? (string) $plateInput : (string) $request->old('license_plate', '');
-        $licensePlate = $chassis === '' ? substr(VehiclePlateSearch::normalize($plateInput), 0, 10) : '';
-
-        $lookup = $licensePlate !== '' ? VehiclePlateSearch::findByPlate($licensePlate) : null;
-        $vehicle = $lookup?->vehicle;
-        $chassisOwned = false;
-        $creatingVehicle = false;
-        $chassisInvalid = false;
-
-        if ($chassis !== '') {
-            if (strlen($chassis) !== 17) {
-                $chassisInvalid = true;
-            } else {
-                $vehicle = Vehicle::findByChassis($chassis);
-
-                if ($vehicle !== null && $vehicle->hasCurrentOwner()) {
-                    $chassisOwned = true;
-                    $vehicle = null;
-                } else {
-                    $creatingVehicle = $vehicle === null;
-                }
-            }
-        }
-
-        $vehicleHasOwner = $vehicle !== null && $vehicle->hasCurrentOwner();
-        // Só a consulta exata de 17 caracteres resolve veículo pelo chassi (chassi curto cai em
-        // $chassisInvalid), e veículo com dono já saiu daqui como $chassisOwned: chegar com veículo
-        // por este caminho é a oficina estar com o carro ou com o documento na mão.
-        $foundByFullChassis = $chassis !== '' && $vehicle !== null;
 
         return view('workshop.maintenances.create', array_merge(
-            [
-                'workshop' => $workshop,
-                'vehicle' => $vehicle,
-                'licensePlate' => $licensePlate,
-                'chassis' => $chassis,
-                'chassisOwned' => $chassisOwned,
-                'chassisInvalid' => $chassisInvalid,
-                'creatingVehicle' => $creatingVehicle,
-                'lookup' => $lookup,
-                'vehicleHasOwner' => $vehicleHasOwner,
-                'showsFullVehicle' => $vehicle === null || WorkshopVehicleVisibility::showsFullVehicle(
-                    $workshop,
-                    $vehicle,
-                    $foundByFullChassis,
-                ),
-            ],
+            ['workshop' => $workshop],
+            WorkshopVehicleStep::resolve($request, $workshop),
             $this->warrantyTemplateOptions($workshop),
         ));
     }
@@ -194,39 +147,16 @@ class MaintenanceController extends Controller
             'photos.*.max' => 'Cada grupo aceita até '.MaintenancePhoto::MAX_PER_GROUP.' fotos.',
         ]);
 
-        $newVehicle = null;
-        $chassis = Vehicle::normalizeChassis((string) ($data['chassis'] ?? ''));
-
-        if ($chassis !== '') {
-            $vehicle = Vehicle::findByChassis($chassis);
-
-            if ($vehicle !== null && $vehicle->hasCurrentOwner()) {
-                return redirect()->back()->withInput()
-                    ->withErrors(['chassis' => self::chassisOwnedMessage()]);
-            }
-
-            if ($vehicle === null) {
-                $newVehicle = $request->validate([
-                    'chassis' => ['required', 'string', new Chassis(isset($data['new_vehicle']['year']) ? (int) $data['new_vehicle']['year'] : null)],
-                    'new_vehicle.brand' => ['required', 'string', 'max:100'],
-                    'new_vehicle.model' => ['required', 'string', 'max:100'],
-                    'new_vehicle.year' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
-                ], [
-                    'new_vehicle.brand.required' => 'Informe a marca do veículo.',
-                    'new_vehicle.model.required' => 'Informe o modelo do veículo.',
-                    'new_vehicle.year.required' => 'Informe o ano do veículo.',
-                ])['new_vehicle'];
-            }
-        } else {
-            $licensePlate = VehiclePlateSearch::normalize((string) $data['license_plate']);
-            $vehicle = VehiclePlateSearch::findByPlate($licensePlate)?->vehicle;
-
-            if ($vehicle === null) {
-                return redirect()->back()
-                    ->withInput()
-                    ->withErrors(['license_plate' => self::vehicleNotFoundMessage($licensePlate)]);
-            }
-        }
+        [
+            'vehicle' => $vehicle,
+            'newVehicle' => $newVehicle,
+            'chassis' => $chassis,
+        ] = $this->resolveWorkshopVehicle(
+            $request,
+            $data,
+            self::chassisOwnedMessage(),
+            fn (string $licensePlate): string => self::vehicleNotFoundMessage($licensePlate),
+        );
 
         if ($vehicle !== null) {
             app(VehicleMileageService::class)->assertMaintenanceKilometers(

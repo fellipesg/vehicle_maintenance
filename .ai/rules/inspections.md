@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'app/Models/VehicleInspection.php,app/Services/Inspection/**,app/Support/Inspection/**,app/Enums/Inspection*,app/Policies/VehicleInspectionPolicy.php,app/Features/VehicleInspections.php,app/Support/Maintenance/VerificationCode.php'
+  - 'app/Models/VehicleInspection.php,app/Services/Inspection/**,app/Support/Inspection/**,app/Enums/Inspection*,app/Policies/VehicleInspectionPolicy.php,app/Features/VehicleInspections.php,app/Support/Maintenance/VerificationCode.php,app/Http/Controllers/Web/Workshop/InspectionController.php,app/Http/Controllers/Web/InspectionReportController.php,app/Http/Requests/Web/Workshop/*VehicleInspectionRequest.php,app/Http/Requests/Concerns/ValidatesVehicleInspection.php,resources/views/workshop/inspections/**'
 ---
 
 # Vistoria cautelar (laudo)
@@ -125,11 +125,52 @@ montado com `getClientOriginalName()` (o nome fica em `report_original_name`), e
 arquivo anterior. Não entra pelo de nota (que é NF-e com parsing) nem pelo de foto (que é imagem com
 variantes).
 
+## A tela da oficina começa pelo veículo, e a etapa 1 é a mesma da OS
+`/oficina/vistorias` (lista, nova, detalhe, edição) espelha a OS de propósito, e a etapa 1 — placa
+(`?license_plate=`) ou chassi (`?chassis=`) — é **código compartilhado**:
+`App\Support\Workshop\WorkshopVehicleStep::resolve` do lado do GET,
+`App\Http\Controllers\Web\Concerns\ResolvesWorkshopVehicle` do lado do POST, e a view
+`resources/views/workshop/_vehicle-step.blade.php` com `$context` ('maintenance' ou 'inspection')
+decidindo rota e texto. Duas cópias da mesma conta é exatamente a forma de a segunda tela esquecer
+uma linha do mascaramento de `.ai/rules/public-lookup.md` — e é mascaramento que decide se a placa
+atual e o hodômetro do veículo saem na tela. `WorkshopVehicleStep::none()` existe para a tela que
+**não** vai mostrar resultado (conta sem a funcionalidade): consultar placa para depois não mostrar
+nada seria dar o oráculo de enumeração de graça a quem a tela já recusou.
+
+**O veredito vem depois dos achados, não antes.** O formulário é: 2 Vistoria (data, validade,
+hodômetro lido) · 3 Achados (os oito eixos) · 4 Veredito e laudo (resultado, resumo, PDF). Perguntar
+o resultado antes convida a marcar "Aprovado" e só então olhar item por item, que é a ordem que a
+guarda de `assertCoherent` existe para desfazer; embaixo, a recusa ("o laudo reprova X, então não
+pode ser Aprovado") aparece logo abaixo do que a causou. Data e hodômetro ficam em cima porque são
+leitura, não juízo — e o eixo "Hodômetro" dos achados fala justamente da leitura registrada ali.
+
+**Veículo criado pelo chassi junto com o laudo nasce sem hodômetro.** `WorkshopVehicleRegistrar`
+recebe quilometragem opcional, e a vistoria não passa nenhuma: a única leitura que ela tem é a do
+laudo, e essa não vira `vehicles.current_kilometers` (a regra acima). Zero é o certo aqui — um
+`odometer_at_registration` com a leitura da vistoria seria piso de toda OS futura.
+
+**A tela não mostra a OS que a leitura contradiz.** `countedMaintenanceAbove` só aparece na mensagem
+da recusa, que custa uma tentativa de gravação com `throttle:uploads`; desenhar "90.000 km em
+12/03/2025" numa tela GET entregaria de graça o hodômetro e a data de uma OS de outra oficina, que é
+o que o mascaramento esconde de quem não tem vínculo com o veículo.
+
+**O PDF nunca sai pelo caminho do storage.** `GET /laudos/{inspection}`
+(`App\Http\Controllers\Web\InspectionReportController`, nome `inspections.report`) fica atrás de
+`VehicleInspectionPolicy::viewReport`, que é a **mesma** pergunta de `showsFullReportTo` usada pela
+redação: rota de arquivo mais frouxa que a tela devolveria por download o que a tela escondeu. Vale
+para os três portais, como a nota fiscal e a foto (`.ai/rules/views.md`).
+
+**Emitir não é oferecido a quem não pode.** Sem a flag: não há item de menu
+(`App\Enums\Portal::navigation`, que agora recebe a conta), não há botão "Nova vistoria" na lista, e
+`/oficina/vistorias/nova` **explica** em vez de devolver 403 — a oficina está aprovada, o que falta é
+a equipe ligar. A lista continua mostrando os laudos já emitidos: desligar a funcionalidade não
+apaga laudo nenhum, como nas fotos (`.ai/rules/features.md`).
+
 ## O que ainda não existe
-Fase 1 é só o núcleo. **Não** existe ainda: tela da oficina, rota, FormRequest (é lá que mora
-`before_or_equal:today` para `inspected_at`, como nas quatro superfícies de OS), página pública
-`/laudo/{código}`, recurso de API, serviço de contestação e de supressão (as colunas existem, quem
-escreve não), marcador na faixa de procedência, selo no estoque do lojista, laudo no PDF do histórico
-e interruptor do admin para a flag. Ao acrescentar qualquer um, varra também os lugares que
-*sugerem* a ação — pendência, filtro, dica, item de menu —, não só o que a executa
+**Não** existe ainda: página pública `/laudo/{código}`, recurso de API, serviço de contestação e de
+supressão (as colunas existem, quem escreve não), marcador na faixa de procedência, selo no estoque
+do lojista, laudo no PDF do histórico, laudo na ficha do veículo do proprietário e interruptor do
+admin para a flag (hoje a liberação é por `tinker`/seed, com
+`App\Support\Inspection\InspectionAccess::set`). Ao acrescentar qualquer um, varra também os lugares
+que *sugerem* a ação — pendência, filtro, dica, item de menu —, não só o que a executa
 (`.ai/rules/features.md`).

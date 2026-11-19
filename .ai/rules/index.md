@@ -27,7 +27,7 @@ must agree on the same contract; they are listed in a separate table below.
 | resources/views/components/{vehicle,maintenance}/**,resources/views/maintenances/**,resources/views/components/provenance-*.blade.php | .ai/rules/domain-components.md |
 | resources/views/garage/**,app/Http/Controllers/Web/Garage/**,app/Support/Vehicle/DealerStock.php,app/Http/Middleware/EnsureGarageApproved.php,app/Http/Middleware/EnsureWorkshopApproved.php,app/Services/Garage/**,app/Services/Workshop/WorkshopReview.php,app/Enums/WorkshopStatus.php,app/Http/Controllers/Web/Admin/WorkshopController.php | .ai/rules/garage.md |
 | app/Services/Invoice/**,app/Http/Controllers/Web/Concerns/StoresMaintenanceInvoices.php,app/Http/Controllers/Api/InvoiceController.php,app/Rules/InvoiceFile.php | .ai/rules/invoices.md |
-| app/Models/VehicleInspection.php,app/Services/Inspection/**,app/Support/Inspection/**,app/Enums/Inspection*,app/Policies/VehicleInspectionPolicy.php,app/Features/VehicleInspections.php,app/Support/Maintenance/VerificationCode.php | .ai/rules/inspections.md |
+| app/Models/VehicleInspection.php,app/Services/Inspection/**,app/Support/Inspection/**,app/Enums/Inspection*,app/Policies/VehicleInspectionPolicy.php,app/Features/VehicleInspections.php,app/Support/Maintenance/VerificationCode.php,app/Http/Controllers/Web/Workshop/InspectionController.php,app/Http/Controllers/Web/InspectionReportController.php,app/Http/Requests/Web/Workshop/*VehicleInspectionRequest.php,app/Http/Requests/Concerns/ValidatesVehicleInspection.php,resources/views/workshop/inspections/** | .ai/rules/inspections.md |
 | app/Jobs/**,app/Console/Commands/PurgePendingMaintenanceAttachments.php | .ai/rules/jobs.md |
 | resources/js/user-portal.js,resources/js/owner-maintenance-form.js,resources/js/maintenance-kilometer-range.js,resources/js/utils/maintenance-kilometers.js | .ai/rules/js.md |
 | resources/views/components/landing/**,resources/views/home.blade.php | .ai/rules/landing-views.md |
@@ -46,7 +46,7 @@ must agree on the same contract; they are listed in a separate table below.
 | routes/*.php | .ai/rules/routes.md |
 | bootstrap/app.php,app/Support/PortalAccess.php,app/Support/FriendlyHttpErrors.php,app/Http/Controllers/Web/Auth/**,app/Http/Controllers/Web/AuthController.php | .ai/rules/portal-access.md |
 | resources/views/layouts/**,app/Enums/Portal.php | .ai/rules/portal-shell.md |
-| app/Http/Controllers/Web/Public*,resources/views/public/**,app/Http/Resources/Api/V1/**,app/Support/Vehicle/VehicleIdentifierVisibility.php,app/Support/Vehicle/VehicleIdentifierMask.php,app/Support/Workshop/WorkshopVehicleVisibility.php,app/Http/Controllers/Web/Workshop/MaintenanceController.php,resources/views/workshop/maintenances/** | .ai/rules/public-lookup.md |
+| app/Http/Controllers/Web/Public*,resources/views/public/**,app/Http/Resources/Api/V1/**,app/Support/Vehicle/VehicleIdentifierVisibility.php,app/Support/Vehicle/VehicleIdentifierMask.php,app/Support/Workshop/WorkshopVehicleVisibility.php,app/Support/Workshop/WorkshopVehicleStep.php,app/Http/Controllers/Web/Concerns/ResolvesWorkshopVehicle.php,app/Http/Controllers/Web/Workshop/MaintenanceController.php,app/Http/Controllers/Web/Workshop/InspectionController.php,resources/views/workshop/maintenances/**,resources/views/workshop/inspections/**,resources/views/workshop/_vehicle-step.blade.php | .ai/rules/public-lookup.md |
 | scripts/crop-brand-assets.php | .ai/rules/scripts.md |
 | app/Support/DemoWorkshopLogoGenerator.php | .ai/rules/support.md |
 | resources/css/provenance.css | .ai/rules/theme.md |

@@ -28,6 +28,16 @@ class VehicleInspection extends Model
      */
     public const CODE_PREFIX = 'LDO';
 
+    /**
+     * Teto do resumo do laudo. O relatório inteiro é o PDF; o resumo é o que a tela mostra.
+     */
+    public const MAX_SUMMARY_LENGTH = 2000;
+
+    /**
+     * Teto do PDF do laudo, em kilobytes — o mesmo da nota fiscal da OS.
+     */
+    public const MAX_REPORT_KILOBYTES = 10240;
+
     protected $fillable = [
         'vehicle_id',
         'tenant_id',

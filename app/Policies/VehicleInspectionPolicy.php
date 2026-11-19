@@ -43,6 +43,18 @@ class VehicleInspectionPolicy
         return $inspection->isVisibleInHistoryTo($user);
     }
 
+    /**
+     * Abrir o PDF do laudo. **Não** é a mesma pergunta de `view`: a forma mínima
+     * (App\Support\Inspection\InspectionRedactor) tira o PDF, o resumo e as observações de quem não
+     * tem o laudo inteiro, e uma rota de arquivo mais frouxa que a tela devolveria por download o
+     * que a tela acabou de esconder. Então a resposta é a mesma de
+     * VehicleInspection::showsFullReportTo, que a redação também usa.
+     */
+    public function viewReport(User $user, VehicleInspection $inspection): bool
+    {
+        return $inspection->showsFullReportTo($user);
+    }
+
     public function create(User $user): Response
     {
         if (! $user->isWorkshop() || $user->workshop === null || ! $user->workshop->isApproved()) {
