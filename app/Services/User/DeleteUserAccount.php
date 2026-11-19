@@ -2,6 +2,7 @@
 
 namespace App\Services\User;
 
+use App\Models\BlogComment;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\VehicleConsignment;
@@ -32,6 +33,9 @@ class DeleteUserAccount
      * placa) e os relatórios em PDF já gerados — linha de `vehicle_pdf_exports` e o arquivo —,
      * que de outro modo só sumiriam no `vehicle-pdf-exports:cleanup`, até 24 h depois.
      *
+     * Os comentários do blog da pessoa saem na mesma transação: o nome aparece neles (primeiro
+     * nome e inicial) e a conta é anonimizada, não apagada, então o cascade de `user_id` não vale.
+     *
      * A sessão web morre aqui, para todos os caminhos de exclusão de uma vez: as linhas de
      * `sessions` da pessoa saem junto. Quem está excluindo pela própria sessão ainda precisa do
      * logout da requisição (App\Http\Controllers\Concerns\EndsDeletedAccountSession), senão o
@@ -49,6 +53,7 @@ class DeleteUserAccount
             $user->tokens()->delete();
             $user->vehicles()->detach();
             $user->notifications()->delete();
+            BlogComment::query()->where('user_id', $user->id)->delete();
 
             $this->deleteWebSessions($user);
             $this->deleteGeneratedPdfExports($user);

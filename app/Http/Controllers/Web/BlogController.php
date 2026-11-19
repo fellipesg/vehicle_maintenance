@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\BlogCategory;
+use App\Models\BlogComment;
 use App\Models\BlogPost;
 use Illuminate\View\View;
 
@@ -64,7 +65,23 @@ class BlogController extends Controller
             ->limit(3)
             ->get();
 
-        return view('blog.show', compact('post', 'related'));
+        $viewer = auth()->user();
+
+        $comments = $post->comments()
+            ->with('user')
+            ->where(fn ($query) => $query
+                ->where('status', BlogComment::STATUS_PUBLISHED)
+                ->when($viewer !== null, fn ($query) => $query->orWhere(fn ($own) => $own
+                    ->where('status', BlogComment::STATUS_PENDING)
+                    ->where('user_id', $viewer->id)))
+            )
+            ->oldest()
+            ->oldest('id')
+            ->get();
+
+        $publishedCommentCount = $comments->where('status', BlogComment::STATUS_PUBLISHED)->count();
+
+        return view('blog.show', compact('post', 'related', 'comments', 'publishedCommentCount'));
     }
 
     /**

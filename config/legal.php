@@ -10,9 +10,9 @@ return [
 
     'support_email' => env('MAIL_SUPPORT_ADDRESS', env('MAIL_REPLY_TO_ADDRESS', 'suporte@revisalog.com.br')),
 
-    'terms_version' => '2026-10-10',
+    'terms_version' => '2026-11-18',
 
-    'privacy_version' => '2026-11-15',
+    'privacy_version' => '2026-11-18',
 
     'terms_of_use' => <<<'TEXT'
 Termos de Uso — RevisaLog
@@ -37,10 +37,13 @@ Documentos enviados (NF-e, DANFE, CRLV) são de responsabilidade de quem os anex
 6. Oficinas
 A oficina que registra um serviço pelo chassi, num veículo cujo proprietário ainda não tem conta, declara que informou o cliente sobre o registro, que tem base legal para registrar o serviço e que não vai colocar dados pessoais do cliente (nome, CPF, telefone, endereço ou placa) em campos de texto livre. Além da nota fiscal do serviço e das fotos do próprio serviço, não deve anexar outros documentos. Notas fiscais e fotos de um veículo sem proprietário ficam visíveis apenas à oficina até o proprietário aceitá-las, e a oficina é responsável pelo que anexa e por convidar o cliente apenas pelos canais previstos na plataforma.
 
-7. Contato
+7. Comentários no blog
+Só contas cadastradas comentam nos artigos do blog. Quem comenta é responsável pelo que escreve: não publique conteúdo ofensivo, discriminatório ou ilegal, spam, propaganda ou links suspeitos, nem dados pessoais de outras pessoas (nome completo, telefone, e-mail, CPF, placa ou endereço). Comentários com link passam por revisão antes de aparecer. O RevisaLog pode ocultar ou remover qualquer comentário que descumpra estas regras, sem aviso prévio, e você pode excluir os seus a qualquer momento.
+
+8. Contato
 Dúvidas, solicitações e reclamações: suporte@revisalog.com.br ou a página de contato em revisalog.com.br/contato.
 
-8. Aceite
+9. Aceite
 Ao marcar que leu e aceita estes termos, você confirma ciência das condições acima e concorda em mantê-las atualizadas conforme alterações futuras publicadas nesta versão.
 TEXT,
 
@@ -58,6 +61,7 @@ O tratamento é feito pela RevisaLog, identificada no rodapé do site. Para exer
 - Veículos e histórico: chassi, placa, RENAVAM, marca, modelo, ano, quilometragem, manutenções, fotos, garantias, notas fiscais (NF-e/DANFE) e CRLV enviados por você.
 - Uso do serviço: notificações (e-mail e no aplicativo), tokens de dispositivo para aviso push e registros técnicos de acesso (IP, data e hora), mantidos por 6 meses conforme o Marco Civil da Internet.
 - Contato: nome, e-mail e mensagem enviados pela página de contato.
+- Comentários no blog: o texto que você escreve num artigo. Ele aparece publicamente com o seu primeiro nome e a inicial do último sobrenome (por exemplo, "Felipe G."), nunca com o nome completo nem o e-mail. Comentários com link só aparecem depois de revisados e podem ser ocultados ou removidos pela equipe se descumprirem os Termos de Uso.
 - Navegação nas páginas públicas (início, blog, consulta de selo, contato, login e cadastro): páginas visitadas, origem do acesso, tipo de aparelho e navegador, cidade aproximada e cliques em links, medidos pelo Google Analytics. As áreas logadas (Início do usuário, oficina, lojista e administração) não são medidas.
 - Anúncios no blog: as páginas do blog exibem anúncios do Google AdSense. O Google recebe o endereço da página, dados do aparelho e do navegador e o endereço IP para escolher e medir os anúncios; com o seu aceite, usa também cookies de publicidade para personalizá-los. Os anúncios aparecem só no blog, nunca nas áreas logadas, na consulta de veículos ou na conferência de selos.
 - Oficinas (prospecção): nome da empresa, e-mail comercial, telefone e endereço publicados no cadastro público de CNPJ da Receita Federal.
@@ -89,9 +93,9 @@ Não vendemos seus dados. Compartilhamos apenas o necessário com:
 Alguns desses prestadores armazenam dados fora do Brasil, com as salvaguardas previstas no art. 33 da LGPD.
 
 7. Conservação
-Mantemos os dados enquanto a conta estiver ativa e o histórico do veículo for necessário ao serviço, ou pelo prazo exigido por lei. Você pode excluir a conta no aplicativo (Configurações → Excluir conta), em "Minha conta" no site, ou pela página revisalog.com.br/excluir-conta, que envia um link de confirmação válido por 1 hora. A exclusão pelo aplicativo e por "Minha conta" pede a sua senha atual; quem entra pelo Google ou pela Apple usa a página com link de confirmação, porque nunca escolheu uma senha. Ao excluir a conta, apagamos ou anonimizamos os dados pessoais, exceto os que precisamos manter por obrigação legal.
+Mantemos os dados enquanto a conta estiver ativa e o histórico do veículo for necessário ao serviço, ou pelo prazo exigido por lei. Você pode excluir a conta no aplicativo (Configurações → Excluir conta), em "Minha conta" no site, ou pela página revisalog.com.br/excluir-conta, que envia um link de confirmação válido por 1 hora. A exclusão pelo aplicativo e por "Minha conta" pede a sua senha atual; quem entra pelo Google ou pela Apple usa a página com link de confirmação, porque nunca escolheu uma senha. Os comentários do blog ficam até você excluí-los ou excluir a conta. Ao excluir a conta, apagamos ou anonimizamos os dados pessoais, exceto os que precisamos manter por obrigação legal.
 
-O que sai na hora: nome, e-mail, telefone, CPF/CNPJ, endereço e coordenadas, foto de perfil, senha e identificador do provedor social, os vínculos entre você e seus veículos, os tokens de acesso do aplicativo e de aviso push, as suas sessões abertas em qualquer aparelho, as notificações que você recebeu na plataforma, os relatórios em PDF que você gerou (registro e arquivo) e a cópia do seu contato que a loja tenha declarado ao registrar uma consignação.
+O que sai na hora: nome, e-mail, telefone, CPF/CNPJ, endereço e coordenadas, foto de perfil, senha e identificador do provedor social, os vínculos entre você e seus veículos, os tokens de acesso do aplicativo e de aviso push, as suas sessões abertas em qualquer aparelho, as notificações que você recebeu na plataforma, os comentários que você escreveu no blog (também podem ser excluídos por você, um a um, a qualquer momento), os relatórios em PDF que você gerou (registro e arquivo) e a cópia do seu contato que a loja tenha declarado ao registrar uma consignação.
 
 O que permanece: os registros de manutenção do veículo, inclusive as notas fiscais e as fotos do serviço, ainda que tenha sido você quem os anexou. Eles são prova do serviço feito naquele chassi, não cadastro de quem os declarou, e é esse histórico que acompanha o carro para o próximo proprietário. Depois da exclusão, esses registros não identificam mais você: ficam ligados ao veículo, sem nome, e-mail, telefone ou documento. Se você entende que um documento ou uma foto específica expõe dado pessoal seu que não deveria continuar ali, peça a remoção pelo suporte (art. 18 da LGPD) e analisamos caso a caso. Anexos de serviços registrados por oficina em veículo sem conta seguem a regra própria da seção 5.
 
