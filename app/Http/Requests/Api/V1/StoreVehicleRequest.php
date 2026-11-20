@@ -48,6 +48,7 @@ class StoreVehicleRequest extends ApiFormRequest
             'current_kilometers' => 'required|integer|min:0|max:9999999',
             'terms_accepted' => 'required|accepted',
             'purchase_date' => 'nullable|date',
+            'crlv_verification_token' => 'nullable|string|max:64',
         ];
     }
 

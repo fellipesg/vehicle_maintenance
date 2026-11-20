@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\UserFcmTokenController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\VehicleCrlvController;
 use App\Http\Controllers\Api\VehiclePdfExportController;
 use App\Http\Controllers\Api\WarrantyTemplateController;
 use App\Http\Controllers\Api\WorkshopController;
@@ -88,6 +89,12 @@ Route::prefix('v1')->group(function () {
         // Vehicle routes
         Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('ability:vehicles:read');
         Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('ability:vehicles:write');
+        Route::post('/vehicles/crlv', [VehicleCrlvController::class, 'read'])
+            ->middleware(['ability:vehicles:write', 'throttle:uploads'])
+            ->name('api.vehicles.crlv.read');
+        Route::post('/vehicles/crlv/claim', [VehicleCrlvController::class, 'claim'])
+            ->middleware('ability:vehicles:write')
+            ->name('api.vehicles.crlv.claim');
         Route::get('/vehicles/{id}', [VehicleController::class, 'show'])->middleware('ability:vehicles:read');
         Route::get('/vehicles/{id}/plates', [VehicleController::class, 'plates'])->middleware('ability:vehicles:read');
         Route::put('/vehicles/{id}', [VehicleController::class, 'update'])->middleware('ability:vehicles:write');

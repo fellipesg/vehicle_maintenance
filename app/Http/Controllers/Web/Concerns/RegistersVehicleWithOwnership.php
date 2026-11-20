@@ -100,34 +100,11 @@ trait RegistersVehicleWithOwnership
     }
 
     /**
-     * Refaz o CRLV-e lido a partir da cópia guardada na sessão (CrlvParseResult::toPreview()).
-     *
      * @param  array<string, mixed>  $preview
      */
     protected function crlvFromPreview(array $preview): CrlvParseResult
     {
-        return new CrlvParseResult(
-            licensePlate: (string) $preview['license_plate'],
-            renavam: (string) $preview['renavam'],
-            brand: (string) $preview['brand'],
-            model: (string) $preview['model'],
-            year: (int) $preview['year'],
-            color: $preview['color'] ?? null,
-            chassis: $preview['chassis'] ?? null,
-            engine: $preview['engine'] ?? null,
-            motorization: $preview['motorization'] ?? null,
-            brandRaw: (string) ($preview['brand_raw'] ?? ''),
-            modelRaw: (string) ($preview['model_raw'] ?? ''),
-            brandMatched: (bool) ($preview['brand_matched'] ?? false),
-            modelMatched: (bool) ($preview['model_matched'] ?? false),
-            detranState: $preview['detran_state'] ?? null,
-            fuel: $preview['fuel'] ?? null,
-            crvNumber: $preview['crv_number'] ?? null,
-            exerciseYear: isset($preview['exercise_year']) ? (int) $preview['exercise_year'] : null,
-            manufacturingYear: isset($preview['manufacturing_year']) ? (int) $preview['manufacturing_year'] : null,
-            ownerName: $preview['owner_name'] ?? null,
-            ownerDocument: $preview['owner_document'] ?? null,
-        );
+        return CrlvParseResult::fromPreview($preview);
     }
 
     protected function registerVehicle(Request $request): RedirectResponse
