@@ -12,14 +12,18 @@
 @endphp
 
 @section('title', $pageTitle)
+@section('meta_description', $pageDescription)
+@section('canonical', $category ? \App\Support\Seo\CanonicalUrl::named('blog.category', $category) : \App\Support\Seo\CanonicalUrl::named('blog.index'))
 
 @push('head')
-    <meta name="description" content="{{ $pageDescription }}">
-    <link rel="canonical" href="{{ $category ? route('blog.category', $category) : route('blog.index') }}">
     <link rel="alternate" type="application/rss+xml" title="Blog RevisaLog" href="{{ route('blog.feed') }}">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="{{ $pageTitle }}">
-    <meta property="og:description" content="{{ $pageDescription }}">
+    @if($category)
+        <x-seo.json-ld :data="\App\Support\Seo\StructuredData::breadcrumb([
+            ['name' => 'Início', 'url' => \App\Support\Seo\CanonicalUrl::home()],
+            ['name' => 'Blog', 'url' => \App\Support\Seo\CanonicalUrl::named('blog.index')],
+            ['name' => $category->name, 'url' => \App\Support\Seo\CanonicalUrl::named('blog.category', $category)],
+        ])" />
+    @endif
 @endpush
 
 @section('content')
@@ -27,7 +31,7 @@
     <x-ui.page-header
         :title="$category?->name ?? 'Blog'"
         :description="$pageDescription"
-        :breadcrumbs="$category ? [['Blog', route('blog.index')], [$category->name]] : []"
+        :breadcrumbs="$category ? [['Início', \App\Support\Seo\CanonicalUrl::home()], ['Blog', route('blog.index')], [$category->name]] : []"
     />
 
     @if($categories->isNotEmpty())

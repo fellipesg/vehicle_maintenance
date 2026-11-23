@@ -2,9 +2,7 @@
 
 @section('title', 'Excluir conta e dados')
 
-@push('head')
-    <meta name="description" content="Como excluir sua conta RevisaLog e seus dados pessoais, pelo aplicativo ou por este formulário, e o que acontece com o histórico do veículo.">
-@endpush
+@section('meta_description', 'Como excluir sua conta RevisaLog e seus dados pessoais, pelo aplicativo ou por este formulário, e o que acontece com o histórico do veículo.')
 
 @section('content')
 <x-ui.container size="sm" padded>

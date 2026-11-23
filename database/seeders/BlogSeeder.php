@@ -111,6 +111,8 @@ Os dois tipos aparecem na mesma linha do tempo, com a origem sempre visível. Ni
 ## Na hora de vender
 
 O comprador consulta o histórico pelo chassi, placa ou RENAVAM antes de fechar negócio. Você não precisa procurar notas fiscais antigas nem confiar na memória: a linha do tempo já está lá, com as datas e as quilometragens que foram registradas.
+
+O [comparativo de apps de histórico de manutenção](/melhor-app-historico-manutencao-carro) coloca esse modelo ao lado da planilha e de outros apps. [Alternativas ao manual de papel](/blog/alternativas-ao-manual-de-revisoes-de-papel) lista o que cobre o caderno quando ele se perde.
 MD,
             ],
             [
@@ -147,6 +149,8 @@ Um registro verificado não pode ser editado nem apagado por quem não é a ofic
 ## Como pedir o registro verificado
 
 Pergunte na oficina se ela usa o RevisaLog. Se usar, peça para registrar o serviço pelo portal — leva o mesmo tempo que preencher a ordem de serviço. Se ainda não usar, você registra pelo app e guarda a nota fiscal como anexo.
+
+O código se confere sem conta em [conferir selo ou laudo](/verificar). Na compra de um usado, [como verificar se as revisões são verdadeiras](/blog/como-verificar-se-revisoes-do-carro-usado-sao-verdadeiras) mostra o que olhar além do selo.
 MD,
             ],
             [
@@ -287,7 +291,9 @@ MD,
                 'title' => 'Vender o carro com histórico: o que o comprador quer ver',
                 'excerpt' => 'Quem compra usado está calculando risco. Um histórico com datas, quilometragens e oficinas identificadas tira parte desse risco da conta.',
                 'content' => <<<'MD'
-Toda negociação de carro usado é uma conversa sobre risco. O comprador não sabe o que foi feito no veículo, então assume o pior cenário e desconta esse valor da oferta. Histórico é a forma mais direta de reduzir essa margem de dúvida.
+> Para mostrar as revisões na venda, junte data, quilometragem e quem fez cada serviço. No site, o botão da ficha se chama Exportar PDF. Com o script da página, ao terminar ele vira o link Baixar PDF. Sem o script, o arquivo segue por e-mail. O comprador confere o código do selo sem conta.
+
+Toda negociação de carro usado é uma conversa sobre risco. O comprador não sabe o que foi feito no veículo, então assume o pior cenário e desconta esse valor da oferta. Histórico é a forma mais direta de reduzir essa margem de dúvida. Não há um percentual de valorização para citar, e o histórico não promete venda mais rápida.
 
 ## O que o comprador tenta descobrir
 
@@ -310,9 +316,42 @@ Quando o serviço foi registrado pela oficina, o selo de verificação e o códi
 4. **Anexe as notas.** Fotos e documentos sustentam o registro.
 5. **Gere o PDF do histórico.** O relatório consolidado é o que você envia para o interessado antes mesmo da visita.
 
+## Como gerar o PDF no RevisaLog
+
+1. Entre na conta de proprietário e abra a ficha do veículo.
+2. Use o botão **Exportar PDF**. Sem o JavaScript da página, o arquivo é enviado por e-mail.
+3. Com o script da página, a geração termina num link **Baixar PDF** no lugar desse botão.
+4. O nome do botão dentro do aplicativo de iPhone não está neste site. A ficha da App Store diz que o app exporta PDF.
+
+O arquivo leva a linha do tempo, a quilometragem, o código do selo e o endereço de conferência (`revisalog.com.br/v/` mais o código). Notas fiscais em PDF entram no arquivo. Não há um QR desenhado: o selo leva o código e o endereço. Se a propriedade não foi confirmada pelo CRLV-e, a busca de procedência esconde o veículo e o PDF marca o histórico como não confirmado.
+
+Quem compra digita o código em [conferir selo ou laudo](/verificar), sem conta. O que olhar além do PDF está em [como verificar se as revisões são verdadeiras](/blog/como-verificar-se-revisoes-do-carro-usado-sao-verdadeiras).
+
+## Ter histórico valoriza o carro?
+
+Reduz a incerteza de quem compra e dá matéria para a negociação. Não há fonte pública, com data, que autorize um percentual. Não dá para prometer preço maior nem venda mais rápida.
+
 ## Do outro lado da negociação
 
-Se você está comprando, faça o caminho inverso: peça o chassi no anúncio e consulte o histórico antes de agendar a visita. Vale para confirmar o que existe — e para saber o que perguntar sobre o que não existe.
+Se você está comprando, faça o caminho inverso: peça o chassi no anúncio e consulte o histórico antes de agendar a visita. Vale para confirmar o que existe — e para saber o que perguntar sobre o que não existe. O [comparativo de apps de histórico de manutenção](/melhor-app-historico-manutencao-carro) mostra o que outros apps informam sobre PDF e sobre histórico que fica no carro.
+
+## Perguntas frequentes
+
+### Como gerar um PDF do histórico de manutenção?
+
+Na ficha do veículo, no site, o botão é Exportar PDF. Com o script da página, ao fim da geração o controle vira o link Baixar PDF. Sem o script, o arquivo vai por e-mail.
+
+### O comprador consegue conferir?
+
+Consegue, quando o serviço tem Selo da oficina. O código abre em /verificar sem conta. Declaração do proprietário ou do lojista não tem código.
+
+### Mando o PDF por onde?
+
+Por qualquer canal que vocês já usem. O RevisaLog não envia esse arquivo por WhatsApp e não integra com classificado.
+
+### Ter histórico valoriza o carro?
+
+Ajuda na negociação porque reduz a dúvida. Não há percentual para afirmar e não há promessa de venda mais rápida.
 MD,
             ],
         ];
