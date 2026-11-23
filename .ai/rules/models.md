@@ -125,6 +125,30 @@ Três detalhes que não são óbvios:
 que as duas contas batem em todos os veículos. Até lá, **nada de ler a tabela em tela, relatório,
 PDF ou API**: ela está sendo enchida, não servida.
 
+### O backfill é manual, e o `--check` é o portão
+
+`odometer:backfill-readings` alcança o histórico anterior aos observers. Ele **não** entra no deploy
+nem no `Schedule`: no deploy, acoplaria a liberação de código a uma varredura de todos os veículos
+sem ganhar nada (trocar o cálculo é outra liberação, decidida depois); no `Schedule`, um backfill que
+roda sozinho toda noite esconderia o dia em que passou a divergir. Ordem de uso: `--dry-run`, depois
+sem opção, depois `--check`.
+
+`--check` compara, veículo por veículo, `highestCountedKilometers` com a fórmula antiga
+(`max(odometer_at_registration, maior km de OS que conta)`) e **sai com código de erro** se alguma
+divergir. Enquanto ele não der zero, trocar o cálculo de `current_kilometers` mudaria o número de
+algum veículo sem ninguém saber qual. A comparação é contra a **fórmula**, não contra a coluna: a
+coluna pode estar velha por um registro anterior ao recálculo, e isso é relatado à parte
+(`vehicles:refresh-kilometers` resolve).
+
+Rodar de novo é seguro — cada leitura é upsert pela origem. Quem grava é o **mesmo**
+`VehicleOdometerLog` dos observers, de propósito: backfill que calcula por conta própria é backfill
+que discorda da produção.
+
+Comando de console guarda contador em propriedade: **zere no início do `handle`**. O console
+reaproveita a instância, então duas chamadas no mesmo processo somam os contadores da primeira —
+foi assim que um `--check` logo depois de outro relatou divergência já corrigida
+(`BackfillOdometerReadingsCommandTest`).
+
 A OS apagada leva a leitura dela pela **FK em cascata** (nenhum dos dois models usa `SoftDeletes`), e
 o gancho de `deleted` existe só para dizer isso.
 
