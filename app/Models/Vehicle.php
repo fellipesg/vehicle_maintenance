@@ -204,6 +204,15 @@ class Vehicle extends Model
         return $this->hasMany(VehiclePlate::class);
     }
 
+    /**
+     * O histórico do odômetro: uma linha por leitura, de qualquer origem. É daqui que sai o
+     * `current_kilometers` (ver App\Services\Vehicle\VehicleOdometerLog).
+     */
+    public function odometerReadings(): HasMany
+    {
+        return $this->hasMany(VehicleOdometerReading::class);
+    }
+
     public function currentPlate(): HasOne
     {
         return $this->hasOne(VehiclePlate::class)->whereNull('ended_at')->latestOfMany();
