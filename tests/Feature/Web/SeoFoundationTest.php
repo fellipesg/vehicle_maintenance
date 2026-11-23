@@ -48,6 +48,18 @@ class SeoFoundationTest extends TestCase
         $this->assertArrayNotHasKey('potentialAction', $this->jsonLdByType($page, 'WebSite'));
 
         $this->assertFaqMatches($page, HomeFaq::items());
+        $this->assertLessThanOrEqual(155, mb_strlen(HomeFaq::metaDescription()));
+
+        $answer = Faq::plain(HomeFaq::items()[0]['parts']);
+        $words = preg_split('/\s+/u', trim($answer)) ?: [];
+        $this->assertSame('O que é o RevisaLog?', HomeFaq::items()[0]['question']);
+        $this->assertGreaterThanOrEqual(40, count($words));
+        $this->assertLessThanOrEqual(60, count($words));
+        $text = (string) $page->documentElement?->textContent;
+        $this->assertStringContainsString('app para iPhone', $text);
+        $this->assertStringContainsString('Grátis no lançamento', $text);
+        $this->assertStringContainsString('Android em breve', $text);
+        $this->assertDoesNotMatchRegularExpression('/Android (já |está )?disponível/u', $text);
     }
 
     public function test_canonical_drops_the_query_string(): void

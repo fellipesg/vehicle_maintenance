@@ -62,6 +62,7 @@
 
             <div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2" data-landing-app-badges>
                 <x-landing.app-store-badge />
+                <p class="text-sm text-muted-foreground">Grátis no lançamento</p>
                 <p class="text-sm text-muted-foreground">Android em breve</p>
             </div>
 
