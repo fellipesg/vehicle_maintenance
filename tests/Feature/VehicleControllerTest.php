@@ -260,6 +260,102 @@ class VehicleControllerTest extends TestCase
         ])->assertStatus(429);
     }
 
+    /**
+     * Ocupação por chassi: POST /api/v1/vehicles grava is_current_owner com
+     * ownership_verified_at nulo para quem postar o chassi de um veículo que a oficina criou (sem
+     * dono, placa nem RENAVAM). Placa e RENAVAM pedidos no cadastro são inventáveis, então não
+     * servem de prova — o que resta é encarecer a varredura, com o mesmo balde de
+     * /vehicles/{id}/link: as duas rotas assumem veículo, e enumerar por duas portas não dá
+     * duas cotas.
+     */
+    public function test_vehicle_registration_attempts_share_the_vehicle_link_rate_limit(): void
+    {
+        $this->actingAsApiUser();
+
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $this->postJson('/api/v1/vehicles', [
+                'license_plate' => 'SCN'.str_pad((string) $attempt, 4, '0', STR_PAD_LEFT),
+                'renavam' => '9999999999'.$attempt,
+                'chassis' => 'SCAN'.str_pad((string) $attempt, 13, 'Z', STR_PAD_LEFT),
+                'brand' => 'Honda',
+                'model' => 'Civic',
+                'year' => now()->year - 2,
+                'current_kilometers' => 1_000,
+                'terms_accepted' => true,
+            ])->assertCreated();
+        }
+
+        $this->postJson('/api/v1/vehicles', [
+            'license_plate' => 'SCN9999',
+            'renavam' => '99999999998',
+            'chassis' => 'SCANZZZZZZZZZZZZZ',
+            'brand' => 'Honda',
+            'model' => 'Civic',
+            'year' => now()->year - 2,
+            'current_kilometers' => 1_000,
+            'terms_accepted' => true,
+        ])->assertStatus(429);
+    }
+
+    public function test_chassis_scan_and_vehicle_link_do_not_get_two_quotas(): void
+    {
+        $this->actingAsApiUser();
+        $vehicle = Vehicle::factory()->create();
+
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $this->postJson("/api/v1/vehicles/{$vehicle->id}/link", [
+                'license_plate' => 'XYZ9K88',
+                'renavam' => '99999999999',
+            ])->assertStatus(422);
+        }
+
+        $this->postJson('/api/v1/vehicles', [
+            'license_plate' => 'SCN1D23',
+            'renavam' => '01050047521',
+            'chassis' => '9BWZZZ377VT004251',
+            'brand' => 'Honda',
+            'model' => 'Civic',
+            'year' => now()->year - 2,
+            'current_kilometers' => 1_000,
+            'terms_accepted' => true,
+        ])->assertStatus(429);
+    }
+
+    public function test_owner_still_claims_a_workshop_vehicle_by_chassis(): void
+    {
+        // O caso legítimo: a oficina cadastrou o carro de um cliente novo pelo chassi, e o dono
+        // chega pelo app com placa e RENAVAM. O vínculo nasce sem verificação, como antes.
+        $user = $this->actingAsApiUser();
+        $workshopVehicle = Vehicle::factory()->create([
+            'license_plate' => null,
+            'renavam' => null,
+            'chassis' => '9BWZZZ377VT004251',
+            'year' => now()->year - 2,
+            'current_kilometers' => 0,
+            'odometer_at_registration' => null,
+        ]);
+
+        $this->postJson('/api/v1/vehicles', [
+            'license_plate' => 'CHS1D23',
+            'renavam' => '01050047521',
+            'chassis' => '9BWZZZ377VT004251',
+            'brand' => 'Honda',
+            'model' => 'Civic',
+            'year' => now()->year - 2,
+            'current_kilometers' => 30_000,
+            'terms_accepted' => true,
+        ])->assertCreated()
+            ->assertJsonPath('data.id', $workshopVehicle->id);
+
+        $this->assertDatabaseHas('user_vehicles', [
+            'user_id' => $user->id,
+            'vehicle_id' => $workshopVehicle->id,
+            'is_current_owner' => true,
+            'ownership_verified_at' => null,
+        ]);
+        $this->assertSame(1, Vehicle::query()->count());
+    }
+
     public function test_cannot_show_nonexistent_vehicle(): void
     {
         $this->actingAsApiUser();

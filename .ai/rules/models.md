@@ -98,23 +98,40 @@ O teto é `PLAUSIBILITY_BASE_KILOMETERS` (50.000 km) + `PLAUSIBILITY_KILOMETERS_
 teto só pega quem digitou um dígito a mais, porque recusar um veículo real é pior que aceitar um
 número alto. **Não aperte a folga sem o caso de uso na mão.**
 
-Dois casos em que o teto **não** recusa um veículo real, os dois com teste
-(`tests/Feature/VehicleMileagePlausibilityTest.php`):
+**Veículo sem ano conhecido** (ano zero/nulo) não tem teto nenhum — não há de onde derivar, e chutar
+um ano seria recusar por chute. É o único caso sem teto, e tem teste
+(`tests/Feature/VehicleMileagePlausibilityTest.php`).
 
-- **veículo sem ano conhecido** (ano zero/nulo): não há teto nenhum — não há de onde derivar, e
-  chutar um ano seria recusar por chute;
-- **veículo que já roda acima do teto derivado do ano**, legitimamente (frota, caminhão, veículo antigo com rodagem
-  alta) ou não (erro ainda não suprimido): o teto fica um ano de folga **acima** do que o veículo já
-  registra (piso da data, `current_kilometers`, `odometer_at_registration`). Parar na leitura atual
-  deixaria a faixa vazia — o veículo não somaria nem um km — e seria exatamente recusar quem roda
-  muito, o que a regra existe para não fazer.
+Para todos os outros o teto é função do ano e só dele: `[fromYear, fromYear + um ano de folga]`
+(`plausibilityCeilingFor`). A folga existe porque parar exatamente na leitura atual deixaria a faixa
+vazia — o veículo no topo da faixa do ano dele não somaria nem um km. O que o veículo **já registra**
+(piso da data, `current_kilometers`, `odometer_at_registration`) entra no cálculo **só até o teto do
+ano**: leitura implausível já gravada não amplia o teto.
 
-O guard é **uma** implementação no serviço: as quatro superfícies que gravam km
-(`StoreMaintenanceRequest`, `UpdateMaintenanceRequest`, formulário do proprietário e da oficina na
-web) chamam o serviço e não repetem a regra na validação. `max:9999999` continua lá só como limite
-de coluna. O teto entra na faixa que o formulário mostra: `MaintenanceMileageContext` manda o `year`
-e `resources/js/utils/maintenance-kilometers.js` espelha as duas constantes — mude os dois juntos
-(`.ai/rules/js.md`).
+Esse recorte é o conserto de um defeito, não um aperto de folga. O termo "já rodado" era ilimitado,
+então cada leitura gravada subia o teto em mais um ano de folga — uma catraca. E como o hodômetro do
+**cadastro** não passava por teto nenhum, cadastrar um veículo do ano com 9.999.999 km levava o teto
+daquele chassi para além de qualquer `max:9999999`: o teto deixava de existir nas quatro superfícies
+de OS, para sempre. Um número que nunca passaria na validação não pode virar o piso que amplia a
+validação. O preço aceito é o veículo que roda mais de PLAUSIBILITY_KILOMETERS_PER_YEAR acima do teto
+do ano **dentro do mesmo ano-calendário**: ele espera a virada do ano (que sobe o teto) ou a correção
+do ano do cadastro.
+
+O guard é **uma** implementação no serviço, com duas portas de entrada. A OS chama
+`assertMaintenanceKilometers` nas quatro superfícies que gravam km (`StoreMaintenanceRequest`,
+`UpdateMaintenanceRequest`, formulário do proprietário e da oficina na web); o **hodômetro do
+veículo** chama `assertOdometerKilometers`, porque esse número não fica no cadastro — vira
+`odometer_at_registration`, o piso de toda OS seguinte e um termo do próprio teto. Hoje estão nessa
+segunda porta: cadastro e edição de veículo na web (`RegistersVehicleWithOwnership`,
+`UpdatesVehicleDetails`, nos dois portais), `POST`/`PUT /api/v1/vehicles`,
+`VehicleOwnershipService::registerNew` e `::claimUnclaimedWorkshopVehicle`, e
+`VehicleMileageService::registerOdometer`, que é o backstop de quem gravar hodômetro por um caminho
+novo — inclusive o veículo que a oficina cria pelo chassi junto com a OS
+(`WorkshopVehicleRegistrar`, com a chave de erro `kilometers`). Nenhuma delas repete a regra na
+validação; `max:9999999` continua lá só como limite de coluna. O teto entra na faixa que o formulário
+mostra: `MaintenanceMileageContext` manda o `year` e
+`resources/js/utils/maintenance-kilometers.js` espelha as duas constantes **e o recorte** — mude os
+dois juntos (`.ai/rules/js.md`).
 
 Teste que grava km alto **fixa o ano do veículo**. `VehicleFactory` sorteia
 `year` entre 2010 e o ano corrente, e o teto sai desse ano: com 300.000 km o teste passava no

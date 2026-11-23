@@ -7,9 +7,9 @@
  *   também o hodômetro do cadastro;
  * - teto: a menor quilometragem registrada depois da data; antes da data do cadastro, também o
  *   hodômetro do cadastro; e sempre o teto de plausibilidade derivado do ano do veículo
- *   (PLAUSIBILITY_BASE_KILOMETERS + PLAUSIBILITY_KILOMETERS_PER_YEAR por ano de vida, e nunca menos
- *   de um ano de folga acima do que o veículo já registra), que é o único teto quando não há
- *   registro posterior. Veículo sem ano conhecido não tem esse teto.
+ *   (PLAUSIBILITY_BASE_KILOMETERS + PLAUSIBILITY_KILOMETERS_PER_YEAR por ano de vida, mais um ano de
+ *   folga quando o veículo já está no topo dessa faixa), que é o único teto quando não há registro
+ *   posterior. Veículo sem ano conhecido não tem esse teto.
  *
  * Datas no formato AAAA-MM-DD (comparadas como texto, como o whereDate do servidor).
  *
@@ -52,8 +52,9 @@ export function formatKilometers(kilometers) {
 }
 
 /**
- * Espelha VehicleMileageService::plausibilityCeiling(): null quando o ano é desconhecido, e sempre
- * um ano de folga acima do que o veículo já registra.
+ * Espelha VehicleMileageService::plausibilityCeilingFor(): null quando o ano é desconhecido; senão o
+ * teto do ano, com um ano de folga quando o veículo já está no topo da faixa. O que o veículo já
+ * registra entra **só até o teto do ano** — leitura implausível já gravada não amplia o teto.
  *
  * @param {MileageVehicle} vehicle
  * @param {number} floor
@@ -67,15 +68,17 @@ function plausibilityCeiling(vehicle, floor) {
     }
 
     const yearsOfLife = Math.max(0, new Date().getFullYear() - year) + 1;
+    const fromYear = PLAUSIBILITY_BASE_KILOMETERS + (yearsOfLife * PLAUSIBILITY_KILOMETERS_PER_YEAR);
     const alreadyRun = Math.max(
+        0,
         floor,
         Number(vehicle?.current_kilometers) || 0,
         Number(vehicle?.registration_kilometers) || 0,
     );
 
     return Math.max(
-        PLAUSIBILITY_BASE_KILOMETERS + (yearsOfLife * PLAUSIBILITY_KILOMETERS_PER_YEAR),
-        alreadyRun + PLAUSIBILITY_KILOMETERS_PER_YEAR,
+        fromYear,
+        Math.min(alreadyRun, fromYear) + PLAUSIBILITY_KILOMETERS_PER_YEAR,
     );
 }
 

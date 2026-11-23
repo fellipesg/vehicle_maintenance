@@ -20,6 +20,7 @@ class VehicleOwnershipService
         private readonly CrlvExerciseValidator $exerciseValidator,
         private readonly VehiclePlateHistoryService $plateHistory,
         private readonly WorkshopRecordsArrivalNotifier $arrivalNotifier,
+        private readonly VehicleMileageService $mileage,
     ) {}
 
     /**
@@ -40,6 +41,13 @@ class VehicleOwnershipService
         if ($renavam === '' || $crvNumber === '') {
             throw new RuntimeException('RENAVAM e número do CRV são obrigatórios para o primeiro cadastro.');
         }
+
+        // O hodômetro do cadastro passa pelo teto de plausibilidade: ele vira
+        // odometer_at_registration, que é o piso de toda OS seguinte (VehicleMileageService).
+        $this->mileage->assertOdometerKilometers(
+            (int) ($vehicleData['current_kilometers'] ?? 0),
+            isset($vehicleData['year']) ? (int) $vehicleData['year'] : null,
+        );
 
         if ($chassis !== '' && Vehicle::findByChassis($chassis)) {
             throw new RuntimeException('Este veículo já está cadastrado. Envie o CRLV-e para vincular à sua conta.');
@@ -181,6 +189,14 @@ class VehicleOwnershipService
      */
     public function claimUnclaimedWorkshopVehicle(User $user, Vehicle $vehicle, array $vehicleData): Vehicle
     {
+        if (isset($vehicleData['current_kilometers'])) {
+            $this->mileage->assertOdometerKilometers(
+                (int) $vehicleData['current_kilometers'],
+                (int) ($vehicleData['year'] ?? $vehicle->year),
+                $vehicle,
+            );
+        }
+
         $vehicle = DB::transaction(function () use ($user, $vehicle, $vehicleData): Vehicle {
             $updates = [];
             $plate = VehiclePlateSearch::normalize((string) ($vehicleData['license_plate'] ?? ''));

@@ -164,6 +164,15 @@ class MaintenanceController extends Controller
                 (int) $data['kilometers'],
                 $data['maintenance_date'],
             );
+        } else {
+            // Veículo que nasce nesta requisição (chassi novo): não há histórico para conferir, mas
+            // a leitura vira o hodômetro de cadastro dele (WorkshopVehicleRegistrar), então o teto
+            // de plausibilidade do ano informado vale aqui também — antes de qualquer upload.
+            app(VehicleMileageService::class)->assertOdometerKilometers(
+                (int) $data['kilometers'],
+                (int) $newVehicle['year'],
+                attribute: 'kilometers',
+            );
         }
 
         $maintenanceData = [

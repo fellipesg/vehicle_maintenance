@@ -77,6 +77,19 @@ isso fazia F5, "Trocar veículo" e o retorno de um erro de validação gastarem 
 O limite não basta sozinho: o que cada perfil pode ver do veículo achado está em
 `.ai/rules/public-lookup.md`.
 
+## Rota que assume veículo divide o balde `vehicle-link`
+
+`POST /api/v1/vehicles` e `POST /api/v1/vehicles/{id}/link` levam `throttle:vehicle-link` (10/min por
+conta ou IP). As duas assumem veículo a partir de identificador, e o cadastro pelo chassi grava
+`is_current_owner` para **quem postar o chassi** de um veículo que a oficina criou (sem dono, placa
+nem RENAVAM): placa e RENAVAM pedidos no cadastro são inventáveis — só há regra `unique` —, então não
+funcionam como prova, e o que resta é encarecer a varredura. O balde é o mesmo de propósito, como em
+`account-vehicle-search`: é a mesma política, e enumerar por duas rotas não dá duas cotas. A posse
+obtida assim **não** é verificada (`ownership_verified_at` nulo) e é recuperável pelo CRLV-e
+(`VehicleOwnershipService::claimExisting`, que tira o veículo de quem o tomou e avisa por e-mail); é
+esse atenuante que faz do teto de requisições a correção certa aqui, em vez de barrar o caso legítimo
+da oficina que cadastrou o carro de um cliente novo.
+
 ## Rota que manda e-mail para o endereço digitado tem balde próprio
 
 Além do `throttle` por IP, essa rota precisa de um teto por destinatário, e nunca divide o balde com

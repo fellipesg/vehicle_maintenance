@@ -106,6 +106,18 @@ class VehicleController extends Controller
 
         $unclaimed = $request->unclaimedWorkshopVehicle();
 
+        // Teto de plausibilidade do hodômetro de cadastro, antes de gravar qualquer coisa: o número
+        // vira odometer_at_registration e o piso de toda OS seguinte (VehicleMileageService).
+        try {
+            app(VehicleMileageService::class)->assertOdometerKilometers(
+                (int) $data['current_kilometers'],
+                (int) $data['year'],
+                $unclaimed,
+            );
+        } catch (ValidationException $e) {
+            return ApiResponse::validation($e->errors());
+        }
+
         if ($unclaimed !== null) {
             // Chegada do proprietário a um veículo que a oficina criou pelo chassi: o vínculo não é
             // verificado, e os registros pendentes das oficinas esperam a decisão dele.
@@ -159,6 +171,18 @@ class VehicleController extends Controller
         $validated = $request->validated();
         $plateChangedAt = $validated['plate_changed_at'] ?? null;
         unset($validated['plate_changed_at']);
+
+        if (array_key_exists('current_kilometers', $validated)) {
+            try {
+                app(VehicleMileageService::class)->assertOdometerKilometers(
+                    (int) $validated['current_kilometers'],
+                    (int) ($validated['year'] ?? $vehicle->year),
+                    $vehicle,
+                );
+            } catch (ValidationException $e) {
+                return ApiResponse::validation($e->errors());
+            }
+        }
 
         $newPlate = $validated['license_plate'] ?? null;
         $previousPlate = $vehicle->license_plate;

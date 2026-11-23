@@ -87,7 +87,11 @@ Route::prefix('v1')->group(function () {
 
         // Vehicle routes
         Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('ability:vehicles:read');
-        Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('ability:vehicles:write');
+        // Cadastro pelo chassi assume o veículo que a oficina criou (sem dono, placa nem RENAVAM):
+        // é a mesma política de /vehicles/{id}/link e divide o balde com ela de propósito —
+        // varrer chassi por duas rotas não dá duas cotas (.ai/rules/routes.md, abuse-guards.md).
+        Route::post('/vehicles', [VehicleController::class, 'store'])
+            ->middleware(['ability:vehicles:write', 'throttle:vehicle-link']);
         Route::get('/vehicles/{id}', [VehicleController::class, 'show'])->middleware('ability:vehicles:read');
         Route::get('/vehicles/{id}/plates', [VehicleController::class, 'plates'])->middleware('ability:vehicles:read');
         Route::put('/vehicles/{id}', [VehicleController::class, 'update'])->middleware('ability:vehicles:write');

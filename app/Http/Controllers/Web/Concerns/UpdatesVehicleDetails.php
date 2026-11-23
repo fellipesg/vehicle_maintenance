@@ -6,6 +6,7 @@ use App\Models\Vehicle;
 use App\Rules\Chassis;
 use App\Rules\UniqueRenavam;
 use App\Services\Vehicle\VehicleCoverService;
+use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\VehiclePlateHistoryService;
 use App\Support\Vehicle\VehicleEntryFlow;
 use Illuminate\Http\Request;
@@ -56,6 +57,16 @@ trait UpdatesVehicleDetails
         ], [
             'current_kilometers.min' => 'A quilometragem atual não pode ser menor que a da última manutenção registrada ('.number_format($kilometerFloor, 0, ',', '.').' km).',
         ]);
+
+        // Teto de plausibilidade do hodômetro: `max:9999999` é limite de coluna, não de realidade, e
+        // o número editado aqui volta a ser o piso de toda OS seguinte (VehicleMileageService).
+        if (($data['current_kilometers'] ?? null) !== null) {
+            app(VehicleMileageService::class)->assertOdometerKilometers(
+                (int) $data['current_kilometers'],
+                (int) $data['year'],
+                $vehicle,
+            );
+        }
 
         $newPlate = (string) $data['license_plate'];
         $previousPlate = (string) $vehicle->license_plate;

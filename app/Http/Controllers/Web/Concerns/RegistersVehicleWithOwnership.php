@@ -7,6 +7,7 @@ use App\Rules\Chassis;
 use App\Rules\UniqueRenavam;
 use App\Services\Crlv\CrlvParseResult;
 use App\Services\Maintenance\OwnerlessMaintenanceService;
+use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\VehicleOwnershipService;
 use App\Support\Vehicle\VehicleEntryFlow;
 use Illuminate\Http\RedirectResponse;
@@ -159,6 +160,17 @@ trait RegistersVehicleWithOwnership
         }
 
         $data = $request->validate($this->vehicleValidationRules(), $this->vehicleValidationMessages());
+
+        // Teto de plausibilidade do hodômetro, aqui no passo Conferir: `max:9999999` é limite de
+        // coluna, não de realidade, e o número informado vira `odometer_at_registration` — o piso de
+        // toda OS seguinte e um termo do próprio teto (VehicleMileageService). O desvio para a
+        // procuração guarda esses dados na sessão e só grava depois do PDF, então recusar lá seria
+        // recusar depois de o lojista subir o documento.
+        app(VehicleMileageService::class)->assertOdometerKilometers(
+            (int) $data['current_kilometers'],
+            (int) $data['year'],
+        );
+
         $ownership = app(VehicleOwnershipService::class);
 
         try {
