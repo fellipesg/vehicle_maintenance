@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Enums\WarrantyScope;
 use App\Enums\WorkshopReviewStatus;
+use App\Observers\MaintenanceObserver;
 use App\Support\DisplayTime;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Gate;
 
+#[ObservedBy(MaintenanceObserver::class)]
 class Maintenance extends Model
 {
     use HasFactory;

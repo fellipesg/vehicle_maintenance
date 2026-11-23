@@ -54,7 +54,7 @@ class VehicleOdometerReadingsTest extends TestCase
 
         $this->log()->recordFromMaintenance($maintenance);
 
-        $reading = $vehicle->odometerReadings()->sole();
+        $reading = $this->maintenanceReadings($vehicle)->sole();
         $this->assertSame(61_000, $reading->kilometers);
         $this->assertSame('2026-03-10', $reading->measured_at->toDateString());
         $this->assertSame(OdometerReadingSource::Maintenance, $reading->source);
@@ -65,7 +65,7 @@ class VehicleOdometerReadingsTest extends TestCase
         $maintenance->update(['kilometers' => 62_500, 'maintenance_date' => '2026-04-02']);
         $this->log()->recordFromMaintenance($maintenance->fresh());
 
-        $reading = $vehicle->odometerReadings()->sole();
+        $reading = $this->maintenanceReadings($vehicle)->sole();
         $this->assertSame(62_500, $reading->kilometers);
         $this->assertSame('2026-04-02', $reading->measured_at->toDateString());
     }
@@ -80,7 +80,7 @@ class VehicleOdometerReadingsTest extends TestCase
         $maintenance->update(['kilometers' => null]);
 
         $this->assertNull($this->log()->recordFromMaintenance($maintenance->fresh()));
-        $this->assertSame(0, $vehicle->odometerReadings()->count());
+        $this->assertSame(0, $this->maintenanceReadings($vehicle)->count());
     }
 
     public function test_a_disputed_or_suppressed_maintenance_stops_counting_without_losing_the_reading(): void
@@ -132,25 +132,28 @@ class VehicleOdometerReadingsTest extends TestCase
         $this->assertSame(OdometerReadingSource::Inspection, $reading->source);
         $this->assertFalse($reading->counts_toward_odometer);
         // O laudo pode estar relatando adulteração: alimentar o km do veículo com ele é o que
-        // .ai/rules/inspections.md proíbe.
-        $this->assertSame(0, $this->log()->highestCountedKilometers($vehicle->fresh()));
+        // .ai/rules/inspections.md proíbe. O hodômetro fica onde estava — no km do cadastro.
+        $this->assertSame(20_000, $this->log()->highestCountedKilometers($vehicle->fresh()));
     }
 
     public function test_an_owner_report_appends_a_reading_each_time(): void
     {
         [$owner, $vehicle] = $this->ownerWithVehicle();
 
-        $this->log()->recordOwnerReport($vehicle, 15_000, $owner);
-        $this->log()->recordOwnerReport($vehicle, 15_150, $owner);
+        $this->log()->recordOwnerReport($vehicle, 25_000, $owner);
+        $this->log()->recordOwnerReport($vehicle, 25_150, $owner);
 
-        $readings = $vehicle->odometerReadings()->latestFirst()->get();
+        $readings = $vehicle->odometerReadings()
+            ->where('source', OdometerReadingSource::OwnerReport)
+            ->latestFirst()
+            ->get();
 
         // Série temporal: cada resposta do dono é leitura nova, não correção da anterior.
         $this->assertCount(2, $readings);
-        $this->assertSame(15_150, $readings->first()->kilometers);
+        $this->assertSame(25_150, $readings->first()->kilometers);
         $this->assertSame(OdometerReadingSource::OwnerReport, $readings->first()->source);
         $this->assertSame($owner->id, $readings->first()->user_id);
-        $this->assertSame(15_150, $this->log()->highestCountedKilometers($vehicle->fresh()));
+        $this->assertSame(25_150, $this->log()->highestCountedKilometers($vehicle->fresh()));
     }
 
     public function test_the_provenance_of_a_reading_is_not_mass_assignable(): void
@@ -215,6 +218,17 @@ class VehicleOdometerReadingsTest extends TestCase
         $this->attachVehicleToUser($owner, $vehicle);
 
         return [$owner->refresh(), $vehicle];
+    }
+
+    /**
+     * As leituras de OS deste veículo. O veículo da factory nasce com hodômetro de cadastro, que o
+     * VehicleObserver projeta: quem fala de OS precisa dizer OS.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<VehicleOdometerReading, Vehicle>
+     */
+    private function maintenanceReadings(Vehicle $vehicle)
+    {
+        return $vehicle->odometerReadings()->where('source', OdometerReadingSource::Maintenance);
     }
 
     private function maintenance(User $owner, Vehicle $vehicle, int $kilometers, string $date): Maintenance

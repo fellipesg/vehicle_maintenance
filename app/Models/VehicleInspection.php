@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\InspectionVerdict;
+use App\Observers\VehicleInspectionObserver;
 use App\Support\Inspection\InspectionFindings;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +21,7 @@ use Illuminate\Support\Facades\Gate;
  * App\Services\Inspection\VehicleInspectionService, que é quem recusa um "Aprovado" em cima de um
  * eixo reprovado. Fillable, qualquer `update()` de controller contornaria a garantia.
  */
+#[ObservedBy(VehicleInspectionObserver::class)]
 class VehicleInspection extends Model
 {
     use HasFactory;

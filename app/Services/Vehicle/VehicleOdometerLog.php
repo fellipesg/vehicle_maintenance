@@ -52,6 +52,25 @@ class VehicleOdometerLog
     }
 
     /**
+     * Espelha `vehicles.odometer_at_registration` na leitura do cadastro: grava quando a coluna tem
+     * número, apaga quando ela ficou nula. É o que o VehicleObserver chama, e é a única entrada que
+     * lê o km do próprio veículo em vez de recebê-lo — porque aqui o dono do número é a coluna.
+     */
+    public function syncRegistration(Vehicle $vehicle): ?VehicleOdometerReading
+    {
+        if ($vehicle->odometer_at_registration === null) {
+            VehicleOdometerReading::query()
+                ->where('vehicle_id', $vehicle->id)
+                ->where('source', OdometerReadingSource::Registration)
+                ->delete();
+
+            return null;
+        }
+
+        return $this->recordRegistration($vehicle, (int) $vehicle->odometer_at_registration);
+    }
+
+    /**
      * A leitura de uma OS. Devolve null — e apaga a leitura que houver — quando a OS está sem km:
      * `maintenances.kilometers` é nulável, e OS sem km não é leitura de odômetro.
      */

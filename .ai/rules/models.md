@@ -82,6 +82,52 @@ Toda mudança no que conta recalcula na hora: `dispute`, `withdrawDispute`, `dec
 (MaintenanceOwnerDecisionService) e `hide`/`restore` (MaintenancePublicVisibilityService). Sem isso o
 veículo fica com o km velho até a próxima gravação qualquer.
 
+## Hodômetro: toda leitura deixa linha em `vehicle_odometer_readings`
+O veículo tem **um** odômetro, e o km dele morava em quatro colunas de três tabelas
+(`vehicles.current_kilometers`, `vehicles.odometer_at_registration`, `maintenances.kilometers`,
+`vehicle_inspections.odometer_km`). Nenhuma delas é "a leitura": é por isso que o lembrete de revisão
+quase nunca dispara (o km corrente é o âncora) e que o teto de plausibilidade tinha furo.
+
+`vehicle_odometer_readings` é a fonte da verdade **do odômetro** — não da OS nem do laudo, que seguem
+donos dos dados deles. É uma **projeção de mão única**: a origem escreve na coluna dela, e a leitura
+acompanha. Quem escreve na tabela é só `App\Services\Vehicle\VehicleOdometerLog`, e cada
+`recordFrom*` é um **upsert pela origem** — corrigir o km de uma OS corrige a leitura dela em vez de
+empilhar uma segunda. O `unique` em `maintenance_id` e em `vehicle_inspection_id` garante isso no
+banco, não só no código (é também o que deixa o backfill rodar de novo sem medo).
+
+Quem alimenta são **observers de model**, não chamadas nos controllers: são seis superfícies gravando
+OS e três gravando hodômetro de cadastro, com assinaturas diferentes, e a projeção não pode depender
+de nenhuma delas lembrar.
+
+| Origem | Gancho | Conta para o hodômetro |
+| --- | --- | --- |
+| cadastro e edição do veículo | `VehicleObserver`, espelhando `odometer_at_registration` | sim |
+| OS | `MaintenanceObserver` | sim, menos contestada e suprimida |
+| laudo da cautelar | `VehicleInspectionObserver` | **nunca** |
+| relato do dono | `VehicleOdometerLog::recordOwnerReport` (sem tela ainda) | sim |
+
+Três detalhes que não são óbvios:
+
+- **`source` e `counts_toward_odometer` não são fillable**, nem as duas FKs de origem. Fillable,
+  qualquer `update()` de controller marcaria uma autodeclaração como leitura de oficina — e é dessa
+  distinção que depende o que pode alimentar taxa de rodagem e teto de plausibilidade.
+- **Contestação e supressão viram a chave, não apagam a linha** (`syncCounts`): a leitura continua no
+  histórico, com a marca, pelo mesmo motivo da seção anterior. O `MaintenanceObserver` separa os dois
+  casos — km/data/veículo regravam a leitura; `owner_disputed_at`/`hidden_by_user_id` só viram a
+  chave —, e é por isso que `dispute`, `withdrawDispute`, `decide`, `hide` e `restore` chegam à
+  projeção sem saber que ela existe.
+- **A leitura do cadastro nasce sem usuário**, de propósito: a coluna que ela espelha também não tem
+  um. Quem cadastrou está em `user_vehicles`; o "quem registrou" é das origens que têm autor.
+
+**Ainda ninguém lê a tabela.** `current_kilometers` continua saindo da fórmula antiga
+(`refreshCurrentKilometers`/`applyMaintenanceKilometers`). Trocar o cálculo por
+`VehicleOdometerLog::highestCountedKilometers` é o passo seguinte, e só depois de o backfill conferir
+que as duas contas batem em todos os veículos. Até lá, **nada de ler a tabela em tela, relatório,
+PDF ou API**: ela está sendo enchida, não servida.
+
+A OS apagada leva a leitura dela pela **FK em cascata** (nenhum dos dois models usa `SoftDeletes`), e
+o gancho de `deleted` existe só para dizer isso.
+
 ## Hodômetro: quilometragem implausível é recusada na entrada
 `VehicleMileageService::assertMaintenanceKilometers` não confere só os registros vizinhos: acima
 deles vale o **teto de plausibilidade** derivado do ano do veículo
