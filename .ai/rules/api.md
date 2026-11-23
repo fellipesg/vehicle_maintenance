@@ -147,3 +147,17 @@ sendo `POST /api/v1/invoices/upload`, que pede `ability:invoices:write` e `invoi
 Sem as fotos das manutenções na conta (flag por conta, features.md): POST /maintenances/{m}/photos responde 403; MaintenanceResource devolve `photos` vazio, `photos_count` 0 e `photos_locked` false (o campo continua existindo); a linha do tempo devolve `photos_count` 0, `photos_locked` false e `photo_preview` vazio; as rotas autorizadas respondem 403 e nenhuma URL assinada é emitida (uma URL já emitida vale até expirar, no máximo 20 minutos, porque a rota assinada não tem usuário). `attachments.photos` dos registros de oficina vira 0. A busca pública por placa (GET /vehicles/search/{identifier}) é a exceção documentada: segue com as fotos públicas, com ou sem o recurso.
 
 `GET /api/v1/me`, login e cadastro trazem `features: {"maintenance_photos": true|false}` em UserResource (só na própria conta, nunca no autor de uma OS aninhada), para o app esconder a interface. `export_include_photos` continua no payload, mas o PUT /me o recusa com 422 quando a conta não tem o recurso.
+
+## Cadastro pelo CRLV-e no app (contrato com o app)
+`POST /api/v1/vehicles/crlv` (multipart `crlv`, `throttle:uploads`) lê o PDF e responde `mode`
+(`new` | `claim` | `linked`), `ownership` (`owner` | `consignment`), `crlv_verification_token`,
+`vehicle` (os campos lidos, **sem** nome nem CPF/CNPJ do titular) e `existing_vehicle` (marca, modelo,
+ano e contagens, sem identificadores). A leitura fica no cache por 30 minutos, presa à conta
+(`App\Services\Crlv\CrlvApiImportStore`): é o `crlv_verification` do site sem sessão. O app nunca
+reenvia os dados do documento como prova; só o token.
+
+`new` grava em `POST /api/v1/vehicles` com o token: placa e RENAVAM do formulário precisam bater com o
+CRLV-e, o CRV vem só da leitura e a posse fica verificada (`registerNew`). `claim` confirma em
+`POST /api/v1/vehicles/crlv/claim` (`claimExisting`, mesma prova do site). Procuração não existe no
+app: `ownership: consignment` grava 422 com `VehicleCrlvMessages::POWER_OF_ATTORNEY_ON_WEB`. O token
+vale uma gravação. Sem o token, `POST /vehicles` segue como cadastro manual, sem verificar a posse.

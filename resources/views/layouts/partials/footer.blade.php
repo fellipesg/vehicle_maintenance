@@ -17,6 +17,7 @@
             ['label' => 'Preço', 'href' => route('home').'#preco'],
             ['label' => 'Perguntas frequentes', 'href' => route('home').'#faq'],
             ['label' => 'Blog', 'href' => route('blog.index')],
+            ['label' => 'Comparativo de apps', 'href' => route('guides.comparison')],
         ],
         'Conta' => [
             ['label' => 'Entrar', 'href' => route('login')],

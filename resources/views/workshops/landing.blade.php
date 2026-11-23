@@ -16,10 +16,15 @@
     ];
 @endphp
 
+@section('meta_description', \App\Support\Seo\WorkshopFaq::metaDescription())
+
 @push('head')
-    <meta name="description" content="RevisaLog para oficinas: o nome da sua oficina fica no histórico do carro com o Selo da oficina. Cadastro direto no site, grátis no lançamento.">
-    <meta property="og:title" content="RevisaLog para oficinas">
-    <meta property="og:description" content="O nome da sua oficina fica no histórico do carro com o Selo da oficina. Cadastro direto no site, grátis no lançamento.">
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::webPage('Para oficinas', \App\Support\Seo\WorkshopFaq::metaDescription(), \App\Support\Seo\CanonicalUrl::named('workshops.landing'))" />
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::breadcrumb([
+        ['name' => 'Início', 'url' => \App\Support\Seo\CanonicalUrl::home()],
+        ['name' => 'Para oficinas', 'url' => \App\Support\Seo\CanonicalUrl::named('workshops.landing')],
+    ])" />
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::faqPage(\App\Support\Seo\WorkshopFaq::items())" />
 @endpush
 
 {{--
@@ -36,6 +41,7 @@
 
     <div class="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 sm:px-6 sm:py-16 lg:grid-cols-2 lg:gap-12 lg:py-24">
         <div>
+            <x-ui.breadcrumb class="mb-5" :items="[['Início', \App\Support\Seo\CanonicalUrl::home()], ['Para oficinas']]" />
             <p class="landing-intro mb-5 inline-flex items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground ring-1 ring-accent-border ring-inset">
                 <x-ui.icon name="wrench-screwdriver" class="size-4" />
                 Para oficinas
@@ -138,26 +144,7 @@
 <section id="faq" class="scroll-mt-24 border-t border-border bg-background py-16 sm:py-20" aria-labelledby="faq-titulo">
     <x-ui.container size="md">
         <h2 id="faq-titulo" class="text-center text-3xl font-bold text-foreground">Perguntas frequentes</h2>
-        <div class="mt-10 space-y-3">
-            <x-landing.faq-item question="Preciso esperar a equipe aprovar o cadastro?">
-                Não. A conta funciona assim que o cadastro termina: você já entra na área da oficina.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="Por que pedem o CNPJ?">
-                Para identificar a oficina que assina o Selo da oficina. O CNPJ é conferido no cadastro e uma oficina não se cadastra duas vezes.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="O que é o Selo da oficina?">
-                É a confirmação de que o serviço foi feito pela oficina. Cada Selo tem um código, e qualquer pessoa confere em <x-ui.link :href="route('verification.lookup')" variant="inline">Conferir selo da oficina</x-ui.link>, sem conta.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="E se o cliente registrar um serviço feito aqui?">
-                O serviço aparece na fila de validação da oficina. Você confirma os que foram feitos aí e o registro recebe o Selo da oficina.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="Vai ser cobrado?">
-                No lançamento, não. Se no futuro houver planos pagos, avisamos com antecedência, e nada é cobrado sem a oficina contratar.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="Tenho uma loja de veículos, não uma oficina.">
-                O cadastro próprio é só para oficinas. Para lojas, <x-ui.link :href="$contactUrl" variant="inline">fale com a equipe</x-ui.link>.
-            </x-landing.faq-item>
-        </div>
+        <x-seo.faq-list :items="\App\Support\Seo\WorkshopFaq::items()" />
     </x-ui.container>
 </section>
 

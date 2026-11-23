@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\UserFcmTokenController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\VehicleCrlvController;
 use App\Http\Controllers\Api\VehiclePdfExportController;
 use App\Http\Controllers\Api\WarrantyTemplateController;
 use App\Http\Controllers\Api\WorkshopController;
@@ -92,6 +93,15 @@ Route::prefix('v1')->group(function () {
         // varrer chassi por duas rotas não dá duas cotas (.ai/rules/routes.md, abuse-guards.md).
         Route::post('/vehicles', [VehicleController::class, 'store'])
             ->middleware(['ability:vehicles:write', 'throttle:vehicle-link']);
+        // O claim pelo CRLV-e não entra no balde do chassi de propósito: ele só acontece com um
+        // token do /vehicles/crlv, que exige o PDF do documento e já tem throttle:uploads. Quem
+        // tem o CRLV-e na mão provou mais do que quem digitou um chassi.
+        Route::post('/vehicles/crlv', [VehicleCrlvController::class, 'read'])
+            ->middleware(['ability:vehicles:write', 'throttle:uploads'])
+            ->name('api.vehicles.crlv.read');
+        Route::post('/vehicles/crlv/claim', [VehicleCrlvController::class, 'claim'])
+            ->middleware('ability:vehicles:write')
+            ->name('api.vehicles.crlv.claim');
         Route::get('/vehicles/{id}', [VehicleController::class, 'show'])->middleware('ability:vehicles:read');
         Route::get('/vehicles/{id}/plates', [VehicleController::class, 'plates'])->middleware('ability:vehicles:read');
         Route::put('/vehicles/{id}', [VehicleController::class, 'update'])->middleware('ability:vehicles:write');

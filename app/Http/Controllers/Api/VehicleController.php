@@ -8,6 +8,7 @@ use App\Http\Requests\Api\V1\LinkVehicleRequest;
 use App\Http\Requests\Api\V1\StoreVehicleRequest;
 use App\Http\Requests\Api\V1\UpdateVehicleRequest;
 use App\Http\Requests\Api\V1\UploadVehicleCoverRequest;
+use App\Http\Requests\Api\V1\VehicleCrlvMessages;
 use App\Http\Resources\Api\V1\MaintenanceResource;
 use App\Http\Resources\Api\V1\PublicVehicleSearchResource;
 use App\Http\Resources\Api\V1\TimelineResource;
@@ -15,6 +16,7 @@ use App\Http\Resources\Api\V1\VehiclePdfExportResource;
 use App\Http\Resources\Api\V1\VehiclePlateResource;
 use App\Http\Resources\Api\V1\VehicleResource;
 use App\Models\Vehicle;
+use App\Services\Crlv\CrlvApiImportStore;
 use App\Services\Maintenance\WorkshopRecordsArrivalNotifier;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleMileageService;
@@ -33,6 +35,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 #[Group('Vehicles', weight: 10)]
 class VehicleController extends Controller
@@ -104,6 +107,10 @@ class VehicleController extends Controller
             ->except(['terms_accepted', 'purchase_date'])
             ->all();
 
+        if ($request->filled('crlv_verification_token')) {
+            return $this->storeFromCrlv($request, $ownership);
+        }
+
         $unclaimed = $request->unclaimedWorkshopVehicle();
 
         // Teto de plausibilidade do hodômetro de cadastro, antes de gravar qualquer coisa: o número
@@ -145,6 +152,42 @@ class VehicleController extends Controller
         $vehicle->refresh();
 
         return ApiResponse::created(new VehicleResource($vehicle), 'Vehicle created successfully');
+    }
+
+    /**
+     * Veículo novo com o CRLV-e lido em POST /api/v1/vehicles/crlv (App\Http\Controllers\Api\VehicleCrlvController).
+     * Placa e RENAVAM do formulário precisam bater com o documento, e o CRV vem só dele: o app não
+     * pede esse número. A posse fica verificada, como no assistente do site.
+     */
+    private function storeFromCrlv(StoreVehicleRequest $request, VehicleOwnershipService $ownership): JsonResponse
+    {
+        $user = $request->user();
+        $token = (string) $request->validated('crlv_verification_token');
+        $crlv = app(CrlvApiImportStore::class)->find($user, $token);
+
+        if ($crlv === null) {
+            return ApiResponse::error(VehicleCrlvMessages::EXPIRED, 422, ['crlv_verification_token' => [VehicleCrlvMessages::EXPIRED]]);
+        }
+
+        if ($ownership->resolveOwnershipType($user, $crlv) === 'consignment') {
+            return ApiResponse::error(VehicleCrlvMessages::POWER_OF_ATTORNEY_ON_WEB, 422, ['vehicle' => [VehicleCrlvMessages::POWER_OF_ATTORNEY_ON_WEB]]);
+        }
+
+        $data = collect($request->validated())
+            ->except(['terms_accepted', 'purchase_date', 'crlv_verification_token'])
+            ->put('license_plate', strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', (string) $request->validated('license_plate'))))
+            ->put('crv_number', $crlv->crvNumber)
+            ->all();
+
+        try {
+            $vehicle = $ownership->registerNew($user, $data, $crlv);
+        } catch (RuntimeException $exception) {
+            return ApiResponse::error($exception->getMessage(), 422, ['vehicle' => [$exception->getMessage()]]);
+        }
+
+        app(CrlvApiImportStore::class)->forget($user, $token);
+
+        return ApiResponse::created(new VehicleResource($vehicle->fresh()), 'Vehicle created successfully');
     }
 
     public function show(Request $request, string $id): JsonResponse

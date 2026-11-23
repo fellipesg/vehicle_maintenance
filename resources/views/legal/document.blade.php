@@ -20,9 +20,7 @@
 @endphp
 
 @if($introduction)
-    @push('head')
-        <meta name="description" content="{{ \Illuminate\Support\Str::limit($introduction, 155) }}">
-    @endpush
+    @section('meta_description', \Illuminate\Support\Str::limit($introduction, 155))
 @endif
 
 @section('content')
