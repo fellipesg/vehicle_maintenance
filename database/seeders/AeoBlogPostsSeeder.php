@@ -29,6 +29,8 @@ class AeoBlogPostsSeeder extends Seeder
             );
         }
 
+        self::refreshExistingPosts();
+
         foreach (self::posts() as $post) {
             BlogPost::updateOrCreate(
                 ['slug' => $post['slug']],
@@ -62,5 +64,36 @@ class AeoBlogPostsSeeder extends Seeder
 
             return $post + ['content' => trim((string) file_get_contents($path))];
         }, $posts);
+    }
+
+    /**
+     * Atualiza o texto dos posts que já existiam, sem mexer em published_at.
+     * O histórico de carro usado vive no Markdown da série: o seeder da série
+     * não sobrescreve post existente, então a cópia nova entra por aqui.
+     */
+    public static function refreshExistingPosts(): void
+    {
+        $slugs = [
+            'como-o-revisalog-guarda-o-historico-do-seu-carro',
+            'selo-da-oficina-manutencao-verificada',
+            'vender-o-carro-com-historico-de-manutencao',
+        ];
+
+        foreach (BlogSeeder::posts() as $post) {
+            if (! in_array($post['slug'], $slugs, true)) {
+                continue;
+            }
+
+            BlogPost::query()->where('slug', $post['slug'])->update([
+                'content' => $post['content'],
+                'excerpt' => $post['excerpt'],
+            ]);
+        }
+
+        $historyPath = database_path('data/blog_series/historico-de-carro-usado-como-consultar.md');
+
+        BlogPost::query()->where('slug', 'historico-de-carro-usado-como-consultar')->update([
+            'content' => trim((string) file_get_contents($historyPath)),
+        ]);
     }
 }

@@ -53,7 +53,7 @@ Essas informações costumam aparecer em **relatórios veiculares pagos**, que c
 
 Repare se as **datas e quilometragens fazem sentido entre si**. Revisões a cada ano com quilometragens que crescem de forma regular são bom sinal. Um salto estranho — 80 mil km numa nota e 60 mil no painel dois anos depois — é o principal indício de quilometragem adulterada, assunto do terceiro post desta série.
 
-Se o carro tem histórico registrado no RevisaLog, a linha do tempo fica vinculada ao chassi, não à conta do vendedor, e a busca funciona também pela placa antiga. O post [Como o RevisaLog guarda o histórico do seu carro](/blog/como-o-revisalog-guarda-o-historico-do-seu-carro) explica como isso funciona.
+Se o carro tem histórico registrado no RevisaLog, a linha do tempo fica vinculada ao chassi, não à conta do vendedor, e a busca funciona também pela placa antiga. O post [Como o RevisaLog guarda o histórico do seu carro](/blog/como-o-revisalog-guarda-o-historico-do-seu-carro) explica como isso funciona. Um código de selo se confere no passo a passo [como verificar se as revisões do carro usado são verdadeiras](/blog/como-verificar-se-revisoes-do-carro-usado-sao-verdadeiras). O [comparativo de apps de histórico de manutenção](/melhor-app-historico-manutencao-carro) registra o que outros apps dizem, e o que não dizem, sobre histórico que fica no carro.
 
 ## Na prática: ordem da consulta
 

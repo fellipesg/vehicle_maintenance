@@ -14,6 +14,7 @@
         ['name' => 'Início', 'url' => \App\Support\Seo\CanonicalUrl::home()],
         ['name' => 'Conferir selo ou laudo', 'url' => \App\Support\Seo\CanonicalUrl::named('verification.lookup')],
     ])" />
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::faqPage(\App\Support\Seo\VerificationFaq::items())" />
 @endpush
 
 @section('content')
@@ -33,6 +34,14 @@
                 'autofocus' => $typedCode === '',
             ])
         </x-ui.card>
+
+        <x-ui.card as="section" title="O que é o código" heading-level="h2">
+            <p class="text-sm leading-relaxed text-muted-foreground">{{ \App\Support\Seo\VerificationFaq::intro() }}</p>
+        </x-ui.card>
+
+        <x-ui.section title="Perguntas frequentes" id="faq">
+            <x-seo.faq-list :items="\App\Support\Seo\VerificationFaq::items()" class="mt-0" />
+        </x-ui.section>
 
         <x-ui.card as="section" title="Onde encontrar o código" heading-level="h2">
             <ul role="list" class="list-disc space-y-2 pl-5 text-sm text-muted-foreground">

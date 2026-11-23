@@ -55,6 +55,26 @@ final class WorkshopFaq
                     ['text' => '.'],
                 ],
             ],
+            [
+                'question' => 'Existe aplicativo em que a oficina registra o serviço feito no carro do cliente?',
+                'parts' => [
+                    ['text' => 'Sim. No RevisaLog a oficina cadastrada registra a ordem de serviço, com itens, fotos, garantia e nota fiscal. O serviço entra no histórico do carro com o Selo da oficina e um código que qualquer pessoa confere em '],
+                    ['text' => 'conferir selo ou laudo', 'href' => route('verification.lookup')],
+                    ['text' => '.'],
+                ],
+            ],
+            [
+                'question' => 'Como a oficina lembra o cliente da próxima revisão?',
+                'parts' => [
+                    ['text' => 'Por e-mail e por notificação no app, com o texto que a oficina escolhe. Há duas situações em uso: quando a quilometragem estimada se aproxima da próxima revisão e alguns dias depois de um serviço. Não é mensagem de WhatsApp.'],
+                ],
+            ],
+            [
+                'question' => 'O RevisaLog substitui o sistema de gestão da oficina?',
+                'parts' => [
+                    ['text' => 'Não. Ele registra o serviço no histórico do carro e avisa o cliente por e-mail e notificação no app. Não é um ERP nem um CRM completo de oficina.'],
+                ],
+            ],
         ];
     }
 }
