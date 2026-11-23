@@ -237,7 +237,9 @@ final class AppComparison
             [
                 'question' => 'Planilha ou aplicativo?',
                 'parts' => [
-                    ['text' => 'A planilha é flexível e pode não custar nada, mas não recebe o selo de uma oficina e depende de alguém manter o arquivo. No RevisaLog, o registro fica no carro e a oficina confirma o serviço.'],
+                    ['text' => 'A planilha é flexível e pode não custar nada, mas não recebe o selo de uma oficina e depende de alguém manter o arquivo. No RevisaLog, o registro fica no carro e a oficina confirma o serviço. O artigo '],
+                    ['text' => 'planilha ou aplicativo de manutenção do carro', 'href' => route('blog.show', 'planilha-ou-aplicativo-manutencao-do-carro')],
+                    ['text' => ' detalha os dois caminhos.'],
                 ],
             ],
             [

@@ -7,6 +7,9 @@
     $updatedAt = \App\Support\DisplayTime::local($post->updated_at)?->locale('pt_BR');
     // "Atualizado em" só quando a revisão veio depois do dia da publicação.
     $showUpdatedAt = $publishedAt !== null && $updatedAt !== null && $updatedAt->toDateString() > $publishedAt->toDateString();
+    $article = \App\Support\Seo\BlogArticle::split($post->content);
+    $articleLead = $article['lead'] ?: $post->excerpt;
+    $articleFaqs = \App\Support\Seo\BlogArticle::faqs($article['body']);
     $canonical = \App\Support\Seo\CanonicalUrl::named('blog.show', $post);
     $breadcrumbs = array_values(array_filter([
         ['Início', \App\Support\Seo\CanonicalUrl::home()],
@@ -48,6 +51,9 @@
     @endif
     <x-seo.json-ld :data="\App\Support\Seo\StructuredData::blogPosting($post, $publishedCommentCount)" />
     <x-seo.json-ld :data="\App\Support\Seo\StructuredData::breadcrumb($breadcrumbSchema)" />
+    @if($articleFaqs !== [])
+        <x-seo.json-ld :data="\App\Support\Seo\StructuredData::faqPage($articleFaqs)" />
+    @endif
 @endpush
 
 @section('content')
@@ -79,9 +85,9 @@
             @endif
         </x-ui.page-header>
 
-        @if($post->excerpt)
-            {{-- Lead: o resumo do post, maior e sem a borda do blockquote, para não parecer citação. --}}
-            <p class="text-lg leading-relaxed text-pretty text-muted-foreground sm:text-xl" data-slot="blog-post-lead">{{ $post->excerpt }}</p>
+        @if($articleLead)
+            {{-- Lead: a resposta direta do post, ou o resumo quando o texto não abre com citação. --}}
+            <p class="text-lg leading-relaxed text-pretty text-muted-foreground sm:text-xl" data-slot="blog-post-lead">{{ $articleLead }}</p>
         @endif
     </div>
 
@@ -103,7 +109,7 @@
 
     {{-- Markdown do post (.ai/rules/blog.md): estilos de .blog-content em resources/css/app.css. --}}
     <div class="blog-content mt-10 leading-[1.8] {{ $readingColumn }}" data-slot="blog-post-content">
-        {!! Str::markdown($post->content) !!}
+        {!! Str::markdown($article['body']) !!}
     </div>
 
     @if($post->isPublished())

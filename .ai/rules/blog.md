@@ -21,7 +21,7 @@ Post público exige `status = published` E `published_at` no passado (scope `pub
 O campo "Data de publicação" (datetime-local) é lido no fuso de exibição com `DisplayTime::fromLocalInput` e gravado em UTC; o editor e a lista do admin mostram com `DisplayTime::local`. A validação de data futura compara depois da conversão (não usar `after:now`, que compara em UTC). O post agendado entra no ar sozinho quando `published_at` passa, porque o scope `published` filtra por `now()`: não há comando nem job de publicação, e não se deve criar um.
 
 ## Conteúdo é Markdown renderizado na view
-`content` é gravado como Markdown e renderizado com `Str::markdown` dentro de `.blog-content` (estilos em resources/css/app.css, o projeto não usa @tailwindcss/typography). Não gravar HTML pronto no banco nem adicionar plugin de tipografia.
+`content` é gravado como Markdown e renderizado com `Str::markdown` dentro de `.blog-content` (estilos em resources/css/app.css, o projeto não usa @tailwindcss/typography). Não gravar HTML pronto no banco nem adicionar plugin de tipografia. Se o arquivo começa com `> uma linha`, essa linha é o lead (`data-slot=blog-post-lead`) e sai do corpo; os outros posts continuam usando o excerpt. `## Perguntas frequentes` seguido de `### pergunta` vira FAQPage com o texto do Markdown.
 
 ## Slug é gerado, nunca colidido
 Use `BlogPost::generateSlug()` / `BlogCategory::generateSlug()` — eles sufixam -2, -3 quando o slug já existe. O slug é a route key das duas models.

@@ -2,6 +2,8 @@
 
 namespace App\Support\Seo;
 
+use App\Models\BlogPost;
+
 /**
  * Resumo em texto puro para assistentes. Os links são as rotas da aplicação,
  * para o arquivo servido em qualquer ambiente apontar para as páginas reais.
@@ -21,6 +23,7 @@ final class LlmsTxt
         $privacy = CanonicalUrl::named('legal.privacy');
         $store = (string) config('app.ios_app_store_url');
         $email = (string) config('legal.support_email');
+        $articles = self::articleLines();
 
         return <<<TXT
         # RevisaLog
@@ -31,7 +34,7 @@ final class LlmsTxt
         - App de histórico de manutenção para donos de carro (consumidor), no iPhone: {$store}
         - Histórico preso ao veículo (chassi, placa ou RENAVAM), não à conta do dono
         - Selo da oficina: serviço confirmado pela oficina, com código RVL-XXXX-XX
-        - Declaração do proprietário: registro feito pelo dono, sem código
+        - Declaração do proprietário ou do lojista: registro sem código
         - PDF do histórico, com a linha do tempo, o código do selo e as notas fiscais em PDF incorporadas ao arquivo
         - Oficinas: cadastro grátis, ordem de serviço com fotos, itens, garantia e nota, lembretes automáticos aos clientes por e-mail e notificação no app
         - O dono também recebe lembrete por e-mail e notificação quando a quilometragem estimada se aproxima da próxima revisão
@@ -57,6 +60,44 @@ final class LlmsTxt
 
         ## Contato
         {$email} · Fundador: Felipe Gonçalves
+        {$articles}
         TXT;
+    }
+
+    /**
+     * Só entra o artigo que já está publicado. Sem o seeder, o link não aparece
+     * e o arquivo não aponta para uma página 404.
+     */
+    private static function articleLines(): string
+    {
+        $slugs = [
+            'perdi-o-manual-de-revisoes-como-comprovar',
+            'planilha-ou-aplicativo-manutencao-do-carro',
+            'alternativas-ao-manual-de-revisoes-de-papel',
+            'como-verificar-se-revisoes-do-carro-usado-sao-verdadeiras',
+            'como-o-revisalog-guarda-o-historico-do-seu-carro',
+            'selo-da-oficina-manutencao-verificada',
+            'vender-o-carro-com-historico-de-manutencao',
+            'historico-de-carro-usado-como-consultar',
+        ];
+
+        $posts = BlogPost::query()->published()->whereIn('slug', $slugs)->get()->keyBy('slug');
+        $lines = [];
+
+        foreach ($slugs as $slug) {
+            $post = $posts->get($slug);
+
+            if ($post === null) {
+                continue;
+            }
+
+            $lines[] = '- ['.$post->title.']('.CanonicalUrl::named('blog.show', $post).')';
+        }
+
+        if ($lines === []) {
+            return '';
+        }
+
+        return "\n## Artigos\n".implode("\n", $lines)."\n";
     }
 }
