@@ -115,6 +115,73 @@ class VehicleMileagePlausibilityTest extends TestCase
         $this->assertSame($alreadyRun + 40_000, $vehicle->fresh()->current_kilometers);
     }
 
+    public function test_a_vehicle_well_inside_its_year_range_gets_no_extra_slack(): void
+    {
+        // Veículo comum: o teto é o do ano, sem folga nenhuma por cima. A folga aparece só para quem
+        // já está no topo da faixa, e é isso que mantém o teto apertado no caso que ele existe para
+        // pegar — os 500.000 km num carro de dois anos.
+        $year = now()->year - 2;
+        $ceiling = $this->ceilingFor($year);
+        $vehicle = Vehicle::factory()->create([
+            'year' => $year,
+            'current_kilometers' => 20_000,
+            'odometer_at_registration' => 20_000,
+        ]);
+        $service = app(VehicleMileageService::class);
+
+        $service->assertMaintenanceKilometers($vehicle, $ceiling, now()->toDateString());
+
+        try {
+            $service->assertMaintenanceKilometers($vehicle, $ceiling + 1, now()->toDateString());
+            $this->fail("Era esperada a recusa de {$ceiling} + 1 km: veículo comum não ganha folga.");
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString("no máximo {$ceiling} km", $exception->errors()['kilometers'][0]);
+        }
+    }
+
+    /**
+     * A folga é uma, e é do ano: ela **não acumula por registro**. Era essa a catraca — cada leitura
+     * gravada subia o teto em mais um ano de folga, então uma sequência de OS no teto levava o teto
+     * daquele chassi a qualquer número (e, pelo cadastro sem teto, num único pedido).
+     */
+    public function test_the_slack_does_not_compound_across_records(): void
+    {
+        $year = now()->year;
+        $fromYear = $this->ceilingFor($year);
+        $widest = $fromYear + 100_000;
+        $owner = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create([
+            'year' => $year,
+            'current_kilometers' => 0,
+            'odometer_at_registration' => 0,
+        ]);
+        $this->attachVehicleToUser($owner, $vehicle);
+        $service = app(VehicleMileageService::class);
+
+        // Primeiro degrau: o teto do ano. Segundo: o ano de folga, que a leitura anterior liberou.
+        foreach ([$fromYear, $widest] as $kilometers) {
+            $service->assertMaintenanceKilometers($vehicle->fresh(), $kilometers, now()->toDateString());
+            Maintenance::factory()->create([
+                'vehicle_id' => $vehicle->id,
+                'user_id' => $owner->id,
+                'tenant_id' => $owner->tenant_id,
+                'kilometers' => $kilometers,
+                'maintenance_date' => now()->toDateString(),
+            ]);
+            $service->applyMaintenanceKilometers($vehicle->fresh(), $kilometers);
+        }
+
+        $this->assertSame($widest, (int) $vehicle->fresh()->current_kilometers);
+
+        // E para de subir aí: o terceiro degrau não existe.
+        try {
+            $service->assertMaintenanceKilometers($vehicle->fresh(), $widest + 1, now()->toDateString());
+            $this->fail('Era esperada a recusa: a folga não acumula por registro.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString("no máximo {$widest} km", $exception->errors()['kilometers'][0]);
+        }
+    }
+
     /**
      * O defeito que o teto tinha: o termo "já rodado" vinha de current_kilometers e
      * odometer_at_registration, que nenhuma validação conferia. Um veículo do ano cadastrado com

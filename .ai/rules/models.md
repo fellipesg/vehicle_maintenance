@@ -98,6 +98,32 @@ O teto é `PLAUSIBILITY_BASE_KILOMETERS` (50.000 km) + `PLAUSIBILITY_KILOMETERS_
 teto só pega quem digitou um dígito a mais, porque recusar um veículo real é pior que aceitar um
 número alto. **Não aperte a folga sem o caso de uso na mão.**
 
+### A folga de um ano foi revisada; ela não é o lugar de apertar
+
+A folga (`PLAUSIBILITY_KILOMETERS_PER_YEAR` acima do teto do ano) só existe para o veículo que **já
+está no topo da faixa do ano dele**: para qualquer veículo comum ela é invisível — num veículo de
+dois anos o teto é 350.000 km com ou sem ela, inclusive para um táxi com 160.000 km rodados. Quem a
+usa é só o caso extremo. Logo, encolhê-la **não ganha nada** contra erro de digitação (um dígito a
+mais é 10×, recusado em qualquer valor dessa ordem) e só recusa o veículo real de rodagem alta, que é
+exatamente o que a regra existe para não fazer. Medido antes de decidir; três alternativas foram
+descartadas:
+
+- **folga sempre, sem olhar o veículo** (teto do ano + folga, plano): afrouxa o caso comum de
+  350.000 para 450.000 km num veículo de dois anos — justo o caso que o teto existe para pegar;
+- **sem folga nenhuma**: trava quem está no topo da faixa (faixa aceita vazia, o veículo não soma nem
+  um km até a virada do ano) e, pior, trava o laudo da vistoria cautelar de relatar a leitura que viu;
+- **teto crescendo dia a dia** (idade fracionária em vez do degrau anual), que acabaria com o degrau
+  e dispensaria a constante: o app roda em `UTC` (`config('app.timezone')`) e o espelho em JS usa a
+  data local do navegador, então os dois discordariam em ~274 km nas horas em que as duas datas
+  diferem — o teto mostrado no formulário deixaria de ser o teto do servidor, e
+  `OwnerPortalScriptsTest` ficaria intermitente. Só vale junto com mandar o teto já calculado no
+  `data-mileage`, o que muda o contrato do espelho.
+
+O que estava quebrado era a folga **acumular**, não o tamanho dela: o termo "já rodado" era
+ilimitado, cada leitura gravada somava mais um ano de folga e o cadastro sem teto fazia isso num
+único pedido. Hoje o teto é `[fromYear, fromYear + uma folga]` e para aí — `test_the_slack_does_not_compound_across_records`
+e `test_a_vehicle_well_inside_its_year_range_gets_no_extra_slack` travam as duas pontas.
+
 **Veículo sem ano conhecido** (ano zero/nulo) não tem teto nenhum — não há de onde derivar, e chutar
 um ano seria recusar por chute. É o único caso sem teto, e tem teste
 (`tests/Feature/VehicleMileagePlausibilityTest.php`).
