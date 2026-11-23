@@ -28,6 +28,7 @@ class SitemapController extends Controller
             'workshops.landing' => '0.7',
             'workshops.signup' => '0.6',
             'verification.lookup' => '0.5',
+            'guides.comparison' => '0.7',
             'contact.show' => '0.5',
             'legal.terms' => '0.3',
             'legal.privacy' => '0.3',

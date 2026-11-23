@@ -16,11 +16,15 @@ return [
         'workshops.landing' => '2026-11-23',
         'workshops.signup' => '2026-11-23',
         'verification.lookup' => '2026-11-23',
+        'guides.comparison' => '2026-11-23',
         'contact.show' => '2026-11-23',
         'legal.terms' => '2026-11-18',
         'legal.privacy' => '2026-11-18',
     ],
 
     'instagram_url' => 'https://www.instagram.com/revisalog/',
+
+    // Dia em que as páginas oficiais dos concorrentes foram lidas para o comparativo.
+    'competitors_verified_on' => '2026-11-23',
 
 ];

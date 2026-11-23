@@ -24,6 +24,7 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BlogCommentController;
 use App\Http\Controllers\Web\BlogController;
 use App\Http\Controllers\Web\BlogFeedController;
+use App\Http\Controllers\Web\ComparisonController;
 use App\Http\Controllers\Web\ConsignmentOwnerController;
 use App\Http\Controllers\Web\ContactController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
@@ -128,6 +129,7 @@ Route::prefix('consignacao')->name('consignments.owner.')->middleware('throttle:
 });
 
 // Conferência pública do Selo da oficina: o campo para digitar o código (/verificar) e a página do QR (/v/).
+Route::get('/melhor-app-historico-manutencao-carro', ComparisonController::class)->name('guides.comparison');
 Route::get('/verificar', [\App\Http\Controllers\Web\PublicVerificationController::class, 'lookup'])
     ->middleware('throttle:search')
     ->name('verification.lookup');

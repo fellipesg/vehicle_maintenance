@@ -147,9 +147,9 @@ final class StructuredData
     /**
      * @return array<string, mixed>
      */
-    public static function webPage(string $name, string $description, string $url): array
+    public static function webPage(string $name, string $description, string $url, ?string $dateModified = null): array
     {
-        return [
+        $data = [
             '@context' => 'https://schema.org',
             '@type' => 'WebPage',
             '@id' => $url.'#webpage',
@@ -163,6 +163,37 @@ final class StructuredData
             'publisher' => [
                 '@id' => CanonicalUrl::organizationId(),
             ],
+        ];
+
+        if ($dateModified !== null) {
+            $data['dateModified'] = $dateModified;
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param  list<array{name: string, url: string}>  $items
+     * @return array<string, mixed>
+     */
+    public static function itemList(string $name, array $items): array
+    {
+        $elements = [];
+
+        foreach (array_values($items) as $index => $item) {
+            $elements[] = [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'url' => $item['url'],
+            ];
+        }
+
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            'name' => $name,
+            'itemListElement' => $elements,
         ];
     }
 

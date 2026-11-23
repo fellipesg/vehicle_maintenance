@@ -14,6 +14,7 @@ final class LlmsTxt
         $workshops = CanonicalUrl::named('workshops.landing');
         $signup = CanonicalUrl::named('workshops.signup');
         $verify = CanonicalUrl::named('verification.lookup');
+        $comparison = CanonicalUrl::named('guides.comparison');
         $contact = CanonicalUrl::named('contact.show');
         $blog = CanonicalUrl::named('blog.index');
         $terms = CanonicalUrl::named('legal.terms');
@@ -48,6 +49,7 @@ final class LlmsTxt
         - [Para oficinas]({$workshops})
         - [Cadastro de oficina]({$signup})
         - [Conferir selo ou laudo]({$verify})
+        - [Comparativo de apps de histórico de manutenção]({$comparison})
         - [Blog]({$blog})
         - [Contato]({$contact})
         - [Termos de uso]({$terms})

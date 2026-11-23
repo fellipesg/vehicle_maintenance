@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Support\Seo\CanonicalUrl;
 use App\Support\Seo\Faq;
 use App\Support\Seo\HomeFaq;
-use App\Support\Seo\LlmsTxt;
 use Dom\Element;
 use Dom\HTMLDocument;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -171,11 +170,6 @@ class SeoFoundationTest extends TestCase
         $schema = $this->jsonLdByType($this->page($this->get(route('blog.show', $post))->assertOk()), 'BlogPosting');
 
         $this->assertSame($post->cover_photo_url, $schema['image']);
-    }
-
-    public function test_llms_body_does_not_link_a_page_that_does_not_exist_yet(): void
-    {
-        $this->assertStringNotContainsString('melhor-app-historico-manutencao-carro', LlmsTxt::body());
     }
 
     private function reminderClaim(string $body): string
