@@ -7,26 +7,19 @@
     $updatedAt = \App\Support\DisplayTime::local($post->updated_at)?->locale('pt_BR');
     // "Atualizado em" só quando a revisão veio depois do dia da publicação.
     $showUpdatedAt = $publishedAt !== null && $updatedAt !== null && $updatedAt->toDateString() > $publishedAt->toDateString();
+    $canonical = \App\Support\Seo\CanonicalUrl::named('blog.show', $post);
     $breadcrumbs = array_values(array_filter([
+        ['Início', \App\Support\Seo\CanonicalUrl::home()],
         ['Blog', route('blog.index')],
         $post->category ? [$post->category->name, route('blog.category', $post->category)] : null,
         [$post->title],
     ]));
-    $structuredData = [
-        '@context' => 'https://schema.org',
-        '@type' => 'BlogPosting',
-        'headline' => $post->title,
-        'description' => $metaDescription,
-        'datePublished' => $post->published_at?->toIso8601String(),
-        'dateModified' => $post->updated_at?->toIso8601String(),
-        'image' => $post->cover_photo_url,
-        'commentCount' => $publishedCommentCount,
-        'mainEntityOfPage' => route('blog.show', $post),
-        'publisher' => [
-            '@type' => 'Organization',
-            'name' => config('legal.company.legal_name') ?: 'RevisaLog',
-        ],
-    ];
+    $breadcrumbSchema = array_values(array_filter([
+        ['name' => 'Início', 'url' => \App\Support\Seo\CanonicalUrl::home()],
+        ['name' => 'Blog', 'url' => \App\Support\Seo\CanonicalUrl::named('blog.index')],
+        $post->category ? ['name' => $post->category->name, 'url' => \App\Support\Seo\CanonicalUrl::named('blog.category', $post->category)] : null,
+        ['name' => $post->title, 'url' => $canonical],
+    ]));
     // Coluna de leitura, a mesma no cabeçalho, no texto e no convite ao fim, para as margens se
     // alinharem. Na Inter 1ch (a largura do "0") vale ~1,3 letra média: 56ch dão ~72 caracteres por
     // linha a 17–18px (68ch passariam de 85, acima dos 60–75 recomendados).
@@ -34,6 +27,9 @@
 @endphp
 
 @section('title', $metaTitle)
+@section('meta_description', $metaDescription)
+@section('canonical', $canonical)
+@section('og_type', 'article')
 
 {{-- A imagem de compartilhamento do post: o layout imprime og:image e twitter:image uma vez só,
      com esta capa no lugar da arte padrão da marca. --}}
@@ -43,22 +39,15 @@
 @endif
 
 @push('head')
-    <meta name="description" content="{{ $metaDescription }}">
-    <link rel="canonical" href="{{ route('blog.show', $post) }}">
     <link rel="alternate" type="application/rss+xml" title="Blog RevisaLog" href="{{ route('blog.feed') }}">
-    <meta property="og:type" content="article">
-    <meta property="og:title" content="{{ $metaTitle }}">
-    <meta property="og:description" content="{{ $metaDescription }}">
-    <meta property="og:url" content="{{ route('blog.show', $post) }}">
     @if($post->published_at)
         <meta property="article:published_time" content="{{ $post->published_at->toIso8601String() }}">
     @endif
     @if($post->category)
         <meta property="article:section" content="{{ $post->category->name }}">
     @endif
-    <script type="application/ld+json">
-        {!! json_encode($structuredData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}
-    </script>
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::blogPosting($post, $publishedCommentCount)" />
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::breadcrumb($breadcrumbSchema)" />
 @endpush
 
 @section('content')

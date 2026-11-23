@@ -11,10 +11,11 @@
     $landingCapabilities = ['Histórico no chassi', 'Selo da oficina', 'Declaração do dono', 'PDF com notas fiscais', 'Busca por placa, chassi ou RENAVAM', 'Oficinas da rede', 'App e navegador'];
 @endphp
 
+@section('meta_description', \App\Support\Seo\HomeFaq::metaDescription())
+
 @push('head')
-    <meta name="description" content="RevisaLog: histórico permanente de manutenções vinculado ao veículo. Selo da oficina, busca por placa, chassi ou RENAVAM e PDF com notas. Grátis no lançamento.">
-    <meta property="og:title" content="Histórico permanente do seu carro">
-    <meta property="og:description" content="RevisaLog: histórico permanente de manutenções vinculado ao veículo. Selo da oficina, busca por placa, chassi ou RENAVAM e PDF com notas. Grátis no lançamento.">
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::mobileApplication(\App\Support\Seo\HomeFaq::definition())" />
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::faqPage(\App\Support\Seo\HomeFaq::items())" />
 @endpush
 
 {{--
@@ -42,8 +43,8 @@
                 O histórico do carro
                 <span class="text-accent-foreground">viaja com o carro</span>
             </h1>
-            <p class="landing-intro mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground [--landing-intro-delay:100ms]">
-                Cada manutenção fica vinculada ao chassi, não ao dono. A oficina confirma o serviço com o Selo da oficina, você declara o que fez, e o histórico passa para o próximo dono na venda.
+            <p class="landing-intro mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground [--landing-intro-delay:100ms]" data-landing-definition>
+                {{ \App\Support\Seo\HomeFaq::definition() }}
             </p>
 
             <div class="landing-intro mt-8 flex flex-col gap-3 [--landing-intro-delay:160ms] sm:flex-row sm:items-start" data-landing-hero-actions>
@@ -376,26 +377,7 @@
 <section id="faq" class="scroll-mt-24 border-t border-border bg-surface py-16 sm:py-20" aria-labelledby="faq-titulo">
     <x-ui.container size="md">
         <h2 id="faq-titulo" class="text-center text-3xl font-bold text-foreground">Perguntas frequentes</h2>
-        <div class="mt-10 space-y-3">
-            <x-landing.faq-item question="É de graça mesmo?">
-                Sim. No lançamento o RevisaLog não cobra nada e não pede cartão.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="O histórico muda de dono junto com o carro?">
-                Sim. O registro fica no veículo: depois da transferência, o histórico continua consultável pela placa, pelo chassi ou pelo RENAVAM.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="Qual a diferença entre selo e declaração?">
-                O Selo da oficina é o serviço confirmado por uma oficina da rede, com código de conferência. A declaração é o que o proprietário ou o lojista registrou por conta própria, sem essa confirmação.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="Preciso de conta para consultar um veículo?">
-                Para buscar pela placa, pelo chassi ou pelo RENAVAM, sim: uma conta gratuita. Para conferir o código de um selo, não: qualquer pessoa confere em <x-ui.link :href="route('verification.lookup')" variant="inline">Conferir selo da oficina</x-ui.link>.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="Oficinas e lojas também podem usar?">
-                Sim. Oficinas aplicam o Selo da oficina e aparecem em Oficinas da rede: <x-ui.link :href="$landingWorkshopsUrl" variant="inline">cadastre sua oficina</x-ui.link> direto no site. Lojas registram a revisão antes da venda no próprio estoque; para entrar, <x-ui.link :href="$landingPartnershipUrl" variant="inline">fale com a equipe</x-ui.link>.
-            </x-landing.faq-item>
-            <x-landing.faq-item question="Tem aplicativo?">
-                Tem. O app para iPhone está na <x-ui.link :href="config('app.ios_app_store_url')" external variant="inline">App Store</x-ui.link>, com a mesma conta e o mesmo histórico do site. A versão para Android está a caminho; enquanto isso, cadastro e consulta funcionam no navegador do celular.
-            </x-landing.faq-item>
-        </div>
+        <x-seo.faq-list :items="\App\Support\Seo\HomeFaq::items()" />
 
         <div class="mt-10 rounded-card border border-border bg-background p-6 text-center">
             <p class="text-muted-foreground">Ficou com outra dúvida? No blog escrevemos sobre manutenção, documentação e o que pesa na hora de vender o carro.</p>

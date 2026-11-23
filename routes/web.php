@@ -34,6 +34,7 @@ use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\InspectionReportController;
 use App\Http\Controllers\Web\InvoiceDownloadController;
 use App\Http\Controllers\Web\LegalController;
+use App\Http\Controllers\Web\LlmsTxtController;
 use App\Http\Controllers\Web\MaintenanceInviteController;
 use App\Http\Controllers\Web\MaintenancePhotoController;
 use App\Http\Controllers\Web\NotificationController;
@@ -70,6 +71,7 @@ Route::get('/blog/categoria/{category}', [BlogController::class, 'category'])->n
 Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
 Route::get('/blog/{post}/comentar/{destination}', [BlogCommentController::class, 'enter'])
     ->whereIn('destination', ['entrar', 'criar-conta'])
+    ->middleware('noindex')
     ->name('blog.comments.enter');
 Route::post('/blog/{post}/comentarios', [BlogCommentController::class, 'store'])
     ->middleware(['auth', 'throttle:blog-comments'])
@@ -80,6 +82,7 @@ Route::delete('/blog/comentarios/{comment}', [BlogCommentController::class, 'des
 // Webhook do Sentry (Internal Integration): autenticado pela assinatura HMAC, sem CSRF.
 Route::post('/webhooks/sentry', SentryWebhookController::class)->middleware('throttle:60,1')->name('webhooks.sentry');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('/llms.txt', LlmsTxtController::class)->name('llms');
 Route::get('/ads.txt', AdsTxtController::class)->name('ads.txt');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
 Route::get('/para-oficinas', WorkshopLandingController::class)->name('workshops.landing');
@@ -142,30 +145,34 @@ Route::get('/laudo/{code}', [\App\Http\Controllers\Web\PublicInspectionControlle
     ->name('inspections.public');
 
 Route::middleware('guest')->group(function () {
-    Route::get('/login', [AuthController::class, 'showLoginHub'])->name('login');
-    Route::get('/login/admin', fn () => app(AuthController::class)->showLogin('admin'))->name('login.admin');
-    Route::get('/login/lojista', fn () => app(AuthController::class)->showLogin('lojista'))->name('login.lojista');
-    Route::get('/login/usuario', fn () => app(AuthController::class)->showLogin('usuario'))->name('login.usuario');
-    Route::get('/login/oficina', fn () => app(AuthController::class)->showLogin('oficina'))->name('login.oficina');
-    Route::post('/login/{portal}', [AuthController::class, 'login'])
-        ->whereIn('portal', ['admin', 'lojista', 'usuario', 'oficina'])
-        ->middleware('throttle:auth-web')
-        ->name('login.submit');
-    Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-web');
+    Route::middleware('noindex')->group(function () {
+        Route::get('/login', [AuthController::class, 'showLoginHub'])->name('login');
+        Route::get('/login/admin', fn () => app(AuthController::class)->showLogin('admin'))->name('login.admin');
+        Route::get('/login/lojista', fn () => app(AuthController::class)->showLogin('lojista'))->name('login.lojista');
+        Route::get('/login/usuario', fn () => app(AuthController::class)->showLogin('usuario'))->name('login.usuario');
+        Route::get('/login/oficina', fn () => app(AuthController::class)->showLogin('oficina'))->name('login.oficina');
+        Route::post('/login/{portal}', [AuthController::class, 'login'])
+            ->whereIn('portal', ['admin', 'lojista', 'usuario', 'oficina'])
+            ->middleware('throttle:auth-web')
+            ->name('login.submit');
+        Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
+        Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-web');
+
+        // Recuperação de senha (Password broker). O limite de tentativas fica no controller, com aviso em pt-BR.
+        Route::get('/esqueci-senha', [PasswordResetController::class, 'create'])->name('password.request');
+        Route::post('/esqueci-senha', [PasswordResetController::class, 'store'])->name('password.email');
+        Route::get('/redefinir-senha/{token}', [PasswordResetController::class, 'edit'])->name('password.reset');
+        Route::post('/redefinir-senha', [PasswordResetController::class, 'update'])->name('password.update');
+    });
+
+    // Landing de aquisição: continua indexável. O noindex fica só nas telas de conta.
     Route::get('/para-oficinas/cadastro', [WorkshopSignupController::class, 'show'])->name('workshops.signup');
     Route::post('/para-oficinas/cadastro', [WorkshopSignupController::class, 'store'])
         ->middleware('throttle:auth-web')
         ->name('workshops.signup.store');
-
-    // Recuperação de senha (Password broker). O limite de tentativas fica no controller, com aviso em pt-BR.
-    Route::get('/esqueci-senha', [PasswordResetController::class, 'create'])->name('password.request');
-    Route::post('/esqueci-senha', [PasswordResetController::class, 'store'])->name('password.email');
-    Route::get('/redefinir-senha/{token}', [PasswordResetController::class, 'edit'])->name('password.reset');
-    Route::post('/redefinir-senha', [PasswordResetController::class, 'update'])->name('password.update');
 });
 
-Route::middleware(['auth', 'tenant'])->group(function () {
+Route::middleware(['auth', 'tenant', 'noindex'])->group(function () {
     // Busca por identificador de quem está logado: mesmo balde da etapa 1 da OS, pela conta. No
     // `search` (por IP) a cota do portal era gasta por visitante da mesma rede.
     Route::get('/buscar-veiculo', [PublicVehicleController::class, 'search'])

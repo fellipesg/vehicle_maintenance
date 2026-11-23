@@ -15,6 +15,8 @@
 
 @section('title', 'Cadastre sua oficina')
 
+@section('meta_description', 'Cadastre sua oficina no RevisaLog. O nome dela fica no histórico do carro com o Selo da oficina. Grátis no lançamento.')
+
 @section('content')
     <x-auth.header icon="wrench-screwdriver" title="Cadastre sua oficina" description="Conta gratuita no lançamento. Funciona assim que o cadastro termina.">
         <p class="text-sm text-muted-foreground">

@@ -3,6 +3,9 @@
     @foreach($staticUrls as $url)
     <url>
         <loc>{{ $url['loc'] }}</loc>
+        @if(! empty($url['lastmod']))
+        <lastmod>{{ $url['lastmod'] }}</lastmod>
+        @endif
         <changefreq>weekly</changefreq>
         <priority>{{ $url['priority'] }}</priority>
     </url>

@@ -9,11 +9,20 @@
         // públicas (home, blog, termos), mesmo logado, fica "{Página} · RevisaLog".
         $isPortalPage = $shellPortal !== null
             && request()->routeIs('user.*', 'garage.*', 'workshop.*', 'admin.*', 'account.*', 'notifications.*', 'vehicle.search');
+        $seoTitle = \App\Support\DocumentTitle::compose($__env->yieldContent('title'), $isPortalPage ? $shellPortal->titleLabel() : null);
+        $seoDescription = trim($__env->yieldContent('meta_description'));
+        $seoCanonical = trim($__env->yieldContent('canonical'));
+        if ($seoCanonical === '') {
+            $seoCanonical = \App\Support\Seo\CanonicalUrl::forRequest();
+        }
+        $seoType = trim($__env->yieldContent('og_type')) ?: 'website';
+        $seoNoIndex = (bool) request()->attributes->get('seoNoIndex');
     @endphp
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{!! \App\Support\DocumentTitle::compose($__env->yieldContent('title'), $isPortalPage ? $shellPortal->titleLabel() : null) !!}</title>
+    <title>{!! $seoTitle !!}</title>
+    @include('layouts.partials.seo-head')
     {{-- Imagem de compartilhamento: a da página (@section('og_image'), a capa do post) ou a da marca. --}}
     <x-brand-head-icons include-og-image :og-image="$__env->yieldContent('og_image')" :og-image-alt="$__env->yieldContent('og_image_alt')" />
     <link rel="preconnect" href="https://fonts.bunny.net">

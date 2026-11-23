@@ -40,7 +40,8 @@ class BlogReadingTest extends TestCase
 
         $this->assertSame('Documentação', $this->text($this->find($page, 'header[data-slot="page-header"] h1')));
         $trail = $this->find($page, 'header[data-slot="page-header"] nav[aria-label="Trilha"]');
-        $this->assertSame(route('blog.index'), $this->find($trail, 'a')->getAttribute('href'));
+        $links = array_map(fn (Element $link): string => $link->getAttribute('href'), iterator_to_array($trail->querySelectorAll('a')));
+        $this->assertSame([\App\Support\Seo\CanonicalUrl::home(), route('blog.index')], $links);
         $this->assertSame('Documentação', $this->text($this->find($trail, '[aria-current="page"]')));
     }
 
@@ -186,7 +187,7 @@ class BlogReadingTest extends TestCase
         $trail = $this->find($page, 'nav[aria-label="Trilha"]');
         $links = array_map(fn (Element $link): string => $link->getAttribute('href'), iterator_to_array($trail->querySelectorAll('a')));
 
-        $this->assertSame([route('blog.index'), route('blog.category', $category)], $links);
+        $this->assertSame([\App\Support\Seo\CanonicalUrl::home(), route('blog.index'), route('blog.category', $category)], $links);
         $this->assertSame($post->title, $this->text($this->find($trail, '[aria-current="page"]')));
     }
 
@@ -299,7 +300,13 @@ class BlogReadingTest extends TestCase
         $this->assertCount(1, $page->querySelectorAll('meta[property="og:image"]'), 'Um og:image só: WhatsApp e Facebook usam o primeiro.');
         $this->assertCount(1, $page->querySelectorAll('meta[name="twitter:card"]'));
         $this->assertCount(1, $page->querySelectorAll('meta[name="twitter:image"]'));
-        $this->assertCount(1, $page->querySelectorAll('script[type="application/ld+json"]'));
+        $this->assertGreaterThanOrEqual(1, count($page->querySelectorAll('script[type="application/ld+json"]')));
+        $types = [];
+        foreach ($page->querySelectorAll('script[type="application/ld+json"]') as $script) {
+            $decoded = json_decode($script->textContent, true);
+            $types[] = $decoded['@type'] ?? null;
+        }
+        $this->assertContains('BlogPosting', $types);
 
         // A imagem compartilhada é a capa do post, não a arte padrão da marca.
         $this->assertSame($post->cover_photo_url, $this->find($page, 'meta[property="og:image"]')->getAttribute('content'));

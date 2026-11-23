@@ -2,8 +2,18 @@
 
 @section('title', 'Conferir selo ou laudo')
 
+@php
+    $verifyDescription = 'Digite o código de verificação do RevisaLog para confirmar um serviço com Selo da oficina ou um laudo de vistoria cautelar.';
+@endphp
+
+@section('meta_description', $verifyDescription)
+
 @push('head')
-    <meta name="description" content="Digite o código de verificação do RevisaLog para confirmar um serviço com Selo da oficina ou um laudo de vistoria cautelar.">
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::webPage('Conferir selo ou laudo', $verifyDescription, \App\Support\Seo\CanonicalUrl::named('verification.lookup'))" />
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::breadcrumb([
+        ['name' => 'Início', 'url' => \App\Support\Seo\CanonicalUrl::home()],
+        ['name' => 'Conferir selo ou laudo', 'url' => \App\Support\Seo\CanonicalUrl::named('verification.lookup')],
+    ])" />
 @endpush
 
 @section('content')
@@ -12,6 +22,7 @@
         eyebrow="Verificação pública RevisaLog"
         title="Conferir selo ou laudo"
         description="Digite o código para confirmar um serviço com Selo da oficina (RVL) ou um laudo de vistoria cautelar (LDO) registrado no RevisaLog."
+        :breadcrumbs="[['Início', \App\Support\Seo\CanonicalUrl::home()], ['Conferir selo ou laudo']]"
     />
 
     <div class="space-y-6">
