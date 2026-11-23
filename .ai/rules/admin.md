@@ -43,3 +43,15 @@ Contestar é do proprietário e só marca; suprimir é daqui, por
 recalcular**: a leitura da vistoria nunca alimentou `vehicles.current_kilometers`. Use para fraude
 confirmada e chassi trocado, não para acalmar um proprietário incomodado — é por isso que a alavanca
 não é dele.
+
+## Vínculo de propriedade errado: é a equipe que encerra, pela ficha do veículo
+`POST admin/veiculos/{vehicle}/proprietarios/{user}/encerrar` (`admin.vehicles.end-ownership`, botão
+"Encerrar vínculo" em `admin.vehicles.show`, com `data-confirm` e motivo **obrigatório**) passa por
+`App\Services\Vehicle\VehicleOwnershipEndingService::endByTeam`. O vínculo **não** é apagado:
+`is_current_owner` vira falso, `sale_date` recebe o dia e ficam gravados
+`ownership_ended_by_user_id` e `ownership_ended_reason` em `user_vehicles`, mais um `Log::info`. O
+ex-dono recebe `VehicleOwnershipEndedByTeamNotification` (só e-mail, sem o motivo); as manutenções
+continuam no chassi. Sem outro dono atual, o veículo volta a aceitar o vínculo por placa e RENAVAM
+(`VehiclePolicy::link`). Use quando o vínculo foi feito na conta errada ou quando o comprador não tem
+como enviar o CRLV-e. Quem tem o CRLV-e no nome não precisa da equipe: `claimExisting` já tira o
+dono anterior.
