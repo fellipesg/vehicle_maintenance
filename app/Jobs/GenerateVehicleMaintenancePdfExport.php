@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\LimitsExecutionTime;
 use App\Models\Vehicle;
 use App\Models\VehiclePdfExport;
 use App\Services\Vehicle\VehicleMaintenancePdfExporter;
@@ -14,6 +15,7 @@ use Throwable;
 
 class GenerateVehicleMaintenancePdfExport implements ShouldQueue
 {
+    use LimitsExecutionTime;
     use Queueable;
 
     public int $timeout = 300;
@@ -26,9 +28,7 @@ class GenerateVehicleMaintenancePdfExport implements ShouldQueue
 
     public function handle(VehicleMaintenancePdfExporter $exporter): void
     {
-        if (function_exists('set_time_limit')) {
-            set_time_limit($this->timeout);
-        }
+        $this->limitExecutionTimeToJobTimeout();
 
         $export = VehiclePdfExport::query()->findOrFail($this->exportId);
         $export->update(['status' => VehiclePdfExport::STATUS_PROCESSING]);

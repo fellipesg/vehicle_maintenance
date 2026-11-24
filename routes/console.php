@@ -25,3 +25,16 @@ Schedule::command('outreach:send')
     ->between('9:00', '17:00')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping();
+
+/*
+ * O Telescope está em require-dev, então um deploy com --no-dev não tem o pacote e não tem o
+ * comando. O mesmo class_exists de bootstrap/providers.php decide aqui: onde o pacote existe
+ * (local, CI, e qualquer deploy que instale as dev deps) o prune é agendado; onde não existe,
+ * nada é registrado e o scheduler não quebra com "command not found".
+ *
+ * O prune não olha telescope.enabled de propósito: desligar a gravação não apaga o que já está
+ * em telescope_entries, e sem prune a tabela cresce sem teto no Neon.
+ */
+if (class_exists(\Laravel\Telescope\TelescopeApplicationServiceProvider::class)) {
+    Schedule::command('telescope:prune --hours=48')->daily();
+}
