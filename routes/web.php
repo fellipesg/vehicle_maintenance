@@ -442,6 +442,11 @@ Route::middleware(['auth', 'tenant', 'noindex'])->group(function () {
         Route::put('/usuarios/{user}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'user'])->name('users.maintenance-photos');
         Route::get('/veiculos', [AdminVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
+        // Desfazer um vínculo de propriedade é ação da equipe, com motivo: ver
+        // App\Services\Vehicle\VehicleOwnershipEndingService.
+        Route::post('/veiculos/{vehicle}/proprietarios/{user}/encerrar', [AdminVehicleController::class, 'endOwnership'])
+            ->whereNumber(['vehicle', 'user'])
+            ->name('vehicles.end-ownership');
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
         // Ocultar da consulta pública é ação da equipe, não do proprietário: ver
         // App\Services\Maintenance\MaintenancePublicVisibilityService.
