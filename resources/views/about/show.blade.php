@@ -55,7 +55,7 @@
         </x-ui.section>
 
         <x-ui.section title="Como os artigos do blog são feitos" id="blog">
-            <p>O <x-ui.link :href="route('blog.index')" variant="inline">blog</x-ui.link> explica manutenção, documentação e compra e venda de carros. Nos assuntos de regra, prazo e intervalo de troca, o texto parte de fontes oficiais, como o manual do fabricante, o Código de Trânsito, o Contran, o Detran e o Procon, e os guias citam essas fontes no fim. Onde a regra muda de estado para estado ou a dúvida é jurídica, o artigo orienta a consultar o órgão competente em vez de afirmar.</p>
+            <p>O <x-ui.link :href="route('blog.index')" variant="inline">blog</x-ui.link> explica manutenção, documentação e compra e venda de carros. Nos assuntos de regra e de prazo, a referência são fontes oficiais, como o manual do fabricante e os órgãos de trânsito e de defesa do consumidor; parte dos artigos traz a lista de fontes no fim. Onde a regra muda de estado para estado ou a dúvida é jurídica, o artigo orienta a consultar o órgão competente em vez de afirmar.</p>
             <p>Os artigos não substituem a avaliação de um mecânico nem orientação jurídica. Se encontrar um erro ou algo desatualizado, avise pelo <x-ui.link :href="route('contact.show')" variant="inline">contato</x-ui.link>, com o endereço do artigo.</p>
         </x-ui.section>
 

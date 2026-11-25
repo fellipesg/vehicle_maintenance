@@ -61,7 +61,7 @@ Para não gastar tempo nem dinheiro com o carro errado, siga esta ordem:
 
 1. **Antes de visitar**: peça placa e RENAVAM e consulte débitos, restrições e bloqueios no Detran. Gratuito.
 2. **Antes de visitar**: consulte recall pelo chassi no site da montadora. Gratuito.
-3. **Na visita**: confira se o chassi gravado no carro bate com o documento (ele fica gravado no carro e consta no documento).
+3. **Na visita**: confira se o chassi gravado no carro bate com o documento.
 4. **Na visita**: peça manual, notas e o contato da oficina.
 5. **Antes de pagar qualquer sinal**: faça o relatório veicular pago e, se possível, leve um mecânico de confiança.
 

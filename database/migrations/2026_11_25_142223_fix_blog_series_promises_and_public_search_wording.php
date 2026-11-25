@@ -23,7 +23,7 @@ return new class extends Migration
         ['quilometragem-adulterada-sinais', 'Faça a [consulta pública do RevisaLog](/buscar-veiculo)', 'Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo)'],
         ['como-fazer-o-cliente-voltar-a-oficina', '(o próximo post desta série trata disso)', '(art. 40)'],
         ['velas-de-ignicao-quando-trocar', 'O próximo post desta série trata das diferenças de manutenção entre rodar com etanol e com gasolina.', 'As diferenças de manutenção entre rodar com etanol e com gasolina variam de carro para carro: o manual do proprietário traz o que o fabricante recomenda para o seu.'],
-        ['historico-de-carro-usado-como-consultar', '(o próximo post mostra onde ele fica)', '(ele fica gravado no carro e consta no documento)'],
+        ['historico-de-carro-usado-como-consultar', ' (o próximo post mostra onde ele fica)', ''],
         ['historico-de-carro-usado-como-consultar', 'Faça a [consulta pública do RevisaLog](/buscar-veiculo)', 'Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo)'],
         ['carro-de-leilao-sinistro-recuperado-vale-a-pena', 'Faça a [consulta pública do RevisaLog](/buscar-veiculo)', 'Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo)'],
         ['checklist-carro-usado', 'Faça a [consulta pública do RevisaLog](/buscar-veiculo)', 'Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo)'],
