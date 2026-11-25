@@ -4,13 +4,15 @@
     $metaTitle = $post->meta_title ?: $post->title;
     $metaDescription = $post->meta_description ?: $post->summary;
     $publishedAt = \App\Support\DisplayTime::local($post->published_at)?->locale('pt_BR');
-    $updatedAt = \App\Support\DisplayTime::local($post->updated_at)?->locale('pt_BR');
-    // "Atualizado em" só quando a revisão veio depois do dia da publicação.
+    $updatedAt = \App\Support\DisplayTime::local($post->modified_at)?->locale('pt_BR');
+    // "Atualizado em" só quando a revisão veio depois do dia da publicação (modified_at nunca é anterior a ela).
     $showUpdatedAt = $publishedAt !== null && $updatedAt !== null && $updatedAt->toDateString() > $publishedAt->toDateString();
     $article = \App\Support\Seo\BlogArticle::split($post->content);
     $articleLead = $article['lead'] ?: $post->excerpt;
     $articleFaqs = \App\Support\Seo\BlogArticle::faqs($article['body']);
     $canonical = \App\Support\Seo\CanonicalUrl::named('blog.show', $post);
+    $authorName = \App\Support\Seo\BlogAuthor::name($post);
+    $authorProfileUrl = \App\Support\Seo\BlogAuthor::profileUrl($post);
     $breadcrumbs = array_values(array_filter([
         ['Início', \App\Support\Seo\CanonicalUrl::home()],
         ['Blog', route('blog.index')],
@@ -73,10 +75,14 @@
                     <span aria-hidden="true">·</span>
                 @endif
                 <span>{{ $post->reading_minutes }} min de leitura</span>
-                @if($post->author)
-                    <span aria-hidden="true">·</span>
-                    <span>por {{ $post->author->name }}</span>
-                @endif
+                <span aria-hidden="true">·</span>
+                <span data-slot="blog-post-author">por
+                    @if($authorProfileUrl)
+                        <x-ui.link :href="route('about').'#autor'" variant="inline" rel="author">{{ $authorName }}</x-ui.link>
+                    @else
+                        {{ $authorName }}
+                    @endif
+                </span>
             </p>
             @if($showUpdatedAt)
                 <p class="mt-1 text-sm text-muted-foreground" data-slot="blog-post-updated">

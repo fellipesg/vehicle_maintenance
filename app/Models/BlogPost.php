@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class BlogPost extends Model
@@ -108,6 +109,25 @@ class BlogPost extends Model
             }
 
             return AppStorage::coversUrl($this->cover_photo_path);
+        });
+    }
+
+    /**
+     * Última alteração pública do texto: nunca anterior à publicação. Um post agendado nasce com
+     * updated_at do dia em que foi gravado, antes de published_at; dateModified e lastmod menores
+     * que a data de publicação são incoerentes.
+     */
+    protected function modifiedAt(): Attribute
+    {
+        return Attribute::get(function (): ?Carbon {
+            $updatedAt = $this->updated_at;
+            $publishedAt = $this->published_at;
+
+            if ($updatedAt === null || $publishedAt === null) {
+                return $updatedAt ?? $publishedAt;
+            }
+
+            return $updatedAt->greaterThan($publishedAt) ? $updatedAt : $publishedAt;
         });
     }
 
