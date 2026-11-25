@@ -12,7 +12,7 @@ return [
 
     'terms_version' => '2026-11-18',
 
-    'privacy_version' => '2026-11-18',
+    'privacy_version' => '2026-11-25',
 
     'terms_of_use' => <<<'TEXT'
 Termos de Uso — RevisaLog
@@ -64,6 +64,7 @@ O tratamento é feito pela RevisaLog, identificada no rodapé do site. Para exer
 - Comentários no blog: o texto que você escreve num artigo. Ele aparece publicamente com o seu primeiro nome e a inicial do último sobrenome (por exemplo, "Felipe G."), nunca com o nome completo nem o e-mail. Comentários com link só aparecem depois de revisados e podem ser ocultados ou removidos pela equipe se descumprirem os Termos de Uso.
 - Navegação nas páginas públicas (início, blog, consulta de selo, contato, login e cadastro): páginas visitadas, origem do acesso, tipo de aparelho e navegador, cidade aproximada e cliques em links, medidos pelo Google Analytics. As áreas logadas (Início do usuário, oficina, lojista e administração) não são medidas.
 - Anúncios no blog: as páginas do blog exibem anúncios do Google AdSense. O Google recebe o endereço da página, dados do aparelho e do navegador e o endereço IP para escolher e medir os anúncios; com o seu aceite, usa também cookies de publicidade para personalizá-los. Os anúncios aparecem só no blog, nunca nas áreas logadas, na consulta de veículos ou na conferência de selos.
+- Aplicativo iOS e medição de anúncios: o aplicativo para iPhone usa o SDK da Meta (Facebook), que recebe a instalação e as aberturas do aplicativo, o fato de que uma conta foi criada e o fato de que um veículo foi cadastrado (só o fato: nunca placa, chassi, RENAVAM, nome, e-mail nem documentos), dados técnicos do aparelho e do aplicativo (modelo, versão do sistema, versão do aplicativo, endereço IP e um identificador gerado pelo próprio SDK) e, somente se você permitir no pedido de rastreamento do iOS, o identificador de publicidade do aparelho (IDFA). Se você recusar, a medição continua sem o IDFA.
 - Oficinas (prospecção): nome da empresa, e-mail comercial, telefone e endereço publicados no cadastro público de CNPJ da Receita Federal.
 
 3. Para que usamos
@@ -71,7 +72,8 @@ O tratamento é feito pela RevisaLog, identificada no rodapé do site. Para exer
 - Segurança: autenticação, verificação em duas etapas, prevenção de fraude e de abuso (legítimo interesse).
 - Comunicação: lembretes de manutenção, avisos de garantia e respostas a solicitações (execução de contrato e legítimo interesse).
 - Cumprir obrigações legais e regulatórias, incluindo a guarda de registros de acesso.
-- Entender como o site é usado: medir visitas e cliques nas páginas públicas, de forma agregada, para melhorar o site e saber quais canais trazem visitantes (legítimo interesse). Não usamos esses dados para publicidade nem para criar perfis de pessoas.
+- Entender como o site é usado: medir visitas e cliques nas páginas públicas, de forma agregada, para melhorar o site e saber quais canais trazem visitantes (legítimo interesse). Não usamos os dados dessa medição do site para publicidade nem para criar perfis de pessoas.
+- Medir e melhorar as campanhas de anúncios da própria RevisaLog na Meta, a partir dos eventos do aplicativo iOS descritos na seção 2 (legítimo interesse). O identificador de publicidade (IDFA) só é usado com o seu consentimento, dado no pedido de rastreamento do iOS, e você pode retirá-lo a qualquer momento em Ajustes → Privacidade e Segurança → Rastreamento.
 - Manter o blog: exibir anúncios do Google AdSense nas páginas do blog (legítimo interesse) e, só se você aceitar no aviso de cookies, anúncios personalizados (consentimento, que você pode retirar a qualquer momento).
 - Convidar oficinas: usamos dados públicos do cadastro de CNPJ da Receita Federal (nome da empresa, e-mail comercial e telefone) para convidar oficinas mecânicas a conhecer o RevisaLog, com base no legítimo interesse (LGPD, art. 7º, IX). Enviamos no máximo duas mensagens por oficina. Você pode recusar qualquer mensagem pelo link que ela traz ou escrevendo para suporte@revisalog.com.br, e a recusa é permanente: não escrevemos mais para esse e-mail.
 
@@ -88,7 +90,7 @@ Uma oficina pode registrar um serviço pelo chassi num veículo cujo proprietár
 6. Compartilhamento
 Não vendemos seus dados. Compartilhamos apenas o necessário com:
 - Oficinas e lojistas, que veem os dados do veículo e das manutenções no contexto do serviço;
-- Prestadores de infraestrutura que operam em nosso nome: Laravel Cloud (hospedagem), Cloudflare (rede, DNS, armazenamento de arquivos e recebimento de e-mail), Resend (envio de e-mail), Google Firebase (notificações push), Google Analytics (medição de uso das páginas públicas), Google AdSense (anúncios no blog) e OpenStreetMap/Nominatim (geolocalização de endereços);
+- Prestadores de infraestrutura que operam em nosso nome: Laravel Cloud (hospedagem), Cloudflare (rede, DNS, armazenamento de arquivos e recebimento de e-mail), Resend (envio de e-mail), Google Firebase (notificações push), Google Analytics (medição de uso das páginas públicas), Google AdSense (anúncios no blog), Meta (SDK do Facebook no aplicativo iOS, para medir os anúncios da RevisaLog) e OpenStreetMap/Nominatim (geolocalização de endereços);
 - Autoridades públicas, quando exigido por lei ou ordem judicial.
 Alguns desses prestadores armazenam dados fora do Brasil, com as salvaguardas previstas no art. 33 da LGPD.
 
