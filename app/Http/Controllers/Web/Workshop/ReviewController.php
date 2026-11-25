@@ -61,6 +61,14 @@ class ReviewController extends Controller
             return $redirect;
         }
 
+        // Confirmar emite o Selo da oficina, e sobre o carro do próprio tenant ele não sai
+        // (MaintenancePolicy::confirmReview). "Não reconheço" continua valendo, e é por ali que o
+        // pedido sai da fila — ver .ai/rules/issuer-independence.md.
+        if (! Gate::allows('confirmReview', $maintenance)) {
+            return redirect()->route('workshop.reviews.index')
+                ->with('error', self::ownVehicleMessage());
+        }
+
         $maintenance = $this->reviews->confirm($maintenance, $request->user());
 
         return redirect()->route('workshop.reviews.index')
@@ -90,5 +98,15 @@ class ReviewController extends Controller
 
         return redirect()->route('workshop.reviews.index')
             ->with('error', 'Esse serviço já foi respondido ou não cita a sua oficina.');
+    }
+
+    /**
+     * A recusa de confirmar por conflito de interesse. Diz a saída, porque existe uma: não
+     * reconhecer tira o vínculo e o item sai da fila.
+     */
+    public static function ownVehicleMessage(): string
+    {
+        return 'Este veículo está na sua própria conta, e o Selo da oficina não sai sobre o próprio carro. '
+            .'Se o serviço não é seu, use "Não reconheço" para tirar o vínculo.';
     }
 }

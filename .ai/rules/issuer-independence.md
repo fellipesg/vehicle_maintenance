@@ -8,6 +8,7 @@ paths:
   - 'app/Policies/MaintenancePolicy.php'
   - 'app/Policies/VehicleInspectionPolicy.php'
   - 'app/Support/Inspection/InspectionAccess.php'
+  - 'app/Http/Controllers/Web/Workshop/ReviewController.php'
 ---
 
 # Independência de quem atesta
@@ -33,7 +34,7 @@ resolve o `tenant_id` da oficina e procura vínculo de posse **atual** daquele t
 Oficina desconhecida ou veículo ausente respondem **não**: sem os dois lados não há como afirmar
 independência.
 
-### Três decisões de escopo, todas falhando fechado
+### Quatro decisões de escopo, todas falhando fechado
 - **Posse não verificada conta** (`user_vehicles.ownership_verified_at` nulo). Verificação é prova de
   *quem é o dono*; conflito de interesse é sobre *interesse*, e quem pôs o carro na própria conta já
   declarou o interesse. Exigir CRLV-e aqui transformaria "não enviei o documento" em licença para
@@ -47,6 +48,15 @@ independência.
   (`.ai/rules/models.md`, "O selo não espera o proprietário") e segue selando. Barrar ali
   reintroduziria a regra que o `WorkshopVehicleLink` perdeu de propósito. Só a posse **atual**
   conflita: a oficina que vendeu o carro volta a ser terceiro nele.
+- **A oficina sem tenant é comparada pelo `user_id` dela.** `workshops.tenant_id` é nulo quando a
+  conta nasceu sem tenant (`ProfileController` copia o `users.tenant_id`, que é nullable) ou quando o
+  tenant foi apagado (`nullOnDelete`), e comparar nulo com nulo não acha linha nenhuma — a guarda
+  desligaria em silêncio justo na conta de cadastro torto, que é o inverso de falhar fechado. Então o
+  lado da oficina são os **dois** identificadores, `tenant_id` e `user_id`, e basta um casar com a
+  posse (`user_vehicles.user_id`, `vehicle_consignments.garage_user_id`) para barrar. Em dados sãos o
+  `user_id` é redundante — um usuário tem um tenant só —, e é por isso que incluí-lo não aperta o
+  caso central. Identificador nulo fica **fora** da comparação; sem nenhum dos dois, `workshopMayAttest`
+  recusa, como recusa oficina inexistente.
 
 ## O gargalo é `applyWorkshopSeal`, e cada chamador decide o que fazer com a recusa
 Todo selo nasce em `MaintenanceVerificationStamper::applyWorkshopSeal`, então é **ali** que o
@@ -70,13 +80,24 @@ um. As quatro respostas são diferentes porque as perguntas são diferentes:
 - **`verifyLinkedWorkshopMaintenances()`** (backfill) **pula** a linha. Uma OS conflitada no meio da
   tabela não pode travar as outras.
 
-## Confirmar uma declarada é emitir selo, então a fila responde ao mesmo invariante
-`MaintenancePolicy::review` exige independência além de "cita a minha oficina": sem isso a conta
-declarava o serviço do próprio carro por um lado e o confirmava pelo outro — o selo pelo caminho mais
-longo. E `WorkshopReviewService::syncAfterDeclaration` trata "não pode atestar" como trata "não cita
-oficina": não enfileira o pedido e limpa um `workshop_review_status` pendente que virou
-inconfirmável. Enfileirar o que a própria tela se nega a responder é pedir para a oficina olhar um
-item morto.
+## Confirmar é emitir selo; não reconhecer não é, e tem de continuar possível
+A fila de validação tem **duas** respostas e elas não respondem à mesma pergunta:
+
+- **`MaintenancePolicy::confirmReview`** (confirmar) exige independência além de "cita a minha
+  oficina", porque confirmar aplica o Selo da oficina: sem isso a conta declarava o serviço do próprio
+  carro por um lado e o confirmava pelo outro — o selo pelo caminho mais longo. A tela esconde o botão
+  (`@can('confirmReview')`) e o POST recusa com a mensagem de `ReviewController::ownVehicleMessage`.
+- **`MaintenancePolicy::review`** (a fila, e "não reconheço") **não** exige independência, de
+  propósito. Rejeitar não emite nada: tira o vínculo com a oficina. Pôr a guarda nas duas prenderia o
+  pedido na fila para sempre, porque o carro pode virar do tenant da oficina **depois** do pedido —
+  `Maintenance::scopeAwaitingReviewBy` lista por status e `workshop_id`, sem olhar posse, e
+  `syncAfterDeclaration` só limpa um pendente quando a declarada é regravada, o que uma mudança de
+  posse não faz. Rejeitar é a saída da fila, e é a resposta honesta de quem não pode atestar.
+
+`WorkshopReviewService::syncAfterDeclaration` trata "não pode atestar" como trata "não cita oficina":
+não enfileira o pedido e limpa um `workshop_review_status` pendente que virou inconfirmável. Isso vale
+para o pedido que **nasce** conflitado (quem declara ali é a própria dona do carro); o que já existia
+quando a posse mudou não passa por lá, e sai pela rejeição.
 
 ## No laudo são três guardas, e a independência é a primeira
 `VehicleInspectionService::assertCoherent` ganhou `assertIndependentIssuer`, que roda junto com

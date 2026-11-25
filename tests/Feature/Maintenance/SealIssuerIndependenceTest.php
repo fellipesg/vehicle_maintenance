@@ -4,6 +4,7 @@ namespace Tests\Feature\Maintenance;
 
 use App\Enums\WorkshopReviewStatus;
 use App\Exceptions\SelfAttestationException;
+use App\Http\Controllers\Web\Workshop\ReviewController;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -211,22 +212,87 @@ class SealIssuerIndependenceTest extends TestCase
         $this->assertSame('confirmed', $sealed->verification_method);
     }
 
-    public function test_review_is_denied_when_the_vehicle_belongs_to_the_workshop_tenant(): void
+    public function test_confirming_is_denied_when_the_vehicle_belongs_to_the_workshop_tenant(): void
     {
-        $maintenance = $this->declaredMaintenance($this->vehicleOwnedByWorkshopTenant());
-        $maintenance->forceFill(['workshop_review_status' => WorkshopReviewStatus::Pending])->save();
+        $maintenance = $this->pendingReview($this->vehicleOwnedByWorkshopTenant());
 
-        $this->assertFalse(Gate::forUser($this->workshopUser)->allows('review', $maintenance->fresh()));
+        $this->assertFalse(Gate::forUser($this->workshopUser)->allows('confirmReview', $maintenance));
     }
 
-    public function test_review_is_allowed_for_a_declared_record_on_a_third_party_vehicle(): void
+    public function test_confirming_is_allowed_for_a_declared_record_on_a_third_party_vehicle(): void
     {
-        $vehicle = Vehicle::factory()->create();
-        $this->attachVehicleToUser(User::factory()->asUser()->create(), $vehicle);
-        $maintenance = $this->declaredMaintenance($vehicle);
-        $maintenance->forceFill(['workshop_review_status' => WorkshopReviewStatus::Pending])->save();
+        $maintenance = $this->pendingReview($this->thirdPartyVehicle());
 
-        $this->assertTrue(Gate::forUser($this->workshopUser)->allows('review', $maintenance->fresh()));
+        $this->assertTrue(Gate::forUser($this->workshopUser)->allows('confirmReview', $maintenance));
+    }
+
+    /**
+     * A posse pode mudar **depois** do pedido, e aí o pendente já está na fila: `scopeAwaitingReviewBy`
+     * lista por status e workshop_id, sem olhar posse, e nada regrava a declarada para limpá-lo. Se a
+     * guarda estivesse em `review` as duas respostas morreriam e o item ficaria preso para sempre —
+     * não reconhecer não emite nada, então continua sendo a saída.
+     */
+    public function test_rejecting_stays_possible_when_the_vehicle_became_the_workshop_tenants(): void
+    {
+        $maintenance = $this->pendingReview($this->vehicleOwnedByWorkshopTenant());
+
+        $this->assertTrue(Gate::forUser($this->workshopUser)->allows('review', $maintenance));
+    }
+
+    public function test_the_queue_screen_refuses_to_confirm_a_vehicle_of_the_workshop_tenant(): void
+    {
+        $maintenance = $this->pendingReview($this->vehicleOwnedByWorkshopTenant());
+
+        $this->actingAs($this->workshopUser)
+            ->post(route('workshop.reviews.confirm', $maintenance))
+            ->assertRedirect(route('workshop.reviews.index'))
+            ->assertSessionHas('error', ReviewController::ownVehicleMessage());
+
+        $this->assertNull($maintenance->fresh()->verified_at);
+        $this->assertSame(WorkshopReviewStatus::Pending, $maintenance->fresh()->workshop_review_status);
+    }
+
+    public function test_the_queue_screen_hides_the_confirm_button_for_a_vehicle_of_the_workshop_tenant(): void
+    {
+        $this->pendingReview($this->vehicleOwnedByWorkshopTenant());
+
+        $this->actingAs($this->workshopUser)
+            ->get(route('workshop.reviews.index'))
+            ->assertOk()
+            ->assertDontSee('Confirmar serviço')
+            ->assertSee('Não reconheço');
+    }
+
+    /**
+     * A saída da fila funciona de ponta a ponta: o item preso sai pela rejeição.
+     */
+    public function test_the_queue_screen_still_rejects_a_vehicle_of_the_workshop_tenant(): void
+    {
+        Notification::fake();
+
+        $maintenance = $this->pendingReview($this->vehicleOwnedByWorkshopTenant());
+
+        $this->actingAs($this->workshopUser)
+            ->post(route('workshop.reviews.reject', $maintenance))
+            ->assertRedirect(route('workshop.reviews.index'))
+            ->assertSessionHasNoErrors();
+
+        $fresh = $maintenance->fresh();
+        $this->assertSame(WorkshopReviewStatus::Rejected, $fresh->workshop_review_status);
+        $this->assertNull($fresh->verified_at);
+    }
+
+    public function test_the_queue_screen_still_confirms_a_third_party_vehicle(): void
+    {
+        Notification::fake();
+
+        $maintenance = $this->pendingReview($this->thirdPartyVehicle());
+
+        $this->actingAs($this->workshopUser)
+            ->post(route('workshop.reviews.confirm', $maintenance))
+            ->assertRedirect(route('workshop.reviews.index'));
+
+        $this->assertNotNull($maintenance->fresh()->verified_at);
     }
 
     public function test_a_declaration_the_workshop_could_never_confirm_is_not_queued_for_review(): void
@@ -268,7 +334,69 @@ class SealIssuerIndependenceTest extends TestCase
         $this->assertNotNull($thirdParty->fresh()->verified_at);
     }
 
+    // ── oficina sem tenant: a guarda não pode desligar em silêncio ───────────
+
+    /**
+     * `workshops.tenant_id` é nullable e `nullOnDelete`. Comparar só tenant faria nulo casar com
+     * nulo em lugar nenhum, e a conta de cadastro torto selaria o próprio carro — o inverso de
+     * falhar fechado. O lado da oficina são os dois identificadores.
+     */
+    public function test_a_workshop_without_tenant_does_not_seal_its_own_users_vehicle(): void
+    {
+        $vehicle = $this->vehicleOwnedByWorkshopTenant();
+        $this->forgetWorkshopTenant($vehicle);
+
+        $stamped = $this->stamper->stamp($this->workshopMaintenance($vehicle), $this->workshopUser->fresh());
+
+        $this->assertNull($stamped->verified_at);
+        $this->assertNull($stamped->verification_code);
+    }
+
+    public function test_a_workshop_without_tenant_still_seals_a_third_party_vehicle(): void
+    {
+        $vehicle = $this->thirdPartyVehicle();
+        $this->forgetWorkshopTenant();
+
+        $stamped = $this->stamper->stamp($this->workshopMaintenance($vehicle), $this->workshopUser->fresh());
+
+        $this->assertNotNull($stamped->verified_at);
+        $this->assertNotNull($stamped->verification_code);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Apaga todo rastro de tenant do lado da oficina — e, quando o veículo é dela, também da posse,
+     * que é como os dados ficam numa conta que nasceu sem tenant.
+     */
+    private function forgetWorkshopTenant(?Vehicle $ownVehicle = null): void
+    {
+        $this->workshop->forceFill(['tenant_id' => null])->save();
+        $this->workshopUser->forceFill(['tenant_id' => null])->save();
+
+        if ($ownVehicle !== null) {
+            $this->workshopUser->vehicles()->updateExistingPivot($ownVehicle->id, ['tenant_id' => null]);
+        }
+    }
+
+    private function thirdPartyVehicle(): Vehicle
+    {
+        $vehicle = Vehicle::factory()->create();
+        $this->attachVehicleToUser(User::factory()->asUser()->create(), $vehicle);
+
+        return $vehicle->fresh();
+    }
+
+    /**
+     * Declarada já na fila de validação da oficina.
+     */
+    private function pendingReview(Vehicle $vehicle): Maintenance
+    {
+        $maintenance = $this->declaredMaintenance($vehicle);
+        $maintenance->forceFill(['workshop_review_status' => WorkshopReviewStatus::Pending])->save();
+
+        return $maintenance->fresh();
+    }
 
     private function vehicleOwnedByWorkshopTenant(): Vehicle
     {

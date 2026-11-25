@@ -38,11 +38,13 @@ class WorkshopReviewService
             return;
         }
 
-        // Pedido que nunca poderia ser confirmado não fica na fila: confirmar emite o selo, e
-        // MaintenancePolicy::review recusa quando o veículo é do tenant da oficina citada
-        // (App\Support\Vehicle\IssuerIndependence). Vale a mesma saída de "não cita oficina" —
-        // inclusive limpar um pendente que virou inconfirmável —, senão a oficina recebe o aviso e
-        // encara um item que a própria tela se nega a responder.
+        // Pedido que nunca poderia ser confirmado não nasce na fila: confirmar emite o selo, e
+        // MaintenancePolicy::confirmReview recusa quando o veículo é do tenant da oficina citada
+        // (App\Support\Vehicle\IssuerIndependence) — quem declara ali é a própria dona do carro.
+        // Vale a mesma saída de "não cita oficina", inclusive limpar um pendente que virou
+        // inconfirmável, senão a oficina recebe o aviso de um item que ela só poderia rejeitar. O
+        // pendente que já existia quando a posse mudou não passa por aqui, e é por isso que
+        // rejeitar continua liberado: é a saída da fila.
         if ($maintenance->workshop_id === null || ! $this->mayAttest($maintenance)) {
             if ($maintenance->workshop_review_status === WorkshopReviewStatus::Pending) {
                 $maintenance->forceFill(['workshop_review_status' => null])->save();

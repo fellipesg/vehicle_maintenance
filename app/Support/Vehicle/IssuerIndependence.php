@@ -6,6 +6,7 @@ use App\Models\UserVehicle;
 use App\Models\Vehicle;
 use App\Models\VehicleConsignment;
 use App\Models\Workshop;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * "Esta oficina é independente deste veículo?" — a pergunta que o Selo da oficina e o laudo de
@@ -28,13 +29,20 @@ use App\Models\Workshop;
  * - **consignação ativa do mesmo tenant conta** (`vehicle_consignments`). Hoje consignação é só de
  *   lojista (`.ai/rules/consignment.md`) e um tenant é de um tipo só, então o cruzamento é
  *   inalcançável; ele entra porque é barato e porque é precisamente o caso que a doutrina do laudo
- *   já nomeia: quem tem o carro para vender não atesta o carro.
+ *   já nomeia: quem tem o carro para vender não atesta o carro;
+ * - **a oficina sem tenant é comparada pelo usuário dela**. `workshops.tenant_id` é nulo quando a
+ *   conta nasceu sem tenant ou quando o tenant foi apagado (`nullOnDelete`), e comparar nulo com
+ *   nulo não acha nada: a guarda desligaria em silêncio justamente para a conta de cadastro torto.
+ *   Então o lado da oficina são **os dois** identificadores, tenant e `user_id`, e basta um casar
+ *   com a posse para barrar. Em dados sãos o `user_id` é redundante (um usuário tem um tenant só),
+ *   e é por isso que incluí-lo não aperta nada no caso central.
  *
  * ## O que esta guarda NÃO cobre
- * Ela compara **tenant**, então não alcança a fraude com duas contas: oficina num e-mail, carro em
- * outro. Ali os `tenant_id` são diferentes e nada aqui enxerga que é a mesma pessoa. Fechar aquilo
- * exigiria cruzar `user_vehicles.owner_document` (encrypted) com o CNPJ da oficina, que é outro
- * trabalho. Ver `.ai/rules/models.md`, "Selo e laudo não saem sobre veículo do próprio tenant".
+ * Ela compara **tenant** (e o usuário da própria oficina), então não alcança a fraude com duas
+ * contas: oficina num e-mail, carro em outro. Ali os `tenant_id` são diferentes, os `user_id`
+ * também, e nada aqui enxerga que é a mesma pessoa. Fechar aquilo exigiria cruzar
+ * `user_vehicles.owner_document` (encrypted) com o CNPJ da oficina, que é outro trabalho. Ver
+ * `.ai/rules/models.md`, "Selo e laudo não saem sobre veículo do próprio tenant".
  */
 final class IssuerIndependence
 {
@@ -48,9 +56,17 @@ final class IssuerIndependence
             return false;
         }
 
-        $tenantId = Workshop::query()->whereKey($workshopId)->value('tenant_id');
+        $workshop = Workshop::query()->whereKey($workshopId)->first(['id', 'tenant_id', 'user_id']);
 
-        return ! self::tenantHoldsVehicle($tenantId === null ? null : (int) $tenantId, $vehicle);
+        if ($workshop === null) {
+            return false;
+        }
+
+        return ! self::holderHoldsVehicle(
+            $workshop->tenant_id === null ? null : (int) $workshop->tenant_id,
+            $workshop->user_id === null ? null : (int) $workshop->user_id,
+            $vehicle,
+        );
     }
 
     /**
@@ -59,18 +75,34 @@ final class IssuerIndependence
      *
      * Tenant nulo não "possui" nada: é a OS de oficina em carro sem dono, o caso central do produto
      * (`.ai/rules/models.md`, "O selo não espera o proprietário"), e barrá-lo devolveria a regra que
-     * o projeto removeu de propósito.
+     * o projeto removeu de propósito. Quem pergunta pela oficina usa `workshopMayAttest`, que não
+     * depende só do tenant.
      */
     public static function tenantHoldsVehicle(?int $tenantId, ?Vehicle $vehicle): bool
     {
-        if ($tenantId === null || $vehicle === null || $vehicle->id === null) {
+        return self::holderHoldsVehicle($tenantId, null, $vehicle);
+    }
+
+    /**
+     * A posse atual do veículo é de quem estes identificadores descrevem? Tenant **ou** usuário:
+     * identificador nulo é o que não se sabe, e o que não se sabe não entra na comparação — nulo
+     * casando com nulo transformaria cadastro torto em licença para selar o próprio carro. Sem
+     * nenhum dos dois não há pergunta a fazer, e a resposta é "não possui".
+     */
+    private static function holderHoldsVehicle(?int $tenantId, ?int $userId, ?Vehicle $vehicle): bool
+    {
+        if ($vehicle === null || $vehicle->id === null) {
+            return false;
+        }
+
+        if ($tenantId === null && $userId === null) {
             return false;
         }
 
         $owns = UserVehicle::query()
             ->where('vehicle_id', $vehicle->id)
-            ->where('tenant_id', $tenantId)
             ->where('is_current_owner', true)
+            ->where(fn (Builder $query) => self::matchHolder($query, 'tenant_id', $tenantId, 'user_id', $userId))
             ->exists();
 
         if ($owns) {
@@ -79,8 +111,27 @@ final class IssuerIndependence
 
         return VehicleConsignment::query()
             ->where('vehicle_id', $vehicle->id)
-            ->where('tenant_id', $tenantId)
             ->where('status', VehicleConsignment::STATUS_ACTIVE)
+            ->where(fn (Builder $query) => self::matchHolder($query, 'tenant_id', $tenantId, 'garage_user_id', $userId))
             ->exists();
+    }
+
+    /**
+     * O grupo "é deste tenant ou deste usuário", pulando o identificador que não se conhece.
+     */
+    private static function matchHolder(
+        Builder $query,
+        string $tenantColumn,
+        ?int $tenantId,
+        string $userColumn,
+        ?int $userId,
+    ): void {
+        if ($tenantId !== null) {
+            $query->orWhere($tenantColumn, $tenantId);
+        }
+
+        if ($userId !== null) {
+            $query->orWhere($userColumn, $userId);
+        }
     }
 }
