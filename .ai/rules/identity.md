@@ -28,10 +28,12 @@ papéis dentro de **uma** conta exigiria que `users.tenant_id` passasse a signif
 papel ativo", e dali sai toda a autorização: 168 referências em 74 arquivos, as 5 policies comparando
 `$model->tenant_id === $user->tenant_id`, `User::currentVehicles()`, `stockVehicles()` e a chave de
 cache do `EtagForVehicleList`. N papéis = N tenants, e cada uma dessas referências mudaria de
-sentido. **Nada disso mudou**: não mexemos em policy, em `tenant_id`, nas chamadas de
-`isUser()/isGarage()/isWorkshop()`, nos grupos de rota `user.type:`, no `app/Enums/Portal.php` nem no
-`app/Support/PortalAccess.php`. Só mudou a porta de entrada. Se uma mudança sua nesta área começar a
-pedir alteração em policy, pare e reveja o desenho: a propriedade se quebrou.
+sentido. **Nada disso mudou**: nenhuma policy, nenhum uso de `tenant_id`, nenhuma das chamadas de
+`isUser()/isGarage()/isWorkshop()`, nenhum grupo de rota `user.type:` e nenhuma decisão de
+`app/Enums/Portal.php` ou `app/Support/PortalAccess.php` (o único toque no `Portal` foi trocar duas
+leituras de relação por `loadMissing`, sem mudar o que ele responde). Só mudou a porta de entrada. Se
+uma mudança sua nesta área começar a pedir alteração em policy, pare e reveja o desenho: a
+propriedade se quebrou.
 
 O guard `web` continua no provider `users` e devolve um `App\Models\User` — é ele que as policies
 comparam. A identidade entra só no login e no broker de senha.
