@@ -84,7 +84,6 @@ return [
         'client' => env('ADSENSE_CLIENT_ID'),
         'slots' => [
             'blog_article' => env('ADSENSE_SLOT_BLOG_ARTICLE'),
-            'blog_index' => env('ADSENSE_SLOT_BLOG_INDEX'),
         ],
     ],
 
