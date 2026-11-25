@@ -2,6 +2,10 @@
 
 namespace App\Http\Requests\Web;
 
+use App\Enums\Portal;
+use App\Models\Identity;
+use App\Rules\AvailableForUserType;
+use App\Rules\MatchesIdentityPassword;
 use App\Rules\ValidCnpj;
 use App\Support\BrazilianStates;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -10,9 +14,16 @@ use Illuminate\Validation\Rule;
 
 /**
  * Cadastro próprio da oficina (/para-oficinas/cadastro): a pessoa responsável, a oficina e o endereço.
+ *
+ * O e-mail já pode ter identidade (a pessoa tem conta de proprietário e agora cadastra a oficina
+ * dela): o que bloqueia é já existir conta **de oficina** nesse e-mail, e a senha pedida passa a ser
+ * a da identidade, não uma nova. Ver App\Rules\AvailableForUserType e
+ * App\Rules\MatchesIdentityPassword.
  */
 class StoreWorkshopSignupRequest extends FormRequest
 {
+    private Identity|false|null $resolvedIdentity = false;
+
     public function authorize(): bool
     {
         return true;
@@ -45,8 +56,10 @@ class StoreWorkshopSignupRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'email' => ['required', 'email', 'max:255', new AvailableForUserType(Portal::Workshop->value)],
+            'password' => $this->existingIdentity() === null
+                ? ['required', 'string', 'min:8', 'confirmed']
+                : ['required', 'string', new MatchesIdentityPassword($this->existingIdentity())],
             'trade_name' => ['required', 'string', 'max:255'],
             'cnpj' => ['required', 'string', new ValidCnpj, 'unique:workshops,cnpj'],
             'phone' => ['required', 'string', 'digits_between:10,11'],
@@ -59,6 +72,21 @@ class StoreWorkshopSignupRequest extends FormRequest
             'state' => ['required', 'string', 'size:2', Rule::in(BrazilianStates::codes())],
             'ref' => ['nullable', 'string', 'max:64'],
         ];
+    }
+
+    /**
+     * Identidade que já existe para o e-mail enviado, quando existe: é a ela que a conta de oficina
+     * se liga, como conta irmã. Resolvida uma vez por requisição.
+     */
+    public function existingIdentity(): ?Identity
+    {
+        if ($this->resolvedIdentity === false) {
+            $this->resolvedIdentity = Identity::query()
+                ->where('email', (string) $this->input('email'))
+                ->first();
+        }
+
+        return $this->resolvedIdentity;
     }
 
     /**

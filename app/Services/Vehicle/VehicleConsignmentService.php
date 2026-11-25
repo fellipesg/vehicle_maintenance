@@ -2,6 +2,7 @@
 
 namespace App\Services\Vehicle;
 
+use App\Enums\Portal;
 use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -231,6 +232,12 @@ class VehicleConsignmentService
      * The owner may already have an account — either because the vehicle is registered to
      * them or because the e-mail the garage typed matches one. Linking it lets us notify
      * them in-app instead of only by e-mail.
+     *
+     * Com identidade compartilhada o e-mail pode casar com mais de uma conta (um papel cada), e
+     * aqui só uma delas serve: a de **proprietário**. Anexar a consignação à conta de oficina ou de
+     * loja da mesma pessoa mandaria o aviso do veículo para a área errada e deixaria a liberação do
+     * histórico na mão de um papel que não é o dono — por isso a busca é pelo papel, e não pela
+     * primeira linha que o e-mail achar.
      */
     private function resolveOwnerUser(Vehicle $vehicle, ?string $email): ?User
     {
@@ -246,6 +253,9 @@ class VehicleConsignmentService
             return null;
         }
 
-        return User::where('email', $email)->first();
+        return User::query()
+            ->where('email', $email)
+            ->where('user_type', Portal::Owner->value)
+            ->first();
     }
 }

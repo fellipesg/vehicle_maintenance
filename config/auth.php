@@ -65,10 +65,15 @@ return [
             'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        /*
+         * A senha mora na identidade (App\Models\Identity), acima das contas: é este provider que
+         * o broker de redefinição usa. O guard `web` continua no provider `users`, porque é o
+         * App\Models\User — com o `tenant_id` dele — que toda policy compara.
+         */
+        'identities' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Identity::class,
+        ],
     ],
 
     /*
@@ -91,8 +96,14 @@ return [
     */
 
     'passwords' => [
+        /*
+         * O broker continua se chamando `users` (é o padrão de 'defaults.passwords' e o nome que o
+         * PasswordResetController lê para calcular a validade do link), mas busca na identidade: com
+         * contas irmãs, procurar o e-mail em `users` casaria com mais de uma linha e não haveria como
+         * escolher qual recebe o link. A senha é uma só, da identidade.
+         */
         'users' => [
-            'provider' => 'users',
+            'provider' => 'identities',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,

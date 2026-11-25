@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Web\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Auth\ResetPasswordRequest;
 use App\Http\Requests\Web\Auth\SendPasswordResetLinkRequest;
-use App\Models\User;
-use App\Support\PortalAccess;
+use App\Models\Identity;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -22,6 +20,11 @@ use Illuminate\View\View;
  * O pedido do link responde sempre a mesma mensagem, exista ou não a conta, para não revelar quais
  * e-mails estão cadastrados. O e-mail sai em pt-BR por App\Notifications\ResetPasswordNotification.
  * A senha nova desconecta os outros aparelhos: sessões web e tokens do app.
+ *
+ * Quem o broker acha é a **identidade** (config/auth.php, provider `identities`), não uma conta: a
+ * senha é dela e vale para todas as contas irmãs. Por isso a redefinição derruba as sessões e os
+ * tokens de todos os papéis daquele e-mail, e a volta é para o login do papel único da identidade —
+ * ou para o hub, quando ela tem mais de um e não há como saber por qual a pessoa vai entrar.
  */
 class PasswordResetController extends Controller
 {
@@ -104,36 +107,44 @@ class PasswordResetController extends Controller
 
         RateLimiter::hit($ipKey, 60);
 
-        $resetUser = null;
+        $resetIdentity = null;
 
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user, string $password) use (&$resetUser): void {
-                $user->forceFill([
-                    'password' => Hash::make($password),
-                    'remember_token' => Str::random(60),
-                ])->save();
+            function (Identity $identity, string $password) use (&$resetIdentity): void {
+                // Quem redefine costuma ter perdido o controle da conta: os tokens do app de todas
+                // as contas irmãs saem, e o remember_token de cada uma é rodado. As sessões web
+                // caem pelo App\Http\Middleware\AuthenticateWebSession, que compara o hash da
+                // senha da identidade.
+                $identity->changePasswordTo($password);
 
-                // Quem redefine costuma ter perdido o controle da conta: os tokens do app também saem.
-                // As sessões web dos outros aparelhos caem pelo App\Http\Middleware\AuthenticateWebSession.
-                $user->tokens()->delete();
+                event(new PasswordReset($identity));
 
-                event(new PasswordReset($user));
-
-                $resetUser = $user;
+                $resetIdentity = $identity;
             },
         );
 
-        if ($status === Password::PASSWORD_RESET && $resetUser instanceof User) {
+        if ($status === Password::PASSWORD_RESET && $resetIdentity instanceof Identity) {
             return redirect()
-                ->route(PortalAccess::loginRouteName($resetUser))
-                ->withInput(['email' => $resetUser->email])
+                ->route($this->loginRouteAfterReset($resetIdentity))
+                ->withInput(['email' => $resetIdentity->email])
                 ->with('status', self::PASSWORD_RESET_MESSAGE);
         }
 
         return back()
             ->withInput($request->only('email'))
             ->withErrors(['token' => self::INVALID_LINK_MESSAGE]);
+    }
+
+    /**
+     * Para onde a pessoa volta depois de redefinir: o login do papel dela quando é um só, e o hub
+     * quando ela tem contas irmãs — com mais de um papel, qualquer escolha nossa seria chute.
+     */
+    private function loginRouteAfterReset(Identity $identity): string
+    {
+        $portals = $identity->accessiblePortals();
+
+        return count($portals) === 1 ? $portals[0]->loginRoute() : 'login';
     }
 
     private function tokenIsValid(string $email, string $token): bool

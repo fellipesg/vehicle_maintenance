@@ -70,8 +70,9 @@ class AccountDeletionTest extends TestCase
 
         Mail::assertQueued(AccountDeletionRequestMail::class, function (AccountDeletionRequestMail $mail) use ($user): bool {
             return $mail->hasTo($user->email)
-                && str_contains($mail->confirmationUrl, 'excluir-conta/confirmar/'.$user->id)
-                && str_contains($mail->confirmationUrl, 'signature=');
+                && count($mail->confirmations) === 1
+                && str_contains($mail->confirmations[0]['url'], 'excluir-conta/confirmar/'.$user->id)
+                && str_contains($mail->confirmations[0]['url'], 'signature=');
         });
     }
 
@@ -185,7 +186,10 @@ class AccountDeletionTest extends TestCase
 
     public function test_the_confirmation_mail_renders_with_the_link(): void
     {
-        $mail = new AccountDeletionRequestMail(confirmationUrl: 'https://revisalog.com.br/excluir-conta/confirmar/1?signature=abc', expiresInMinutes: 60);
+        $mail = new AccountDeletionRequestMail(
+            confirmations: [['label' => 'Proprietário', 'url' => 'https://revisalog.com.br/excluir-conta/confirmar/1?signature=abc']],
+            expiresInMinutes: 60,
+        );
 
         $rendered = $mail->render();
 

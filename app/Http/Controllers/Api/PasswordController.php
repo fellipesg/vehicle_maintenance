@@ -11,9 +11,7 @@ use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 
 #[Group('Password', weight: 9)]
 class PasswordController extends Controller
@@ -60,20 +58,14 @@ class PasswordController extends Controller
             ? $currentTokenKey
             : null;
 
-        $user->forceFill([
-            'password' => Hash::make((string) $request->validated('password')),
-            // Desliga o "Lembrar de mim" das sessões web, como a troca pelo portal.
-            'remember_token' => Str::random(60),
-        ])->save();
-
-        // Quem troca a senha costuma estar tirando outro aparelho da conta, então os outros
-        // tokens saem. O desta requisição fica, senão o app se deslogaria sozinho ao salvar.
-        $user->tokens()
-            ->when(
-                $currentTokenId !== null,
-                fn ($query) => $query->whereKeyNot($currentTokenId),
-            )
-            ->delete();
+        // A senha é da identidade, compartilhada pelas contas irmãs: a troca vale para todos os
+        // papéis daquele e-mail, e por isso derruba os tokens e o "Lembrar de mim" de todos eles.
+        // Quem troca a senha costuma estar tirando outro aparelho da conta. O token desta
+        // requisição fica, senão o app se deslogaria sozinho ao salvar.
+        $user->loadMissing('identity')->identity->changePasswordTo(
+            (string) $request->validated('password'),
+            $currentTokenId,
+        );
 
         return ApiResponse::success(
             message: 'Senha alterada. Os outros aparelhos foram desconectados.',
