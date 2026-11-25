@@ -15,7 +15,7 @@ class SitemapController extends Controller
         $posts = BlogPost::query()
             ->published()
             ->orderByDesc('published_at')
-            ->get(['slug', 'updated_at']);
+            ->get(['slug', 'updated_at', 'published_at']);
 
         $categories = BlogCategory::query()
             ->active()
@@ -29,6 +29,7 @@ class SitemapController extends Controller
             'workshops.signup' => '0.6',
             'verification.lookup' => '0.5',
             'guides.comparison' => '0.7',
+            'about' => '0.5',
             'contact.show' => '0.5',
             'legal.terms' => '0.3',
             'legal.privacy' => '0.3',

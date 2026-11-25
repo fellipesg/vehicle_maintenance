@@ -21,7 +21,7 @@
     @foreach($posts as $post)
     <url>
         <loc>{{ route('blog.show', $post) }}</loc>
-        <lastmod>{{ $post->updated_at?->toAtomString() }}</lastmod>
+        <lastmod>{{ $post->modified_at?->toAtomString() }}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.7</priority>
     </url>

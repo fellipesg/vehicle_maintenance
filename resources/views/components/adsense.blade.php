@@ -1,6 +1,6 @@
 @php
     /*
-     * Google AdSense só no blog (App\Support\GoogleAdsense) e só com ADSENSE_CLIENT_ID definido.
+     * Google AdSense só no artigo do blog (App\Support\GoogleAdsense) e só com ADSENSE_CLIENT_ID definido.
      * Anúncio personalizado depende do aceite no aviso <x-ads.consent-banner> (cookie rl_ads_consent,
      * gravado por resources/js/ad-consent.js); sem aceite, ou com o sinal Global Privacy Control do
      * navegador, o AdSense recebe consentimento negado e serve só anúncio não personalizado.

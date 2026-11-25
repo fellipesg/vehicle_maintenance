@@ -4,9 +4,9 @@
 
 @php
     /*
-     * Bloco de anúncio do AdSense: só aparece nas páginas do blog com o cliente e o slot configurados
+     * Bloco de anúncio do AdSense: só aparece no artigo do blog (blog.show) com o cliente e o slot configurados
      * (App\Support\GoogleAdsense). O pedido do anúncio sai de resources/js/ad-consent.js.
-     * - placement: nome do bloco em config/services.php (blog_article | blog_index). Não se chama
+     * - placement: nome do bloco em config/services.php (blog_article). Não se chama
      *   "slot" porque $slot é o conteúdo do componente no Blade.
      */
     $adSlotId = \App\Support\GoogleAdsense::isActiveOnCurrentPage() && is_string($placement) ? \App\Support\GoogleAdsense::slot($placement) : null;

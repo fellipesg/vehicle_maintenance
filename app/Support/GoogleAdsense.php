@@ -3,16 +3,17 @@
 namespace App\Support;
 
 /**
- * Google AdSense, só nas páginas públicas do blog e só com ADSENSE_CLIENT_ID definido. Portais,
- * landing, consulta pública e selo (/v/) ficam sem anúncio: anúncio de oficina concorrente na tela
- * do cliente, ou numa página que prova autenticidade, custa mais do que rende.
+ * Google AdSense, só na página do artigo do blog e só com ADSENSE_CLIENT_ID definido. Listagem do
+ * blog, categorias, portais, landing, busca e selo (/v/) ficam sem anúncio: o AdSense recusou o site
+ * por pouco conteúdo, e anúncio em página que é só lista de links, ou em página que prova
+ * autenticidade, custa mais do que rende.
  */
 final class GoogleAdsense
 {
     /**
      * Rotas que carregam o script do AdSense e o aviso de consentimento.
      */
-    public const ROUTES = ['blog.index', 'blog.category', 'blog.show'];
+    public const ROUTES = ['blog.show'];
 
     /**
      * ID do cliente ("ca-pub-…"), ou null quando o AdSense está desligado.
@@ -35,7 +36,7 @@ final class GoogleAdsense
     }
 
     /**
-     * ID de um bloco de anúncio configurado (blog_article, blog_index), ou null.
+     * ID de um bloco de anúncio configurado (blog_article), ou null.
      */
     public static function slot(string $name): ?string
     {

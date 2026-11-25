@@ -40,7 +40,7 @@ As **bobinas** não têm intervalo de troca: são trocadas quando falham. Mas ve
 
 Motores flex trabalham com etanol e gasolina, e a vela precisa funcionar bem com os dois. Por isso, nesses motores, usar exatamente a vela especificada é ainda mais importante. Etanol exige mais da ignição em partidas a frio, e velas gastas costumam aparecer primeiro como **dificuldade de partida com álcool em dias frios**.
 
-O próximo post desta série trata das diferenças de manutenção entre rodar com etanol e com gasolina.
+As diferenças de manutenção entre rodar com etanol e com gasolina variam de carro para carro: o manual do proprietário traz o que o fabricante recomenda para o seu.
 
 ## A troca: detalhes que fazem diferença
 

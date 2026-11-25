@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * AdSense só no blog, personalização só com aceite (.ai/rules/config.md).
+ * AdSense só no artigo do blog, personalização só com aceite (.ai/rules/config.md).
  */
 class GoogleAdsenseTest extends TestCase
 {
@@ -18,14 +18,11 @@ class GoogleAdsenseTest extends TestCase
 
     private const ARTICLE_SLOT = '1111111111';
 
-    private const INDEX_SLOT = '2222222222';
-
     private function enableAdsense(bool $withSlots = true): void
     {
         config([
             'services.google_adsense.client' => self::CLIENT,
             'services.google_adsense.slots.blog_article' => $withSlots ? self::ARTICLE_SLOT : null,
-            'services.google_adsense.slots.blog_index' => $withSlots ? self::INDEX_SLOT : null,
         ]);
     }
 
@@ -46,7 +43,9 @@ class GoogleAdsenseTest extends TestCase
     {
         config(['services.google_adsense.client' => 'pub-123']);
 
-        $this->get(route('blog.index'))->assertOk()->assertDontSee('adsbygoogle', false);
+        $post = BlogPost::factory()->create();
+
+        $this->get(route('blog.show', $post))->assertOk()->assertDontSee('adsbygoogle', false);
         $this->get(route('ads.txt'))->assertNotFound();
     }
 
@@ -64,25 +63,37 @@ class GoogleAdsenseTest extends TestCase
             ->assertSee('<section hidden aria-labelledby="aviso-cookies-titulo"', false)
             ->assertSee('data-ad-consent-choice="granted"', false)
             ->assertSee('data-ad-consent-choice="denied"', false);
+    }
 
-        $this->get(route('blog.index'))
-            ->assertOk()
-            ->assertSee('data-ad-slot="'.self::INDEX_SLOT.'"', false)
-            ->assertDontSee('data-ad-slot="'.self::ARTICLE_SLOT.'"', false);
+    public function test_blog_listing_and_category_pages_have_no_ads_or_consent_notice(): void
+    {
+        $this->enableAdsense();
+        $post = BlogPost::factory()->create();
+
+        $this->assertSame(['blog.show'], \App\Support\GoogleAdsense::ROUTES);
+
+        foreach ([route('blog.index'), route('blog.category', $post->category)] as $url) {
+            $this->get($url)
+                ->assertOk()
+                ->assertDontSee('adsbygoogle', false)
+                ->assertDontSee('data-ad-consent', false)
+                ->assertDontSee('data-slot="ad-unit"', false);
+        }
     }
 
     public function test_consent_defaults_to_denied_when_analytics_is_off(): void
     {
         $this->enableAdsense();
+        $post = BlogPost::factory()->create();
         config(['services.google_analytics.measurement_id' => '']);
 
-        $this->get(route('blog.index'))
+        $this->get(route('blog.show', $post))
             ->assertOk()
             ->assertSee("window.gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied'", false);
 
         config(['services.google_analytics.measurement_id' => 'G-TEST123456']);
 
-        $this->get(route('blog.index'))
+        $this->get(route('blog.show', $post))
             ->assertOk()
             ->assertDontSee("window.gtag('consent', 'default'", false)
             ->assertSee("ad_storage: 'denied'", false);
@@ -91,8 +102,9 @@ class GoogleAdsenseTest extends TestCase
     public function test_units_need_a_configured_slot(): void
     {
         $this->enableAdsense(withSlots: false);
+        $post = BlogPost::factory()->create();
 
-        $this->get(route('blog.index'))
+        $this->get(route('blog.show', $post))
             ->assertOk()
             ->assertSee('adsbygoogle.js', false)
             ->assertDontSee('data-slot="ad-unit"', false);
@@ -114,7 +126,7 @@ class GoogleAdsenseTest extends TestCase
     {
         $this->enableAdsense();
 
-        foreach ([route('home'), route('legal.privacy'), route('legal.terms'), route('workshops.landing'), route('login'), route('verification.lookup')] as $url) {
+        foreach ([route('home'), route('legal.privacy'), route('legal.terms'), route('workshops.landing'), route('about'), route('blog.index'), route('login'), route('verification.lookup')] as $url) {
             $this->get($url)->assertOk()->assertDontSee('adsbygoogle', false)->assertDontSee('data-ad-consent', false);
         }
 

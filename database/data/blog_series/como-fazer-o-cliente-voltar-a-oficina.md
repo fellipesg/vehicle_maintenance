@@ -14,7 +14,7 @@ O momento mais forte para garantir a próxima visita é a entrega do carro. Ante
 
 Confiança é o que mais segura um cliente. E ela se constrói com:
 
-- **orçamento prévio por escrito**, com peças e mão de obra separadas — além de ser exigência do Código de Defesa do Consumidor (o próximo post desta série trata disso);
+- **orçamento prévio por escrito**, com peças e mão de obra separadas — além de ser exigência do Código de Defesa do Consumidor (art. 40);
 - **autorização antes de qualquer serviço extra**;
 - **peça antiga mostrada** ou devolvida, quando o cliente quiser;
 - **explicação simples**, sem jargão, do que foi feito e por quê.
