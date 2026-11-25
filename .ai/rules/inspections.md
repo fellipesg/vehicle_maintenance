@@ -58,7 +58,9 @@ que o serviço recusa um "sem apontamento" no eixo do hodômetro.
 ## As duas garantias do laudo são assimétricas, e guardam a transição
 `App\Services\Inspection\VehicleInspectionService` é a **única** escrita de `verdict`, `findings` e
 `verification_code` — nenhum dos três é `fillable`, justamente para que nenhum `update()` de
-controller contorne as garantias:
+controller contorne as garantias. Hoje são três; a primeira é anterior às outras duas e está em
+`.ai/rules/issuer-independence.md` (laudo sobre veículo do tenant da própria oficina não é laudo, 422
+em `verdict`). As duas assimétricas:
 
 - **"Aprovado" não convive com eixo reprovado** (422 em `verdict`);
 - **o eixo do hodômetro não diz "sem apontamento"** quando a própria leitura do laudo está abaixo de
@@ -92,6 +94,12 @@ carrega esse código, senão a tela diria "pede para o admin ligar" a quem só p
 Os escopos são o usuário e a oficina. **`Garage` não entra**: o lojista é quem *lê* o laudo ao
 comprar, e deixá-lo atestar o carro que ele mesmo vende é o conflito de interesse que o laudo existe
 para resolver.
+
+Esse conflito tem a outra metade fechada por `.ai/rules/issuer-independence.md`: aquilo barra **tipo
+de papel**, e nem a oficina emite laudo sobre veículo do tenant dela. É a terceira guarda de
+`VehicleInspectionService` (abaixo), o código `DENIED_OWN_VEHICLE` da policy em `create`, `update` e
+`delete`, e `InspectionAccess::allowsIssuingAbout` — a pergunta "pode emitir **sobre este
+veículo**?".
 
 ## Ver o laudo segue o histórico; o emissor sempre vê o próprio inteiro
 `VehicleInspection::scopeVisibleInHistoryTo` e `Vehicle::inspectionsVisibleTo` são o par consulta/
