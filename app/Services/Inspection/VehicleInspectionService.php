@@ -13,6 +13,7 @@ use App\Services\Vehicle\VehicleMileageService;
 use App\Support\AppStorage;
 use App\Support\Inspection\InspectionFindings;
 use App\Support\Maintenance\VerificationCode;
+use App\Support\Vehicle\IssuerIndependence;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -23,11 +24,13 @@ use Illuminate\Validation\ValidationException;
  * e chamam daqui; `verdict`, `findings` e `verification_code` não são fillable justamente para que
  * nenhum `update()` de controller contorne as duas garantias abaixo.
  *
- * As duas são assimétricas de propósito: recusam a afirmação que **engana quem compra**, e deixam
+ * Duas delas são assimétricas de propósito: recusam a afirmação que **engana quem compra**, e deixam
  * passar a que só prejudica quem vende. "Aprovado" escondendo um eixo reprovado é a primeira;
  * "aprovado com restrições" sem restrição nenhuma é a segunda, e o vistoriador assina o que quiser.
+ * A terceira é anterior às duas: laudo sobre veículo do tenant da própria oficina não é laudo
+ * (assertIndependentIssuer), porque não há terceiro atestando nada.
  *
- * As duas também guardam a **transição, não o estado**: laudo cuja gravação não mexeu em veredito,
+ * As três também guardam a **transição, não o estado**: laudo cuja gravação não mexeu em veredito,
  * achados nem hodômetro passa sem ser reavaliado, senão um laudo antigo (ou um que mudou de regra
  * depois) trancaria a própria tela de edição. É o mesmo padrão de
  * EnforcesWorkshopMessageTemplateLimit e de App\Rules\KnownMessageTemplateTags.
@@ -64,7 +67,7 @@ class VehicleInspectionService
         $findings = InspectionFindings::normalize($data['findings'] ?? []);
         $odometer = $this->odometerFrom($data['odometer_km'] ?? null);
 
-        $this->assertCoherent($vehicle, $verdict, $findings, $odometer, null);
+        $this->assertCoherent($vehicle, $verdict, $findings, $odometer, null, (int) $workshop->id);
 
         $inspection = new VehicleInspection([
             'vehicle_id' => $vehicle->id,
@@ -113,7 +116,14 @@ class VehicleInspectionService
             throw new \RuntimeException('Laudo sem veículo: não há com o que conferir a leitura do hodômetro.');
         }
 
-        $this->assertCoherent($vehicle, $verdict, $findings, $odometer, $inspection);
+        $this->assertCoherent(
+            $vehicle,
+            $verdict,
+            $findings,
+            $odometer,
+            $inspection,
+            $inspection->workshop_id === null ? null : (int) $inspection->workshop_id,
+        );
 
         $fill = [];
 
@@ -208,6 +218,7 @@ class VehicleInspectionService
         array $findings,
         ?int $odometerKm,
         ?VehicleInspection $existing,
+        ?int $workshopId,
     ): void {
         $claimChanged = $existing === null
             || $existing->verdict !== $verdict
@@ -217,6 +228,7 @@ class VehicleInspectionService
             || $this->odometerFrom($existing->odometer_km) !== $odometerKm;
 
         if ($claimChanged) {
+            $this->assertIndependentIssuer($vehicle, $workshopId);
             $this->assertVerdictMatchesFindings($verdict, $findings);
         }
 
@@ -228,6 +240,35 @@ class VehicleInspectionService
         if ($claimChanged || $readingChanged) {
             $this->assertOdometerFindingMatchesReading($vehicle, $findings, $odometerKm);
         }
+    }
+
+    /**
+     * A terceira garantia: ninguém atesta o próprio carro. O laudo afirma "eu examinei e atesto o
+     * que encontrei", e a oficina que examina um veículo do tenant dela não está atestando — está se
+     * auto-declarando, sem o rótulo que a procedência declarada dá a isso. É a doutrina que
+     * `App\Support\Inspection\InspectionAccess` já escrevia para o lojista ("deixá-lo atestar o carro
+     * que ele mesmo vende é o conflito de interesse que o laudo existe para resolver"), agora por
+     * dono do veículo.
+     *
+     * Roda com a **afirmação** (`$claimChanged`), como as outras duas: é o veredito e os achados que
+     * o conflito contamina. Corrigir só a data de um laudo legítimo não reabre a pergunta — e quem
+     * decide se aquela conta ainda pode mexer no laudo é a VehicleInspectionPolicy, que recusa a
+     * edição inteira nesse caso.
+     *
+     * A recusa sai em `verdict` porque é ali que a afirmação mora e é embaixo dela que o formulário
+     * desenha o erro, como no "Aprovado" sobre eixo reprovado.
+     *
+     * @throws ValidationException
+     */
+    private function assertIndependentIssuer(Vehicle $vehicle, ?int $workshopId): void
+    {
+        if (IssuerIndependence::workshopMayAttest($workshopId, $vehicle)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'verdict' => 'Este veículo está na sua própria conta, e vistoria cautelar sobre o próprio carro não vale como laudo. Quem emite tem de ser independente de quem vende.',
+        ]);
     }
 
     /**

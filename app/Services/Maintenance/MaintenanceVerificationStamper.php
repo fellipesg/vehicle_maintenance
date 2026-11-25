@@ -2,10 +2,13 @@
 
 namespace App\Services\Maintenance;
 
+use App\Exceptions\SelfAttestationException;
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Services\Workshop\WorkshopLeadRecorder;
 use App\Support\Maintenance\VerificationCode;
+use App\Support\Vehicle\IssuerIndependence;
 use Illuminate\Support\Facades\DB;
 
 class MaintenanceVerificationStamper
@@ -16,12 +19,18 @@ class MaintenanceVerificationStamper
             return $maintenance;
         }
 
+        // Oficina selando a OS que registrou — o caminho principal. Quando o veículo é do tenant
+        // dela, o selo não sai e o registro cai na procedência declarada abaixo: o serviço existiu e
+        // o histórico pertence ao chassi (.ai/rules/models.md), mas quem atesta é a própria dona, e
+        // é isso que "Declarada" diz com honestidade. Recusar a OS inteira apagaria histórico real.
         if ($actor->isWorkshop() && $actor->workshop && $maintenance->workshop_id === $actor->workshop->id) {
-            return $this->applyWorkshopSeal($maintenance, $actor->workshop->id);
-        }
-
-        if (self::autoVerifyEnabled() && $maintenance->workshop_id !== null) {
-            return $this->applyWorkshopSeal($maintenance, (int) $maintenance->workshop_id);
+            if ($this->mayAttest($maintenance, (int) $actor->workshop->id)) {
+                return $this->applyWorkshopSeal($maintenance, $actor->workshop->id);
+            }
+        } elseif (self::autoVerifyEnabled() && $maintenance->workshop_id !== null) {
+            if ($this->mayAttest($maintenance, (int) $maintenance->workshop_id)) {
+                return $this->applyWorkshopSeal($maintenance, (int) $maintenance->workshop_id);
+            }
         }
 
         $type = match (true) {
@@ -54,6 +63,13 @@ class MaintenanceVerificationStamper
             return $maintenance;
         }
 
+        // O dono que acabou de vincular é do mesmo tenant da oficina: vincular segue valendo (o
+        // registro entra no histórico dele), o selo é que não nasce retroativo. Devolver sem selo em
+        // vez de recusar mantém a decisão do proprietário, que é o que a tela dele promete.
+        if (! $this->mayAttest($maintenance, $workshopId)) {
+            return $maintenance;
+        }
+
         return $this->applyWorkshopSeal($maintenance, $workshopId, 'confirmed');
     }
 
@@ -64,6 +80,22 @@ class MaintenanceVerificationStamper
     public function confirmDeclared(Maintenance $maintenance, int $workshopId): Maintenance
     {
         return $this->applyWorkshopSeal($maintenance, $workshopId, 'confirmed');
+    }
+
+    /**
+     * A oficina pode atestar sobre o veículo desta OS? A relação é carregada com `loadMissing`
+     * porque o `preventLazyLoading` fora de produção derrubaria o acesso direto — e aqui o certo é
+     * responder, não quebrar.
+     */
+    private function mayAttest(Maintenance $maintenance, int $workshopId): bool
+    {
+        $maintenance->loadMissing('vehicle');
+        $vehicle = $maintenance->getRelationValue('vehicle');
+
+        return IssuerIndependence::workshopMayAttest(
+            $workshopId,
+            $vehicle instanceof Vehicle ? $vehicle : null,
+        );
     }
 
     /**
@@ -84,6 +116,12 @@ class MaintenanceVerificationStamper
             ->whereNull('verified_at')
             ->orderBy('id')
             ->each(function (Maintenance $maintenance) use (&$count): void {
+                // Backfill pula o que não pode selar em vez de morrer na linha: uma OS conflitada no
+                // meio da tabela não pode travar as outras.
+                if (! $this->mayAttest($maintenance, (int) $maintenance->workshop_id)) {
+                    return;
+                }
+
                 $this->applyWorkshopSeal($maintenance, (int) $maintenance->workshop_id);
                 $count++;
             });
@@ -91,8 +129,21 @@ class MaintenanceVerificationStamper
         return $count;
     }
 
+    /**
+     * O gargalo único do selo: todo caminho de procedência verificada passa por aqui, então é aqui
+     * que o invariante de conflito de interesse é inegociável. Os chamadores perguntam antes com
+     * `mayAttest` e tratam a recusa com o que faz sentido em cada um (declarada, selo não aplicado,
+     * 422 na fila de validação); esta asserção existe para o caminho que **esquecer** de perguntar —
+     * incluindo o próximo. Um selo que mente é pior que uma exceção.
+     *
+     * @throws SelfAttestationException
+     */
     private function applyWorkshopSeal(Maintenance $maintenance, int $workshopId, string $method = 'registered'): Maintenance
     {
+        if (! $this->mayAttest($maintenance, $workshopId)) {
+            throw SelfAttestationException::forVehicle($workshopId, $maintenance->vehicle_id);
+        }
+
         $maintenance->forceFill([
             'registered_by_type' => 'workshop',
             'verified_at' => now(),

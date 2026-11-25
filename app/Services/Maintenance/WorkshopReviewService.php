@@ -5,10 +5,12 @@ namespace App\Services\Maintenance;
 use App\Enums\WorkshopReviewStatus;
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Models\Workshop;
 use App\Notifications\WorkshopReviewDecidedNotification;
 use App\Notifications\WorkshopReviewRequestedNotification;
 use App\Services\FcmService;
+use App\Support\Vehicle\IssuerIndependence;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -36,7 +38,12 @@ class WorkshopReviewService
             return;
         }
 
-        if ($maintenance->workshop_id === null) {
+        // Pedido que nunca poderia ser confirmado não fica na fila: confirmar emite o selo, e
+        // MaintenancePolicy::review recusa quando o veículo é do tenant da oficina citada
+        // (App\Support\Vehicle\IssuerIndependence). Vale a mesma saída de "não cita oficina" —
+        // inclusive limpar um pendente que virou inconfirmável —, senão a oficina recebe o aviso e
+        // encara um item que a própria tela se nega a responder.
+        if ($maintenance->workshop_id === null || ! $this->mayAttest($maintenance)) {
             if ($maintenance->workshop_review_status === WorkshopReviewStatus::Pending) {
                 $maintenance->forceFill(['workshop_review_status' => null])->save();
             }
@@ -51,6 +58,21 @@ class WorkshopReviewService
         if ($isNewRequest) {
             $this->requestReview($maintenance);
         }
+    }
+
+    /**
+     * A oficina citada pode atestar sobre o veículo desta OS? `loadMissing` porque o
+     * `preventLazyLoading` fora de produção derrubaria o acesso direto à relação.
+     */
+    private function mayAttest(Maintenance $maintenance): bool
+    {
+        $maintenance->loadMissing('vehicle');
+        $vehicle = $maintenance->getRelationValue('vehicle');
+
+        return IssuerIndependence::workshopMayAttest(
+            $maintenance->workshop_id === null ? null : (int) $maintenance->workshop_id,
+            $vehicle instanceof Vehicle ? $vehicle : null,
+        );
     }
 
     public function requestReview(Maintenance $maintenance): void

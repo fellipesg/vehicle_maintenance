@@ -4,7 +4,9 @@ namespace App\Support\Inspection;
 
 use App\Features\VehicleInspections;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Models\Workshop;
+use App\Support\Vehicle\IssuerIndependence;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Pennant\Feature;
 
@@ -15,6 +17,11 @@ use Laravel\Pennant\Feature;
  * Escopos: o próprio usuário e a oficina dele. Loja não entra: o lojista é quem *lê* o laudo na hora
  * de comprar, e deixá-lo atestar o carro que ele mesmo vende é o conflito de interesse que o laudo
  * existe para resolver. Ver quem emitiu continua sendo regra de histórico, não desta flag.
+ *
+ * Aquele conflito tinha metade escrita: barrava o **papel** (lojista não emite) e não o **dono do
+ * veículo**. `allowsIssuingAbout` fecha a outra metade — nem a oficina atesta o carro do tenant dela
+ * (App\Support\Vehicle\IssuerIndependence). Quem sabe sobre qual veículo o laudo sai pergunta por
+ * ali; `allowsIssuing` continua respondendo a pergunta sem veículo (menu, botão, lista).
  */
 final class InspectionAccess
 {
@@ -31,6 +38,27 @@ final class InspectionAccess
         }
 
         return false;
+    }
+
+    /**
+     * Emitir laudo **sobre este veículo**: a flag da conta e a independência de quem atesta. Veículo
+     * nulo é a pergunta genérica (o veículo ainda vai nascer do chassi, e carro novo não tem dono):
+     * cai em `allowsIssuing`.
+     */
+    public static function allowsIssuingAbout(?User $user, ?Vehicle $vehicle): bool
+    {
+        if (! self::allowsIssuing($user)) {
+            return false;
+        }
+
+        if ($vehicle === null) {
+            return true;
+        }
+
+        return IssuerIndependence::workshopMayAttest(
+            $user?->loadMissing('workshop')->workshop?->id,
+            $vehicle,
+        );
     }
 
     /**

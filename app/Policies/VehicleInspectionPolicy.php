@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Models\VehicleInspection;
 use App\Support\Inspection\InspectionAccess;
 use Illuminate\Auth\Access\Response;
@@ -28,6 +29,13 @@ class VehicleInspectionPolicy
      * tela lê o código com Gate::inspect para explicar em vez de devolver um 403 seco.
      */
     public const DENIED_FEATURE_OFF = 'inspections_feature_off';
+
+    /**
+     * Código da recusa por conflito de interesse: o veículo é do tenant da própria oficina. Separado
+     * de DENIED_FEATURE_OFF porque a resposta é outra — não é "pede para o admin ligar", é "este
+     * carro é seu, e laudo sobre o próprio carro não é laudo".
+     */
+    public const DENIED_OWN_VEHICLE = 'inspections_own_vehicle';
 
     public function viewAny(User $user): bool
     {
@@ -55,7 +63,13 @@ class VehicleInspectionPolicy
         return $inspection->showsFullReportTo($user);
     }
 
-    public function create(User $user): Response
+    /**
+     * `$vehicle` é opcional porque a pergunta aparece nas duas formas: sem veículo (item de menu,
+     * botão "Nova vistoria", a tela de criação antes da etapa 1) e sobre um veículo já resolvido, no
+     * envio do formulário. Só a segunda pode responder o conflito de interesse, e é a que decide se
+     * o laudo nasce — a primeira continua valendo o que valia.
+     */
+    public function create(User $user, ?Vehicle $vehicle = null): Response
     {
         if (! $user->isWorkshop() || $user->workshop === null || ! $user->workshop->isApproved()) {
             return Response::deny();
@@ -63,6 +77,10 @@ class VehicleInspectionPolicy
 
         if (! InspectionAccess::allowsIssuing($user)) {
             return Response::deny(code: self::DENIED_FEATURE_OFF);
+        }
+
+        if (! InspectionAccess::allowsIssuingAbout($user, $vehicle)) {
+            return Response::deny(code: self::DENIED_OWN_VEHICLE);
         }
 
         return Response::allow();
@@ -78,6 +96,14 @@ class VehicleInspectionPolicy
         return $this->canChange($user, $inspection);
     }
 
+    /**
+     * Corrigir e excluir é do emissor — menos quando o carro passou a ser do tenant dele. Aí as duas
+     * ações viram a fraude que o laudo existe para impedir: editar reescreve o veredito do carro que
+     * ele está vendendo, e excluir apaga o "Reprovado" que o comprador precisava ler. O laudo não
+     * fica refém: suprimir é da equipe (`/admin/vistorias`), como manda .ai/rules/inspections.md, e é
+     * por lá que um laudo intocável se resolve. O preço é a oficina não arrumar nem a data depois de
+     * comprar o carro, e é o preço certo.
+     */
     private function canChange(User $user, VehicleInspection $inspection): Response
     {
         if (! $user->isWorkshop() || $user->workshop === null) {
@@ -90,6 +116,12 @@ class VehicleInspectionPolicy
 
         if (! InspectionAccess::allowsIssuing($user)) {
             return Response::deny(code: self::DENIED_FEATURE_OFF);
+        }
+
+        $inspection->loadMissing('vehicle');
+
+        if (! InspectionAccess::allowsIssuingAbout($user, $inspection->getRelationValue('vehicle'))) {
+            return Response::deny(code: self::DENIED_OWN_VEHICLE);
         }
 
         return Response::allow();

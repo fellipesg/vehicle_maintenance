@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Support\Vehicle\IssuerIndependence;
 use Illuminate\Auth\Access\Response;
 
 class MaintenancePolicy
@@ -63,12 +64,22 @@ class MaintenancePolicy
      * Validar (confirmar ou não reconhecer) uma declarada: só a conta da oficina que ela cita,
      * enquanto espera a resposta (WorkshopReviewService).
      */
+    /**
+     * Confirmar uma declarada **emite o Selo da oficina**, então a fila de validação responde ao
+     * mesmo invariante de independência do selo: a oficina não confirma serviço em veículo do tenant
+     * dela (App\Support\Vehicle\IssuerIndependence). Sem isso, a conta declarava o serviço do próprio
+     * carro por um lado e o confirmava pelo outro — o selo pelo caminho mais longo.
+     */
     public function review(User $user, Maintenance $maintenance): bool
     {
         return $user->isWorkshop()
             && $user->workshop !== null
             && $maintenance->isAwaitingWorkshopReview()
-            && (int) $maintenance->workshop_id === (int) $user->workshop->id;
+            && (int) $maintenance->workshop_id === (int) $user->workshop->id
+            && IssuerIndependence::workshopMayAttest(
+                (int) $user->workshop->id,
+                $maintenance->loadMissing('vehicle')->getRelationValue('vehicle'),
+            );
     }
 
     private function canChange(User $user, Maintenance $maintenance): Response
