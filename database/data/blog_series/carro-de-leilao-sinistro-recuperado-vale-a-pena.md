@@ -80,4 +80,4 @@ Para quem compra, o histórico de manutenção mostra se o carro foi cuidado dep
 
 ---
 
-**Está avaliando um carro de leilão?** Faça a [consulta pública do RevisaLog](/buscar-veiculo) e veja se ele tem manutenções registradas depois do reparo.
+**Está avaliando um carro de leilão?** Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo) e veja se ele tem manutenções registradas depois do reparo.

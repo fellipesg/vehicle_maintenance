@@ -32,7 +32,7 @@ Monte a sequência das revisões, com data e quilometragem, a partir do manual c
 
 ## 6. Peças que já deveriam ter sido trocadas — e foram
 
-Algumas peças têm troca em intervalos conhecidos: pneus, pastilhas, discos, correia dentada, embreagem, amortecedores. Se o carro tem 45 mil km e já está no segundo jogo de pneus, com discos de freio novos e embreagem trocada, ele provavelmente rodou bem mais do que mostra. Confira a data de fabricação dos pneus (o código DOT, explicado em um post futuro desta série): pneu de três anos atrás num carro de oito anos com "pneus originais" não fecha.
+Algumas peças têm troca em intervalos conhecidos: pneus, pastilhas, discos, correia dentada, embreagem, amortecedores. Se o carro tem 45 mil km e já está no segundo jogo de pneus, com discos de freio novos e embreagem trocada, ele provavelmente rodou bem mais do que mostra. Confira a data de fabricação dos pneus (o código DOT, gravado na lateral do pneu, termina em quatro dígitos: semana e ano de fabricação): pneu de três anos atrás num carro de oito anos com "pneus originais" não fecha.
 
 ## 7. Desgaste geral da lataria e da frente
 
@@ -71,4 +71,4 @@ Se ficar comprovado que o vendedor adulterou o odômetro, isso pode configurar c
 
 ---
 
-**Quer conferir a quilometragem de um carro?** Faça a [consulta pública do RevisaLog](/buscar-veiculo) e veja as quilometragens registradas em cada manutenção.
+**Quer conferir a quilometragem de um carro?** Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo) e veja as quilometragens registradas em cada manutenção.
