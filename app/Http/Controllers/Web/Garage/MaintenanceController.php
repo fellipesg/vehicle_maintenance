@@ -169,9 +169,8 @@ class MaintenanceController extends Controller
             function () use ($data, $request) {
                 $maintenance = Maintenance::create($data);
                 app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
-                app(VehicleMileageService::class)->applyMaintenanceKilometers(
+                app(VehicleMileageService::class)->refreshCurrentKilometers(
                     Vehicle::findOrFail($data['vehicle_id']),
-                    (int) $data['kilometers'],
                 );
 
                 return $maintenance;

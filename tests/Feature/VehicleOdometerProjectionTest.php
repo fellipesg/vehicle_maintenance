@@ -28,8 +28,9 @@ use Tests\TestCase;
  * serviço de supressão) em vez de chamar o VehicleOdometerLog: o que está em teste é o gancho, e não
  * o escritor, que VehicleOdometerReadingsTest já cobre.
  *
- * Nesta etapa nada **lê** a tabela ainda: `vehicles.current_kilometers` continua vindo da fórmula
- * antiga, e trocá-la é o passo seguinte do plano, depois de o backfill conferir que as duas batem.
+ * Aqui está em teste só o enchimento da tabela. Quem a lê é
+ * VehicleMileageService::refreshCurrentKilometers, e o efeito dela em `current_kilometers` é o
+ * assunto de VehicleOdometerFromReadingsTest.
  */
 class VehicleOdometerProjectionTest extends TestCase
 {

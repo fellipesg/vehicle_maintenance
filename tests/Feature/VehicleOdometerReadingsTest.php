@@ -18,8 +18,9 @@ use Tests\TestCase;
  *
  * O veículo tem um odômetro, e o km dele estava em quatro colunas de três tabelas. Esta tabela é a
  * fonte da verdade **do odômetro** — não da OS nem do laudo — e recebe uma cópia de mão única de
- * cada escrita de km. Nesta etapa nada no sistema a lê nem a alimenta ainda: os ganchos e a troca
- * do cálculo de `current_kilometers` são os passos seguintes do plano.
+ * cada escrita de km. Aqui está em teste o escritor, sozinho: quem o chama são os observers
+ * (VehicleOdometerProjectionTest) e quem lê a tabela é o recálculo de `current_kilometers`
+ * (VehicleOdometerFromReadingsTest).
  */
 class VehicleOdometerReadingsTest extends TestCase
 {

@@ -10,6 +10,8 @@ use Illuminate\Validation\ValidationException;
 
 class VehicleMileageService
 {
+    public function __construct(private readonly VehicleOdometerLog $odometerLog) {}
+
     /**
      * Folga fixa do teto de plausibilidade, em km (ver plausibilityCeiling()).
      */
@@ -181,24 +183,27 @@ class VehicleMileageService
         ]);
     }
 
-    public function applyMaintenanceKilometers(Vehicle $vehicle, int $kilometers): void
-    {
-        $vehicle->update([
-            'current_kilometers' => max(
-                (int) ($vehicle->odometer_at_registration ?? 0),
-                (int) $vehicle->maintenances()->countsTowardOdometer()->max('kilometers'),
-                $kilometers,
-            ),
-        ]);
-    }
-
+    /**
+     * Recalcula `vehicles.current_kilometers` a partir de `vehicle_odometer_readings`: é o maior km
+     * entre as leituras que contam (VehicleOdometerLog::highestCountedKilometers). A coluna passa a
+     * ser um valor derivado — cache de consulta —, e a tabela é a fonte da verdade do odômetro.
+     *
+     * Até aqui o cálculo era `max(odometer_at_registration, maior OS que conta)` repetido em dois
+     * métodos, e quem gravava um km novo passava o número para não depender da ordem das escritas.
+     * Não é mais preciso: os observers gravam a leitura dentro do save da origem, antes de qualquer
+     * chamador chegar aqui, então o maior km da tabela já inclui o que acabou de ser gravado. Por
+     * isso o antigo applyMaintenanceKilometers($vehicle, $kilometers) deixou de existir: um
+     * parâmetro que ninguém mais precisa é um parâmetro que volta a divergir.
+     *
+     * **A projeção precisa estar completa antes disto rodar em produção.** Veículo sem leitura
+     * gravada volta zero, e zero é o que vai para a coluna: é para isso que existe
+     * `odometer:backfill-readings --check`, que falha enquanto algum veículo divergir da fórmula
+     * antiga (.ai/rules/models.md).
+     */
     public function refreshCurrentKilometers(Vehicle $vehicle): void
     {
         $vehicle->update([
-            'current_kilometers' => max(
-                (int) ($vehicle->odometer_at_registration ?? 0),
-                (int) $vehicle->maintenances()->countsTowardOdometer()->max('kilometers'),
-            ),
+            'current_kilometers' => $this->odometerLog->highestCountedKilometers($vehicle),
         ]);
     }
 

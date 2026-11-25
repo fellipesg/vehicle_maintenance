@@ -181,10 +181,11 @@ class VehicleOdometerLog
     }
 
     /**
-     * O maior km entre as leituras que contam — o que `vehicles.current_kilometers` passa a ser.
+     * O maior km entre as leituras que contam — o que `vehicles.current_kilometers` **é**.
      *
-     * Ainda não é consumido: a troca do cálculo em VehicleMileageService é o passo seguinte do
-     * plano, feito depois de o backfill conferir que a projeção bate com a fórmula antiga.
+     * VehicleMileageService::refreshCurrentKilometers grava esse número na coluna, e é o único
+     * caminho até ela. Veículo sem leitura devolve zero: a projeção precisa estar completa, e é o
+     * `odometer:backfill-readings --check` que garante isso antes do deploy.
      */
     public function highestCountedKilometers(Vehicle $vehicle): int
     {

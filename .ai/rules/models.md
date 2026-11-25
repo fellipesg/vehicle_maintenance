@@ -104,7 +104,7 @@ de nenhuma delas lembrar.
 | cadastro e edição do veículo | `VehicleObserver`, espelhando `odometer_at_registration` | sim |
 | OS | `MaintenanceObserver` | sim, menos contestada e suprimida |
 | laudo da cautelar | `VehicleInspectionObserver` | **nunca** |
-| relato do dono | `VehicleOdometerLog::recordOwnerReport` (sem tela ainda) | sim |
+| relato do dono | `VehicleOdometerLog::recordOwnerReport` (sem tela ainda) | sim, e move a coluna |
 
 Três detalhes que não são óbvios:
 
@@ -119,11 +119,26 @@ Três detalhes que não são óbvios:
 - **A leitura do cadastro nasce sem usuário**, de propósito: a coluna que ela espelha também não tem
   um. Quem cadastrou está em `user_vehicles`; o "quem registrou" é das origens que têm autor.
 
-**Ainda ninguém lê a tabela.** `current_kilometers` continua saindo da fórmula antiga
-(`refreshCurrentKilometers`/`applyMaintenanceKilometers`). Trocar o cálculo por
-`VehicleOdometerLog::highestCountedKilometers` é o passo seguinte, e só depois de o backfill conferir
-que as duas contas batem em todos os veículos. Até lá, **nada de ler a tabela em tela, relatório,
-PDF ou API**: ela está sendo enchida, não servida.
+**A tabela já manda em `current_kilometers`.** `VehicleMileageService::refreshCurrentKilometers`
+grava o maior km entre as leituras que contam (`VehicleOdometerLog::highestCountedKilometers`): a
+coluna é valor derivado, cache de consulta, e não o dado. O antigo
+`applyMaintenanceKilometers($vehicle, $kilometers)` **deixou de existir** — ele recebia o número para
+não depender da ordem das escritas, e não precisa mais, porque os observers gravam a leitura dentro
+do save da origem, antes de qualquer chamador chegar ao recálculo. Parâmetro que ninguém precisa é
+parâmetro que volta a divergir.
+
+Duas consequências:
+
+- **O relato do proprietário move o hodômetro**, o que a fórmula antiga não permitia (ela só conhecia
+  cadastro e OS). Tela que o grave ainda não existe; o caminho, sim.
+- **Veículo sem leitura gravada volta zero**, e zero é o que vai para a coluna. Não há rede de
+  segurança no recálculo, de propósito: rede que mascara o problema faz o `--check` opinar sobre
+  nada. Por isso o backfill é **obrigatório antes de este código subir**, e
+  `VehicleOdometerFromReadingsTest` escreve essa condição por extenso em vez de deixá-la para
+  alguém descobrir em produção.
+
+Ler a tabela direto em tela, relatório, PDF ou API continua não acontecendo: ela alimenta a coluna, e
+as superfícies leem a coluna.
 
 ### O backfill é manual, e o `--check` é o portão
 

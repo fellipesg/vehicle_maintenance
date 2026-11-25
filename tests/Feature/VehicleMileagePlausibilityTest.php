@@ -30,6 +30,25 @@ class VehicleMileagePlausibilityTest extends TestCase
         return 50_000 + ((max(0, (int) now()->year - $year) + 1) * 100_000);
     }
 
+    /**
+     * Grava uma OS e recalcula o hodômetro — o caminho real pelo qual o km de um serviço chega a
+     * `vehicles.current_kilometers`.
+     *
+     * Antes bastava applyMaintenanceKilometers($vehicle, $km): o método recebia o número. Agora o
+     * recálculo lê a tabela de leituras, então o teste precisa da OS que projeta a leitura. É o
+     * caminho que as telas usam, e por isso o teste ficou mais honesto com a troca.
+     */
+    private function recordMaintenance(Vehicle $vehicle, int $kilometers): void
+    {
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'kilometers' => $kilometers,
+            'maintenance_date' => now()->toDateString(),
+        ]);
+
+        app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
+    }
+
     public function test_absurd_kilometers_are_refused_for_a_recent_vehicle(): void
     {
         $vehicle = Vehicle::factory()->create([
@@ -83,7 +102,7 @@ class VehicleMileagePlausibilityTest extends TestCase
 
         $service = app(VehicleMileageService::class);
         $service->assertMaintenanceKilometers($vehicle, 380_000, now()->toDateString());
-        $service->applyMaintenanceKilometers($vehicle, 380_000);
+        $this->recordMaintenance($vehicle, 380_000);
 
         $this->assertSame(380_000, $vehicle->fresh()->current_kilometers);
     }
@@ -110,7 +129,7 @@ class VehicleMileagePlausibilityTest extends TestCase
         }
 
         $service->assertMaintenanceKilometers($vehicle, $alreadyRun + 40_000, now()->toDateString());
-        $service->applyMaintenanceKilometers($vehicle, $alreadyRun + 40_000);
+        $this->recordMaintenance($vehicle, $alreadyRun + 40_000);
 
         $this->assertSame($alreadyRun + 40_000, $vehicle->fresh()->current_kilometers);
     }
@@ -168,7 +187,7 @@ class VehicleMileagePlausibilityTest extends TestCase
                 'kilometers' => $kilometers,
                 'maintenance_date' => now()->toDateString(),
             ]);
-            $service->applyMaintenanceKilometers($vehicle->fresh(), $kilometers);
+            $service->refreshCurrentKilometers($vehicle->fresh());
         }
 
         $this->assertSame($widest, (int) $vehicle->fresh()->current_kilometers);
@@ -234,7 +253,7 @@ class VehicleMileagePlausibilityTest extends TestCase
 
         $service = app(VehicleMileageService::class);
         $service->assertMaintenanceKilometers($vehicle, 9_999_999, now()->toDateString());
-        $service->applyMaintenanceKilometers($vehicle, 9_999_999);
+        $this->recordMaintenance($vehicle, 9_999_999);
 
         $this->assertSame(9_999_999, $vehicle->fresh()->current_kilometers);
     }

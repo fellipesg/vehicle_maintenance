@@ -215,10 +215,7 @@ class MaintenanceController extends Controller
                         $maintenance = $ownerless->markPending($maintenance)->fresh();
                     }
 
-                    app(VehicleMileageService::class)->applyMaintenanceKilometers(
-                        $vehicle,
-                        (int) $data['kilometers'],
-                    );
+                    app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle);
                     $this->syncMaintenanceItems($maintenance, $request);
                     $this->syncMaintenanceWarranties($maintenance, $request, $workshop);
 
