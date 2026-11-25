@@ -21,6 +21,7 @@ class VehicleOwnershipService
         private readonly VehiclePlateHistoryService $plateHistory,
         private readonly WorkshopRecordsArrivalNotifier $arrivalNotifier,
         private readonly VehicleMileageService $mileage,
+        private readonly VehicleOdometerLog $odometerLog,
     ) {}
 
     /**
@@ -212,10 +213,6 @@ class VehicleOwnershipService
                 }
             }
 
-            if (isset($vehicleData['current_kilometers'])) {
-                $updates['current_kilometers'] = max((int) $vehicleData['current_kilometers'], (int) $vehicle->current_kilometers);
-            }
-
             if ($updates !== []) {
                 $vehicle->update($updates);
             }
@@ -236,6 +233,21 @@ class VehicleOwnershipService
 
             return $vehicle->fresh();
         });
+
+        // O hodômetro que o proprietário informa ao assumir o carro vira **leitura** dele, e não
+        // escrita direta em `current_kilometers`. Gravar a coluna à mão punha aqui um número que a
+        // fonte da verdade não conhecia: bastava a oficina registrar depois uma OS com data
+        // anterior e km menor para o recálculo derrubar a coluna, e o número que o dono informou
+        // não existia em lugar nenhum para ser recuperado.
+        //
+        // O recálculo continua garantindo que isto não baixa o odômetro: se há OS que conta com km
+        // maior, ela ganha — o relato fica no histórico, como leitura, sem mandar na coluna.
+        if (isset($vehicleData['current_kilometers'])
+            && (int) $vehicleData['current_kilometers'] !== (int) $vehicle->current_kilometers) {
+            $this->odometerLog->recordOwnerReport($vehicle, (int) $vehicleData['current_kilometers'], $user);
+            $this->mileage->refreshCurrentKilometers($vehicle);
+            $vehicle = $vehicle->fresh();
+        }
 
         $this->arrivalNotifier->notify($user, $vehicle);
 

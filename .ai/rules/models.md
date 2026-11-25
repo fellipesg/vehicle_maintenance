@@ -104,7 +104,7 @@ de nenhuma delas lembrar.
 | cadastro e edição do veículo | `VehicleObserver`, espelhando `odometer_at_registration` | sim |
 | OS | `MaintenanceObserver` | sim, menos contestada e suprimida |
 | laudo da cautelar | `VehicleInspectionObserver` | **nunca** |
-| relato do dono | `VehicleOdometerLog::recordOwnerReport` (sem tela ainda) | sim, e move a coluna |
+| relato do dono | `VehicleOdometerLog::recordOwnerReport`, nas três portas abaixo | sim, e move a coluna |
 
 Três detalhes que não são óbvios:
 
@@ -143,6 +143,35 @@ Duas consequências:
 
 Ler a tabela direto em tela, relatório, PDF ou API continua não acontecendo: ela alimenta a coluna, e
 as superfícies leem a coluna.
+
+### Quem digita hodômetro fora de uma OS grava leitura, não coluna
+
+São três portas, e todas gravavam `current_kilometers` na mão:
+
+| Porta | Onde |
+| --- | --- |
+| edição do veículo pela API | `Api\VehicleController::update` |
+| edição do veículo pela web | `Concerns\UpdatesVehicleDetails` |
+| proprietário assume o carro que a oficina criou pelo chassi | `VehicleOwnershipService::claimUnclaimedWorkshopVehicle` |
+
+Escrever a coluna ali deixou de funcionar no dia em que ela passou a ser derivada: na API o número
+era apagado pelo recálculo **na mesma requisição** (a resposta já saía com o valor antigo), e nas
+outras duas durava até a próxima OS. Agora as três gravam uma leitura `OwnerReport`, e a coluna sai
+dela como sai de qualquer outra — então o número digitado tem lastro.
+
+Três detalhes de quem for mexer nisso:
+
+- **Só grava quando muda.** Os formulários reenviam o campo inteiro a cada edição; trocar a cor não
+  é leitura de odômetro, e série temporal cheia de linhas idênticas é série que ninguém lê. A
+  comparação é contra `current_kilometers`, que é o que o formulário mostrava.
+- **Autodeclaração não puxa o odômetro para trás.** O relato entra no histórico, mas quem manda na
+  coluna é o maior km que conta: OS registrada acima do número declarado continua ganhando.
+- **Baixar o número na edição web é outra coisa**: conserta `odometer_at_registration` e, por
+  tabela, a leitura do cadastro (corrigida no lugar, não empilhada). O relato é gravado do mesmo
+  jeito — as duas afirmações são verdadeiras e cada uma tem a sua linha.
+
+`OwnerReport` é a origem de "alguém com acesso ao veículo digitou", e não literalmente "o dono": na
+API quem edita pode ser a loja em consignação. O nome ficou do caso principal.
 
 ### O backfill é manual, e o `--check` é o portão
 

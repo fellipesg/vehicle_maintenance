@@ -157,11 +157,17 @@ class VehicleOdometerLog
     }
 
     /**
-     * A leitura que o proprietário informa (hoje por tela, adiante respondendo à notificação de
-     * odômetro). É série temporal: cada resposta é uma leitura nova, não a correção da anterior.
+     * A leitura que alguém com acesso ao veículo informa fora de uma OS: a edição do veículo pela
+     * API e pela web, e a chegada do proprietário ao carro que a oficina criou pelo chassi (adiante,
+     * a resposta à notificação de odômetro). É série temporal: cada relato é uma leitura nova, não a
+     * correção da anterior.
+     *
+     * `OwnerReport` quer dizer "digitado por quem tem acesso", não literalmente "pelo dono" — na API
+     * quem edita pode ser a loja em consignação. O nome ficou do caso principal.
      *
      * Quem chama confere o teto de plausibilidade antes
-     * (VehicleMileageService::assertOdometerKilometers): aqui é gravação, não validação.
+     * (VehicleMileageService::assertOdometerKilometers) e só grava quando o número mudou: aqui é
+     * gravação, não validação nem decisão.
      */
     public function recordOwnerReport(Vehicle $vehicle, int $kilometers, User $user): VehicleOdometerReading
     {
