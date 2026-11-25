@@ -195,6 +195,26 @@ class VehicleOdometerLog
     }
 
     /**
+     * O mesmo maior km, limitado às origens que a **fórmula antiga** conhecia: o hodômetro do
+     * cadastro e as OS que contam.
+     *
+     * Existe para o `odometer:backfill-readings --check`, e só para ele. A fórmula que o portão
+     * compara não conhece autodeclaração do dono; incluí-la na outra ponta faria o portão acusar
+     * divergência justamente onde a projeção está certa, e um portão que grita sozinho deixa de ser
+     * lido. Quem quer o odômetro do veículo usa highestCountedKilometers.
+     */
+    public function highestCountedKilometersFromColumns(Vehicle $vehicle): int
+    {
+        return (int) $vehicle->odometerReadings()
+            ->countsTowardOdometer()
+            ->whereIn('source', [
+                OdometerReadingSource::Registration,
+                OdometerReadingSource::Maintenance,
+            ])
+            ->max('kilometers');
+    }
+
+    /**
      * Espelha Maintenance::scopeCountsTowardOdometer: fica de fora o que o proprietário contestou e
      * o que a equipe suprimiu. As duas formas precisam andar juntas.
      */

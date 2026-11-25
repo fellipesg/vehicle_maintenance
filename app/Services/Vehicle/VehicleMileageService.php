@@ -195,16 +195,25 @@ class VehicleMileageService
      * isso o antigo applyMaintenanceKilometers($vehicle, $kilometers) deixou de existir: um
      * parâmetro que ninguém mais precisa é um parâmetro que volta a divergir.
      *
-     * **A projeção precisa estar completa antes disto rodar em produção.** Veículo sem leitura
-     * gravada volta zero, e zero é o que vai para a coluna: é para isso que existe
-     * `odometer:backfill-readings --check`, que falha enquanto algum veículo divergir da fórmula
-     * antiga (.ai/rules/models.md).
+     * **Projeção vazia não é odômetro zero.** Veículo anterior aos observers, ou que o backfill
+     * ainda não alcançou, não tem leitura nenhuma — e sobrescrever a coluna com zero apagaria o
+     * único lugar onde o número dele existe. Quando a tabela não tem o que dizer sobre este
+     * veículo, este método não diz nada: deixa a coluna como está e espera o
+     * `odometer:backfill-readings`, que é quem alcança o histórico.
+     *
+     * A condição é "nenhuma leitura", não "maior km igual a zero": veículo cuja única OS foi
+     * contestada, sem hodômetro de cadastro, tem leitura e vale zero mesmo — e aí zero é a
+     * resposta certa, não a ausência de resposta.
      */
     public function refreshCurrentKilometers(Vehicle $vehicle): void
     {
-        $vehicle->update([
-            'current_kilometers' => $this->odometerLog->highestCountedKilometers($vehicle),
-        ]);
+        $highest = $this->odometerLog->highestCountedKilometers($vehicle);
+
+        if ($highest === 0 && ! $vehicle->odometerReadings()->exists()) {
+            return;
+        }
+
+        $vehicle->update(['current_kilometers' => $highest]);
     }
 
     private function minimumAllowedKilometers(Vehicle $vehicle, ?CarbonImmutable $date, ?Maintenance $except): int

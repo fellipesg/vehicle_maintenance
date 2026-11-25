@@ -131,11 +131,15 @@ Duas consequências:
 
 - **O relato do proprietário move o hodômetro**, o que a fórmula antiga não permitia (ela só conhecia
   cadastro e OS). Tela que o grave ainda não existe; o caminho, sim.
-- **Veículo sem leitura gravada volta zero**, e zero é o que vai para a coluna. Não há rede de
-  segurança no recálculo, de propósito: rede que mascara o problema faz o `--check` opinar sobre
-  nada. Por isso o backfill é **obrigatório antes de este código subir**, e
-  `VehicleOdometerFromReadingsTest` escreve essa condição por extenso em vez de deixá-la para
-  alguém descobrir em produção.
+- **Projeção vazia não é odômetro zero.** Veículo anterior aos observers, ou que o backfill ainda
+  não alcançou, não tem leitura nenhuma — e o recálculo **se cala** nesse caso (`$highest === 0` e
+  nenhuma leitura): deixa a coluna como está e espera o backfill, porque sobrescrever com zero
+  apagaria o único lugar onde o número daquele veículo existe. A condição é "nenhuma leitura", não
+  "maior km igual a zero": veículo cuja única OS foi contestada, sem hodômetro de cadastro, **vai**
+  a zero, porque aí zero é a resposta e não a ausência dela. As duas pontas estão travadas em
+  `VehicleOdometerFromReadingsTest`; mexer numa sem a outra transforma o conserto em coluna travada.
+  O backfill continua sendo o certo a fazer antes de subir — o que mudou é que esquecê-lo deixa o
+  número velho, e não um zero.
 
 Ler a tabela direto em tela, relatório, PDF ou API continua não acontecendo: ela alimenta a coluna, e
 as superfícies leem a coluna.
@@ -148,9 +152,16 @@ sem ganhar nada (trocar o cálculo é outra liberação, decidida depois); no `S
 roda sozinho toda noite esconderia o dia em que passou a divergir. Ordem de uso: `--dry-run`, depois
 sem opção, depois `--check`.
 
-`--check` compara, veículo por veículo, `highestCountedKilometers` com a fórmula antiga
+`--check` compara, veículo por veículo, `highestCountedKilometersFromColumns` com a fórmula antiga
 (`max(odometer_at_registration, maior km de OS que conta)`) e **sai com código de erro** se alguma
-divergir. Enquanto ele não der zero, trocar o cálculo de `current_kilometers` mudaria o número de
+divergir. É `FromColumns`, e não `highestCountedKilometers`, porque a fórmula do outro lado não
+conhece autodeclaração do dono: comparar a leitura dela faria o portão acusar divergência onde a
+projeção está certa, e portão que grita sozinho deixa de ser lido.
+
+**Portão que não conferiu nada não libera nada.** `--vehicle` com id que não casa com ninguém sai com
+erro, em vez de dizer "nenhuma divergência" sem ter olhado uma linha — a mesma aprovação vazia que
+`pint --test` dá dentro de `.claude/worktrees/**`. Banco sem veículo nenhum, esse sim, sai com
+sucesso: é um fato, não um engano. Enquanto ele não der zero, trocar o cálculo de `current_kilometers` mudaria o número de
 algum veículo sem ninguém saber qual. A comparação é contra a **fórmula**, não contra a coluna: a
 coluna pode estar velha por um registro anterior ao recálculo, e isso é relatado à parte
 (`vehicles:refresh-kilometers` resolve).

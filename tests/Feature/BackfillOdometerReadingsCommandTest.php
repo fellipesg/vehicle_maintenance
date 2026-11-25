@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleInspection;
 use App\Models\VehicleOdometerReading;
+use App\Services\Vehicle\VehicleOdometerLog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -164,6 +165,51 @@ class BackfillOdometerReadingsCommandTest extends TestCase
      *
      * @return array{0: Vehicle, 1: Maintenance, 2: VehicleInspection}
      */
+    public function test_the_check_refuses_a_vehicle_id_that_matches_nothing(): void
+    {
+        $this->legacyVehicle();
+        $this->artisan('odometer:backfill-readings')->assertSuccessful();
+
+        // Portão que não conferiu nada não libera nada. Com um id errado o loop não roda, e dizer
+        // "nenhuma divergência" aqui seria aprovar a troca do cálculo sem ter olhado uma linha —
+        // a mesma aprovação vazia que `pint --test` dá dentro de .claude/worktrees/**.
+        $this->artisan('odometer:backfill-readings', ['--check' => true, '--vehicle' => 999999])
+            ->expectsOutputToContain('Nenhum veículo com id 999999')
+            ->assertFailed();
+
+        // E o id errado também não passa como gravação bem-sucedida.
+        $this->artisan('odometer:backfill-readings', ['--vehicle' => 999999])->assertFailed();
+    }
+
+    public function test_an_empty_database_is_not_a_failure(): void
+    {
+        // Banco sem veículo é um fato, não um engano: não há o que conferir, e o portão diz isso em
+        // vez de inventar divergência.
+        $this->artisan('odometer:backfill-readings', ['--check' => true])
+            ->expectsOutputToContain('Nenhum veículo no banco')
+            ->assertSuccessful();
+    }
+
+    public function test_an_owner_report_does_not_make_the_check_fail(): void
+    {
+        [$vehicle] = $this->legacyVehicle();
+        $this->artisan('odometer:backfill-readings')->assertSuccessful();
+
+        $owner = User::factory()->asUser()->create()->refresh();
+        app(VehicleOdometerLog::class)->recordOwnerReport($vehicle->fresh(), 61_000, $owner);
+
+        // A autodeclaração do dono move o hodômetro e a fórmula antiga não a conhece. Se o --check
+        // comparasse o maior km de todas as leituras, ele acusaria divergência (61.000 contra
+        // 55.000) justamente onde a projeção está certa — e portão que grita sozinho deixa de ser
+        // lido. Por isso ele compara só cadastro e OS.
+        $this->artisan('odometer:backfill-readings', ['--check' => true])
+            ->expectsOutputToContain('Nenhuma divergência')
+            ->assertSuccessful();
+
+        // E o hodômetro do veículo, esse sim, considera o relato do dono.
+        $this->assertSame(61_000, app(VehicleOdometerLog::class)->highestCountedKilometers($vehicle->fresh()));
+    }
+
     private function legacyVehicle(string $chassis = '9BWZZZ377VT004251'): array
     {
         return Model::withoutEvents(function () use ($chassis): array {

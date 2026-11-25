@@ -135,7 +135,7 @@ class VehicleOdometerFromReadingsTest extends TestCase
         $this->assertSame(42_000, (int) $vehicle->fresh()->current_kilometers);
     }
 
-    public function test_a_vehicle_with_no_readings_falls_to_zero_until_the_backfill_runs(): void
+    public function test_a_vehicle_with_no_readings_keeps_its_kilometers_until_the_backfill_runs(): void
     {
         // Veículo e OS como estavam no banco antes de a projeção existir: sem observers, sem
         // leitura. withoutEvents é a única forma honesta de montar legado.
@@ -159,20 +159,50 @@ class VehicleOdometerFromReadingsTest extends TestCase
 
         $this->assertSame(0, $vehicle->odometerReadings()->count());
 
-        // É isto que acontece se a etapa 4 subir antes do backfill: o recálculo lê uma tabela vazia
-        // e zera a coluna. Não há rede de segurança aqui de propósito — rede que mascara o problema
-        // faria o `--check` opinar sobre nada. O portão é o backfill, e é por isso que ele é
-        // obrigatório antes do deploy (.ai/rules/models.md).
+        // Projeção vazia não é odômetro zero: a tabela não tem o que dizer sobre este veículo, e
+        // sobrescrever com zero apagaria o único lugar onde o número dele existe. O recálculo se
+        // cala e espera o backfill.
         app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
-        $this->assertSame(0, (int) $vehicle->fresh()->current_kilometers);
+        $this->assertSame(70_000, (int) $vehicle->fresh()->current_kilometers);
 
-        // E é isto que o backfill conserta: projeta o legado e devolve o número certo.
+        // E o backfill é quem resolve: projeta o legado, o --check passa, e daí em diante a coluna
+        // sai da tabela.
         $this->assertSame(0, Artisan::call('odometer:backfill-readings'));
         $this->assertSame(0, Artisan::call('odometer:backfill-readings', ['--check' => true]));
 
         app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
         $this->assertSame(70_000, (int) $vehicle->fresh()->current_kilometers);
         $this->assertSame(70_000, (int) $maintenance->fresh()->kilometers);
+    }
+
+    public function test_a_vehicle_whose_only_reading_stopped_counting_does_go_to_zero(): void
+    {
+        // A outra ponta da condição: aqui existe leitura, e ela diz zero. Zero por ausência de
+        // resposta (o teste acima) e zero como resposta são coisas diferentes, e o recálculo
+        // precisa saber qual é qual — senão o conserto do primeiro caso vira coluna travada.
+        $vehicle = Vehicle::factory()->create([
+            'license_plate' => 'ZER0K99',
+            'chassis' => '9BWZZZ377VT004666',
+            'year' => now()->year - 5,
+            'current_kilometers' => 30_000,
+            'odometer_at_registration' => null,
+        ]);
+
+        $maintenance = Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'kilometers' => 30_000,
+            'maintenance_date' => '2026-04-01',
+        ]);
+
+        $this->assertSame(1, $vehicle->odometerReadings()->count());
+
+        $maintenance->owner_disputed_at = now();
+        $maintenance->save();
+
+        app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
+
+        $this->assertSame(1, $vehicle->odometerReadings()->count());
+        $this->assertSame(0, (int) $vehicle->fresh()->current_kilometers);
     }
 
     private function ownedCar(): Vehicle

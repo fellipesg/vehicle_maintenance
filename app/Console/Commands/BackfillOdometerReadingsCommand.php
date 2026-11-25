@@ -189,7 +189,10 @@ class BackfillOdometerReadingsCommand extends Command
             (int) $vehicle->maintenances()->countsTowardOdometer()->max('kilometers'),
         );
 
-        $fromReadings = $log->highestCountedKilometers($vehicle);
+        // Limitado a cadastro e OS: é o que a fórmula do outro lado sabe ver. A autodeclaração do
+        // dono move o hodômetro e a fórmula antiga não a conhece, então compará-la aqui faria o
+        // portão acusar divergência onde a projeção está certa.
+        $fromReadings = $log->highestCountedKilometersFromColumns($vehicle);
 
         if ($fromReadings !== $fromFormula) {
             $this->diverging++;
@@ -207,10 +210,38 @@ class BackfillOdometerReadingsCommand extends Command
         }
     }
 
+    /**
+     * Nenhum veículo passou pelo loop. São dois casos diferentes, e o portão não pode tratá-los
+     * igual:
+     *
+     * - **`--vehicle` que não casou com nada** (id errado, id de um veículo apagado): o operador
+     *   pediu um veículo e não conferiu veículo nenhum. Dizer "nenhuma divergência" aqui seria
+     *   liberar a troca do cálculo sem ter olhado uma linha — o mesmo tipo de aprovação vazia que
+     *   `pint --test` dá dentro de `.claude/worktrees/**`. Sai com erro.
+     * - **banco sem veículo**: não há o que conferir, e isso é um fato, não um engano. Sai com
+     *   sucesso dizendo o que viu.
+     */
+    private function reportNothingSeen(): int
+    {
+        if (($id = $this->option('vehicle')) !== null) {
+            $this->error("Nenhum veículo com id {$id}: nada foi conferido nem gravado. Confira o id.");
+
+            return self::FAILURE;
+        }
+
+        $this->comment('Nenhum veículo no banco.');
+
+        return self::SUCCESS;
+    }
+
     private function reportCheck(): int
     {
         $this->newLine();
         $this->line("Veículos conferidos: {$this->vehicles}");
+
+        if ($this->vehicles === 0) {
+            return $this->reportNothingSeen();
+        }
 
         if ($this->alreadyStale > 0) {
             $this->comment(
@@ -237,6 +268,10 @@ class BackfillOdometerReadingsCommand extends Command
 
         $this->newLine();
         $this->line("Veículos: {$this->vehicles}");
+
+        if ($this->vehicles === 0) {
+            return $this->reportNothingSeen();
+        }
         $this->line("Leituras {$verb} — cadastro: {$this->registrations}, OS: {$this->maintenances}, laudo: {$this->inspections}");
 
         if ($dryRun) {

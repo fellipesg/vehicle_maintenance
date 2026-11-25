@@ -10,9 +10,10 @@ use Illuminate\Console\Command;
  * Reescreve `vehicles.current_kilometers` de todos os veículos a partir de
  * `vehicle_odometer_readings` (VehicleMileageService::refreshCurrentKilometers).
  *
- * É o conserto da coluna velha — registro gravado antes de o recálculo existir, por exemplo. Em
- * banco onde a projeção ainda não foi preenchida ele zera a coluna, então o
- * `odometer:backfill-readings` vem primeiro (.ai/rules/models.md).
+ * É o conserto da coluna velha — registro gravado antes de o recálculo existir, por exemplo.
+ * Veículo que a projeção ainda não alcançou ele deixa como está (o recálculo se cala quando não há
+ * leitura), então ele não estraga nada; mas também não conserta esse veículo: quem alcança o
+ * histórico é o `odometer:backfill-readings`, e ele vem primeiro (.ai/rules/models.md).
  */
 class RefreshVehicleKilometersCommand extends Command
 {
