@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\AboutController;
 use App\Http\Controllers\Web\AccountController;
 use App\Http\Controllers\Web\AccountDeletionController;
 use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryController;
@@ -85,6 +86,7 @@ Route::post('/webhooks/sentry', SentryWebhookController::class)->middleware('thr
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/llms.txt', LlmsTxtController::class)->name('llms');
 Route::get('/ads.txt', AdsTxtController::class)->name('ads.txt');
+Route::get('/sobre', AboutController::class)->name('about');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
 Route::get('/para-oficinas', WorkshopLandingController::class)->name('workshops.landing');
 Route::get('/o/{token}', [OutreachController::class, 'click'])->middleware('throttle:search')->name('outreach.click');

@@ -17,6 +17,7 @@ final class LlmsTxt
         $signup = CanonicalUrl::named('workshops.signup');
         $verify = CanonicalUrl::named('verification.lookup');
         $comparison = CanonicalUrl::named('guides.comparison');
+        $about = CanonicalUrl::named('about');
         $contact = CanonicalUrl::named('contact.show');
         $blog = CanonicalUrl::named('blog.index');
         $terms = CanonicalUrl::named('legal.terms');
@@ -54,6 +55,7 @@ final class LlmsTxt
         - [Conferir selo ou laudo]({$verify})
         - [Comparativo de apps de histórico de manutenção]({$comparison})
         - [Blog]({$blog})
+        - [Sobre o RevisaLog]({$about})
         - [Contato]({$contact})
         - [Termos de uso]({$terms})
         - [Privacidade]({$privacy})
