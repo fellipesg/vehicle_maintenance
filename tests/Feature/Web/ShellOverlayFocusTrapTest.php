@@ -85,7 +85,8 @@ class ShellOverlayFocusTrapTest extends TestCase
         }
 
         $partial = File::get(resource_path('views/layouts/partials/shell-script.blade.php'));
-        $this->assertSame(1, preg_match('#<script>(.*)</script>#s', $partial, $matches));
+        // A tag abre com atributos (nonce do CSP), então o padrão não pode exigir `<script>` cru.
+        $this->assertSame(1, preg_match('#<script[^>]*>(.*)</script>#s', $partial, $matches));
 
         $this->sandbox = storage_path('framework/testing/shell-script-'.Str::random(12));
         File::ensureDirectoryExists($this->sandbox);

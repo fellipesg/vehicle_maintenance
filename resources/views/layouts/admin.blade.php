@@ -53,7 +53,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />
     <x-brand-head-icons />
-    <script>
+    <script nonce="@cspNonce">
         // Sidebar recolhida (escolha salva por resources/js/ui/sidebar.js): aplicada antes da primeira
         // pintura, para a sidebar não abrir larga e encolher. Sem armazenamento, fica expandida.
         try {
@@ -212,7 +212,7 @@
     />
 
     @include('layouts.partials.shell-script')
-    <script>
+    <script nonce="@cspNonce">
         // Abaixo de md a sidebar abre como gaveta modal: enquanto está aberta, é anunciada como
         // diálogo. No desktop ela nunca abre por overlay e continua sendo o <aside> da página.
         (() => {

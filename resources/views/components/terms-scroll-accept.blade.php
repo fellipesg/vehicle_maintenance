@@ -75,7 +75,7 @@
 
 @once
     @push('scripts')
-        <script>
+        <script nonce="@cspNonce">
             (() => {
                 document.querySelectorAll('[data-terms-scroll-accept]').forEach((root) => {
                     const box = root.querySelector('[data-terms-scroll-box]');

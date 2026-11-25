@@ -10,7 +10,7 @@
     $analyticsDeclaresConsent = trim((string) config('services.google_analytics.measurement_id')) !== '';
 @endphp
 @if ($adsenseClient !== null)
-    <script>
+    <script nonce="@cspNonce">
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
         @unless ($analyticsDeclaresConsent)
@@ -25,5 +25,5 @@
             }
         })();
     </script>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ $adsenseClient }}" crossorigin="anonymous"></script>
+    <script nonce="@cspNonce" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ $adsenseClient }}" crossorigin="anonymous"></script>
 @endif

@@ -445,7 +445,11 @@ class AccountDeletionTest extends TestCase
             $attempts[] = [
                 'status' => $response->getStatusCode(),
                 'location' => $response->headers->get('Location'),
-                'body' => $response->getContent(),
+                // O nonce do CSP é sorteado a cada pedido (.ai/rules/security-headers.md) e aparece
+                // nas tags da página de erro do 429. Ele muda entre dois pedidos iguais, então não
+                // diz nada sobre existir a conta: sai da comparação para o oráculo seguir sendo o
+                // que o teste afirma.
+                'body' => preg_replace('/nonce="[^"]*"/', 'nonce="NONCE"', (string) $response->getContent()),
             ];
         }
 

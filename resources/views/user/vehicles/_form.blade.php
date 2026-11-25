@@ -86,7 +86,7 @@
 </div>
 
 @push('scripts')
-<script>
+<script nonce="@cspNonce">
 (() => {
     const catalog = @json($catalog);
     const brandSelect = document.getElementById('brand');
