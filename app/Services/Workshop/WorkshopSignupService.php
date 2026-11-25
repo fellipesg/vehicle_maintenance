@@ -9,7 +9,6 @@ use App\Models\Workshop;
 use App\Models\WorkshopProspect;
 use App\Services\TenantService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 /**
  * Cadastro próprio de oficina: conta (user_type workshop), tenant e Workshop numa transação, pelo
@@ -36,8 +35,10 @@ class WorkshopSignupService
                 'email' => $data['email'],
                 'identity_id' => $identity?->getKey(),
                 // Conta irmã não mexe na senha da identidade; conta nova ganha a identidade dela
-                // ao ser gravada (App\Models\User::save).
-                'password' => $identity === null ? Hash::make($data['password']) : null,
+                // ao ser gravada (App\Models\User::save). A senha vai sem Hash::make porque o cast
+                // `hashed` da identidade já cuida disso — e aceita um valor que **já** vem com hash,
+                // que é como o cadastro em etapas entrega (nunca guardou a senha em claro).
+                'password' => $identity === null ? ($data['password'] ?? null) : null,
                 'user_type' => 'workshop',
                 'phone' => $data['phone'],
                 'country' => 'Brasil',

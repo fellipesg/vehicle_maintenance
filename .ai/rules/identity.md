@@ -113,6 +113,46 @@ anexar a consignação à conta de oficina da mesma pessoa mandaria o aviso para
 deixaria a liberação do histórico com um papel que não é o dono. `EmailSuppression` e
 `WorkshopObserver` continuam por endereço, não por conta — estão certos como estão.
 
+## O cadastro em etapas é a porta da frente (/cadastro)
+Três etapas: **perfil e e-mail**, **senha**, **dados do perfil**. A busca do e-mail acontece na
+primeira, que é o ponto: num formulário de uma página só, a pessoa preenchia CNPJ, CEP e endereço
+inteiros para então ler "informe a senha da sua conta".
+
+O estado mora em `App\Support\Account\SignupFlow` (sessão, 30 minutos), nunca em campo escondido —
+ali a senha viajaria no HTML e voltaria em qualquer reenvio. **Senha em claro não entra na sessão**:
+no caminho da identidade nova fica o *hash* (que o cast `hashed` aceita pronto) e no da conta irmã
+não fica senha nenhuma, só a marca de que a pessoa a soube.
+
+As etapas são guardadas pelo middleware `signup.step`, e não por `authorize()` do FormRequest, por
+dois motivos: 403 é resposta errada para quem só perdeu o fluxo, e a validação do FormRequest roda
+antes do controller — sem a guarda, a etapa da senha validaria pelo ramo errado (senha nova em vez
+da senha da identidade) com o fluxo expirado.
+
+Balde próprio `throttle:signup`, nunca `auth-web`: a chave do `auth-web` cai em
+`login:<e-mail>|<ip>` fora dos caminhos que ele conhece, e um cadastro passaria a gastar a cota de
+**login** daquele e-mail. São dois limites — por aparelho (enumeração na etapa 1) e por e-mail mais
+aparelho (adivinhação de senha na etapa 2, com o e-mail lido da sessão porque o formulário não o
+reenvia).
+
+O lojista aparece na escolha mas leva ao login social: a loja não se cadastra por e-mail e senha
+(ver "Lojista signs up through a social provider", `.ai/rules/web-api.md`).
+
+As duas entradas antigas continuam: `/register` (proprietário, caminho curto de quem veio da busca
+de veículo) e `/para-oficinas/cadastro`, que é a landing de aquisição e carrega o `ref` da
+prospecção (`.ai/rules/outreach.md`). Para não existirem duas implementações da mesma coisa, a
+criação mora em `App\Services\User\OwnerSignupService` e `App\Services\Workshop\WorkshopSignupService`,
+a validação dos campos da oficina em `App\Http\Requests\Concerns\ValidatesWorkshopProfile` e o
+formulário deles em `resources/views/auth/partials/workshop-profile-fields.blade.php`. Campo novo da
+oficina entra nesses dois lugares, senão a mesma oficina passa numa tela e não na outra.
+
+## Logado não se troca de perfil — é requisito, não acaso
+Não existe caminho de conta logada para outro papel, e isso é deliberado: as telas de cadastro e de
+login estão **todas** no grupo `guest` (quem está logado cai no próprio Início por
+`redirectUsersTo`), e `Portal::accessibleBy()` devolve só a área da própria conta, então o menu de
+conta não oferece a área da irmã. Trocar de perfil é sair e entrar pela porta do outro portal.
+`Tests\Feature\Web\SignupFlowTest` trava as duas pontas. Qualquer tela de "adicionar perfil" dentro
+da conta logada quebraria esse requisito.
+
 ## Cadastro do segundo papel pede a senha da identidade
 O que bloqueia um cadastro deixou de ser "o e-mail existe" e passou a ser "o papel existe":
 `App\Rules\AvailableForUserType` no lugar do `unique:users,email`, com a mesma mensagem de antes

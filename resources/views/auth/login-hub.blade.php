@@ -42,14 +42,16 @@
 
     <div class="mt-6 space-y-3 border-t border-border pt-6">
         @if($intendedNotice === 'search')
+            {{-- Quem veio da busca de veículo precisa de conta de proprietário: o cadastro direto
+                 poupa a escolha de perfil. O /cadastro em etapas fica para quem ainda não sabe. --}}
             <x-ui.button :href="route('register')" size="lg" full>Criar conta grátis</x-ui.button>
         @else
             <p class="text-sm text-muted-foreground">
-                Proprietário sem conta? <x-ui.link :href="route('register')" variant="inline">Criar conta grátis</x-ui.link>
+                Sem conta? <x-ui.link :href="route('signup.start')" variant="inline">Criar conta grátis</x-ui.link> — de proprietário ou de oficina.
             </p>
         @endif
         <p class="text-sm text-muted-foreground">
-            Lojista ou oficina? <x-ui.link :href="route('contact.show', ['assunto' => 'partnership'])" variant="inline">Fale com a equipe</x-ui.link>
+            Lojista? <x-ui.link :href="route('contact.show', ['assunto' => 'partnership'])" variant="inline">Fale com a equipe</x-ui.link>
         </p>
     </div>
 @endsection

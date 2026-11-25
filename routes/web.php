@@ -43,6 +43,7 @@ use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OutreachController;
 use App\Http\Controllers\Web\PublicVehicleController;
 use App\Http\Controllers\Web\SentryWebhookController;
+use App\Http\Controllers\Web\SignupController;
 use App\Http\Controllers\Web\SitemapController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\Web\User\InspectionDisputeController as UserInspectionDisputeController;
@@ -161,6 +162,29 @@ Route::middleware('guest')->group(function () {
             ->name('login.submit');
         Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
         Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-web');
+
+        // Cadastro em etapas: perfil e e-mail, senha, dados do perfil. O balde é o `signup`, e não
+        // o `auth-web`: a etapa 1 é um oráculo de "este e-mail tem conta?" e a etapa 2 é tentativa
+        // de senha de uma conta que já existe — limites diferentes, e nenhum deles pode gastar a
+        // cota de login de quem só está se cadastrando (App\Providers\AppServiceProvider).
+        Route::get('/cadastro', [SignupController::class, 'start'])->name('signup.start');
+        Route::post('/cadastro', [SignupController::class, 'storeProfile'])
+            ->middleware('throttle:signup')
+            ->name('signup.profile');
+
+        Route::middleware('signup.step:started')->group(function (): void {
+            Route::get('/cadastro/senha', [SignupController::class, 'password'])->name('signup.password');
+            Route::post('/cadastro/senha', [SignupController::class, 'storePassword'])
+                ->middleware('throttle:signup')
+                ->name('signup.password.store');
+        });
+
+        Route::middleware('signup.step:password')->group(function (): void {
+            Route::get('/cadastro/dados', [SignupController::class, 'details'])->name('signup.details');
+            Route::post('/cadastro/dados', [SignupController::class, 'storeDetails'])
+                ->middleware('throttle:signup')
+                ->name('signup.details.store');
+        });
 
         // Recuperação de senha (Password broker). O limite de tentativas fica no controller, com aviso em pt-BR.
         Route::get('/esqueci-senha', [PasswordResetController::class, 'create'])->name('password.request');

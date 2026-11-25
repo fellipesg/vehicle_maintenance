@@ -3,14 +3,12 @@
 namespace App\Http\Requests\Web;
 
 use App\Enums\Portal;
+use App\Http\Requests\Concerns\ValidatesWorkshopProfile;
 use App\Models\Identity;
 use App\Rules\AvailableForUserType;
 use App\Rules\MatchesIdentityPassword;
-use App\Rules\ValidCnpj;
-use App\Support\BrazilianStates;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Cadastro próprio da oficina (/para-oficinas/cadastro): a pessoa responsável, a oficina e o endereço.
@@ -22,6 +20,8 @@ use Illuminate\Validation\Rule;
  */
 class StoreWorkshopSignupRequest extends FormRequest
 {
+    use ValidatesWorkshopProfile;
+
     private Identity|false|null $resolvedIdentity = false;
 
     public function authorize(): bool
@@ -29,24 +29,9 @@ class StoreWorkshopSignupRequest extends FormRequest
         return true;
     }
 
-    /**
-     * CNPJ, CEP e telefone aceitam pontuação; o resto da requisição só enxerga os dígitos.
-     */
     protected function prepareForValidation(): void
     {
-        $normalized = [];
-
-        foreach (['cnpj', 'cep', 'phone'] as $field) {
-            if ($this->filled($field) && is_scalar($this->input($field))) {
-                $normalized[$field] = preg_replace('/\D/', '', (string) $this->input($field));
-            }
-        }
-
-        if ($this->filled('state') && is_scalar($this->input('state'))) {
-            $normalized['state'] = strtoupper(trim((string) $this->input('state')));
-        }
-
-        $this->merge($normalized);
+        $this->normalizeWorkshopProfileInput();
     }
 
     /**
@@ -60,17 +45,7 @@ class StoreWorkshopSignupRequest extends FormRequest
             'password' => $this->existingIdentity() === null
                 ? ['required', 'string', 'min:8', 'confirmed']
                 : ['required', 'string', new MatchesIdentityPassword($this->existingIdentity())],
-            'trade_name' => ['required', 'string', 'max:255'],
-            'cnpj' => ['required', 'string', new ValidCnpj, 'unique:workshops,cnpj'],
-            'phone' => ['required', 'string', 'digits_between:10,11'],
-            'cep' => ['required', 'string', 'size:8'],
-            'street' => ['required', 'string', 'max:255'],
-            'number' => ['required', 'string', 'max:20'],
-            'complement' => ['nullable', 'string', 'max:255'],
-            'neighborhood' => ['required', 'string', 'max:255'],
-            'city' => ['required', 'string', 'max:255'],
-            'state' => ['required', 'string', 'size:2', Rule::in(BrazilianStates::codes())],
-            'ref' => ['nullable', 'string', 'max:64'],
+            ...$this->workshopProfileRules(),
         ];
     }
 
@@ -97,9 +72,7 @@ class StoreWorkshopSignupRequest extends FormRequest
         return [
             'password.min' => 'A senha deve ter no mínimo 8 caracteres.',
             'password.confirmed' => 'A confirmação da senha não confere.',
-            'phone.digits_between' => 'Informe o WhatsApp ou telefone com DDD (10 ou 11 dígitos).',
-            'cep.size' => 'Informe o CEP com 8 dígitos.',
-            'state.in' => 'Escolha a UF da lista.',
+            ...$this->workshopProfileMessages(),
         ];
     }
 }

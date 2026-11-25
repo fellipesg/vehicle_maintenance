@@ -10,12 +10,11 @@ use App\Models\Identity;
 use App\Models\User;
 use App\Rules\AvailableForUserType;
 use App\Rules\MatchesIdentityPassword;
-use App\Services\TenantService;
+use App\Services\User\OwnerSignupService;
 use App\Support\PortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\View\View;
@@ -56,6 +55,8 @@ class AuthController extends Controller
     public const REGISTERED_MESSAGE = 'Conta criada. Enviamos as boas-vindas para :email. Próximo passo: adicione seu veículo.';
 
     public const LOGGED_OUT_MESSAGE = 'Você saiu da sua conta.';
+
+    public function __construct(private OwnerSignupService $ownerSignup) {}
 
     public function showLoginHub(Request $request): View
     {
@@ -158,24 +159,10 @@ class AuthController extends Controller
             'document.regex' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.',
         ]);
 
-        $user = DB::transaction(function () use ($data, $identity): User {
-            $user = User::create([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                // Conta irmã entra na identidade que já existe, com a senha dela intocada; conta
-                // nova ganha a identidade dela ao ser gravada (App\Models\User::save).
-                'identity_id' => $identity?->getKey(),
-                'password' => $identity === null ? Hash::make($data['password']) : null,
-                'user_type' => Portal::Owner->value,
-                'phone' => $data['phone'] ?? null,
-                'document' => $data['document'] ?? null,
-                'country' => 'Brasil',
-            ]);
-
-            (new TenantService)->createForUser($user);
-
-            return $user;
-        });
+        // Conta irmã entra na identidade que já existe, com a senha dela intocada; conta nova ganha
+        // a identidade dela ao ser gravada (App\Models\User::save). A criação é a mesma do cadastro
+        // em etapas (/cadastro), por isso mora num serviço.
+        $user = $this->ownerSignup->register($data, $identity);
 
         UserRegistered::dispatch($user, RegistrationSource::Web);
 
