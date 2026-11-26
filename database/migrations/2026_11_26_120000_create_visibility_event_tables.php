@@ -58,6 +58,12 @@ return new class extends Migration
     /**
      * Forma compartilhada das duas trilhas. Escrever as duas iguais aqui é o que impede uma de
      * ganhar coluna que a outra não tem — os serviços são irmãos e a equipe lê um esperando o outro.
+     *
+     * `reason` é `text`, e não `string(500)` como `maintenances.hidden_reason`, porque a trilha
+     * recebe cópia de **duas** origens e a outra é mais larga: `vehicle_inspections.hidden_reason` é
+     * `text`. Com a coluna estreita, o backfill faria uma cópia que estreita sem avisar — ou estoura
+     * o insert no Postgres (22001), ou truncaria a prova. A trilha é lida como prova: ela acomoda o
+     * que a origem guardava, e quem limita o tamanho é a validação da tela (`max:500`).
      */
     private function defineEventTable(Blueprint $table, string $foreignKey, string $foreignTable): void
     {
@@ -67,13 +73,17 @@ return new class extends Migration
             ->comment('hidden | restored (App\Enums\VisibilityEventAction)');
         $table->foreignId('actor_user_id')->nullable()->constrained('users')->nullOnDelete()
             ->comment('Quem decidiu; nulo se a conta foi removida depois');
-        $table->string('reason', 500)->nullable()
+        $table->text('reason')->nullable()
             ->comment('Motivo informado na supressão; a devolução hoje não pede motivo');
         $table->timestamp('occurred_at')
             ->comment('Quando o ato aconteceu — nos eventos semeados, o hidden_from_public_at original');
         $table->timestamps();
 
-        $table->index([$foreignKey, 'occurred_at']);
+        // Nome explícito porque o automático do lado do laudo
+        // (inspection_visibility_events_vehicle_inspection_id_occurred_at_index) tem 68 caracteres e
+        // passa do limite de 63 do Postgres, que **trunca em silêncio** em vez de recusar: o índice
+        // nasceria com nome diferente do que esta migração diz, e no MySQL nem nasceria.
+        $table->index([$foreignKey, 'occurred_at'], $table->getTable().'_trail_index');
     }
 
     /**

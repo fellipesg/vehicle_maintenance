@@ -120,6 +120,34 @@ class VisibilityTrailBackfillTest extends TestCase
     }
 
     /**
+     * `vehicle_inspections.hidden_reason` é `text`, sem teto no banco: hoje a tela limita a 500
+     * caracteres, mas a coluna aceita mais, e o backfill copia o que estiver lá. Com a trilha em
+     * `string(500)` essa cópia estreitava sem avisar — no Postgres o insert estouraria (22001) e
+     * levaria a migração junto, no Neon, com dados reais. A trilha é lida como prova: ela acomoda o
+     * que a origem guardava.
+     *
+     * **Este teste só prova algo no Postgres** (`phpunit.pgsql.xml`): o SQLite ignora o tamanho
+     * declarado em `varchar`, então ele passaria lá mesmo com a coluna estreita. É um dos casos em
+     * que rodar os dois engines não é zelo, é o que separa o teste do enfeite.
+     */
+    public function test_a_reason_longer_than_the_form_allows_survives_the_backfill(): void
+    {
+        $reason = str_repeat('Laudo com chassi divergente. ', 40);
+
+        $this->assertGreaterThan(500, mb_strlen($reason), 'O motivo precisa passar do teto da tela.');
+
+        $inspection = $this->inspection();
+        $inspection->forceFill([
+            'hidden_from_public_at' => now()->subMonth(),
+            'hidden_reason' => $reason,
+        ])->saveQuietly();
+
+        $this->rerunMigration();
+
+        $this->assertSame($reason, InspectionVisibilityEvent::query()->sole()->reason);
+    }
+
+    /**
      * `down()` funcionando é requisito da entrega: a migração tem de voltar atrás no Neon.
      */
     public function test_down_drops_both_trails(): void

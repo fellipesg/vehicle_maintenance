@@ -65,18 +65,25 @@ class MaintenancePublicVisibilityService
      * `Maintenance::scopeCountsTowardOdometer` lê `hidden_by_user_id` para distinguir a supressão da
      * equipe do ocultar antigo do proprietário, então deixar o nome preso ali tiraria a OS da conta
      * do hodômetro para sempre (.ai/rules/models.md) — e a projeção de leituras lê a mesma coluna,
-     * pelo MaintenanceObserver, então o nome preso travaria `counts_toward_odometer` também. O que a supressão foi fica na trilha, que esta
-     * devolução acrescenta em vez de apagar.
+     * pelo MaintenanceObserver, então o nome preso travaria `counts_toward_odometer` também. O que a
+     * supressão foi fica na trilha, que esta devolução acrescenta em vez de apagar.
      *
      * Exige o admin por isso: devolver o ativo à circulação é decisão de gente, e trilha sem nome
      * não serve de prova. OS que não estava suprimida **não** gera evento: não houve transição, e
      * inventá-la encheria a trilha de atos que não aconteceram — é também o caso das linhas do fluxo
      * antigo, ocultadas pelo proprietário, que a migração não semeou.
+     *
+     * A transição é lida com a linha **travada**, como no irmão do laudo: sem a trava, duas
+     * devoluções simultâneas da mesma OS gravariam duas linhas de trilha para uma transição só, e a
+     * trilha é append-only. Ver InspectionPublicVisibilityService::restore.
      */
     public function restore(Maintenance $maintenance, User $admin): Maintenance
     {
         return DB::transaction(function () use ($maintenance, $admin): Maintenance {
-            $wasHidden = $maintenance->isHiddenFromPublic();
+            $wasHidden = Maintenance::query()
+                ->lockForUpdate()
+                ->find($maintenance->id)
+                ?->isHiddenFromPublic() ?? false;
 
             $maintenance->forceFill([
                 'hidden_from_public_at' => null,

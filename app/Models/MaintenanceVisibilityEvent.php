@@ -25,11 +25,6 @@ class MaintenanceVisibilityEvent extends Model
 {
     use HasFactory;
 
-    /**
-     * Teto do motivo, o mesmo de `maintenances.hidden_reason` e do campo da tela do admin.
-     */
-    public const MAX_REASON_LENGTH = 500;
-
     protected $fillable = [
         'maintenance_id',
         'action',

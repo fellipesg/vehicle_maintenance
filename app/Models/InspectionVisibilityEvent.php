@@ -30,11 +30,6 @@ class InspectionVisibilityEvent extends Model
 {
     use HasFactory;
 
-    /**
-     * Teto do motivo, o mesmo de `vehicle_inspections.hidden_reason` e do campo da tela do admin.
-     */
-    public const MAX_REASON_LENGTH = 500;
-
     protected $fillable = [
         'vehicle_inspection_id',
         'action',

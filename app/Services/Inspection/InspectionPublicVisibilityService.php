@@ -69,11 +69,21 @@ final class InspectionPublicVisibilityService
      * Exige o admin por isso: devolver o ativo à circulação é decisão de gente, e trilha sem nome
      * não serve de prova. Laudo que não estava suprimido **não** gera evento: não houve transição, e
      * inventá-la encheria a trilha de atos que não aconteceram.
+     *
+     * A transição é lida com a linha **travada**, e não do model que chegou do roteador: sem a
+     * trava, dois admins clicando em "publicar" ao mesmo tempo (ou um duplo clique) leriam os dois
+     * `hidden_from_public_at` ainda preenchido e gravariam duas devoluções para uma transição só —
+     * exatamente o que o `$wasHidden` existe para evitar. E a trilha é append-only: o evento a mais
+     * não teria como ser corrigido depois. No SQLite `lockForUpdate` é inócuo, e lá não há
+     * concorrência de escrita para disputar.
      */
     public function restore(VehicleInspection $inspection, User $admin): VehicleInspection
     {
         return DB::transaction(function () use ($inspection, $admin): VehicleInspection {
-            $wasHidden = $inspection->isHiddenFromPublic();
+            $wasHidden = VehicleInspection::query()
+                ->lockForUpdate()
+                ->find($inspection->id)
+                ?->isHiddenFromPublic() ?? false;
 
             $inspection->forceFill([
                 'hidden_from_public_at' => null,

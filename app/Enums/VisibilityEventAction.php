@@ -24,24 +24,4 @@ enum VisibilityEventAction: string
             self::Restored => 'Devolvido ao histórico',
         };
     }
-
-    /**
-     * Variante do <x-ui.badge>. A supressão é o estado que tira o ativo do produto de circulação, e
-     * a devolução é o retorno ao normal — nenhuma das duas é "sucesso" ou "erro", são transições.
-     */
-    public function badgeVariant(): string
-    {
-        return match ($this) {
-            self::Hidden => 'neutral',
-            self::Restored => 'success',
-        };
-    }
-
-    /**
-     * @return list<string>
-     */
-    public static function values(): array
-    {
-        return array_map(fn (self $action): string => $action->value, self::cases());
-    }
 }
