@@ -209,12 +209,26 @@ class WorkshopSelfSignupTest extends TestCase
         $this->assertSame(0, User::count());
     }
 
-    public function test_signup_rejects_a_duplicate_email(): void
+    public function test_signup_rejects_an_email_that_already_has_a_workshop_account(): void
     {
-        User::factory()->create(['email' => 'carlos@autocenter.example.com']);
+        // O que impede o cadastro é já existir conta **de oficina** nesse e-mail. E-mail com outro
+        // papel cria conta irmã, informando a senha da identidade — ver
+        // Tests\Feature\Web\SharedIdentityTest.
+        User::factory()->asWorkshop()->create(['email' => 'carlos@autocenter.example.com']);
 
         $this->post(route('workshops.signup.store'), $this->payload())
             ->assertSessionHasErrors(['email' => 'Este e-mail já está cadastrado.']);
+
+        $this->assertGuest();
+        $this->assertDatabaseCount('workshops', 1);
+    }
+
+    public function test_signup_asks_for_the_identity_password_when_the_email_has_another_profile(): void
+    {
+        User::factory()->asUser()->create(['email' => 'carlos@autocenter.example.com']);
+
+        $this->post(route('workshops.signup.store'), $this->payload())
+            ->assertSessionHasErrors(['password' => \App\Rules\MatchesIdentityPassword::MESSAGE]);
 
         $this->assertGuest();
         $this->assertDatabaseCount('workshops', 0);

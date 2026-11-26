@@ -10,8 +10,8 @@
 <x-ui.container size="sm" padded>
     <x-ui.page-header eyebrow="RevisaLog" title="Confirmar exclusão da conta">
         <x-slot:description>
-            Último passo. Ao confirmar, os dados pessoais de <strong>{{ $user->email }}</strong> são apagados
-            e não há como desfazer.
+            Último passo. Ao confirmar, os dados pessoais do perfil <strong>{{ $user->typeLabel() }}</strong>
+            de <strong>{{ $user->email }}</strong> são apagados e não há como desfazer.
         </x-slot:description>
     </x-ui.page-header>
 
@@ -22,6 +22,15 @@
                 apagados, e o vínculo com seus veículos é desfeito. O histórico de manutenções segue no chassi,
                 sem nenhuma ligação com você.
             </x-ui.alert>
+
+            @if($otherProfileLabels !== [])
+                {{-- Contas irmãs: excluir um perfil não leva os outros, e a página diz quais ficam. --}}
+                <x-ui.alert variant="info" title="Os seus outros perfis continuam">
+                    Este e-mail também tem {{ implode(' e ', $otherProfileLabels) }} na RevisaLog. Só o perfil
+                    {{ $user->typeLabel() }} é excluído aqui; para excluir outro, peça o link de novo e escolha
+                    o perfil na mensagem.
+                </x-ui.alert>
+            @endif
 
             <p class="text-sm text-muted-foreground">
                 Não foi você que pediu? Basta fechar esta página: nada é excluído sem a confirmação, e o link

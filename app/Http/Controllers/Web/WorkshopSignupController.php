@@ -41,7 +41,7 @@ class WorkshopSignupController extends Controller
 
     public function store(StoreWorkshopSignupRequest $request): RedirectResponse
     {
-        $user = $this->signup->register($request->validated());
+        $user = $this->signup->register($request->validated(), $request->existingIdentity());
 
         UserRegistered::dispatch($user, RegistrationSource::Web);
 

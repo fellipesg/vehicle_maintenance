@@ -23,7 +23,14 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'user_type' => $this->user_type,
-            'workshop_id' => $this->when($this->isWorkshop(), fn () => $this->workshop?->id),
+            // `loadMissing`, e não `$this->workshop`: o Model::preventLazyLoading está ligado fora
+            // de produção e a conta chega aqui direto do login, sem a oficina carregada — ali uma
+            // violação viraria 500 no lugar da resposta. O campo continua no contrato (não é
+            // `whenLoaded`): a oficina é carregada, não omitida.
+            'workshop_id' => $this->when(
+                $this->isWorkshop(),
+                fn () => $this->resource->loadMissing('workshop')->getRelation('workshop')?->id,
+            ),
             'tenant_id' => $this->tenant_id,
             'is_admin' => (bool) $this->is_admin,
             'phone' => $this->phone,

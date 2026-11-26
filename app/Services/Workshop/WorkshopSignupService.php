@@ -3,17 +3,21 @@
 namespace App\Services\Workshop;
 
 use App\Enums\WorkshopProspectStatus;
+use App\Models\Identity;
 use App\Models\User;
 use App\Models\Workshop;
 use App\Models\WorkshopProspect;
 use App\Services\TenantService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 /**
  * Cadastro próprio de oficina: conta (user_type workshop), tenant e Workshop numa transação, pelo
  * mesmo TenantService das outras contas. Sem etapa de aprovação: o Workshop não tem esse campo e a
  * conta já nasce no plano gratuito (WorkshopPlan::Free).
+ *
+ * Quando o e-mail já tem identidade (a pessoa é proprietária e agora cadastra a oficina), a conta
+ * nasce como irmã dela: mesma senha, mesmo 2FA, `tenant_id` próprio. A senha da identidade já foi
+ * conferida pelo StoreWorkshopSignupRequest.
  */
 class WorkshopSignupService
 {
@@ -21,14 +25,20 @@ class WorkshopSignupService
 
     /**
      * @param  array<string, mixed>  $data  Dados validados por StoreWorkshopSignupRequest.
+     * @param  Identity|null  $identity  Identidade que já existe para o e-mail, quando existe.
      */
-    public function register(array $data): User
+    public function register(array $data, ?Identity $identity = null): User
     {
-        return DB::transaction(function () use ($data): User {
+        return DB::transaction(function () use ($data, $identity): User {
             $user = User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
-                'password' => Hash::make($data['password']),
+                'identity_id' => $identity?->getKey(),
+                // Conta irmã não mexe na senha da identidade; conta nova ganha a identidade dela
+                // ao ser gravada (App\Models\User::save). A senha vai sem Hash::make porque o cast
+                // `hashed` da identidade já cuida disso — e aceita um valor que **já** vem com hash,
+                // que é como o cadastro em etapas entrega (nunca guardou a senha em claro).
+                'password' => $identity === null ? ($data['password'] ?? null) : null,
                 'user_type' => 'workshop',
                 'phone' => $data['phone'],
                 'country' => 'Brasil',

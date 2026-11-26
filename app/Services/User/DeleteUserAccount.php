@@ -3,6 +3,7 @@
 namespace App\Services\User;
 
 use App\Models\BlogComment;
+use App\Models\Identity;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\VehicleConsignment;
@@ -36,6 +37,11 @@ class DeleteUserAccount
      * Os comentários do blog da pessoa saem na mesma transação: o nome aparece neles (primeiro
      * nome e inicial) e a conta é anonimizada, não apagada, então o cascade de `user_id` não vale.
      *
+     * Com identidade compartilhada, excluir um papel **não** leva os outros: a conta excluída sai
+     * para uma identidade só dela (o e-mail inutilizável e uma senha aleatória), e as contas irmãs
+     * seguem entrando com a senha que já tinham. Quando o papel excluído era o último daquela
+     * identidade, a identidade vai junto — é ali que moravam e-mail, senha e 2FA da pessoa.
+     *
      * A sessão web morre aqui, para todos os caminhos de exclusão de uma vez: as linhas de
      * `sessions` da pessoa saem junto. Quem está excluindo pela própria sessão ainda precisa do
      * logout da requisição (App\Http\Controllers\Concerns\EndsDeletedAccountSession), senão o
@@ -49,6 +55,8 @@ class DeleteUserAccount
         DB::transaction(function () use ($user, $originalEmail): void {
             $this->deleteStoredFile($user->avatar);
 
+            $sharedIdentity = $user->loadMissing('identity')->identity;
+
             $user->fcmTokens()->delete();
             $user->tokens()->delete();
             $user->vehicles()->detach();
@@ -58,9 +66,16 @@ class DeleteUserAccount
             $this->deleteWebSessions($user);
             $this->deleteGeneratedPdfExports($user);
 
+            // O papel sai da identidade compartilhada antes de ser anonimizado: a senha e o
+            // e-mail gravados abaixo são desta conta só, e não das irmãs.
+            $user->identity()->associate(Identity::create([
+                'email' => $this->deletedEmail($user),
+                'password' => Str::password(32),
+            ]));
+
             $user->forceFill([
                 'name' => self::DELETED_NAME,
-                'email' => $this->deletedEmail($user),
+                'email' => $user->identity->email,
                 'password' => Str::password(32),
                 'phone' => null,
                 'document' => null,
@@ -77,12 +92,11 @@ class DeleteUserAccount
                 'provider_id' => null,
                 'avatar' => null,
                 'remember_token' => null,
-                'two_factor_secret' => null,
-                'two_factor_confirmed_at' => null,
-                'two_factor_recovery_codes' => null,
                 'is_admin' => false,
                 'subscription_active' => false,
             ])->save();
+
+            $this->deleteOrphanedIdentity($sharedIdentity, $user);
 
             $this->scrubConsignmentContact($user, $originalEmail);
             $this->scrubIndividualTenantName($user);
@@ -94,6 +108,26 @@ class DeleteUserAccount
             $consignment->garageUser?->notify(
                 new ConsignmentOwnerAccountDeletedNotification($consignment->fresh())
             );
+        }
+    }
+
+    /**
+     * A identidade de onde a conta saiu morre quando era o último papel dela: é a linha com o
+     * e-mail, a senha e o 2FA da pessoa, e ninguém mais entra por ela. Sobrando conta irmã, a
+     * identidade fica como está — excluir um papel não pode tirar os outros do ar.
+     */
+    private function deleteOrphanedIdentity(?Identity $identity, User $deletedUser): void
+    {
+        if ($identity === null) {
+            return;
+        }
+
+        $stillInUse = $identity->users()
+            ->whereKeyNot($deletedUser->getKey())
+            ->exists();
+
+        if (! $stillInUse) {
+            $identity->delete();
         }
     }
 

@@ -14,10 +14,8 @@ use App\Services\User\DeleteUserAccount;
 use App\Support\PortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -92,6 +90,13 @@ class AccountController extends Controller
 
         $user->save();
 
+        // O e-mail é da identidade; `users.email` é a cópia desnormalizada que o provider do guard
+        // e as buscas por endereço leem. Trocar numa ponta só é como uma conta irmã deixa de
+        // entrar — por isso a troca passa por Identity::changeEmailTo, que grava nas duas.
+        if ($emailChanged) {
+            $user->loadMissing('identity')->identity->changeEmailTo((string) $user->email);
+        }
+
         // A troca pediu a senha atual (UpdateAccountRequest); o endereço antigo ainda é avisado.
         if ($emailChanged) {
             Notification::route('mail', $previousEmail)
@@ -111,11 +116,10 @@ class AccountController extends Controller
     public function updatePassword(UpdateAccountPasswordRequest $request): RedirectResponse
     {
         // A senha nova derruba a sessão dos outros aparelhos (App\Http\Middleware\AuthenticateWebSession)
-        // e o novo remember_token desliga o "Lembrar de mim" deles; esta sessão continua.
-        $request->user()->forceFill([
-            'password' => Hash::make((string) $request->validated('password')),
-            'remember_token' => Str::random(60),
-        ])->save();
+        // e o novo remember_token desliga o "Lembrar de mim" deles; esta sessão continua. A senha é
+        // da identidade, então a troca vale para as contas irmãs — todos os papéis deste e-mail.
+        $request->user()->loadMissing('identity')->identity
+            ->changePasswordTo((string) $request->validated('password'));
 
         $request->session()->regenerate();
 

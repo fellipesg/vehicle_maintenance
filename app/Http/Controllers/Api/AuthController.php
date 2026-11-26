@@ -21,6 +21,7 @@ use App\Support\ApiResponse;
 use App\Support\SanctumMobileToken;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -91,9 +92,10 @@ class AuthController extends Controller
             return ApiResponse::error('Invalid login credentials', 401);
         }
 
-        $user = User::where('email', $request->email)->firstOrFail();
+        $portal = $request->filled('portal') ? $request->string('portal')->toString() : null;
+        $user = $this->resolveAccountForPortal((string) $request->email, $portal);
 
-        if ($request->filled('portal') && ! $this->userMatchesPortal($user, $request->string('portal')->toString())) {
+        if ($user === null) {
             return ApiResponse::error('This account does not have access to this portal.', 403);
         }
 
@@ -278,7 +280,8 @@ class AuthController extends Controller
             ->where('provider', 'google')
             ->where('provider_id', $identity->subject)
             ->first()
-            ?? User::query()->whereRaw('lower(email) = ?', [$identity->email])->first();
+            ?? $this->resolveAccountForPortal($identity->email, $portal, caseInsensitive: true)
+            ?? $this->accountsForEmail($identity->email, caseInsensitive: true)->first();
 
         if ($existing && $portal && ! $this->userMatchesPortal($existing, $portal)) {
             return ApiResponse::error('This account does not have access to this portal.', 403);
@@ -337,7 +340,11 @@ class AuthController extends Controller
             ->first();
 
         if (! $existing && $identity->email) {
-            $existing = User::query()->where('email', $identity->email)->first();
+            // Com contas irmãs, a do portal pedido; sem nenhuma do portal, a primeira do e-mail —
+            // é ela que faz a checagem logo abaixo responder 403, como antes desta mudança. Login
+            // social **não** cria papel novo para um e-mail que já tem conta.
+            $existing = $this->resolveAccountForPortal($identity->email, $portal)
+                ?? $this->accountsForEmail($identity->email)->first();
         }
 
         if ($existing && $portal && ! $this->userMatchesPortal($existing, $portal)) {
@@ -406,7 +413,13 @@ class AuthController extends Controller
         }
 
         if (filled($email)) {
-            $user = User::query()->where('email', $email)->first();
+            // Com identidade compartilhada o e-mail pode ter uma conta por papel: o vínculo do
+            // provedor vai para a conta do papel que o app pediu (userType), e não para a primeira
+            // linha que o e-mail achar.
+            $user = $this->resolveAccountForPortal(
+                $email,
+                $userType === 'garage' ? 'lojista' : null,
+            ) ?? $this->accountsForEmail($email)->first();
         }
 
         if ($user) {
@@ -456,6 +469,54 @@ class AuthController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * A conta deste e-mail que atende o portal pedido.
+     *
+     * Com identidade compartilhada um e-mail pode ter uma conta por papel, e `where('email')->first()`
+     * passaria a devolver uma linha qualquer. Com `portal` no pedido a escolha é dele; sem `portal`
+     * — o app ainda não o manda em todo caminho — a ordem é fixa e documentada: proprietário,
+     * lojista, oficina. Com uma conta só, o caso de toda a base de hoje, é sempre a mesma conta de
+     * sempre, e a resposta da API não muda.
+     *
+     * Enquanto o app não mandar o portal, a conta irmã de outro papel não entra por ele. O que a
+     * API ainda precisa está em .ai/rules/identity.md, "A API não mudou neste PR".
+     */
+    private function resolveAccountForPortal(string $email, ?string $portal, bool $caseInsensitive = false): ?User
+    {
+        $accounts = $this->accountsForEmail($email, $caseInsensitive);
+
+        if ($portal !== null) {
+            return $accounts->first(fn (User $user): bool => $this->userMatchesPortal($user, $portal));
+        }
+
+        foreach (['usuario', 'lojista', 'oficina'] as $candidate) {
+            $match = $accounts->first(fn (User $user): bool => $this->userMatchesPortal($user, $candidate));
+
+            if ($match !== null) {
+                return $match;
+            }
+        }
+
+        return $accounts->first();
+    }
+
+    /**
+     * Todas as contas deste e-mail, em ordem estável. Um e-mail pode ter uma conta por papel.
+     *
+     * @return EloquentCollection<int, User>
+     */
+    private function accountsForEmail(string $email, bool $caseInsensitive = false): EloquentCollection
+    {
+        return User::query()
+            ->when(
+                $caseInsensitive,
+                fn ($query) => $query->whereRaw('lower(email) = ?', [mb_strtolower($email)]),
+                fn ($query) => $query->where('email', $email),
+            )
+            ->orderBy('id')
+            ->get();
     }
 
     private function userMatchesPortal(User $user, string $portal): bool

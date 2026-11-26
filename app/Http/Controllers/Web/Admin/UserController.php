@@ -87,6 +87,7 @@ class UserController extends Controller
 
         return view('admin.users.index', [
             'users' => $users,
+            'otherProfileLabels' => $this->otherProfileLabelsFor($users->getCollection()),
             'search' => $search,
             'profile' => $profile,
             'profileCounts' => $counts,
@@ -160,6 +161,40 @@ class UserController extends Controller
     /**
      * @param  Builder<User>  $query
      */
+    /**
+     * Com identidade compartilhada (App\Models\Identity) a mesma pessoa aparece numa linha por
+     * papel, e a lista é por conta. Para a lista não parecer ter cadastros repetidos, cada linha
+     * recebe os rótulos dos **outros** perfis daquele e-mail — uma consulta para a página inteira,
+     * não uma por linha.
+     *
+     * @param  Collection<int, User>  $accounts
+     * @return array<int, list<string>> id da conta => rótulos dos outros perfis da mesma pessoa
+     */
+    private function otherProfileLabelsFor(Collection $accounts): array
+    {
+        $identityIds = $accounts->pluck('identity_id')->filter()->unique()->all();
+
+        if ($identityIds === []) {
+            return [];
+        }
+
+        $byIdentity = User::query()
+            ->whereIn('identity_id', $identityIds)
+            ->get(['id', 'identity_id', 'user_type'])
+            ->groupBy('identity_id');
+
+        return $accounts
+            ->mapWithKeys(fn (User $account): array => [
+                $account->id => $byIdentity
+                    ->get($account->identity_id, new Collection)
+                    ->reject(fn (User $sibling): bool => (int) $sibling->id === (int) $account->id)
+                    ->map(fn (User $sibling): string => $sibling->typeLabel())
+                    ->values()
+                    ->all(),
+            ])
+            ->all();
+    }
+
     private function applySearch(Builder $query, string $search): void
     {
         $like = '%'.mb_strtolower($search).'%';

@@ -100,6 +100,27 @@ class AppServiceProvider extends ServiceProvider
                     ]),
         ));
 
+        /*
+         * Cadastro em etapas (/cadastro). Dois baldes, porque as etapas são ataques diferentes:
+         * a etapa 1 diz se um e-mail tem conta (enumeração, teto por aparelho) e a etapa 2 recebe
+         * tentativas da senha de uma conta que já existe (adivinhação, teto por e-mail e aparelho).
+         * O e-mail vem da sessão do fluxo: o formulário da senha não o reenvia.
+         *
+         * Balde próprio e não o `auth-web`: ali a chave cai em 'login:<e-mail>|<ip>' fora dos
+         * caminhos conhecidos, e um cadastro passaria a gastar a cota de login daquele e-mail.
+         */
+        RateLimiter::for('signup', function (Request $request): array {
+            $limits = [Limit::perMinute(5)->by('signup-ip|'.$request->ip())];
+
+            if ($request->routeIs('signup.password.store')) {
+                $email = Str::lower((string) ($request->session()->get('signup')['email'] ?? ''));
+
+                $limits[] = Limit::perMinute(5)->by('signup-password|'.$email.'|'.$request->ip());
+            }
+
+            return $limits;
+        });
+
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by(
             (string) ($request->user()?->id ?: $request->ip()),
         ));

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\Maintenance\MaintenanceVerificationStamper;
 use App\Services\TenantService;
+use App\Services\TwoFactorService;
 use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\VehiclePlateHistoryService;
 use Illuminate\Database\Seeder;
@@ -116,13 +117,13 @@ class PlayReviewAccountsSeeder extends Seeder
 
         // O revisor não tem como responder a um desafio de 2FA nem a uma
         // verificação de e-mail, então essas contas nascem e permanecem livres
-        // das duas. Campos fora do $fillable exigem forceFill.
+        // das duas. Campos fora do $fillable exigem forceFill, e o 2FA mora na
+        // identidade (App\Models\Identity).
         $user->forceFill([
             'email_verified_at' => $user->email_verified_at ?? now(),
-            'two_factor_secret' => null,
-            'two_factor_recovery_codes' => null,
-            'two_factor_confirmed_at' => null,
         ])->save();
+
+        app(TwoFactorService::class)->clearTwoFactor($user);
 
         if (! $user->tenant_id) {
             $tenantService->createForUser($user);

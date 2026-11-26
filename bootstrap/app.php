@@ -59,6 +59,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'noindex' => \App\Http\Middleware\NoIndex::class,
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
             'etag.vehicle_list' => \App\Http\Middleware\EtagForVehicleList::class,
+            'signup.step' => \App\Http\Middleware\EnsureSignupStep::class,
         ]);
 
         // Visitante que abre um link protegido vai ao login do portal da URL (/garagem → lojista),

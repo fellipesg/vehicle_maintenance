@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\GarageStatus;
 use App\Models\Garage;
+use App\Models\Identity;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Workshop;
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
+ * A conta nasce com a identidade dela (e-mail e senha), criada pelo próprio App\Models\User ao
+ * gravar: a suíte inteira continua chamando `User::factory()` sem saber que a senha mudou de
+ * tabela. Para contas irmãs — o mesmo e-mail em mais de um papel — use `forIdentity()`.
+ *
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
  */
 class UserFactory extends Factory
@@ -103,6 +108,19 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'is_admin' => true,
+        ]);
+    }
+
+    /**
+     * Conta irmã: o papel entra sob uma identidade que já existe, com o e-mail dela. A senha fica
+     * como está — é da identidade, compartilhada com as outras contas, e um papel novo não a troca.
+     */
+    public function forIdentity(Identity $identity): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'identity_id' => $identity->getKey(),
+            'email' => $identity->email,
+            'password' => null,
         ]);
     }
 }

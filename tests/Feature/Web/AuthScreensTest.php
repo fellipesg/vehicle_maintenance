@@ -183,11 +183,14 @@ class AuthScreensTest extends TestCase
 
     public function test_taken_email_offers_sign_in_and_password_reset(): void
     {
-        User::factory()->asGarage()->create(['email' => 'loja@example.com']);
+        // O e-mail que já tem conta **de proprietário** continua recusado: é esse cadastro que a
+        // pessoa está tentando repetir. (E-mail com outro papel é o caminho da conta irmã, em
+        // Tests\Feature\Web\SharedIdentityTest.)
+        User::factory()->asUser()->create(['email' => 'dono@example.com']);
 
         $this->from(route('register'))->post('/register', [
-            'name' => 'Loja',
-            'email' => 'loja@example.com',
+            'name' => 'Outro',
+            'email' => 'dono@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ])->assertSessionHasErrors(['email' => 'Este e-mail já está cadastrado.']);
@@ -198,7 +201,7 @@ class AuthScreensTest extends TestCase
         $this->assertStringContainsString('Este e-mail já tem conta na RevisaLog.', $this->text($notice));
         $this->assertNotNull($page->querySelector('[data-email-taken] a[href="'.route('login').'"]'));
         $this->assertNotNull($page->querySelector('[data-email-taken] a[href="'.e(route('password.request', ['portal' => 'usuario'])).'"]'));
-        $this->assertSame('loja@example.com', $this->element($page, 'input#email')->getAttribute('value'));
+        $this->assertSame('dono@example.com', $this->element($page, 'input#email')->getAttribute('value'));
     }
 
     public function test_other_email_errors_do_not_show_the_sign_in_notice(): void
