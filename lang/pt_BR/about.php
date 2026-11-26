@@ -7,6 +7,6 @@ return [
     | responsável. Vazio, a seção mostra só o nome e o papel; nenhum parágrafo é impresso. Não
     | preencher com o que não for verdade: o texto aparece como está, em uma única linha de parágrafo.
     */
-    'author_bio' => '',
+    'author_bio' => 'Felipe é desenvolvedor de software e programa o app e o site do RevisaLog.',
 
 ];

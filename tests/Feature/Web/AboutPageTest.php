@@ -55,23 +55,22 @@ class AboutPageTest extends TestCase
             ->assertDontSee('revisado por', false);
     }
 
-    public function test_author_section_has_the_anchor_name_and_no_bio_by_default(): void
+    public function test_author_section_has_the_anchor_name_and_the_bio(): void
     {
         $page = $this->page($this->get(route('about'))->assertOk());
         $section = $this->element($page, 'section#autor');
 
         $this->assertSame('Felipe Gonçalves', $this->text($this->element($section, '[data-slot="about-author-name"]')));
-        $this->assertNull($section->querySelector('[data-slot="about-author-bio"]'));
-        $this->assertSame('', trim((string) __('about.author_bio')));
+        $this->assertSame(__('about.author_bio'), $this->text($this->element($section, '[data-slot="about-author-bio"]')));
     }
 
-    public function test_author_bio_renders_only_when_the_language_line_is_filled(): void
+    public function test_author_section_prints_no_bio_paragraph_when_the_language_line_is_empty(): void
     {
-        app('translator')->addLines(['about.author_bio' => 'Texto de apresentação escrito pelo responsável.'], 'pt_BR');
+        app('translator')->addLines(['about.author_bio' => ''], 'pt_BR');
 
         $page = $this->page($this->get(route('about'))->assertOk());
 
-        $this->assertSame('Texto de apresentação escrito pelo responsável.', $this->text($this->element($page, '[data-slot="about-author-bio"]')));
+        $this->assertNull($this->element($page, 'section#autor')->querySelector('[data-slot="about-author-bio"]'));
     }
 
     public function test_about_page_is_in_the_sitemap_footer_and_llms_txt(): void
