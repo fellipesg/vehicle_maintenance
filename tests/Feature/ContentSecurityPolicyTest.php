@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BlogPost;
 use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\User;
@@ -140,8 +141,14 @@ class ContentSecurityPolicyTest extends TestCase
     public function test_page_with_ads_gets_the_wider_policy_for_creatives(): void
     {
         config(['services.google_adsense.client' => 'ca-pub-1234567890123456']);
+        $article = BlogPost::factory()->create();
 
-        $policy = $this->policyOf($this->get(route('blog.index')));
+        $response = $this->get(route('blog.show', $article));
+
+        // Sem isto um 500 passaria por política fechada e a falha apontaria para o lugar errado.
+        $response->assertOk();
+
+        $policy = $this->policyOf($response);
 
         // Criativo e iframe de anúncio vêm de domínio que não se enumera.
         $this->assertContains('https:', $this->sourcesOf($policy, 'img-src'));
@@ -154,13 +161,31 @@ class ContentSecurityPolicyTest extends TestCase
         $this->assertStringNotContainsString("'unsafe-inline'", $scriptSrc);
     }
 
-    public function test_blog_without_adsense_configured_keeps_the_closed_list(): void
+    public function test_article_without_adsense_configured_keeps_the_closed_list(): void
     {
         config(['services.google_adsense.client' => null]);
+        $article = BlogPost::factory()->create();
 
-        $policy = $this->policyOf($this->get(route('blog.index')));
+        $policy = $this->policyOf($this->get(route('blog.show', $article)));
 
         $this->assertNotContains('https:', $this->sourcesOf($policy, 'img-src'));
+    }
+
+    /**
+     * O perfil largo segue o anúncio, não a seção: a listagem do blog não carrega AdSense
+     * (GoogleAdsense::ROUTES, hoje só blog.show) e fica fechada mesmo com o cliente configurado.
+     */
+    public function test_blog_listing_has_no_ads_and_keeps_the_closed_list(): void
+    {
+        config(['services.google_adsense.client' => 'ca-pub-1234567890123456']);
+
+        $response = $this->get(route('blog.index'));
+
+        $response->assertOk();
+        $policy = $this->policyOf($response);
+
+        $this->assertNotContains('https:', $this->sourcesOf($policy, 'img-src'));
+        $this->assertNotContains('https:', $this->sourcesOf($policy, 'frame-src'));
     }
 
     public function test_authenticated_portal_page_gets_the_closed_list(): void

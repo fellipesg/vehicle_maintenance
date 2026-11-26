@@ -16,12 +16,12 @@ use Illuminate\Support\Str;
  * Os hosts listados em script-src são o degrau para navegador sem `'strict-dynamic'` (Safari < 15.4,
  * que entende nonce mas ignora a palavra): lá a lista vale, nos atuais ela é ignorada.
  *
- * Dois perfis, porque anúncio e portal não cabem na mesma política:
- * páginas do blog com AdSense (GoogleAdsense::ROUTES) liberam img/frame/connect para `https:`,
- * porque criativo e iframe de anúncio vêm de domínio que não se enumera; o resto do site — e todo
- * portal autenticado, onde estão chassi, RENAVAM, documento do proprietário e nota fiscal — fica na
- * lista fechada. Em navegador com `'strict-dynamic'` nem o perfil do anúncio aceita script injetado
- * sem nonce, que é o vetor que interessa.
+ * Dois perfis, porque anúncio e portal não cabem na mesma política: a página que carrega AdSense
+ * (GoogleAdsense::ROUTES, hoje só o artigo do blog) libera img/frame/connect para `https:`, porque
+ * criativo e iframe de anúncio vêm de domínio que não se enumera; o resto do site — e todo portal
+ * autenticado, onde estão chassi, RENAVAM, documento do proprietário e nota fiscal — fica na lista
+ * fechada. Em navegador com `'strict-dynamic'` nem o perfil do anúncio aceita script injetado sem
+ * nonce, que é o vetor que interessa.
  */
 final class ContentSecurityPolicy
 {

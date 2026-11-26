@@ -30,7 +30,7 @@ Os oito blocos inline de hoje: `layouts/partials/shell-script`, `layouts/admin` 
 A política é `'nonce-…' 'strict-dynamic'`. Nos navegadores atuais o `'strict-dynamic'` **desliga a
 lista de hosts** do `script-src`: quem carrega é o nonce, e script que um script confiável injeta
 herda a confiança. É isso que deixa o gtag.js e o adsbygoogle.js puxarem os próprios arquivos de
-vários domínios do Google sem enumerar nenhum — medido: a página do blog termina com 3 scripts
+vários domínios do Google sem enumerar nenhum — medido: a página do artigo do blog termina com 3 scripts
 Google no DOM, mais que as 2 tags escritas na view.
 
 A armadilha é a consequência: `<script src="https://…">` escrito na view **não** passa pela lista de
@@ -62,7 +62,9 @@ página.
 ## Duas políticas: anúncio e portal não cabem na mesma
 
 Páginas com AdSense (`GoogleAdsense::isActiveOnCurrentPage()`, mesma fonte que decide o anúncio —
-não duplique a lista de rotas) liberam `img-src`, `frame-src` e `connect-src` para `https:`, porque
+não duplique a lista de rotas, que já mudou uma vez: o AdSense saiu da listagem do blog e ficou só
+no artigo, e a política acompanhou sem ninguém tocar nela) liberam `img-src`, `frame-src` e
+`connect-src` para `https:`, porque
 criativo e iframe de anúncio vêm de domínio que não se enumera. Todo o resto — e todo portal
 autenticado, onde estão chassi, RENAVAM, documento do proprietário e nota fiscal — fica na lista
 fechada. Mesmo no perfil do anúncio o `script-src` continua preso ao nonce, que é o vetor que
