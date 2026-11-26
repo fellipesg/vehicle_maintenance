@@ -25,3 +25,6 @@ variáveis que moldam o ambiente de teste: um shell que exporta o `.env` vence o
 inteira, com o mecanismo e o estrago no banco de desenvolvimento, está em `.ai/rules/ci.md`
 ("An exported environment variable beats `<env>` without `force`"). Ao mexer em um dos dois blocos,
 mantenha o outro em sincronia.
+
+## Servidor local com limite de upload de 20 MB
+`php artisan serve` não repassa flags `-d` ao processo filho (`php -S`), então `-d upload_max_filesize=20M` no comando dele não tem efeito e uploads acima de 2 MB falham localmente. O `composer run dev` sobe o servidor com `php -S` a partir de `public/`, usando `vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php` e as flags no próprio processo. Não volte a usar `artisan serve` com `-d` para testar upload de nota fiscal. A mensagem de erro em `StoresMaintenanceInvoices` aponta para `composer run dev`.
