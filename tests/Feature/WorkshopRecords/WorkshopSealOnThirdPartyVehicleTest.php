@@ -236,6 +236,35 @@ class WorkshopSealOnThirdPartyVehicleTest extends TestCase
     }
 
     /**
+     * Conta de oficina SEM linha em `workshops` não é oficina para o store da API: ela cai no
+     * Gate::authorize('addMaintenance'), que pede o veículo do próprio dono, e leva 403 no carro de
+     * terceiro. O store tinha um `if (! $user->workshop)` aninhado dentro de
+     * `if ($user->isWorkshop() && $user->workshop)` que nunca rodava — a condição externa já havia
+     * garantido a oficina. Este teste fixa quem responde o 403: o Gate, com a mensagem dele, e não
+     * um 'Workshop profile is required.' do ramo morto.
+     */
+    public function test_a_workshop_account_without_a_workshop_row_is_refused_by_the_gate(): void
+    {
+        [, $vehicle] = $this->ownedVehicle();
+
+        $workshopUser = $this->workshopAccount();
+        $workshopUser->workshop->delete();
+
+        $response = $this->actingAs($workshopUser->fresh())
+            ->postJson('/api/v1/maintenances', [
+                'vehicle_id' => $vehicle->id,
+                'maintenance_type' => 'Revisão geral',
+                'maintenance_date' => now()->toDateString(),
+                'kilometers' => 55_000,
+                'service_category' => 'mechanical',
+            ])
+            ->assertStatus(403);
+
+        $this->assertNotSame('Workshop profile is required.', $response->json('message'));
+        $this->assertSame(0, Maintenance::query()->count());
+    }
+
+    /**
      * @return array{0: User, 1: Vehicle}
      */
     private function ownedVehicle(): array
