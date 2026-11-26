@@ -5,6 +5,14 @@
 
     O PDF nunca sai pelo caminho do storage: o link é route('inspections.report'), atrás da
     VehicleInspectionPolicy::viewReport (.ai/rules/views.md).
+
+    O laudo inteiro é sempre do emissor; o **veículo** de terceiro não é. A placa de hoje depende de
+    $showsFullVehicle, o mesmo mascaramento da etapa 1 (.ai/rules/public-lookup.md): sem vínculo ela
+    não sai, senão emitir um laudo com uma placa antiga viraria oráculo de rotação de placa.
+
+    $viewerIsWorkshop existe porque esta tela também abre para quem chegou pelo ramo de tenant da
+    VehicleInspectionPolicy::view (conta de oficina ainda sem oficina cadastrada): a explicação da
+    placa oculta não pode falar de "a sua oficina" para quem não tem uma.
 --}}
 @extends('layouts.app')
 
@@ -72,7 +80,13 @@
                         <dd class="mt-0.5 text-foreground">
                             {{ $vehicleName }}
                             @if($vehicle && filled($vehicle->license_plate))
-                                <span class="font-mono text-xs tracking-wider text-muted-foreground"><span class="sr-only">Placa </span>{{ $vehicle->license_plate }}</span>
+                                @if($showsFullVehicle)
+                                    <span class="font-mono text-xs tracking-wider text-muted-foreground"><span class="sr-only">Placa </span>{{ $vehicle->license_plate }}</span>
+                                @elseif($viewerIsWorkshop)
+                                    <span class="text-xs text-muted-foreground" data-vehicle-plate-withheld>Placa não exibida: a sua oficina não tem OS deste veículo.</span>
+                                @else
+                                    <span class="text-xs text-muted-foreground" data-vehicle-plate-withheld>Placa não exibida: o veículo não está na sua conta.</span>
+                                @endif
                             @endif
                         </dd>
                     </div>

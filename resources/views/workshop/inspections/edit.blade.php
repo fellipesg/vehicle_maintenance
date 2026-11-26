@@ -35,11 +35,13 @@
             @include('workshop._vehicle-step', [
                 'context' => 'inspection',
                 'vehicle' => $vehicle,
-                'licensePlate' => $vehicle?->license_plate ?? '',
+                // Emitir o laudo não é vínculo com o veículo: não cria OS, e tratá-lo como
+                // vínculo faria desta tela o oráculo de rotação de placa que a etapa 1 fecha
+                // (.ai/rules/public-lookup.md). Sem vínculo, a placa de hoje não entra no HTML.
+                'licensePlate' => $showsFullVehicle ? ($vehicle?->license_plate ?? '') : '',
                 'lookup' => null,
                 'vehicleHasOwner' => true,
-                // A edição só abre para a oficina que emitiu o laudo: o vínculo com o veículo existe.
-                'showsFullVehicle' => true,
+                'showsFullVehicle' => $showsFullVehicle,
                 'readonly' => true,
             ])
 

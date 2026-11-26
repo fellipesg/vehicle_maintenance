@@ -9,7 +9,9 @@
       quilometragem, e "Trocar veículo". Na edição ($readonly) o card não tem troca.
       Sem $showsFullVehicle (veículo achado pela placa e sem OS desta oficina — com dono ou sem, ver
       App\Support\Workshop\WorkshopVehicleVisibility) o card fica no que a consulta pública mostra:
-      a placa de volta é a que foi digitada, nunca a atual do veículo, e a quilometragem sai.
+      a placa de volta é a que foi digitada, nunca a atual do veículo, e a quilometragem sai. Na
+      edição de um laudo não há placa digitada: sem vínculo o card diz "Placa não exibida", que é
+      outra coisa de "Placa não informada" (o veículo cadastrado pelo chassi, que não tem placa).
 
     Pelo chassi (?chassis=): veículo com proprietário não mostra nada do carro (só manda usar a placa);
     sem proprietário é reaproveitado e aparece inteiro (os 17 caracteres exatos são a posse do carro);
@@ -41,6 +43,9 @@
     $matchedPreviousPlate = ($lookup ?? null)?->matchedBy === VehicleLookupResult::MATCH_PREVIOUS_PLATE;
     // Sem acesso ao veículo inteiro, a placa que volta é a que a oficina digitou: ela já a conhece.
     $plateOnCard = $showsFullVehicle ? $vehicle?->license_plate : ($licensePlate !== '' ? $licensePlate : null);
+    // Veículo com placa, mas sem placa a devolver: a edição de um laudo cujo emissor não tem
+    // vínculo com o veículo. "Não informada" diria que o carro não tem placa, o que é outra coisa.
+    $plateWithheld = $plateOnCard === null && ! $showsFullVehicle && filled($vehicle?->license_plate);
     $inviteText = $isInspection
         ? 'Crie sua conta grátis no RevisaLog e adicione o seu veículo para receber o laudo da vistoria e o histórico de manutenção: '.route('register')
         : 'Crie sua conta grátis no RevisaLog e adicione o seu veículo para receber o histórico de manutenção com o Selo da oficina: '.route('register');
@@ -59,6 +64,8 @@
                 <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     @if(filled($plateOnCard))
                         <span class="rounded-md border border-border-strong bg-surface px-1.5 py-px font-mono text-xs tracking-wider text-foreground"><span class="sr-only">Placa </span>{{ $plateOnCard }}</span>
+                    @elseif($plateWithheld)
+                        <span class="text-muted-foreground" data-vehicle-plate-withheld>Placa não exibida</span>
                     @else
                         <span class="text-muted-foreground">Placa não informada</span>
                     @endif

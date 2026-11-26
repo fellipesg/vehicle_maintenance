@@ -3,12 +3,20 @@
 namespace App\Support\Workshop;
 
 use App\Models\Maintenance;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Workshop;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
  * O que a oficina pode saber de um veículo que ela só consultou pela placa.
+ *
+ * Vale para a etapa 1 (Nova OS e Nova vistoria) e para as três telas de laudo da oficina — lista,
+ * detalhe e edição. Elas imprimiam `vehicles.license_plate` direto, e isso é um oráculo de rotação
+ * de placa: emitir laudo **não** cria OS, então quem digita uma placa antiga que conhece, emite um
+ * laudo e volta à própria lista passaria a ler a placa de hoje daquele carro — e a continuaria lendo
+ * depois de o carro ser vendido. O laudo inteiro é do emissor
+ * (VehicleInspection::showsFullReportTo); o veículo de terceiro segue esta régua.
  *
  * A busca da nova OS (/oficina/manutencoes/nova) é aberta a qualquer oficina aprovada (o prefixo
  * /oficina leva o middleware workshop.approved), e aprovação é cadastro conferido, não vínculo com
@@ -41,15 +49,96 @@ final class WorkshopVehicleVisibility
             return true;
         }
 
-        if ($workshop === null) {
-            return false;
+        return self::linkedVehicleIds($workshop, [$vehicle->id]) !== [];
+    }
+
+    /**
+     * Quais destes veículos a oficina tem vínculo com, em **uma** consulta.
+     *
+     * Existe para a lista de laudos (/oficina/vistorias): perguntar veículo por veículo seria uma
+     * consulta por linha, e a resposta tem de ser a mesma de `showsFullVehicle` — daí ser este o
+     * único lugar onde o SQL do vínculo mora. Não há `$foundByFullChassis` aqui: a posse que libera
+     * o card na etapa 1 é a consulta exata de 17 caracteres daquele instante, e nada a registra
+     * para depois. Uma lista é sempre o depois.
+     *
+     * @param  list<int>  $vehicleIds
+     * @return list<int>
+     */
+    /**
+     * Quais destes veículos o **leitor** das telas de laudo alcança por inteiro, placa atual
+     * incluída, em duas consultas no total.
+     *
+     * Duas coisas liberam o veículo, e é a união delas: o vínculo de oficina (abaixo) e a posse de
+     * hoje — a tenant do leitor ser a dona atual. Só o vínculo esconderia a placa do próprio dono:
+     * o laudo que a oficina emitiu sobre carro de terceiro continua na tela dela depois de a tenant
+     * dela comprar o carro, estado que `VehicleInspectionPolicy::canChange` já prevê
+     * (`DENIED_OWN_VEHICLE`). E só a posse esconderia a placa da oficina que atendeu o carro.
+     *
+     * É uma pergunta só, usada pela lista e pelo detalhe, porque duas contas separadas é como as
+     * duas telas passam a discordar — foi assim que a placa sumiu para o dono na primeira versão
+     * disto. O termo de posse é mais estreito que `VehiclePolicy::viewFullHistory` de propósito:
+     * nunca mostra mais, e os outros braços daquele gate (admin, consignação do lojista) não
+     * alcançam uma rota com `user.type:workshop`.
+     *
+     * @param  list<int>  $vehicleIds
+     * @return list<int>
+     */
+    public static function fullVehicleIdsFor(?Workshop $workshop, ?User $viewer, array $vehicleIds): array
+    {
+        return array_values(array_unique(array_merge(
+            self::linkedVehicleIds($workshop, $vehicleIds),
+            self::ownedVehicleIds($viewer, $vehicleIds),
+        )));
+    }
+
+    /**
+     * O leitor alcança este veículo por inteiro? Mesma conta de `fullVehicleIdsFor`, para uma linha.
+     */
+    public static function showsFullVehicleTo(?Workshop $workshop, ?User $viewer, Vehicle $vehicle): bool
+    {
+        return in_array($vehicle->id, self::fullVehicleIdsFor($workshop, $viewer, [$vehicle->id]), true);
+    }
+
+    /**
+     * Os veículos desta lista de que a tenant do leitor é dona **atual**, em uma consulta. Espelha
+     * `VehiclePolicy::viewFullHistory` → `tenantOwnsVehicle`, inclusive o `whereRaw` do booleano.
+     *
+     * @param  list<int>  $vehicleIds
+     * @return list<int>
+     */
+    private static function ownedVehicleIds(?User $viewer, array $vehicleIds): array
+    {
+        $vehicleIds = array_values(array_unique(array_filter($vehicleIds)));
+
+        if ($viewer === null || ! $viewer->tenant_id || $vehicleIds === []) {
+            return [];
+        }
+
+        return $viewer->vehicles()
+            ->whereIn('vehicles.id', $vehicleIds)
+            ->whereRaw('user_vehicles.is_current_owner = true')
+            ->wherePivot('tenant_id', $viewer->tenant_id)
+            ->pluck('vehicles.id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+    }
+
+    public static function linkedVehicleIds(?Workshop $workshop, array $vehicleIds): array
+    {
+        $vehicleIds = array_values(array_unique(array_filter($vehicleIds)));
+
+        if ($workshop === null || $vehicleIds === []) {
+            return [];
         }
 
         return Maintenance::query()
-            ->where('vehicle_id', $vehicle->id)
+            ->whereIn('vehicle_id', $vehicleIds)
             ->where(fn (Builder $query) => $query
                 ->where('workshop_id', $workshop->id)
                 ->orWhere('verified_workshop_id', $workshop->id))
-            ->exists();
+            ->distinct()
+            ->pluck('vehicle_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
     }
 }

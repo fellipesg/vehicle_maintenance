@@ -11,6 +11,7 @@ use App\Models\Maintenance;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleInspection;
+use App\Models\VehiclePlate;
 use App\Models\Workshop;
 use App\Support\AppStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -516,6 +517,221 @@ class WorkshopInspectionScreenTest extends TestCase
         $this->actingAs($otherUser->fresh())->get($url)->assertForbidden();
         $this->post('/logout');
         $this->get($url)->assertRedirect();
+    }
+
+    /**
+     * As três telas de laudo da oficina (lista, detalhe, edição) seguem o mascaramento da etapa 1.
+     *
+     * Elas imprimiam `vehicles.license_plate` direto, e emitir laudo **não** cria OS: o emissor não
+     * ganha vínculo por esse caminho, então quem emitia um laudo passava a ler na própria tela a
+     * placa de hoje de um carro de terceiro. O laudo inteiro continua sendo do emissor
+     * (showsFullReportTo); o veículo não.
+     */
+    public function test_the_laudo_screens_mask_the_current_plate_for_a_workshop_without_a_link(): void
+    {
+        $this->enableVehicleInspectionsForEveryone();
+        [$user, $workshop] = $this->workshop();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        $inspection = $this->issuedLaudo($vehicle, $workshop);
+
+        $list = $this->actingAs($user->fresh())->get('/oficina/vistorias')->assertOk();
+        $list->assertSee($inspection->verification_code);
+        $list->assertDontSee('ABC1D23');
+
+        $show = $this->actingAs($user->fresh())->get('/oficina/vistorias/'.$inspection->id)->assertOk();
+        $show->assertSee('data-vehicle-plate-withheld', false);
+        $show->assertDontSee('ABC1D23');
+
+        $edit = $this->actingAs($user->fresh())->get('/oficina/vistorias/'.$inspection->id.'/editar')->assertOk();
+        $edit->assertSee('data-vehicle-plate-withheld', false);
+        $edit->assertDontSee('ABC1D23');
+    }
+
+    public function test_the_laudo_screens_show_the_current_plate_to_the_workshop_that_served_the_vehicle(): void
+    {
+        $this->enableVehicleInspectionsForEveryone();
+        [$user, $workshop] = $this->workshop();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        $inspection = $this->issuedLaudo($vehicle, $workshop);
+
+        // O vínculo é o mesmo da MaintenancePolicy: OS registrada (ou selada) por esta oficina.
+        Maintenance::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'workshop_id' => $workshop->id,
+        ]);
+
+        $this->actingAs($user->fresh())->get('/oficina/vistorias')
+            ->assertOk()
+            ->assertSee('ABC1D23')
+            ->assertDontSee('data-vehicle-plate-withheld', false);
+
+        $this->actingAs($user->fresh())->get('/oficina/vistorias/'.$inspection->id)
+            ->assertOk()
+            ->assertSee('ABC1D23')
+            ->assertDontSee('data-vehicle-plate-withheld', false);
+
+        $this->actingAs($user->fresh())->get('/oficina/vistorias/'.$inspection->id.'/editar')
+            ->assertOk()
+            ->assertSee('ABC1D23')
+            ->assertDontSee('data-vehicle-plate-withheld', false);
+    }
+
+    /**
+     * O oráculo de rotação de placa, pelo preço de um laudo: a oficina digita uma placa **antiga**
+     * que conhece (a etapa 1 aceita e só ecoa o digitado), emite o laudo e, se as telas lessem
+     * `vehicles.license_plate`, leria a placa de hoje daquele carro — e continuaria lendo depois de
+     * o carro ser vendido. Nenhuma superfície da oficina revela a placa nova.
+     */
+    public function test_issuing_a_laudo_with_an_old_plate_never_reveals_the_current_one(): void
+    {
+        $this->enableVehicleInspectionsForEveryone();
+        [$user] = $this->workshop();
+
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'XYZ9K88']);
+        VehiclePlate::create([
+            'vehicle_id' => $vehicle->id,
+            'plate' => 'ABC1D23',
+            'started_at' => now()->subYears(3),
+            'ended_at' => now()->subYear(),
+            'source' => 'manual',
+        ]);
+
+        // A etapa 1 já devolve só a placa digitada, e diz que a atual é outra sem dizer qual.
+        $this->actingAs($user->fresh())->get('/oficina/vistorias/nova?license_plate=ABC1D23')
+            ->assertOk()
+            ->assertSee('data-vehicle-found', false)
+            ->assertSee('o veículo usa outra placa hoje')
+            ->assertDontSee('XYZ9K88');
+
+        $this->actingAs($user->fresh())
+            ->post('/oficina/vistorias', $this->payload(['license_plate' => 'ABC1D23']))
+            ->assertRedirect();
+
+        $inspection = VehicleInspection::query()->sole();
+        $this->assertSame($vehicle->id, $inspection->vehicle_id);
+
+        foreach ([
+            '/oficina/vistorias',
+            '/oficina/vistorias/'.$inspection->id,
+            '/oficina/vistorias/'.$inspection->id.'/editar',
+        ] as $url) {
+            $this->actingAs($user->fresh())->get($url)
+                ->assertOk()
+                ->assertDontSee('XYZ9K88');
+        }
+
+        // E a página pública do laudo nunca mostra placa nenhuma (.ai/rules/public-lookup.md).
+        $public = $this->get(route('inspections.public', $inspection->verification_code))->assertOk();
+        $public->assertDontSee('XYZ9K88');
+        $public->assertDontSee('ABC1D23');
+    }
+
+    /**
+     * O espelho do caso acima, e o que a primeira versão desta correção errava: a oficina **tem**
+     * oficina cadastrada, não tem OS no veículo, e a tenant dela virou a dona atual do carro depois
+     * de ter emitido o laudo — estado que VehicleInspectionPolicy::canChange já prevê
+     * (DENIED_OWN_VEHICLE). Perguntar só vínculo de oficina esconderia dela a placa do carro que é
+     * dela, e que ela lê na própria ficha do veículo. Lista e detalhe respondem igual.
+     */
+    public function test_the_issuing_workshop_whose_tenant_now_owns_the_vehicle_sees_the_plate(): void
+    {
+        $this->enableVehicleInspectionsForEveryone();
+        [$user, $workshop] = $this->workshop();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        $inspection = $this->issuedLaudo($vehicle, $workshop);
+
+        // Sem OS nenhuma desta oficina no veículo: o vínculo não existe, a posse sim.
+        $this->attachVehicleToUser($user, $vehicle);
+
+        $this->actingAs($user->fresh())->get('/oficina/vistorias/'.$inspection->id)
+            ->assertOk()
+            ->assertSee('ABC1D23')
+            ->assertDontSee('data-vehicle-plate-withheld', false);
+
+        $this->actingAs($user->fresh())->get('/oficina/vistorias')
+            ->assertOk()
+            ->assertSee('ABC1D23');
+
+        $this->assertSame(0, $vehicle->maintenances()->count());
+    }
+
+    /**
+     * O detalhe também abre para quem **não** é a oficina emissora: com a conta ainda sem oficina
+     * cadastrada (EnsureWorkshopApproved deixa passar, é o onboarding), VehicleInspectionPolicy
+     * ::view cai em isVisibleInHistoryTo, cujo ramo de tenant compara o tenant do dono **na
+     * emissão**. Perguntar vínculo de oficina a quem não tem oficina esconderia a placa do próprio
+     * dono — e a explicação não pode falar de "a sua oficina" para quem não tem uma.
+     */
+    public function test_the_owning_tenant_without_a_workshop_profile_still_sees_the_plate(): void
+    {
+        [$user, $workshop] = $this->workshop();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        $this->attachVehicleToUser($user, $vehicle);
+        $inspection = $this->issuedLaudo($vehicle, $workshop, ['tenant_id' => $user->tenant_id]);
+
+        // A conta de oficina ainda não cadastrou a oficina: a policy deixa de ser a da emissora.
+        $workshop->delete();
+
+        $this->actingAs($user->fresh())->get('/oficina/vistorias/'.$inspection->id)
+            ->assertOk()
+            ->assertSee('ABC1D23')
+            ->assertDontSee('data-vehicle-plate-withheld', false);
+    }
+
+    /**
+     * E o outro lado do mesmo ramo: o tenant que era dono **na emissão** e vendeu o carro. Ele
+     * continua alcançando o laudo (o tenant do laudo não muda), mas a placa de hoje é do dono de
+     * hoje — entregá-la ali seria o furo da rotação de placa pela porta do ex-dono. A explicação
+     * também não fala de oficina, porque esta conta não tem uma.
+     */
+    public function test_the_tenant_that_sold_the_vehicle_does_not_learn_the_new_plate(): void
+    {
+        [$seller, $workshop] = $this->workshop();
+        $buyer = User::factory()->asUser()->create();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'XYZ9K88']);
+        $this->attachVehicleToUser($buyer, $vehicle);
+        $inspection = $this->issuedLaudo($vehicle, $workshop, ['tenant_id' => $seller->tenant_id]);
+
+        $workshop->delete();
+
+        $response = $this->actingAs($seller->fresh())->get('/oficina/vistorias/'.$inspection->id)
+            ->assertOk()
+            ->assertSee('data-vehicle-plate-withheld', false);
+
+        $response->assertDontSee('XYZ9K88');
+        $response->assertDontSee('a sua oficina');
+        $response->assertSee('o veículo não está na sua conta');
+    }
+
+    /**
+     * O admin não entra nessa régua: /admin/vistorias é a tela da equipe, que vê o laudo suprimido
+     * e identifica o veículo pela placa (.ai/rules/admin.md).
+     */
+    public function test_the_staff_inspection_list_still_shows_the_plate(): void
+    {
+        [, $workshop] = $this->workshop();
+        $vehicle = Vehicle::factory()->create(['license_plate' => 'ABC1D23']);
+        $this->issuedLaudo($vehicle, $workshop);
+
+        $this->actingAs(User::factory()->asUser()->asAdmin()->create()->fresh())
+            ->get(route('admin.inspections.index'))
+            ->assertOk()
+            ->assertSee('ABC1D23');
+    }
+
+    /**
+     * Um laudo como a emissão o deixa: sem OS nenhuma do emissor no veículo, que é o estado de quem
+     * só emitiu laudo — emitir não cria OS.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function issuedLaudo(Vehicle $vehicle, Workshop $workshop, array $overrides = []): VehicleInspection
+    {
+        return VehicleInspection::factory()->create(array_merge([
+            'vehicle_id' => $vehicle->id,
+            'workshop_id' => $workshop->id,
+            'workshop_name' => $workshop->name,
+        ], $overrides));
     }
 
     /**

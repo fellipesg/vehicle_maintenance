@@ -52,6 +52,74 @@ reimplementá-la pela metade. Note que o POST ainda revela o piso do hodômetro 
 `VehicleMileageService::assertMaintenanceKilometers`, com o custo de `throttle:uploads` e de uma
 tentativa de OS.
 
+## O mascaramento não acaba na etapa 1: as telas de laudo também respondem a ele
+A etapa 1 era o único lugar que chamava a conta, e isso deixou um furo nas **três** telas de vistoria
+da oficina — `/oficina/vistorias` (lista), o detalhe e a edição. Elas imprimiam
+`$vehicle->license_plate`, a placa de **hoje**, direto da tabela `vehicles`. O que fecha o furo não é
+ter emitido o laudo: **emitir laudo não cria OS**, então o emissor não ganha `workshop_id` nem
+`verified_workshop_id` em nada, e `WorkshopVehicleVisibility::showsFullVehicle` continua devolvendo
+false para ele. Tratar a emissão como vínculo faria dela um **oráculo de rotação de placa pelo preço
+de um laudo**: a oficina digita uma placa antiga que conhece (a etapa 1 aceita e só ecoa o digitado,
+porque `VehiclePlateSearch::findByPlate` resolve o veículo pela placa antiga), emite o laudo e passa a
+ler na própria lista a placa atual daquele carro — e continua lendo depois de o carro ser vendido.
+
+A régua é a de `VehicleInspection::showsFullReportTo` partida em duas: o **laudo** é sempre inteiro
+para quem o assinou (foi ela que escreveu a prosa e é ela quem corrige, mesmo sem vínculo e mesmo
+suprimido), e o **veículo de terceiro** não é. São perguntas diferentes, e a edição afirmava
+`'showsFullVehicle' => true` com o comentário "a edição só abre para quem emitiu, então o vínculo
+existe" — a premissa errada, em uma linha.
+
+**O laudo não guarda a placa da emissão, e não é hora de guardar.** Ele desnormaliza `workshop_name`
+(para sobreviver à exclusão da oficina), mas placa nenhuma, e as três razões se somam: laudo já
+emitido não tem backfill honesto — a única fonte seria `vehicles.license_plate`, a placa de hoje, que
+é justamente o vazamento; `/laudo/{código}` não mostra placa nenhuma (a seção abaixo), então a coluna
+só seria convidada para lá; e o veículo que a oficina cadastra pelo chassi nasce **sem** placa de
+propósito (`WorkshopVehicleRegistrar`, LGPD art. 6º III), que é exatamente o caso em que a oficina
+mais precisaria do rótulo. Sem vínculo, então, a placa atual **sai da tela**, como em toda superfície
+pública — e sem máscara parcial: não existe máscara de placa no projeto, e o docblock de
+`VehicleIdentifierMask::chassis` já explica por que revelar pedaço de identificador curto vira
+oráculo de tentativa. Sete caracteres não sobrevivem a isso.
+
+**Vínculo de oficina não é a conta inteira: é a união dele com a posse de hoje.** Só o vínculo
+esconde a placa do **próprio dono**, em dois caminhos que o código já prevê. A oficina que emitiu o
+laudo sobre carro de terceiro e cuja tenant **comprou o carro depois** continua com o laudo na tela
+(`VehicleInspectionPolicy::canChange` trata esse estado com `DENIED_OWN_VEHICLE`) e lê a placa na
+ficha do veículo — esconder ali seria incoerência visível. E a conta que ainda **não** cadastrou
+oficina (o onboarding, que `EnsureWorkshopApproved` deixa passar de propósito) chega ao detalhe pelo
+ramo de tenant de `isVisibleInHistoryTo`, que `VehicleInspectionPolicy::view` só consulta nesse caso.
+Esse ramo compara o tenant do dono **na emissão**, então aceitá-lo como resposta entregaria a placa de
+hoje a quem já vendeu o carro: o mesmo furo pelo outro lado. Por isso a pergunta é uma só,
+`WorkshopVehicleVisibility::fullVehicleIdsFor` (vínculo ∪ posse atual), usada pela lista **e** pelo
+detalhe — duas contas separadas é como as duas telas passam a discordar, e foi assim que a placa sumiu
+para o dono na primeira versão disto. O termo de posse é mais estreito que
+`VehiclePolicy::viewFullHistory` de propósito: nunca mostra mais, e os outros braços daquele gate
+(admin, consignação do lojista) não alcançam uma rota com `user.type:workshop`.
+
+A explicação da placa oculta é condicional (`$viewerIsWorkshop`): dizer "a sua oficina não tem OS
+deste veículo" a quem não tem oficina é afirmação falsa na tela.
+
+Duas armadilhas de desenho ficaram fixadas em teste
+(`tests/Feature/Inspection/WorkshopInspectionScreenTest.php`):
+
+- **Nada de `$foundByFullChassis` depois da etapa 1.** A posse dos 17 caracteres libera o card no
+  instante da busca, e nada a registra para depois — e uma lista é sempre o depois. Passá-la ali
+  entregaria a placa que o **dono** cadastrou meses depois no veículo que a oficina criou pelo
+  chassi, que é a metade "carro vendido" do mesmo furo.
+- **"Placa não exibida" não é "Placa não informada".** A segunda é o veículo que não tem placa (o
+  cadastrado pelo chassi); usar a mesma frase para o mascaramento afirmaria que o carro não tem
+  placa. O card compartilhado distingue as duas (`$plateWithheld`).
+
+O SQL do vínculo mora em um lugar só, como a conta da etapa 1: `WorkshopVehicleVisibility`
+`::linkedVehicleIds` resolve a página inteira da lista em **uma** consulta e `showsFullVehicle`
+delega — chamar a versão singular por linha seria uma consulta por laudo, e duas definições de
+"vínculo" é como a próxima tela esquece uma delas.
+
+As telas de **OS** da oficina (lista, detalhe, edição, fila de validações) imprimem a placa e estão
+certas por construção, não por sorte: todas filtram por `workshop_id` (`$workshop->maintenances()`,
+`maintenancesAwaitingReview`), que é a própria condição de vínculo — não há caso sem vínculo para
+alcançar. `/admin/vistorias` mostra a placa de propósito, e o PDF do histórico fica atrás de
+`Gate viewFullHistory` em `VehiclePdfExportService::createExport`, que oficina sem vínculo não passa.
+
 ## A conferência pública tem dois documentos, e um campo só
 `/verificar` é o único campo público de código, e o produto tem dois: `RVL`, o Selo da oficina
 (`/v/{código}`), e `LDO`, o laudo de vistoria cautelar (`/laudo/{código}`,

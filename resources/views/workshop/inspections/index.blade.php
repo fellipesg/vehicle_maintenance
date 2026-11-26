@@ -67,6 +67,10 @@
                         @php
                             $rowVehicle = $inspection->vehicle;
                             $rowVerdict = $inspection->verdict;
+                            // A placa atual é do mascaramento, não de ter emitido o laudo: emitir
+                            // não cria OS. Vínculo de oficina **ou** posse de hoje, a mesma conta do
+                            // detalhe (ver o docblock do InspectionController).
+                            $rowShowsPlate = $rowVehicle && in_array($rowVehicle->id, $fullVehicleIds, true);
                         @endphp
                         <tr data-inspection-row="{{ $inspection->id }}">
                             <td class="whitespace-nowrap">
@@ -81,7 +85,7 @@
                                 @if($rowVehicle)
                                     <span class="flex flex-col items-end md:items-start">
                                         <span class="text-foreground">{{ trim($rowVehicle->brand.' '.$rowVehicle->model) }}</span>
-                                        @if(filled($rowVehicle->license_plate))
+                                        @if($rowShowsPlate && filled($rowVehicle->license_plate))
                                             <span class="font-mono text-xs tracking-wider text-muted-foreground"><span class="sr-only">Placa </span>{{ $rowVehicle->license_plate }}</span>
                                         @endif
                                     </span>

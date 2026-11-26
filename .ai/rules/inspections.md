@@ -145,6 +145,17 @@ atual e o hodômetro do veículo saem na tela. `WorkshopVehicleStep::none()` exi
 **não** vai mostrar resultado (conta sem a funcionalidade): consultar placa para depois não mostrar
 nada seria dar o oráculo de enumeração de graça a quem a tela já recusou.
 
+**O mascaramento não para na etapa 1.** As outras três telas — lista, detalhe e edição — imprimiam
+`$vehicle->license_plate` sem nunca chamar a conta, e o que as corrige não é ter emitido o laudo:
+emitir **não cria OS**, então o emissor não ganha vínculo por esse caminho e
+`WorkshopVehicleVisibility::showsFullVehicle` segue false para ele. Elas passam pela mesma régua
+(`InspectionController::showsFullVehicle`, e `linkedVehicleIds` para a lista, que resolve a página em
+uma consulta). É a partição de `showsFullReportTo` levada ao veículo: o **laudo** é sempre inteiro
+para quem o assinou, o **veículo** de terceiro não é — a edição afirmava `showsFullVehicle => true`
+dizendo "só abre para quem emitiu, então o vínculo existe", e era a premissa errada. O porquê, o que
+o laudo não persiste (placa nenhuma, só `workshop_name`) e por que não passa a persistir estão em
+`.ai/rules/public-lookup.md`.
+
 **O veredito vem depois dos achados, não antes.** O formulário é: 2 Vistoria (data, validade,
 hodômetro lido) · 3 Achados (os oito eixos) · 4 Veredito e laudo (resultado, resumo, PDF). Perguntar
 o resultado antes convida a marcar "Aprovado" e só então olhar item por item, que é a ordem que a

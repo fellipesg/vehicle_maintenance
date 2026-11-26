@@ -11,6 +11,7 @@ use App\Policies\VehicleInspectionPolicy;
 use App\Services\Inspection\VehicleInspectionService;
 use App\Services\Vehicle\WorkshopVehicleRegistrar;
 use App\Support\Workshop\WorkshopVehicleStep;
+use App\Support\Workshop\WorkshopVehicleVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,13 @@ use Illuminate\View\View;
  *
  * O veredito, os achados e o código público nunca são gravados daqui: quem escreve é o
  * VehicleInspectionService, que é quem recusa um "Aprovado" sobre um eixo reprovado.
+ *
+ * As quatro telas decidem a placa atual do veículo pelo **mesmo** mascaramento da etapa 1
+ * (App\Support\Workshop\WorkshopVehicleVisibility, .ai/rules/public-lookup.md), e não por ter
+ * emitido o laudo: emitir não cria OS, então o emissor não ganha vínculo por esse caminho, e tratar
+ * o laudo como vínculo faria da emissão um oráculo de rotação de placa — digita-se uma placa antiga
+ * que se conhece, emite-se um laudo e passa-se a ler a placa de hoje. O laudo inteiro é do emissor
+ * (VehicleInspection::showsFullReportTo); o veículo de terceiro não é.
  */
 class InspectionController extends Controller
 {
@@ -40,6 +48,7 @@ class InspectionController extends Controller
     {
         $workshop = $request->user()->workshop;
         $inspections = null;
+        $fullVehicleIds = [];
 
         if ($workshop !== null) {
             $inspections = $workshop->inspections()
@@ -48,11 +57,19 @@ class InspectionController extends Controller
                 ->orderByDesc('id')
                 ->paginate(15)
                 ->withQueryString();
+
+            // A página inteira em duas consultas, não duas por linha.
+            $fullVehicleIds = WorkshopVehicleVisibility::fullVehicleIdsFor(
+                $workshop,
+                $request->user(),
+                $inspections->pluck('vehicle_id')->all(),
+            );
         }
 
         return view('workshop.inspections.index', [
             'workshop' => $workshop,
             'inspections' => $inspections,
+            'fullVehicleIds' => $fullVehicleIds,
             'mayIssue' => Gate::allows('create', VehicleInspection::class),
         ]);
     }
@@ -148,6 +165,10 @@ class InspectionController extends Controller
         return view('workshop.inspections.show', [
             'inspection' => $inspection,
             'canManage' => Gate::allows('update', $inspection),
+            'showsFullVehicle' => $this->showsFullVehicle($request, $inspection),
+            // A tela é da oficina, mas o leitor pode ter chegado pelo ramo de tenant da policy: a
+            // explicação da placa oculta não pode falar de "a sua oficina" para quem não tem uma.
+            'viewerIsWorkshop' => $request->user()->workshop !== null,
         ]);
     }
 
@@ -161,6 +182,7 @@ class InspectionController extends Controller
             'inspection' => $inspection,
             'vehicle' => $inspection->vehicle,
             'workshop' => $request->user()->workshop,
+            'showsFullVehicle' => $this->showsFullVehicle($request, $inspection),
         ]);
     }
 
@@ -192,6 +214,29 @@ class InspectionController extends Controller
 
         return redirect()->route('workshop.inspections.index')
             ->with('success', 'Laudo excluído.');
+    }
+
+    /**
+     * Este leitor alcança a placa atual do veículo deste laudo?
+     *
+     * A mesma pergunta da lista (`WorkshopVehicleVisibility::fullVehicleIdsFor`), de propósito: a
+     * união do vínculo de oficina com a posse de hoje. Perguntar só o vínculo esconde a placa do
+     * próprio dono — a oficina cuja tenant comprou o carro depois de ter emitido o laudo, e a conta
+     * que ainda não cadastrou oficina e chegou aqui pelo ramo de tenant de
+     * `VehicleInspection::isVisibleInHistoryTo` (esse ramo compara o tenant do dono **na emissão**,
+     * então aceitar só ele entregaria a placa de hoje a quem já vendeu o carro: o mesmo furo pelo
+     * outro lado). Nada de `$foundByFullChassis`: a posse dos 17 caracteres libera o card no
+     * instante da busca da etapa 1, e nada a registra para depois.
+     */
+    private function showsFullVehicle(Request $request, VehicleInspection $inspection): bool
+    {
+        $vehicle = $inspection->vehicle;
+
+        return $vehicle !== null && WorkshopVehicleVisibility::showsFullVehicleTo(
+            $request->user()->workshop,
+            $request->user(),
+            $vehicle,
+        );
     }
 
     public static function chassisOwnedMessage(): string
