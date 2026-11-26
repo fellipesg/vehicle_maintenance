@@ -20,6 +20,7 @@ use App\Services\Crlv\CrlvApiImportStore;
 use App\Services\Maintenance\WorkshopRecordsArrivalNotifier;
 use App\Services\Vehicle\VehicleCoverService;
 use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Vehicle\VehicleOdometerLog;
 use App\Services\Vehicle\VehicleOwnershipService;
 use App\Services\Vehicle\VehiclePdfExportService;
 use App\Services\Vehicle\VehiclePlateHistoryService;
@@ -113,6 +114,18 @@ class VehicleController extends Controller
 
         $unclaimed = $request->unclaimedWorkshopVehicle();
 
+        // Teto de plausibilidade do hodômetro de cadastro, antes de gravar qualquer coisa: o número
+        // vira odometer_at_registration e o piso de toda OS seguinte (VehicleMileageService).
+        try {
+            app(VehicleMileageService::class)->assertOdometerKilometers(
+                (int) $data['current_kilometers'],
+                (int) $data['year'],
+                $unclaimed,
+            );
+        } catch (ValidationException $e) {
+            return ApiResponse::validation($e->errors());
+        }
+
         if ($unclaimed !== null) {
             // Chegada do proprietário a um veículo que a oficina criou pelo chassi: o vínculo não é
             // verificado, e os registros pendentes das oficinas esperam a decisão dele.
@@ -203,9 +216,33 @@ class VehicleController extends Controller
         $plateChangedAt = $validated['plate_changed_at'] ?? null;
         unset($validated['plate_changed_at']);
 
+        if (array_key_exists('current_kilometers', $validated)) {
+            try {
+                app(VehicleMileageService::class)->assertOdometerKilometers(
+                    (int) $validated['current_kilometers'],
+                    (int) ($validated['year'] ?? $vehicle->year),
+                    $vehicle,
+                );
+            } catch (ValidationException $e) {
+                return ApiResponse::validation($e->errors());
+            }
+        }
+
         $newPlate = $validated['license_plate'] ?? null;
         $previousPlate = $vehicle->license_plate;
         unset($validated['license_plate']);
+
+        // O hodômetro editado aqui vira **leitura**, não escrita direta na coluna: a coluna é
+        // derivada das leituras (VehicleMileageService::refreshCurrentKilometers), então gravá-la à
+        // mão era gravar um número que o recálculo apagava na mesma requisição — a edição não pegava
+        // e a resposta já saía com o valor antigo. Só registra quando muda: o app reenvia o campo
+        // inteiro a cada edição, e série temporal cheia de linhas idênticas é série que ninguém lê.
+        $reportedKilometers = array_key_exists('current_kilometers', $validated)
+            && (int) $validated['current_kilometers'] !== (int) $vehicle->current_kilometers
+                ? (int) $validated['current_kilometers']
+                : null;
+
+        unset($validated['current_kilometers']);
 
         $vehicle->update($validated);
 
@@ -220,7 +257,13 @@ class VehicleController extends Controller
             );
         }
 
-        if ($request->has('current_kilometers')) {
+        if ($reportedKilometers !== null) {
+            app(VehicleOdometerLog::class)->recordOwnerReport(
+                $vehicle->fresh(),
+                $reportedKilometers,
+                $request->user(),
+            );
+
             app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
         }
 

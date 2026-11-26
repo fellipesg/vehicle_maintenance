@@ -25,7 +25,7 @@ class WorkshopVehicleRegistrar
         ]);
 
         if ($kilometers > 0) {
-            $this->mileage->registerOdometer($vehicle, $kilometers);
+            $this->mileage->registerOdometer($vehicle, $kilometers, 'kilometers');
         }
 
         return $vehicle->refresh();

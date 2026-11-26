@@ -20,6 +20,8 @@ class VehicleOwnershipService
         private readonly CrlvExerciseValidator $exerciseValidator,
         private readonly VehiclePlateHistoryService $plateHistory,
         private readonly WorkshopRecordsArrivalNotifier $arrivalNotifier,
+        private readonly VehicleMileageService $mileage,
+        private readonly VehicleOdometerLog $odometerLog,
     ) {}
 
     /**
@@ -40,6 +42,13 @@ class VehicleOwnershipService
         if ($renavam === '' || $crvNumber === '') {
             throw new RuntimeException('RENAVAM e número do CRV são obrigatórios para o primeiro cadastro.');
         }
+
+        // O hodômetro do cadastro passa pelo teto de plausibilidade: ele vira
+        // odometer_at_registration, que é o piso de toda OS seguinte (VehicleMileageService).
+        $this->mileage->assertOdometerKilometers(
+            (int) ($vehicleData['current_kilometers'] ?? 0),
+            isset($vehicleData['year']) ? (int) $vehicleData['year'] : null,
+        );
 
         if ($chassis !== '' && Vehicle::findByChassis($chassis)) {
             throw new RuntimeException('Este veículo já está cadastrado. Envie o CRLV-e para vincular à sua conta.');
@@ -181,6 +190,14 @@ class VehicleOwnershipService
      */
     public function claimUnclaimedWorkshopVehicle(User $user, Vehicle $vehicle, array $vehicleData): Vehicle
     {
+        if (isset($vehicleData['current_kilometers'])) {
+            $this->mileage->assertOdometerKilometers(
+                (int) $vehicleData['current_kilometers'],
+                (int) ($vehicleData['year'] ?? $vehicle->year),
+                $vehicle,
+            );
+        }
+
         $vehicle = DB::transaction(function () use ($user, $vehicle, $vehicleData): Vehicle {
             $updates = [];
             $plate = VehiclePlateSearch::normalize((string) ($vehicleData['license_plate'] ?? ''));
@@ -194,10 +211,6 @@ class VehicleOwnershipService
                 if (filled($vehicleData[$field] ?? null) && blank($vehicle->{$field})) {
                     $updates[$field] = $vehicleData[$field];
                 }
-            }
-
-            if (isset($vehicleData['current_kilometers'])) {
-                $updates['current_kilometers'] = max((int) $vehicleData['current_kilometers'], (int) $vehicle->current_kilometers);
             }
 
             if ($updates !== []) {
@@ -220,6 +233,21 @@ class VehicleOwnershipService
 
             return $vehicle->fresh();
         });
+
+        // O hodômetro que o proprietário informa ao assumir o carro vira **leitura** dele, e não
+        // escrita direta em `current_kilometers`. Gravar a coluna à mão punha aqui um número que a
+        // fonte da verdade não conhecia: bastava a oficina registrar depois uma OS com data
+        // anterior e km menor para o recálculo derrubar a coluna, e o número que o dono informou
+        // não existia em lugar nenhum para ser recuperado.
+        //
+        // O recálculo continua garantindo que isto não baixa o odômetro: se há OS que conta com km
+        // maior, ela ganha — o relato fica no histórico, como leitura, sem mandar na coluna.
+        if (isset($vehicleData['current_kilometers'])
+            && (int) $vehicleData['current_kilometers'] !== (int) $vehicle->current_kilometers) {
+            $this->odometerLog->recordOwnerReport($vehicle, (int) $vehicleData['current_kilometers'], $user);
+            $this->mileage->refreshCurrentKilometers($vehicle);
+            $vehicle = $vehicle->fresh();
+        }
 
         $this->arrivalNotifier->notify($user, $vehicle);
 

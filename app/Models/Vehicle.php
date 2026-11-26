@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Observers\VehicleObserver;
 use App\Support\AppStorage;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Gate;
 
+#[ObservedBy(VehicleObserver::class)]
 class Vehicle extends Model
 {
     use HasFactory;
@@ -202,6 +205,15 @@ class Vehicle extends Model
     public function plates(): HasMany
     {
         return $this->hasMany(VehiclePlate::class);
+    }
+
+    /**
+     * O histórico do odômetro: uma linha por leitura, de qualquer origem. É daqui que sai o
+     * `current_kilometers` (ver App\Services\Vehicle\VehicleOdometerLog).
+     */
+    public function odometerReadings(): HasMany
+    {
+        return $this->hasMany(VehicleOdometerReading::class);
     }
 
     public function currentPlate(): HasOne

@@ -88,7 +88,14 @@ Route::prefix('v1')->group(function () {
 
         // Vehicle routes
         Route::get('/vehicles', [VehicleController::class, 'index'])->middleware('ability:vehicles:read');
-        Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('ability:vehicles:write');
+        // Cadastro pelo chassi assume o veículo que a oficina criou (sem dono, placa nem RENAVAM):
+        // é a mesma política de /vehicles/{id}/link e divide o balde com ela de propósito —
+        // varrer chassi por duas rotas não dá duas cotas (.ai/rules/routes.md, abuse-guards.md).
+        Route::post('/vehicles', [VehicleController::class, 'store'])
+            ->middleware(['ability:vehicles:write', 'throttle:vehicle-link']);
+        // O claim pelo CRLV-e não entra no balde do chassi de propósito: ele só acontece com um
+        // token do /vehicles/crlv, que exige o PDF do documento e já tem throttle:uploads. Quem
+        // tem o CRLV-e na mão provou mais do que quem digitou um chassi.
         Route::post('/vehicles/crlv', [VehicleCrlvController::class, 'read'])
             ->middleware(['ability:vehicles:write', 'throttle:uploads'])
             ->name('api.vehicles.crlv.read');

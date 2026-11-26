@@ -39,6 +39,7 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Mail/** | .ai/rules/mail.md |
 | config/queue.php,config/cache.php,config/session.php,app/Jobs/**,docker-compose.yml | .ai/rules/messaging.md |
 | app/Models/Vehicle.php,app/Support/VehiclePlateSearch.php,database/migrations/*vehicle_plates* | .ai/rules/migrations.md |
+| app/Observers/**,app/Models/VehicleOdometerReading.php,app/Services/Vehicle/VehicleOdometerLog.php,app/Console/Commands/BackfillOdometerReadingsCommand.php | .ai/rules/models.md |
 | app/Services/Maintenance/MaintenanceVerificationStamper.php,app/Models/Maintenance.php,app/Models/MaintenancePhoto.php,app/Services/Maintenance/**,app/Support/Maintenance/MaintenanceRedactor.php,app/Services/Vehicle/VehicleMileageService.php,app/Services/Maintenance/MaintenancePublicVisibilityService.php,app/Support/UploadedImageExtension.php,app/Services/Workshop/WorkshopLogoService.php,app/Services/Blog/BlogCoverService.php,app/Console/Commands/FixImageExtensionsCommand.php | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
 | app/Services/Workshop/WorkshopMessageTemplateDispatcher.php,app/Enums/WorkshopMessageTrigger.php,app/Enums/WorkshopPlan.php,app/Support/Workshop/WorkshopPlanLimits.php,app/Support/WorkshopMessageTemplateRenderer.php,config/workshop_messages.php,resources/views/workshop/message-templates/**,app/Rules/KnownMessageTemplateTags.php | .ai/rules/workshop-messages.md |

@@ -6,6 +6,8 @@ use App\Models\Vehicle;
 use App\Rules\Chassis;
 use App\Rules\UniqueRenavam;
 use App\Services\Vehicle\VehicleCoverService;
+use App\Services\Vehicle\VehicleMileageService;
+use App\Services\Vehicle\VehicleOdometerLog;
 use App\Services\Vehicle\VehiclePlateHistoryService;
 use App\Support\Vehicle\VehicleEntryFlow;
 use Illuminate\Http\Request;
@@ -57,21 +59,46 @@ trait UpdatesVehicleDetails
             'current_kilometers.min' => 'A quilometragem atual não pode ser menor que a da última manutenção registrada ('.number_format($kilometerFloor, 0, ',', '.').' km).',
         ]);
 
+        // Teto de plausibilidade do hodômetro: `max:9999999` é limite de coluna, não de realidade, e
+        // o número editado aqui volta a ser o piso de toda OS seguinte (VehicleMileageService).
+        if (($data['current_kilometers'] ?? null) !== null) {
+            app(VehicleMileageService::class)->assertOdometerKilometers(
+                (int) $data['current_kilometers'],
+                (int) $data['year'],
+                $vehicle,
+            );
+        }
+
         $newPlate = (string) $data['license_plate'];
         $previousPlate = (string) $vehicle->license_plate;
         $kilometers = $data['current_kilometers'] ?? null;
 
         unset($data['cover'], $data['cover_portrait'], $data['license_plate'], $data['current_kilometers']);
 
-        if ($kilometers !== null) {
-            $data['current_kilometers'] = (int) $kilometers;
+        // O hodômetro editado vira **leitura** (OdometerReadingSource::OwnerReport), e não escrita
+        // direta em `current_kilometers`: a coluna é derivada das leituras, então gravá-la aqui dava
+        // um número que o próximo recálculo apagava — o que o formulário mostrava durava até a OS
+        // seguinte. Só registra quando muda, porque o formulário reenvia o campo a cada edição
+        // (trocar a cor não é leitura de odômetro).
+        $reportedKilometers = $kilometers !== null && (int) $kilometers !== (int) $vehicle->current_kilometers
+            ? (int) $kilometers
+            : null;
 
-            if ($vehicle->odometer_at_registration !== null && (int) $kilometers < (int) $vehicle->odometer_at_registration) {
-                $data['odometer_at_registration'] = (int) $kilometers;
-            }
+        // Edição que **baixa** o número conserta o hodômetro do cadastro, e aí a leitura do cadastro
+        // é corrigida no lugar (VehicleOdometerLog::syncRegistration, pelo VehicleObserver): é a
+        // mesma leitura consertada, não uma leitura nova.
+        if ($kilometers !== null
+            && $vehicle->odometer_at_registration !== null
+            && (int) $kilometers < (int) $vehicle->odometer_at_registration) {
+            $data['odometer_at_registration'] = (int) $kilometers;
         }
 
         $vehicle->update($data);
+
+        if ($reportedKilometers !== null) {
+            app(VehicleOdometerLog::class)->recordOwnerReport($vehicle->fresh(), $reportedKilometers, $request->user());
+            app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
+        }
 
         if (strtoupper($newPlate) !== strtoupper($previousPlate)) {
             app(VehiclePlateHistoryService::class)->changePlate($vehicle->fresh(), $newPlate, 'manual', $request->user());

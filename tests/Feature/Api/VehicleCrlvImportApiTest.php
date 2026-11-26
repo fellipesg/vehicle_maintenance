@@ -32,6 +32,12 @@ class VehicleCrlvImportApiTest extends TestCase
 
     private const OWNER_DOCUMENT = '52998224725';
 
+    /**
+     * O ano do veículo da fixture. É constante porque o CRLV-e e o formulário precisam bater, e
+     * porque o teto de plausibilidade do hodômetro é derivado dele.
+     */
+    private const YEAR = 2020;
+
     public function test_reading_a_new_vehicle_returns_the_fields_and_a_token(): void
     {
         $this->actingAsApiUser($this->account());
@@ -88,6 +94,28 @@ class VehicleCrlvImportApiTest extends TestCase
         $this->postJson('/api/v1/vehicles', $this->formData(['license_plate' => 'XYZ9A87', 'crlv_verification_token' => $token]))
             ->assertUnprocessable()
             ->assertJsonPath('message', 'A placa informada não confere com o CRLV-e.');
+
+        $this->assertNull(Vehicle::findByChassis(self::CHASSIS));
+    }
+
+    public function test_store_with_the_token_still_passes_the_plausibility_ceiling(): void
+    {
+        $this->actingAsApiUser($this->account());
+        $token = $this->readCrlv($this->crlv())->json('data.crlv_verification_token');
+
+        // O CRLV-e prova de quem é o carro, não quantos km ele andou: o hodômetro continua sendo
+        // digitado. 4.200.000 km é 42.000 com dois dígitos sobrando, e vira
+        // odometer_at_registration — o piso de toda OS seguinte (.ai/rules/models.md).
+        // O teto cresce com a idade do veículo, então ele é calculado aqui pelo mesmo caminho de
+        // VehicleMileageService::plausibilityCeilingFor: número fixo quebraria na virada do ano.
+        $ceiling = 50_000 + ((max(0, (int) now()->year - self::YEAR) + 1) * 100_000);
+
+        $this->postJson('/api/v1/vehicles', $this->formData([
+            'current_kilometers' => 4_200_000,
+            'crlv_verification_token' => $token,
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.current_kilometers.0', "A quilometragem deve ser no máximo {$ceiling} km: é o teto plausível para um veículo ".self::YEAR.'. Confira se não sobrou um dígito.');
 
         $this->assertNull(Vehicle::findByChassis(self::CHASSIS));
     }
@@ -242,7 +270,7 @@ class VehicleCrlvImportApiTest extends TestCase
             renavam: self::RENAVAM,
             brand: 'Volkswagen',
             model: 'Gol',
-            year: 2020,
+            year: self::YEAR,
             color: 'Prata',
             chassis: $chassis,
             brandMatched: true,
@@ -265,7 +293,7 @@ class VehicleCrlvImportApiTest extends TestCase
             'renavam' => self::RENAVAM,
             'brand' => 'Volkswagen',
             'model' => 'Gol',
-            'year' => 2020,
+            'year' => self::YEAR,
             'color' => 'Prata',
             'chassis' => self::CHASSIS,
             'current_kilometers' => 42000,
