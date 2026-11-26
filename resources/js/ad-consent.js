@@ -1,5 +1,5 @@
 /**
- * AdSense do blog (<x-adsense />, <x-ads.unit>, <x-ads.consent-banner>): pede os blocos de anúncio
+ * AdSense do artigo do blog (<x-adsense />, <x-ads.unit>, <x-ads.consent-banner>): pede os blocos de anúncio
  * da página e mostra o aviso de cookies de publicidade para quem ainda não escolheu. A escolha fica no
  * cookie rl_ads_consent por um ano; quem manda o sinal Global Privacy Control nunca vê o aviso e
  * segue com consentimento negado.

@@ -17,6 +17,7 @@ return [
         'workshops.signup' => '2026-11-23',
         'verification.lookup' => '2026-11-23',
         'guides.comparison' => '2026-11-23',
+        'about' => '2026-11-25',
         'contact.show' => '2026-11-23',
         'legal.terms' => '2026-11-18',
         'legal.privacy' => '2026-11-18',

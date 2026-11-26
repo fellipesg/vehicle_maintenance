@@ -32,6 +32,7 @@
         'Legal' => [
             ['label' => 'Termos de uso', 'href' => route('legal.terms')],
             ['label' => 'Privacidade', 'href' => route('legal.privacy')],
+            ['label' => 'Sobre o RevisaLog', 'href' => route('about')],
             ['label' => 'Contato', 'href' => route('contact.show')],
             ['label' => config('legal.support_email'), 'href' => 'mailto:'.config('legal.support_email')],
         ],

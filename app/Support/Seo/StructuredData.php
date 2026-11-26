@@ -173,6 +173,33 @@ final class StructuredData
     }
 
     /**
+     * Página /sobre: AboutPage sobre a Organization (que já declara o fundador).
+     *
+     * @return array<string, mixed>
+     */
+    public static function aboutPage(string $name, string $description, string $url): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'AboutPage',
+            '@id' => $url.'#webpage',
+            'name' => $name,
+            'description' => $description,
+            'url' => $url,
+            'inLanguage' => 'pt-BR',
+            'isPartOf' => [
+                '@id' => CanonicalUrl::websiteId(),
+            ],
+            'about' => [
+                '@id' => CanonicalUrl::organizationId(),
+            ],
+            'publisher' => [
+                '@id' => CanonicalUrl::organizationId(),
+            ],
+        ];
+    }
+
+    /**
      * @param  list<array{name: string, url: string}>  $items
      * @return array<string, mixed>
      */
@@ -203,7 +230,8 @@ final class StructuredData
     public static function blogPosting(BlogPost $post, int $commentCount): array
     {
         $url = CanonicalUrl::named('blog.show', $post);
-        $authorName = $post->author?->name;
+        $authorName = BlogAuthor::name($post);
+        $authorUrl = BlogAuthor::profileUrl($post);
         $data = [
             '@context' => 'https://schema.org',
             '@type' => 'BlogPosting',
@@ -211,15 +239,16 @@ final class StructuredData
             'description' => $post->meta_description ?: $post->summary,
             'inLanguage' => 'pt-BR',
             'datePublished' => $post->published_at?->toIso8601String(),
-            'dateModified' => ($post->updated_at ?? $post->published_at)?->toIso8601String(),
+            'dateModified' => $post->modified_at?->toIso8601String(),
             'mainEntityOfPage' => [
                 '@type' => 'WebPage',
                 '@id' => $url,
             ],
-            'author' => [
+            'author' => array_filter([
                 '@type' => 'Person',
-                'name' => is_string($authorName) && $authorName !== '' ? $authorName : 'Felipe Gonçalves',
-            ],
+                'name' => $authorName,
+                'url' => $authorUrl,
+            ]),
             'publisher' => [
                 '@type' => 'Organization',
                 '@id' => CanonicalUrl::organizationId(),

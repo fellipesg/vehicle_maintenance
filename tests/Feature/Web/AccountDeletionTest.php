@@ -316,7 +316,7 @@ class AccountDeletionTest extends TestCase
             ->assertSee('inclusive as notas fiscais e as fotos do serviço')
             ->assertSee('pede a sua senha atual');
 
-        $this->assertSame('2026-11-18', config('legal.privacy_version'));
+        $this->assertSame('2026-11-25', config('legal.privacy_version'));
     }
 
     /**

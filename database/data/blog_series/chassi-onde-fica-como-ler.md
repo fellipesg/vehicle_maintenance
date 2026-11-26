@@ -70,4 +70,4 @@ Como o chassi não muda, ele é a melhor chave para guardar o histórico de manu
 
 ---
 
-**Já conferiu o chassi?** Use a [consulta pública do RevisaLog](/buscar-veiculo) com ele para ver se o carro tem manutenções registradas.
+**Já conferiu o chassi?** Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo) com ele para ver se o carro tem manutenções registradas.

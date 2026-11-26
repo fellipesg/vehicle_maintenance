@@ -91,4 +91,4 @@ Alguns achados não se negociam: chassi que não bate, sinais de reparo na estru
 
 ---
 
-**Achou o carro certo?** Faça a [consulta pública do RevisaLog](/buscar-veiculo) pela placa ou pelo chassi antes de fechar negócio.
+**Achou o carro certo?** Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo) pela placa ou pelo chassi antes de fechar negócio.
