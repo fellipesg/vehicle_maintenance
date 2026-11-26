@@ -10,6 +10,10 @@ paths:
   - 'app/Http/Requests/Api/V1/*WorkshopMessageTemplateRequest.php'
   - 'resources/views/workshop/message-templates/**'
   - 'app/Rules/KnownMessageTemplateTags.php'
+  - 'app/Support/Workshop/WorkshopMessageConsent.php'
+  - 'app/Models/WorkshopMessageOptOut.php'
+  - 'app/Http/Controllers/Web/WorkshopMessageOptOutController.php'
+  - 'app/Notifications/WorkshopFollowUpNotification.php'
 ---
 
 # Mensagens automáticas da oficina
@@ -70,3 +74,45 @@ só guarda a transição, quem impede o disparo depois do rebaixamento é a roda
 (`WorkshopPlanLimits::allowsTrigger` no loop de `dispatchFollowUps`), que não grava nada ao barrar:
 se a oficina voltar ao plano, a oportunidade continua livre.
 `tests/Feature/Workshop/WorkshopMessageTemplateTriggerPlanTest.php` guarda as duas direções.
+
+## O descadastro é por pessoa e oficina, e cala todos os canais
+`workshop_message_opt_outs` tem uma linha por destinatário e oficina, e `workshop_id` **nulo** vale
+para todas as oficinas (é o "calar todas" que a página oferece). Não há coluna de canal **de
+propósito**: uma linha cala e-mail, aviso no app e push daquela oficina, porque quem pede para parar
+de receber não está pedindo para trocar de canal. `App\Support\Workshop\WorkshopMessageConsent` é o
+único lugar que lê e grava isso.
+
+Não confunda com `email_suppressions`, que é só do canal de e-mail (a mesma lista do convite da OS e
+da prospecção). A diferença aparece em `WorkshopFollowUpNotification::via()`: opt-out devolve `[]`,
+endereço suprimido devolve `['database']` — **o aviso no app continua chegando**. Suprimir não é
+descadastrar.
+
+## A checagem de consentimento mora em dois lugares, e nenhum é redundante
+`WorkshopMessageConsent::allows()` é consultado no `via()` da notificação **e** em
+`WorkshopMessageTemplateDispatcher::dispatchToOwner()`. Parece duplicado e não é:
+
+- O **push não passa pelos canais da notificação**. `sendPushNotification` é chamado pelo dispatcher
+  depois da transação, então um `via()` devolvendo `[]` não o impediria: quem segura o push é a
+  checagem do dispatcher.
+- A checagem do dispatcher vem **antes** de `alreadyDispatched()` e de gravar
+  `WorkshopMessageDispatch`, então o destinatário descadastrado não queima o dedupe nem o intervalo
+  mínimo daquela oportunidade.
+
+Se você mover ou "unificar" uma das duas, o push volta a sair para quem pediu silêncio.
+`tests/Feature/WorkshopFollowUpDispatcherTest.php` afirma `shouldNotReceive('sendToUser')` nos casos
+de opt-out, e `tests/Unit/WorkshopFollowUpNotificationTest.php` guarda os três retornos do `via()`.
+
+## O clique de um clique: idempotente, assinado e fora do CSRF
+O e-mail leva `List-Unsubscribe` e `List-Unsubscribe-Post` (RFC 8058), então o provedor pode fazer o
+POST sozinho, sem sessão e sem token — `oficinas/descadastrar` está no `except` de
+`validateCsrfTokens` em `bootstrap/app.php`, e a **URL assinada é a proteção**. Duas consequências
+que já estão no código e precisam continuar:
+
+- `optOut()` usa `firstOrCreate`: o mesmo clique pode chegar mais de uma vez.
+- A entrada do `except` é **exata**. `Str::is` não faz `'oficinas/descadastrar'` casar com um
+  padrão com `/*`, e é o mesmo cuidado que o comentário do `convite/descadastrar` registra ali.
+
+A oficina pode já não existir (conta apagada): `resolve()` devolve `workshop` nulo e a página
+responde o mesmo "pronto" em vez de quebrar o clique. E o descadastro é por `user_id`, então
+destinatário que não é conta não tem URL (`unsubscribeUrl()` devolve null) e o e-mail sai sem o
+cabeçalho.

@@ -59,6 +59,25 @@ class WorkshopApprovalGateTest extends TestCase
         }
     }
 
+    /**
+     * O modo do EnsureWorkshopApproved é o parâmetro da rota ('workshop.approved' na web,
+     * 'workshop.approved:api' na API), nunca o cabeçalho do cliente. O middleware tinha
+     * `$mode === 'api' || $request->expectsJson()`: com um Accept: application/json a rota web caía
+     * no ramo da API, onde o GET casa com READ_METHODS e segue adiante — a oficina em análise abria
+     * as telas de OS com 200 em vez de voltar para "Minha oficina". Sem este teste, é um portão que
+     * um cabeçalho abre.
+     */
+    public function test_a_web_route_redirects_even_when_the_client_asks_for_json(): void
+    {
+        $user = $this->workshopUser(WorkshopStatus::Pending);
+
+        foreach ($this->blockedRoutes() as $route) {
+            $this->actingAs($user)
+                ->get(route($route), ['Accept' => 'application/json'])
+                ->assertRedirect(route('workshop.profile.show'));
+        }
+    }
+
     public function test_rejected_workshop_is_blocked_the_same_way(): void
     {
         $this->actingAs($this->workshopUser(WorkshopStatus::Rejected))
