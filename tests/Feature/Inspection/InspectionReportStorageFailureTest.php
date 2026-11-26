@@ -104,13 +104,12 @@ class InspectionReportStorageFailureTest extends TestCase
 
         $service = app(VehicleInspectionService::class);
 
-        // Uma coluna inexistente faz o save() estourar depois de o arquivo já estar no storage.
-        $inspection->forceFill(['nao_existe_esta_coluna' => 1]);
+        $this->failTheNextSave();
 
         try {
             $service->attachReport($inspection, UploadedFile::fake()->create('laudo.pdf', 100, 'application/pdf'));
             $this->fail('O save() deveria ter falhado.');
-        } catch (\Throwable) {
+        } catch (\RuntimeException) {
             // esperado
         }
 
@@ -147,11 +146,12 @@ class InspectionReportStorageFailureTest extends TestCase
         AppStorage::disk()->assertExists($first);
 
         $service = app(VehicleInspectionService::class);
-        $inspection->forceFill(['nao_existe_esta_coluna' => 1]);
+        $this->failTheNextSave();
 
         try {
             $service->attachReport($inspection, UploadedFile::fake()->create('segundo.pdf', 100, 'application/pdf'));
-        } catch (\Throwable) {
+            $this->fail('O save() deveria ter falhado.');
+        } catch (\RuntimeException) {
             // esperado
         }
 
@@ -209,6 +209,24 @@ class InspectionReportStorageFailureTest extends TestCase
         $this->assertStringStartsWith('inspections/', (string) $inspection->report_path);
         $this->assertSame('laudo.pdf', $inspection->report_original_name);
         AppStorage::disk()->assertExists($inspection->report_path);
+    }
+
+    /**
+     * Faz o próximo `save()` de um laudo estourar **antes** de qualquer SQL, como
+     * InvoiceControllerTest já faz com `Invoice::creating`.
+     *
+     * Não por coluna inexistente: um statement recusado pelo Postgres aborta a transação que o
+     * RefreshDatabase mantém aberta, e todo `fresh()` depois dele vira SQLSTATE 25P02 — o teste
+     * passaria só no job do SQLite, que é exatamente a assimetria de .ai/rules/ci.md ("A suíte roda
+     * no SQLite e no Postgres"). O listener também é mais honesto com o que está sob teste: o que
+     * `attachReport` promete é descartar o arquivo quando a linha não entra, qualquer que seja o
+     * motivo da falha.
+     */
+    private function failTheNextSave(): void
+    {
+        VehicleInspection::saving(function (): void {
+            throw new \RuntimeException('save() falhou de propósito');
+        });
     }
 
     /**
