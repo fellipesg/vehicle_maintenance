@@ -165,7 +165,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/redefinir-senha', [PasswordResetController::class, 'update'])->name('password.update');
 });
 
-Route::middleware(['auth', 'tenant'])->group(function () {
+Route::middleware('auth')->group(function () {
     // Busca por identificador de quem está logado: mesmo balde da etapa 1 da OS, pela conta. No
     // `search` (por IP) a cota do portal era gasta por visitante da mesma rede.
     Route::get('/buscar-veiculo', [PublicVehicleController::class, 'search'])

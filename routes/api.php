@@ -69,7 +69,7 @@ Route::prefix('v1')->group(function () {
     // workshop.approved:api — oficina em análise só lê pela API, pelo mesmo motivo e no mesmo
     // formato do portão da loja: pelo app ela criaria OS com Selo, moveria o hodômetro de um
     // veículo e mandaria convite para terceiros (App\Http\Middleware\EnsureWorkshopApproved).
-    Route::middleware(['auth:sanctum', 'tenant', 'throttle:api', 'garage.approved:api', 'workshop.approved:api'])->group(function () {
+    Route::middleware(['auth:sanctum', 'throttle:api', 'garage.approved:api', 'workshop.approved:api'])->group(function () {
         // Auth routes
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me'])->middleware('ability:profile:read');

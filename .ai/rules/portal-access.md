@@ -9,6 +9,13 @@ paths:
 
 # Portal Access
 
+## Não existe middleware de tenant para registrar aqui
+O alias `tenant` (`App\Http\Middleware\SetTenantContext`) existiu em `$middleware->alias([...])` e
+foi removido: ele preenchia um estático que nenhum leitor lia. Antes de registrar middleware que
+monte "contexto da conta" para a consulta usar, leia "O isolamento não tem contexto ambiente, e não
+vai ter escopo global" em `.ai/rules/policies.md` — o isolamento aqui é por policy mais scope de
+visibilidade, e já foi decidido que não passa por estado de requisição.
+
 ## Wrong area redirects to the account's Início
 A web 403 on another profile's area (/usuario, /garagem, /oficina, /admin) becomes a redirect to the account's Início with a notice, done in bootstrap/app.php through App\Support\FriendlyHttpErrors (not in the middleware). A 403 inside the account's own area keeps the pt-BR error page. 419 on login, sign-up, password, contact and logout forms returns to the form with a friendly message. The API keeps answering JSON.
 

@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('/two-factor/challenge', [TwoFactorController::class, 'challenge'])
     ->middleware('throttle:two-factor');
 
-Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
     Route::post('/two-factor/enable', [TwoFactorController::class, 'enable']);
     Route::post('/two-factor/confirm', [TwoFactorController::class, 'confirm']);
     Route::post('/two-factor/disable', [TwoFactorController::class, 'disable']);
