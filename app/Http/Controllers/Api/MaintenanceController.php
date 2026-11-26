@@ -91,11 +91,7 @@ class MaintenanceController extends Controller
 
         $vehicle = \App\Models\Vehicle::findOrFail($request->vehicle_id);
 
-        if ($user->isWorkshop() && $user->workshop) {
-            if (! $user->workshop) {
-                return ApiResponse::error('Workshop profile is required.', 403);
-            }
-        } else {
+        if (! ($user->isWorkshop() && $user->workshop)) {
             Gate::authorize('addMaintenance', $vehicle);
         }
 

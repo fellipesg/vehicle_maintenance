@@ -41,6 +41,14 @@ class EnsureGarageApproved
     /**
      * $mode é 'api' no grupo da API (routes/api.php). Explícito de propósito: um cliente que não
      * manda Accept: application/json receberia o redirect da web em vez do 403.
+     *
+     * Não acrescente `|| $request->expectsJson()`: quem diz o modo é a rota, não o cabeçalho do
+     * cliente. Com aquele `||` no lugar, bastava um Accept: application/json para a rota web entrar
+     * no ramo da API, e aí o GET casava com READ_METHODS e **passava** — medido: a loja em análise
+     * abria /garagem/estoque com 200 em vez do redirect para "Minha loja". No POST o efeito era o
+     * envelope 403 da API no lugar do redirect. Nenhum cliente do repositório mandava esse
+     * cabeçalho nessas rotas (o resources/js/api/client.js fala só com /api/v1), mas o portão não
+     * pode depender disso.
      */
     public function handle(Request $request, Closure $next, ?string $mode = null): Response
     {
@@ -50,7 +58,7 @@ class EnsureGarageApproved
             return $next($request);
         }
 
-        if ($mode === 'api' || $request->expectsJson()) {
+        if ($mode === 'api') {
             if (in_array($request->method(), self::READ_METHODS, true)) {
                 return $next($request);
             }
