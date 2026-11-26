@@ -8,6 +8,7 @@ use App\Models\VehicleConsignment;
 use App\Models\VehicleInspection;
 use App\Models\Workshop;
 use App\Notifications\VehicleInspectionDisputedNotification;
+use App\Services\Inspection\InspectionPublicVisibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
@@ -237,6 +238,61 @@ class InspectionDisputeTest extends TestCase
             ->post(route('user.inspections.dispute', $inspection), [])
             ->assertRedirect()
             ->assertSessionHasErrors('dispute');
+
+        $this->assertNull($inspection->fresh()->owner_disputed_at);
+    }
+
+    /**
+     * A simetria que faltava: `dispute` conferia `hiddenFrom` e `withdrawDispute` não. Um laudo
+     * suprimido não podia ser contestado, mas a contestação que já estava nele podia ser **retirada**
+     * — o dono mexendo num documento que a equipe tirou de circulação, justamente o que a supressão
+     * existe para impedir enquanto está sob análise.
+     */
+    public function test_a_suppressed_report_cannot_have_its_dispute_withdrawn(): void
+    {
+        Notification::fake();
+
+        [$owner, $vehicle] = $this->ownerWithVehicle();
+
+        // Contestado **e** suprimido: as duas colunas são independentes de propósito.
+        $inspection = VehicleInspection::factory()->disputed()->hiddenByStaff()->create([
+            'vehicle_id' => $vehicle->id,
+            'workshop_id' => Workshop::factory()->create()->id,
+            'owner_disputed_by_user_id' => $owner->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->delete(route('user.inspections.dispute.withdraw', $inspection))
+            ->assertRedirect()
+            ->assertSessionHasErrors('dispute');
+
+        // A contestação continua de pé.
+        $this->assertNotNull($inspection->fresh()->owner_disputed_at);
+    }
+
+    /**
+     * E quando a equipe devolve o laudo ao histórico, retirar volta a funcionar: a recusa é do
+     * estado, não uma porta trancada para sempre.
+     */
+    public function test_withdrawing_works_again_once_the_report_is_restored(): void
+    {
+        Notification::fake();
+
+        [$owner, $vehicle] = $this->ownerWithVehicle();
+        $inspection = VehicleInspection::factory()->disputed()->hiddenByStaff()->create([
+            'vehicle_id' => $vehicle->id,
+            'workshop_id' => Workshop::factory()->create()->id,
+            'owner_disputed_by_user_id' => $owner->id,
+        ]);
+
+        // `restore` exige o admin desde a trilha de supressão (PR #110): devolver o ativo à
+        // circulação é ato de gente, e é ele que a trilha grava.
+        app(InspectionPublicVisibilityService::class)->restore($inspection, User::factory()->asAdmin()->create());
+
+        $this->actingAs($owner)
+            ->delete(route('user.inspections.dispute.withdraw', $inspection))
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
         $this->assertNull($inspection->fresh()->owner_disputed_at);
     }

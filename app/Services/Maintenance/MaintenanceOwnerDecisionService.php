@@ -147,6 +147,12 @@ class MaintenanceOwnerDecisionService
             throw ValidationException::withMessages(['dispute' => self::NOT_DISPUTABLE_MESSAGE]);
         }
 
+        // Como no laudo (App\Services\Inspection\InspectionDisputeService::dispute): a gravação é
+        // idempotente na data, e o aviso passou a ser também. Cada POST mandava outro e-mail para a
+        // caixa da oficina; avisa na primeira contestação e quando o motivo realmente muda.
+        $isFirstDispute = $maintenance->owner_disputed_at === null;
+        $reasonChanged = $maintenance->owner_dispute_reason !== $reason;
+
         $maintenance->forceFill([
             'owner_disputed_at' => $maintenance->owner_disputed_at ?? now(),
             'owner_disputed_by_user_id' => $owner->id,
@@ -158,9 +164,11 @@ class MaintenanceOwnerDecisionService
         // Contestado sai da conta do hodômetro (Maintenance::scopeCountsTowardOdometer).
         $this->refreshOdometer($maintenance);
 
-        $maintenance->loadMissing('workshop.user');
-        $maintenance->getRelationValue('workshop')?->user
-            ?->notify(new MaintenanceDisputedNotification($maintenance, $reason));
+        if ($isFirstDispute || $reasonChanged) {
+            $maintenance->loadMissing('workshop.user');
+            $maintenance->getRelationValue('workshop')?->user
+                ?->notify(new MaintenanceDisputedNotification($maintenance, $reason));
+        }
 
         return $maintenance;
     }

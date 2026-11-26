@@ -209,6 +209,33 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(30)->by('blog-comments-daily|'.($request->user()?->id ?: $request->ip())),
         ]);
 
+        /*
+         * Contestar um registro de oficina (OS ou laudo de vistoria) dispara e-mail para a caixa da
+         * oficina, e a rota não tinha teto nenhum: cada POST regravava o motivo e mandava **outro**
+         * e-mail, então o dono atual de um veículo podia encher a caixa da oficina com um formulário
+         * de 500 caracteres livres. É o caso que .ai/rules/abuse-guards.md cobre ("rota que dispara
+         * e-mail tem balde próprio"), e o balde é só destas rotas — nunca dividido com as de busca
+         * ou de upload.
+         *
+         * A chave é a conta, não o IP: as quatro rotas exigem login, e num balde por IP a cota de
+         * quem tem conta é gasta por estranhos atrás do mesmo NAT (o defeito que levou
+         * /oficina/manutencoes/nova para `account-vehicle-search`). O IP fica de reserva, para o caso
+         * de a rota perder o `auth`.
+         *
+         * Um balde para as duas áreas de propósito, como em `account-vehicle-search`: é a mesma
+         * política — a resposta do proprietário a um registro de oficina —, e contestar por duas
+         * telas não dá duas cotas. Retirar entra junto porque retirar e contestar de novo é
+         * exatamente a sequência que repete o e-mail.
+         *
+         * Os limites são os do comentário do blog, que é o outro texto livre de conta logada: 5 por
+         * minuto contra rajada e 30 por dia contra quem insiste devagar. Uma contestação de verdade
+         * é um punhado na vida da conta; 30 por dia não alcança ninguém de boa-fé.
+         */
+        RateLimiter::for('owner-disputes', fn (Request $request) => [
+            Limit::perMinute(5)->by('owner-disputes|'.($request->user()?->id ?: $request->ip())),
+            Limit::perDay(30)->by('owner-disputes-daily|'.($request->user()?->id ?: $request->ip())),
+        ]);
+
         // Relatório de CSP: o navegador manda um por recurso bloqueado, sem sessão, então o balde
         // é largo de propósito — o teto existe para o log não virar alvo, não para frear a página.
         RateLimiter::for('csp-report', fn (Request $request) => Limit::perMinute(120)->by(

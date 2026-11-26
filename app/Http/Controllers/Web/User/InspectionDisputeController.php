@@ -53,6 +53,9 @@ class InspectionDisputeController extends Controller
             $this->disputes->withdrawDispute($inspection, $request->user());
         } catch (AuthorizationException $exception) {
             return back()->withErrors(['dispute' => $exception->getMessage()]);
+        } catch (ValidationException $exception) {
+            // Laudo suprimido pela equipe: não é contestável nem descontestável (ver o serviço).
+            return back()->withErrors(['dispute' => (string) collect($exception->errors())->flatten()->first()]);
         }
 
         return back()->with('success', 'Contestação retirada.');

@@ -79,6 +79,14 @@ final class InspectionDisputeService
             throw ValidationException::withMessages(['dispute' => self::NOT_DISPUTABLE_MESSAGE]);
         }
 
+        // A gravação é idempotente na data, mas o aviso precisava ser também: cada POST mandava
+        // **outro** e-mail para a caixa da oficina, com 500 caracteres livres do formulário, e o
+        // dono atual podia repetir à vontade. Avisa na primeira contestação e quando o motivo
+        // realmente muda — a segunda é informação nova para quem corrige o laudo; reenviar o mesmo
+        // texto não é.
+        $isFirstDispute = $inspection->owner_disputed_at === null;
+        $reasonChanged = $inspection->owner_dispute_reason !== $reason;
+
         // Contestar de novo não reabre a data: a primeira é quando o dono discordou, e sobrescrevê-la
         // apagaria há quanto tempo a oficina está sem responder. O motivo, esse, é o mais recente.
         $inspection->forceFill([
@@ -91,9 +99,11 @@ final class InspectionDisputeService
 
         // A oficina emissora é a única que pode corrigir ou excluir o laudo (VehicleInspectionPolicy),
         // então sem este aviso a contestação ficaria invisível para quem resolve.
-        $inspection->loadMissing('workshop.user');
-        $inspection->getRelationValue('workshop')?->user
-            ?->notify(new VehicleInspectionDisputedNotification($inspection, $reason));
+        if ($isFirstDispute || $reasonChanged) {
+            $inspection->loadMissing('workshop.user');
+            $inspection->getRelationValue('workshop')?->user
+                ?->notify(new VehicleInspectionDisputedNotification($inspection, $reason));
+        }
 
         return $inspection;
     }
@@ -102,10 +112,20 @@ final class InspectionDisputeService
      * Retirar a contestação é do mesmo dono, e apaga as três colunas: o laudo volta a ser só o que a
      * oficina assinou. Não devolve nada que a supressão tenha tirado — as duas coisas são
      * independentes de propósito.
+     *
+     * Confere `hiddenFrom` como `dispute`: laudo suprimido pela equipe não é contestável, e também
+     * não é **descontestável**. Sem esta linha a assimetria era real — o dono não podia contestar o
+     * que não vê, mas podia apagar a contestação que já estava lá, mexendo num documento que a
+     * equipe tirou de circulação justamente porque está sob análise. Quando o laudo voltar ao
+     * histórico, retirar volta a funcionar.
      */
     public function withdrawDispute(VehicleInspection $inspection, User $owner): VehicleInspection
     {
         $this->assertCurrentOwner($inspection, $owner);
+
+        if ($inspection->hiddenFrom($owner)) {
+            throw ValidationException::withMessages(['dispute' => self::NOT_DISPUTABLE_MESSAGE]);
+        }
 
         $inspection->forceFill([
             'owner_disputed_at' => null,

@@ -77,3 +77,18 @@ que leia segredo do ambiente segue os três.
 
 ## Comentário do blog tem balde pela conta
 `POST /blog/{post}/comentarios` usa `throttle:blog-comments` (`AppServiceProvider`): 5/min e 30/dia, chave `user()?->id ?: ip()` (a rota exige login; o IP é reserva), mais o honeypot `website` do formulário. Balde próprio, nunca dividido com `contact`. Ver blog.md.
+
+## Contestar é canal de mensagem, e tem balde próprio
+`POST|DELETE /usuario/registros-de-oficinas/{maintenance}/contestar` e
+`POST|DELETE /usuario/vistorias/{inspection}/contestar` usam `throttle:owner-disputes`
+(`AppServiceProvider`): 5/min e 30/dia, chave `user()?->id ?: ip()` (as quatro rotas exigem login; o
+IP é reserva). Contestar dispara e-mail para a caixa da **oficina**, então cai nesta regra; o balde é
+só destas rotas, nunca dividido com busca ou upload.
+
+Um balde para as duas áreas de propósito, como `account-vehicle-search`: é a mesma política — a
+resposta do proprietário a um registro de oficina — e contestar por duas telas não dá duas cotas.
+Retirar entra junto porque retirar e contestar de novo é a sequência que repete o e-mail.
+
+O teto não bastava sozinho: a gravação era idempotente na data mas o **aviso** não, e cada POST
+regravava o motivo (500 caracteres livres) e mandava outro e-mail. Os dois serviços passaram a
+notificar só na primeira contestação ou quando o motivo muda (.ai/rules/notifications.md).
