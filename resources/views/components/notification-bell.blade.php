@@ -87,7 +87,7 @@
     </details>
 
     @once
-        <script>
+        <script nonce="@cspNonce">
             (() => {
                 const openBells = () => document.querySelectorAll('details[data-notification-bell][open]');
 

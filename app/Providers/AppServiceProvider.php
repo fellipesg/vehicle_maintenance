@@ -28,6 +28,7 @@ use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -59,6 +60,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureLocale();
+
+        // `nonce="@cspNonce"` nos scripts inline. Fora de um pedido web (console, teste de view
+        // isolada) sai vazio, e um `nonce` vazio não muda o comportamento da tag.
+        Blade::directive(
+            'cspNonce',
+            fn (): string => "<?php echo e(\App\Support\Security\ContentSecurityPolicy::nonce() ?? ''); ?>",
+        );
 
         MaintenancePhotoUrls::registerLocalTemporaryUrls(Storage::disk('public'));
 
@@ -179,6 +187,12 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by('blog-comments|'.($request->user()?->id ?: $request->ip())),
             Limit::perDay(30)->by('blog-comments-daily|'.($request->user()?->id ?: $request->ip())),
         ]);
+
+        // Relatório de CSP: o navegador manda um por recurso bloqueado, sem sessão, então o balde
+        // é largo de propósito — o teto existe para o log não virar alvo, não para frear a página.
+        RateLimiter::for('csp-report', fn (Request $request) => Limit::perMinute(120)->by(
+            'csp-report|'.$request->ip(),
+        ));
 
         if ($this->app->runningInConsole()) {
             $this->describeAbuseGuards();

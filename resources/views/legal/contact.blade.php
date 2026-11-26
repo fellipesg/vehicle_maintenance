@@ -6,7 +6,7 @@
 
 @push('head')
     @if($turnstileSiteKey)
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        <script nonce="@cspNonce" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     @endif
 @endpush
 

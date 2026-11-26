@@ -34,7 +34,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Descadastro de um clique (RFC 8058): o provedor de e-mail faz o POST sem sessão; a URL
         // assinada protege. Quem leva a carga na query, e não no caminho, tem de vir como caminho
         // exato: 'convite/descadastrar/*' não casa com 'convite/descadastrar' (Str::is).
+        // O relatório de violação de CSP sai do navegador sem sessão e sem token.
         $middleware->validateCsrfTokens(except: [
+            'csp-report',
             'descadastrar/*',
             'convite/descadastrar',
             'oficinas/descadastrar',

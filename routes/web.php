@@ -28,6 +28,7 @@ use App\Http\Controllers\Web\BlogFeedController;
 use App\Http\Controllers\Web\ComparisonController;
 use App\Http\Controllers\Web\ConsignmentOwnerController;
 use App\Http\Controllers\Web\ContactController;
+use App\Http\Controllers\Web\CspReportController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
 use App\Http\Controllers\Web\Garage\ProfileController as GarageProfileController;
@@ -81,6 +82,11 @@ Route::post('/blog/{post}/comentarios', [BlogCommentController::class, 'store'])
 Route::delete('/blog/comentarios/{comment}', [BlogCommentController::class, 'destroy'])
     ->middleware('auth')
     ->name('blog.comments.destroy');
+// Violações de CSP: o navegador manda sem sessão e sem token, e repete por recurso bloqueado,
+// então o balde é largo e a rota só grava no log. Ver config/security.php.
+Route::post('/csp-report', CspReportController::class)
+    ->middleware('throttle:csp-report')
+    ->name('csp-report');
 // Webhook do Sentry (Internal Integration): autenticado pela assinatura HMAC, sem CSRF.
 Route::post('/webhooks/sentry', SentryWebhookController::class)->middleware('throttle:60,1')->name('webhooks.sentry');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
