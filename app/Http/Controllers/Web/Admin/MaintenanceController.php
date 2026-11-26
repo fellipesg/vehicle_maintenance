@@ -47,9 +47,14 @@ class MaintenanceController extends Controller
         return back()->with('success', 'Registro oculto da consulta pública.');
     }
 
-    public function restore(Maintenance $maintenance): RedirectResponse
+    /**
+     * Devolver também é ato com nome: o admin vai para a trilha
+     * (App\Models\MaintenanceVisibilityEvent), que esta ação acrescenta sem apagar a supressão
+     * anterior.
+     */
+    public function restore(Request $request, Maintenance $maintenance): RedirectResponse
     {
-        $this->visibility->restore($maintenance);
+        $this->visibility->restore($maintenance, $request->user());
 
         return back()->with('success', 'Registro de volta na consulta pública.');
     }
@@ -62,7 +67,7 @@ class MaintenanceController extends Controller
         $counts = $this->provenanceCounts(clone $filtered);
 
         $maintenances = $filtered
-            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user', 'hiddenBy', 'disputedBy'])
+            ->with(['vehicle', 'workshop', 'verifiedWorkshop', 'user', 'hiddenBy', 'disputedBy', 'visibilityEvents.actor'])
             ->when($filters['verified'] === '1', fn (Builder $query) => $query->whereNotNull('verified_at'))
             ->when($filters['verified'] === '0', fn (Builder $query) => $query->whereNull('verified_at'))
             ->orderBy('maintenance_date', $filters['direction'])

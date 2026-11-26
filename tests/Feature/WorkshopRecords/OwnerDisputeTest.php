@@ -396,7 +396,7 @@ class OwnerDisputeTest extends TestCase
             now()->toDateString(),
         );
 
-        $visibility->restore($record);
+        $visibility->restore($record, $admin);
 
         $this->assertSame(55_000, $vehicle->fresh()->current_kilometers);
     }

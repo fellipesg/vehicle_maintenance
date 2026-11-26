@@ -133,6 +133,11 @@
                                 @endif
                             </p>
                         @endif
+                        <x-admin.visibility-trail
+                            :events="$maintenance->visibilityEvents"
+                            :label="'da manutenção '.$maintenance->id"
+                        />
+
                         <span class="mt-2 block">
                             @if($maintenance->isHiddenFromPublic())
                                 <form method="POST" action="{{ route('admin.maintenances.restore', $maintenance) }}">

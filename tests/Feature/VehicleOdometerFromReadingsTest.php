@@ -99,7 +99,7 @@ class VehicleOdometerFromReadingsTest extends TestCase
 
         $this->assertSame(10_000, (int) $vehicle->fresh()->current_kilometers);
 
-        app(MaintenancePublicVisibilityService::class)->restore($maintenance->fresh());
+        app(MaintenancePublicVisibilityService::class)->restore($maintenance->fresh(), $admin);
 
         $this->assertSame(55_000, (int) $vehicle->fresh()->current_kilometers);
     }

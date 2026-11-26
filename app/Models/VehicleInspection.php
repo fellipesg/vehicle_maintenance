@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -88,6 +89,20 @@ class VehicleInspection extends Model
     public function hiddenBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'hidden_by_user_id');
+    }
+
+    /**
+     * A trilha de supressão deste laudo, da mais antiga para a mais nova.
+     *
+     * `hiddenBy` acima e `hidden_reason` descrevem só a supressão **corrente**: devolver o laudo ao
+     * histórico zera as duas, e sem esta relação não sobraria registro de que a supressão existiu.
+     * É o que a tela do admin mostra (App\Services\Inspection\InspectionPublicVisibilityService).
+     *
+     * @return HasMany<InspectionVisibilityEvent, $this>
+     */
+    public function visibilityEvents(): HasMany
+    {
+        return $this->hasMany(InspectionVisibilityEvent::class, 'vehicle_inspection_id')->inOrder();
     }
 
     public function isDisputed(): bool

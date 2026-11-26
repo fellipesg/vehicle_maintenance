@@ -136,6 +136,11 @@
                         </p>
                     @endif
 
+                    <x-admin.visibility-trail
+                        :events="$inspection->visibilityEvents"
+                        :label="'do laudo '.$inspection->verification_code"
+                    />
+
                     <span class="mt-2 block">
                         @if($inspection->isHiddenFromPublic())
                             <form method="POST" action="{{ route('admin.inspections.restore', $inspection) }}">
