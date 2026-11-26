@@ -11,7 +11,10 @@ visibilidade da consulta (`Vehicle::maintenancesVisibleTo` e `::inspectionsVisib
 `visibleInHistoryTo` e os pares em memória `Maintenance::isVisibleInHistoryTo` e
 `VehicleInspection::isVisibleInHistoryTo`). Não existe `tenant` ambiente guardado pela requisição,
 não existe `app/Models/Scopes/`, nem `#[ScopedBy]`, nem `addGlobalScope` — e isso é escolha, não
-esquecimento. `TenantIsolationHasNoAmbientContextTest` tranca as duas metades.
+esquecimento. `TenantIsolationHasNoAmbientContextTest` tranca as duas metades, e a metade do
+middleware é verificada na pilha **resolvida** (global, grupos e aliases do kernel, não só o que
+a rota declara): `gatherMiddleware()` devolve `web`/`api` sem expandir, então um
+`$middleware->append(...)` passaria por baixo de uma checagem feita só por rota.
 
 `App\Support\TenantContext` e o middleware `tenant` existiam e foram **removidos**: `id()` e
 `tenant()` tinham zero leitores em `app/`, `tests/` e `resources/`, e o único escritor era o
