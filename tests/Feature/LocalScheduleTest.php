@@ -39,4 +39,24 @@ class LocalScheduleTest extends TestCase
             collect($commands)->contains(fn (string $command): bool => str_contains($command, 'vehicle-pdf-exports:cleanup')),
         );
     }
+
+    /**
+     * Sem prune a telescope_entries cresce sem teto no Neon. O agendamento fica atrás de um
+     * class_exists porque o pacote está em require-dev e um deploy com --no-dev não o tem.
+     */
+    public function test_telescope_prune_is_scheduled_while_the_package_is_installed(): void
+    {
+        if (! class_exists(\Laravel\Telescope\TelescopeApplicationServiceProvider::class)) {
+            $this->markTestSkipped('laravel/telescope não está instalado neste ambiente.');
+        }
+
+        $prune = collect(app(Schedule::class)->events())->first(
+            fn (Event $event): bool => str_contains((string) ($event->command ?? ''), 'telescope:prune')
+        );
+
+        $this->assertNotNull($prune, 'Expected telescope:prune to be scheduled');
+        $this->assertStringContainsString('--hours=48', (string) $prune->command);
+        $this->assertSame('0 0 * * *', $prune->expression);
+        $this->assertTrue($prune->runsInEnvironment('production'));
+    }
 }

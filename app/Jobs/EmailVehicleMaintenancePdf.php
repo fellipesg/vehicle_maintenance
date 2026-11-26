@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\LimitsExecutionTime;
 use App\Mail\VehicleMaintenancePdfMail;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Mail;
 
 class EmailVehicleMaintenancePdf implements ShouldQueue
 {
+    use LimitsExecutionTime;
     use Queueable;
 
     public int $timeout = 300;
@@ -26,9 +28,7 @@ class EmailVehicleMaintenancePdf implements ShouldQueue
 
     public function handle(VehicleMaintenancePdfExporter $exporter): void
     {
-        if (function_exists('set_time_limit')) {
-            set_time_limit($this->timeout);
-        }
+        $this->limitExecutionTimeToJobTimeout();
 
         $file = $exporter->generate(
             $this->vehicle,
