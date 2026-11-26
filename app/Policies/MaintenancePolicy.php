@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Maintenance;
 use App\Models\User;
+use App\Support\Vehicle\IssuerIndependence;
 use Illuminate\Auth\Access\Response;
 
 class MaintenancePolicy
@@ -69,6 +70,28 @@ class MaintenancePolicy
             && $user->workshop !== null
             && $maintenance->isAwaitingWorkshopReview()
             && (int) $maintenance->workshop_id === (int) $user->workshop->id;
+    }
+
+    /**
+     * A metade da fila que **emite o Selo da oficina**, e por isso a única que responde ao invariante
+     * de independência (App\Support\Vehicle\IssuerIndependence): a oficina não confirma serviço em
+     * veículo do tenant dela. Sem isso, a conta declarava o serviço do próprio carro por um lado e o
+     * confirmava pelo outro — o selo pelo caminho mais longo.
+     *
+     * **Não reconhecer fica em `review`, de propósito.** Rejeitar não emite nada: tira o vínculo com
+     * a oficina. Negar as duas respostas junto prenderia o pedido na fila para sempre, porque o carro
+     * pode virar do tenant da oficina **depois** do pedido — `Maintenance::scopeAwaitingReviewBy`
+     * continua listando (status e workshop_id, nada de posse) e `WorkshopReviewService` só limpa um
+     * pendente quando a declarada é regravada, o que uma mudança de posse não faz. Rejeitar é a saída,
+     * e é a resposta honesta de quem não pode atestar.
+     */
+    public function confirmReview(User $user, Maintenance $maintenance): bool
+    {
+        return $this->review($user, $maintenance)
+            && IssuerIndependence::workshopMayAttest(
+                (int) $user->workshop->id,
+                $maintenance->loadMissing('vehicle')->getRelationValue('vehicle'),
+            );
     }
 
     private function canChange(User $user, Maintenance $maintenance): Response

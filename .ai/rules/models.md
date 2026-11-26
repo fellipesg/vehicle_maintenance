@@ -8,6 +8,12 @@ paths:
 ## Procedência só via MaintenanceVerificationStamper
 registered_by_type, verified_at, verified_workshop_id e verification_code não são fillable. Selo (workshop) só quando o ator é oficina e workshop_id da manutenção é o da oficina. Código RVL-XXXX-XX gerado com retry. Manutenção verificada não é editável/apagável por não-oficina.
 
+E **nunca** sobre veículo que o tenant da própria oficina possui: `applyWorkshopSeal` é o gargalo
+único do selo e confere independência ali, com `App\Support\Vehicle\IssuerIndependence`. Cada
+chamador trata a recusa de um jeito (o `stamp` cai em declarada, o backfill pula, a fila de validação
+nem enfileira). A regra inteira, com o que ela decide sobre posse não verificada e consignação e com
+o que ela **não** cobre (duas contas do mesmo humano), está em `.ai/rules/issuer-independence.md`.
+
 ## O selo não espera o proprietário
 Oficina **aprovada** (`.ai/rules/garage.md`) sela a OS que registrou em **qualquer** veículo, com ou
 sem proprietário cadastrado, e o registro entra no histórico do chassi na hora. O histórico pertence

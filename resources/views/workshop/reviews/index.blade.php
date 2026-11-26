@@ -76,15 +76,22 @@
                                     <x-ui.button variant="secondary" size="sm" icon="x-mark" data-dialog-open="{{ $dialogId }}">
                                         Não reconheço<span class="sr-only"> {{ $serviceLabel }}</span>
                                     </x-ui.button>
-                                    <form method="POST" action="{{ route('workshop.reviews.confirm', $maintenance) }}"
-                                          data-confirm="O serviço recebe o Selo da oficina e passa a ser da sua oficina: o cliente não edita mais e é avisado."
-                                          data-confirm-title="Confirmar {{ $serviceLabel }}?"
-                                          data-confirm-action-label="Confirmar serviço">
-                                        @csrf
-                                        <x-ui.button type="submit" size="sm" icon="shield-check" loading-label="Confirmando…">
-                                            Confirmar serviço<span class="sr-only"> {{ $serviceLabel }}</span>
-                                        </x-ui.button>
-                                    </form>
+                                    @can('confirmReview', $maintenance)
+                                        <form method="POST" action="{{ route('workshop.reviews.confirm', $maintenance) }}"
+                                              data-confirm="O serviço recebe o Selo da oficina e passa a ser da sua oficina: o cliente não edita mais e é avisado."
+                                              data-confirm-title="Confirmar {{ $serviceLabel }}?"
+                                              data-confirm-action-label="Confirmar serviço">
+                                            @csrf
+                                            <x-ui.button type="submit" size="sm" icon="shield-check" loading-label="Confirmando…">
+                                                Confirmar serviço<span class="sr-only"> {{ $serviceLabel }}</span>
+                                            </x-ui.button>
+                                        </form>
+                                    @else
+                                        {{-- O veículo é do tenant da oficina: confirmar aplicaria o selo sobre o próprio carro. Não reconhecer continua valendo, e é a saída da fila. --}}
+                                        <p class="max-w-xs text-sm text-muted-foreground lg:text-right">
+                                            Este veículo está na sua conta, então o Selo da oficina não sai aqui.
+                                        </p>
+                                    @endcan
                                 </div>
                             </div>
 
