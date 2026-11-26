@@ -54,7 +54,6 @@ must agree on the same contract; they are listed in a separate table below.
 | app/Http/Controllers/Web/Public*,resources/views/public/**,app/Http/Resources/Api/V1/**,app/Support/Vehicle/VehicleIdentifierVisibility.php,app/Support/Vehicle/VehicleIdentifierMask.php,app/Support/Workshop/WorkshopVehicleVisibility.php,app/Support/Workshop/WorkshopVehicleStep.php,app/Http/Controllers/Web/Concerns/ResolvesWorkshopVehicle.php,app/Http/Controllers/Web/Workshop/MaintenanceController.php,app/Http/Controllers/Web/Workshop/InspectionController.php,resources/views/workshop/maintenances/**,resources/views/workshop/inspections/**,resources/views/workshop/_vehicle-step.blade.php | .ai/rules/public-lookup.md |
 | scripts/crop-brand-assets.php | .ai/rules/scripts.md |
 | app/Support/DemoWorkshopLogoGenerator.php | .ai/rules/support.md |
-| app/Support/TenantContext.php,app/Http/Middleware/SetTenantContext.php | .ai/rules/tenant.md |
 | resources/css/provenance.css | .ai/rules/theme.md |
 | resources/views/components/ui/**,resources/views/** | .ai/rules/ui-components.md |
 | resources/js/** | .ai/rules/ui-scripts.md |

@@ -55,7 +55,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.type' => \App\Http\Middleware\EnsureUserType::class,
             'garage.approved' => \App\Http\Middleware\EnsureGarageApproved::class,
             'workshop.approved' => \App\Http\Middleware\EnsureWorkshopApproved::class,
-            'tenant' => \App\Http\Middleware\SetTenantContext::class,
             'noindex' => \App\Http\Middleware\NoIndex::class,
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
             'etag.vehicle_list' => \App\Http\Middleware\EtagForVehicleList::class,
