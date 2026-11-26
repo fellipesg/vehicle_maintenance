@@ -26,6 +26,12 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * A exclusão em si é a mesma do app: App\Services\User\DeleteUserAccount anonimiza os dados
  * pessoais e preserva veículos, placas e manutenções, que pertencem ao chassi.
  *
+ * Com identidade compartilhada o endereço pode ter uma conta por papel. A página é pública — não há
+ * sessão para dizer de qual papel se trata —, então o e-mail leva **um link por perfil**, nomeado,
+ * e a escolha é de quem abre a caixa de entrada. Cada link apaga só o seu perfil; os outros ficam
+ * (ver DeleteUserAccount). Mandar um link só, para a primeira conta que o e-mail achasse, apagaria
+ * silenciosamente o papel errado.
+ *
  * O link pode ser aberto no mesmo navegador em que a pessoa está logada, então a sessão dela
  * também sai daqui (EndsDeletedAccountSession).
  */
@@ -45,11 +51,20 @@ class AccountDeletionController extends Controller
     public function request(StoreAccountDeletionRequest $request): RedirectResponse
     {
         if (blank($request->input('website'))) {
-            $user = User::query()->where('email', $request->validated('email'))->first();
+            $accounts = User::query()
+                ->where('email', $request->validated('email'))
+                ->orderBy('id')
+                ->get();
 
-            if ($user !== null) {
-                Mail::to($user->email)->send(new AccountDeletionRequestMail(
-                    confirmationUrl: $this->confirmationUrl($user),
+            if ($accounts->isNotEmpty()) {
+                Mail::to((string) $accounts->first()->email)->send(new AccountDeletionRequestMail(
+                    confirmations: $accounts
+                        ->map(fn (User $user): array => [
+                            'label' => $user->typeLabel(),
+                            'url' => $this->confirmationUrl($user),
+                        ])
+                        ->values()
+                        ->all(),
                     expiresInMinutes: self::LINK_MINUTES,
                 ));
             }
@@ -68,6 +83,12 @@ class AccountDeletionController extends Controller
         return view('legal.account-deletion-confirm', [
             'user' => $user,
             'confirmationUrl' => $request->fullUrl(),
+            // Quantos outros perfis o mesmo e-mail tem: a página diz qual está sendo excluído e
+            // que os demais continuam.
+            'otherProfileLabels' => $user->siblingAccounts()
+                ->map(fn (User $sibling): string => $sibling->typeLabel())
+                ->values()
+                ->all(),
         ]);
     }
 

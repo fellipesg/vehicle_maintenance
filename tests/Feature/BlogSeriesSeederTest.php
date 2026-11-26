@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use App\Support\BlogCoverArt;
+use Database\Seeders\AeoBlogPostsSeeder;
 use Database\Seeders\BlogSeeder;
 use Database\Seeders\BlogSeriesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -108,7 +109,12 @@ class BlogSeriesSeederTest extends TestCase
     public function test_internal_links_only_point_to_posts_already_live_on_that_date(): void
     {
         $posts = BlogSeriesSeeder::posts();
-        $existingSlugs = array_column(BlogSeeder::posts(), 'slug');
+        // Os posts de resposta direta saem publicados no mesmo deploy (23/11/2026),
+        // então o artigo de 17/11 pode apontar para eles sem ficar no 404.
+        $existingSlugs = array_merge(
+            array_column(BlogSeeder::posts(), 'slug'),
+            array_column(AeoBlogPostsSeeder::posts(), 'slug'),
+        );
         $publishAtBySlug = array_column($posts, 'publish_at', 'slug');
 
         foreach ($posts as $post) {

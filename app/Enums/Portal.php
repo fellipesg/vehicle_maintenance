@@ -4,6 +4,7 @@ namespace App\Enums;
 
 use App\Models\User;
 use App\Support\Inspection\InspectionAccess;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -122,9 +123,13 @@ enum Portal: string
      */
     public static function dealerAwaitingApproval(?User $user): bool
     {
-        return $user !== null
-            && $user->isGarage()
-            && ! ($user->garage?->isApproved() ?? false);
+        if ($user === null || ! $user->isGarage()) {
+            return false;
+        }
+
+        $garage = self::relationOf($user, 'garage');
+
+        return ! ($garage?->isApproved() ?? false);
     }
 
     /**
@@ -138,7 +143,7 @@ enum Portal: string
             return false;
         }
 
-        $workshop = $user->workshop;
+        $workshop = self::relationOf($user, 'workshop');
 
         return $workshop !== null && ! $workshop->isApproved();
     }
@@ -149,6 +154,32 @@ enum Portal: string
     public static function awaitingApproval(?User $user): bool
     {
         return self::dealerAwaitingApproval($user) || self::workshopAwaitingApproval($user);
+    }
+
+    /**
+     * Loja ou oficina da conta, com `loadMissing` e não `$user->garage`: o
+     * Model::preventLazyLoading está ligado fora de produção e isto roda no login, antes de
+     * qualquer tela carregar o cadastro — ali uma violação viraria 500 em vez de resposta.
+     *
+     * Relação já anexada em memória vale como está (é como alguns testes montam a conta), e conta
+     * ainda não gravada não tem o que consultar: sem chave, o eager load iria ao banco com `id 0`,
+     * que o lazy load evitava sozinho.
+     */
+    private static function relationOf(User $user, string $relation): ?Model
+    {
+        if ($user->relationLoaded($relation)) {
+            $loaded = $user->getRelation($relation);
+
+            return $loaded instanceof Model ? $loaded : null;
+        }
+
+        if ($user->getKey() === null) {
+            return null;
+        }
+
+        $value = $user->loadMissing($relation)->getRelation($relation);
+
+        return $value instanceof Model ? $value : null;
     }
 
     /**

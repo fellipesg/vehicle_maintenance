@@ -1,6 +1,6 @@
 @php
     /*
-     * Google AdSense só no blog (App\Support\GoogleAdsense) e só com ADSENSE_CLIENT_ID definido.
+     * Google AdSense só no artigo do blog (App\Support\GoogleAdsense) e só com ADSENSE_CLIENT_ID definido.
      * Anúncio personalizado depende do aceite no aviso <x-ads.consent-banner> (cookie rl_ads_consent,
      * gravado por resources/js/ad-consent.js); sem aceite, ou com o sinal Global Privacy Control do
      * navegador, o AdSense recebe consentimento negado e serve só anúncio não personalizado.
@@ -10,7 +10,7 @@
     $analyticsDeclaresConsent = trim((string) config('services.google_analytics.measurement_id')) !== '';
 @endphp
 @if ($adsenseClient !== null)
-    <script>
+    <script nonce="@cspNonce">
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
         @unless ($analyticsDeclaresConsent)
@@ -25,5 +25,5 @@
             }
         })();
     </script>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ $adsenseClient }}" crossorigin="anonymous"></script>
+    <script nonce="@cspNonce" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ $adsenseClient }}" crossorigin="anonymous"></script>
 @endif

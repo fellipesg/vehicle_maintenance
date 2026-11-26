@@ -16,6 +16,8 @@ class UserVehicle extends Pivot
         'purchase_date',
         'sale_date',
         'is_current_owner',
+        'ownership_ended_by_user_id',
+        'ownership_ended_reason',
         'tenant_id',
         'ownership_verified_at',
         'crlv_exercise_year',

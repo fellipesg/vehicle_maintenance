@@ -53,7 +53,7 @@ Essas informações costumam aparecer em **relatórios veiculares pagos**, que c
 
 Repare se as **datas e quilometragens fazem sentido entre si**. Revisões a cada ano com quilometragens que crescem de forma regular são bom sinal. Um salto estranho — 80 mil km numa nota e 60 mil no painel dois anos depois — é o principal indício de quilometragem adulterada, assunto do terceiro post desta série.
 
-Se o carro tem histórico registrado no RevisaLog, a linha do tempo fica vinculada ao chassi, não à conta do vendedor, e a busca funciona também pela placa antiga. O post [Como o RevisaLog guarda o histórico do seu carro](/blog/como-o-revisalog-guarda-o-historico-do-seu-carro) explica como isso funciona.
+Se o carro tem histórico registrado no RevisaLog, a linha do tempo fica vinculada ao chassi, não à conta do vendedor, e a busca funciona também pela placa antiga. O post [Como o RevisaLog guarda o histórico do seu carro](/blog/como-o-revisalog-guarda-o-historico-do-seu-carro) explica como isso funciona. Um código de selo se confere no passo a passo [como verificar se as revisões do carro usado são verdadeiras](/blog/como-verificar-se-revisoes-do-carro-usado-sao-verdadeiras). O [comparativo de apps de histórico de manutenção](/melhor-app-historico-manutencao-carro) registra o que outros apps dizem, e o que não dizem, sobre histórico que fica no carro.
 
 ## Na prática: ordem da consulta
 
@@ -61,7 +61,7 @@ Para não gastar tempo nem dinheiro com o carro errado, siga esta ordem:
 
 1. **Antes de visitar**: peça placa e RENAVAM e consulte débitos, restrições e bloqueios no Detran. Gratuito.
 2. **Antes de visitar**: consulte recall pelo chassi no site da montadora. Gratuito.
-3. **Na visita**: confira se o chassi gravado no carro bate com o documento (o próximo post mostra onde ele fica).
+3. **Na visita**: confira se o chassi gravado no carro bate com o documento.
 4. **Na visita**: peça manual, notas e o contato da oficina.
 5. **Antes de pagar qualquer sinal**: faça o relatório veicular pago e, se possível, leve um mecânico de confiança.
 
@@ -77,4 +77,4 @@ Carro sem nota e sem revisão carimbada não é necessariamente ruim — muita g
 
 ---
 
-**Vai ver um carro?** Faça a [consulta pública do RevisaLog](/buscar-veiculo) pela placa ou pelo chassi e veja se ele já tem manutenções registradas.
+**Vai ver um carro?** Com uma conta gratuita, use a [busca do RevisaLog](/buscar-veiculo) pela placa ou pelo chassi e veja se ele já tem manutenções registradas.

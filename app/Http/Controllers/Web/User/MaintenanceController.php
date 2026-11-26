@@ -134,9 +134,8 @@ class MaintenanceController extends Controller
                 $maintenance = Maintenance::create($data);
                 $maintenance = app(MaintenanceVerificationStamper::class)->stamp($maintenance, $request->user());
                 app(WorkshopLeadRecorder::class)->rememberContact($maintenance, $workshopContact);
-                $this->mileage->applyMaintenanceKilometers(
+                $this->mileage->refreshCurrentKilometers(
                     Vehicle::findOrFail($data['vehicle_id']),
-                    (int) $data['kilometers'],
                 );
 
                 return $maintenance;

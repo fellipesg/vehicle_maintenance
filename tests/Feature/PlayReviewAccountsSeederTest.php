@@ -72,10 +72,13 @@ class PlayReviewAccountsSeederTest extends TestCase
         $seeder = new PlayReviewAccountsSeeder;
         $seeder->run();
 
-        User::where('email', PlayReviewAccountsSeeder::OWNER_EMAIL)->firstOrFail()->forceFill([
-            'two_factor_secret' => 'ABC123',
-            'two_factor_confirmed_at' => now(),
-        ])->save();
+        // O 2FA mora na identidade (App\Models\Identity), não na conta.
+        User::where('email', PlayReviewAccountsSeeder::OWNER_EMAIL)->firstOrFail()
+            ->identity
+            ->forceFill([
+                'two_factor_secret' => 'ABC123',
+                'two_factor_confirmed_at' => now(),
+            ])->save();
 
         $seeder->run();
 

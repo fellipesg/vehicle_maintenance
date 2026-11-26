@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\AboutController;
 use App\Http\Controllers\Web\AccountController;
 use App\Http\Controllers\Web\AccountDeletionController;
 use App\Http\Controllers\Web\Admin\BlogCategoryController as AdminBlogCategoryController;
@@ -24,8 +25,10 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BlogCommentController;
 use App\Http\Controllers\Web\BlogController;
 use App\Http\Controllers\Web\BlogFeedController;
+use App\Http\Controllers\Web\ComparisonController;
 use App\Http\Controllers\Web\ConsignmentOwnerController;
 use App\Http\Controllers\Web\ContactController;
+use App\Http\Controllers\Web\CspReportController;
 use App\Http\Controllers\Web\Garage\DashboardController as GarageDashboardController;
 use App\Http\Controllers\Web\Garage\MaintenanceController as GarageMaintenanceController;
 use App\Http\Controllers\Web\Garage\ProfileController as GarageProfileController;
@@ -34,12 +37,14 @@ use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\InspectionReportController;
 use App\Http\Controllers\Web\InvoiceDownloadController;
 use App\Http\Controllers\Web\LegalController;
+use App\Http\Controllers\Web\LlmsTxtController;
 use App\Http\Controllers\Web\MaintenanceInviteController;
 use App\Http\Controllers\Web\MaintenancePhotoController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OutreachController;
 use App\Http\Controllers\Web\PublicVehicleController;
 use App\Http\Controllers\Web\SentryWebhookController;
+use App\Http\Controllers\Web\SignupController;
 use App\Http\Controllers\Web\SitemapController;
 use App\Http\Controllers\Web\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\Web\User\InspectionDisputeController as UserInspectionDisputeController;
@@ -70,6 +75,7 @@ Route::get('/blog/categoria/{category}', [BlogController::class, 'category'])->n
 Route::get('/blog/{post}', [BlogController::class, 'show'])->name('blog.show');
 Route::get('/blog/{post}/comentar/{destination}', [BlogCommentController::class, 'enter'])
     ->whereIn('destination', ['entrar', 'criar-conta'])
+    ->middleware('noindex')
     ->name('blog.comments.enter');
 Route::post('/blog/{post}/comentarios', [BlogCommentController::class, 'store'])
     ->middleware(['auth', 'throttle:blog-comments'])
@@ -77,10 +83,17 @@ Route::post('/blog/{post}/comentarios', [BlogCommentController::class, 'store'])
 Route::delete('/blog/comentarios/{comment}', [BlogCommentController::class, 'destroy'])
     ->middleware('auth')
     ->name('blog.comments.destroy');
+// Violações de CSP: o navegador manda sem sessão e sem token, e repete por recurso bloqueado,
+// então o balde é largo e a rota só grava no log. Ver config/security.php.
+Route::post('/csp-report', CspReportController::class)
+    ->middleware('throttle:csp-report')
+    ->name('csp-report');
 // Webhook do Sentry (Internal Integration): autenticado pela assinatura HMAC, sem CSRF.
 Route::post('/webhooks/sentry', SentryWebhookController::class)->middleware('throttle:60,1')->name('webhooks.sentry');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('/llms.txt', LlmsTxtController::class)->name('llms');
 Route::get('/ads.txt', AdsTxtController::class)->name('ads.txt');
+Route::get('/sobre', AboutController::class)->name('about');
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
 Route::get('/para-oficinas', WorkshopLandingController::class)->name('workshops.landing');
 Route::get('/o/{token}', [OutreachController::class, 'click'])->middleware('throttle:search')->name('outreach.click');
@@ -125,6 +138,7 @@ Route::prefix('consignacao')->name('consignments.owner.')->middleware('throttle:
 });
 
 // Conferência pública do Selo da oficina: o campo para digitar o código (/verificar) e a página do QR (/v/).
+Route::get('/melhor-app-historico-manutencao-carro', ComparisonController::class)->name('guides.comparison');
 Route::get('/verificar', [\App\Http\Controllers\Web\PublicVerificationController::class, 'lookup'])
     ->middleware('throttle:search')
     ->name('verification.lookup');
@@ -142,30 +156,57 @@ Route::get('/laudo/{code}', [\App\Http\Controllers\Web\PublicInspectionControlle
     ->name('inspections.public');
 
 Route::middleware('guest')->group(function () {
-    Route::get('/login', [AuthController::class, 'showLoginHub'])->name('login');
-    Route::get('/login/admin', fn () => app(AuthController::class)->showLogin('admin'))->name('login.admin');
-    Route::get('/login/lojista', fn () => app(AuthController::class)->showLogin('lojista'))->name('login.lojista');
-    Route::get('/login/usuario', fn () => app(AuthController::class)->showLogin('usuario'))->name('login.usuario');
-    Route::get('/login/oficina', fn () => app(AuthController::class)->showLogin('oficina'))->name('login.oficina');
-    Route::post('/login/{portal}', [AuthController::class, 'login'])
-        ->whereIn('portal', ['admin', 'lojista', 'usuario', 'oficina'])
-        ->middleware('throttle:auth-web')
-        ->name('login.submit');
-    Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-web');
+    Route::middleware('noindex')->group(function () {
+        Route::get('/login', [AuthController::class, 'showLoginHub'])->name('login');
+        Route::get('/login/admin', fn () => app(AuthController::class)->showLogin('admin'))->name('login.admin');
+        Route::get('/login/lojista', fn () => app(AuthController::class)->showLogin('lojista'))->name('login.lojista');
+        Route::get('/login/usuario', fn () => app(AuthController::class)->showLogin('usuario'))->name('login.usuario');
+        Route::get('/login/oficina', fn () => app(AuthController::class)->showLogin('oficina'))->name('login.oficina');
+        Route::post('/login/{portal}', [AuthController::class, 'login'])
+            ->whereIn('portal', ['admin', 'lojista', 'usuario', 'oficina'])
+            ->middleware('throttle:auth-web')
+            ->name('login.submit');
+        Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
+        Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-web');
+
+        // Cadastro em etapas: perfil e e-mail, senha, dados do perfil. O balde é o `signup`, e não
+        // o `auth-web`: a etapa 1 é um oráculo de "este e-mail tem conta?" e a etapa 2 é tentativa
+        // de senha de uma conta que já existe — limites diferentes, e nenhum deles pode gastar a
+        // cota de login de quem só está se cadastrando (App\Providers\AppServiceProvider).
+        Route::get('/cadastro', [SignupController::class, 'start'])->name('signup.start');
+        Route::post('/cadastro', [SignupController::class, 'storeProfile'])
+            ->middleware('throttle:signup')
+            ->name('signup.profile');
+
+        Route::middleware('signup.step:started')->group(function (): void {
+            Route::get('/cadastro/senha', [SignupController::class, 'password'])->name('signup.password');
+            Route::post('/cadastro/senha', [SignupController::class, 'storePassword'])
+                ->middleware('throttle:signup')
+                ->name('signup.password.store');
+        });
+
+        Route::middleware('signup.step:password')->group(function (): void {
+            Route::get('/cadastro/dados', [SignupController::class, 'details'])->name('signup.details');
+            Route::post('/cadastro/dados', [SignupController::class, 'storeDetails'])
+                ->middleware('throttle:signup')
+                ->name('signup.details.store');
+        });
+
+        // Recuperação de senha (Password broker). O limite de tentativas fica no controller, com aviso em pt-BR.
+        Route::get('/esqueci-senha', [PasswordResetController::class, 'create'])->name('password.request');
+        Route::post('/esqueci-senha', [PasswordResetController::class, 'store'])->name('password.email');
+        Route::get('/redefinir-senha/{token}', [PasswordResetController::class, 'edit'])->name('password.reset');
+        Route::post('/redefinir-senha', [PasswordResetController::class, 'update'])->name('password.update');
+    });
+
+    // Landing de aquisição: continua indexável. O noindex fica só nas telas de conta.
     Route::get('/para-oficinas/cadastro', [WorkshopSignupController::class, 'show'])->name('workshops.signup');
     Route::post('/para-oficinas/cadastro', [WorkshopSignupController::class, 'store'])
         ->middleware('throttle:auth-web')
         ->name('workshops.signup.store');
-
-    // Recuperação de senha (Password broker). O limite de tentativas fica no controller, com aviso em pt-BR.
-    Route::get('/esqueci-senha', [PasswordResetController::class, 'create'])->name('password.request');
-    Route::post('/esqueci-senha', [PasswordResetController::class, 'store'])->name('password.email');
-    Route::get('/redefinir-senha/{token}', [PasswordResetController::class, 'edit'])->name('password.reset');
-    Route::post('/redefinir-senha', [PasswordResetController::class, 'update'])->name('password.update');
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'noindex'])->group(function () {
     // Busca por identificador de quem está logado: mesmo balde da etapa 1 da OS, pela conta. No
     // `search` (por IP) a cota do portal era gasta por visitante da mesma rede.
     Route::get('/buscar-veiculo', [PublicVehicleController::class, 'search'])
@@ -433,6 +474,11 @@ Route::middleware('auth')->group(function () {
         Route::put('/usuarios/{user}/fotos-manutencao', [AdminMaintenancePhotosFeatureController::class, 'user'])->name('users.maintenance-photos');
         Route::get('/veiculos', [AdminVehicleController::class, 'index'])->name('vehicles.index');
         Route::get('/veiculos/{vehicle}', [AdminVehicleController::class, 'show'])->name('vehicles.show');
+        // Desfazer um vínculo de propriedade é ação da equipe, com motivo: ver
+        // App\Services\Vehicle\VehicleOwnershipEndingService.
+        Route::post('/veiculos/{vehicle}/proprietarios/{user}/encerrar', [AdminVehicleController::class, 'endOwnership'])
+            ->whereNumber(['vehicle', 'user'])
+            ->name('vehicles.end-ownership');
         Route::get('/manutencoes', [AdminMaintenanceController::class, 'index'])->name('maintenances.index');
         // Ocultar da consulta pública é ação da equipe, não do proprietário: ver
         // App\Services\Maintenance\MaintenancePublicVisibilityService.

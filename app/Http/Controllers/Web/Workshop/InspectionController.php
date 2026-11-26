@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -102,6 +103,16 @@ class InspectionController extends Controller
             self::chassisOwnedMessage(),
             fn (string $licensePlate): string => self::vehicleNotFoundMessage($licensePlate),
         );
+
+        // Conflito de interesse: a oficina não emite laudo sobre veículo do tenant dela
+        // (.ai/rules/inspections.md). A recusa sai aqui, antes da transação, e em `license_plate`
+        // porque é o único caminho que chega a um veículo com dono — pelo chassi,
+        // ResolvesWorkshopVehicle já recusa carro que tem proprietário.
+        if ($vehicle !== null && Gate::inspect('create', [VehicleInspection::class, $vehicle])->code() === VehicleInspectionPolicy::DENIED_OWN_VEHICLE) {
+            throw ValidationException::withMessages([
+                'license_plate' => self::ownVehicleMessage(),
+            ]);
+        }
 
         $inspection = DB::transaction(function () use ($vehicle, $newVehicle, $chassis, $data, $request, $workshop): VehicleInspection {
             // Veículo criado pelo chassi nasce **sem** hodômetro: a leitura do laudo é do laudo, e
@@ -191,5 +202,10 @@ class InspectionController extends Controller
     public static function vehicleNotFoundMessage(string $licensePlate): string
     {
         return 'Veículo '.$licensePlate.' ainda não está no RevisaLog. Cadastre-o pelo chassi para emitir o laudo.';
+    }
+
+    public static function ownVehicleMessage(): string
+    {
+        return 'Este veículo está na sua própria conta. A vistoria cautelar é a palavra de quem não tem interesse na venda, então o laudo não pode ser emitido sobre o próprio carro.';
     }
 }

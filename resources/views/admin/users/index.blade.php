@@ -106,6 +106,13 @@
                         <span class="min-w-0">
                             <x-ui.link :href="route('admin.users.show', $account)">{{ $account->name }}</x-ui.link>
                             <span class="block truncate text-xs font-normal text-muted-foreground">{{ $account->email }}</span>
+                            @if($others = $otherProfileLabels[$account->id] ?? [])
+                                {{-- Mesma pessoa, outro papel: a lista é por conta, então o e-mail
+                                     repetido é um perfil irmão, não cadastro duplicado. --}}
+                                <span class="mt-1 block text-xs font-normal text-muted-foreground" data-slot="sibling-profiles">
+                                    Mesma pessoa, também {{ implode(' e ', $others) }}
+                                </span>
+                            @endif
                         </span>
                     </span>
                 </th>

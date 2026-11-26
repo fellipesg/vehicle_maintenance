@@ -4,19 +4,10 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\AuthenticateWebSession;
 use App\Http\Middleware\SetSecurityHeaders;
-use App\Models\Garage;
 use App\Models\Invoice;
 use App\Models\Maintenance;
 use App\Models\User;
-use App\Models\UserVehicle;
 use App\Models\Vehicle;
-use App\Models\VehicleConsignment;
-use App\Models\VehicleInspection;
-use App\Models\VehiclePdfExport;
-use App\Models\VehiclePlate;
-use App\Models\WarrantyTemplate;
-use App\Models\Workshop;
-use App\Models\WorkshopMessageTemplate;
 use App\Support\SanctumMobileToken;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +17,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use ReflectionClass;
 use Tests\TestCase;
 
 /**
@@ -100,23 +92,16 @@ class TenantIsolationHasNoAmbientContextTest extends TestCase
      * esta exceção um `use SoftDeletes` legítimo em qualquer destes models falharia aqui com uma
      * mensagem sobre isolamento, mandando quem mexeu para a regra errada.
      */
-    public function test_no_tenant_model_registers_a_global_scope(): void
+    public function test_no_model_registers_a_global_scope(): void
     {
-        $models = [
-            Vehicle::class,
-            Maintenance::class,
-            VehicleInspection::class,
-            Invoice::class,
-            UserVehicle::class,
-            VehiclePlate::class,
-            VehicleConsignment::class,
-            VehiclePdfExport::class,
-            WarrantyTemplate::class,
-            WorkshopMessageTemplate::class,
-            User::class,
-            Workshop::class,
-            Garage::class,
-        ];
+        $models = $this->allModelClasses();
+
+        // A lista sai do diretório, não é escrita à mão: model novo com tenant_id entra sozinho.
+        // Era o furo que a fusão com a main expôs — ela trouxe Identity e VehicleOdometerReading,
+        // os dois com tenant_id, e uma lista fixa não os cobriria.
+        $this->assertGreaterThan(20, count($models), 'A descoberta de models não achou nada.');
+        $this->assertContains(Maintenance::class, $models);
+        $this->assertContains(Vehicle::class, $models);
 
         foreach ($models as $class) {
             /** @var Model $model */
@@ -135,6 +120,36 @@ class TenantIsolationHasNoAmbientContextTest extends TestCase
                 .'de visibilidade na consulta; ver .ai/rules/policies.md antes de mudar isto.',
             );
         }
+    }
+
+    /**
+     * Todo model concreto de app/Models, descoberto pelo diretório.
+     *
+     * @return list<class-string<Model>>
+     */
+    private function allModelClasses(): array
+    {
+        $classes = [];
+
+        foreach (glob(app_path('Models/*.php')) ?: [] as $file) {
+            $class = 'App\\Models\\'.basename($file, '.php');
+
+            if (! class_exists($class)) {
+                continue;
+            }
+
+            $reflection = new ReflectionClass($class);
+
+            if ($reflection->isAbstract() || ! $reflection->isSubclassOf(Model::class)) {
+                continue;
+            }
+
+            $classes[] = $class;
+        }
+
+        sort($classes);
+
+        return $classes;
     }
 
     /**

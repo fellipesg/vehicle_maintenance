@@ -70,8 +70,9 @@ class AccountDeletionTest extends TestCase
 
         Mail::assertQueued(AccountDeletionRequestMail::class, function (AccountDeletionRequestMail $mail) use ($user): bool {
             return $mail->hasTo($user->email)
-                && str_contains($mail->confirmationUrl, 'excluir-conta/confirmar/'.$user->id)
-                && str_contains($mail->confirmationUrl, 'signature=');
+                && count($mail->confirmations) === 1
+                && str_contains($mail->confirmations[0]['url'], 'excluir-conta/confirmar/'.$user->id)
+                && str_contains($mail->confirmations[0]['url'], 'signature=');
         });
     }
 
@@ -185,7 +186,10 @@ class AccountDeletionTest extends TestCase
 
     public function test_the_confirmation_mail_renders_with_the_link(): void
     {
-        $mail = new AccountDeletionRequestMail(confirmationUrl: 'https://revisalog.com.br/excluir-conta/confirmar/1?signature=abc', expiresInMinutes: 60);
+        $mail = new AccountDeletionRequestMail(
+            confirmations: [['label' => 'Proprietário', 'url' => 'https://revisalog.com.br/excluir-conta/confirmar/1?signature=abc']],
+            expiresInMinutes: 60,
+        );
 
         $rendered = $mail->render();
 
@@ -316,7 +320,7 @@ class AccountDeletionTest extends TestCase
             ->assertSee('inclusive as notas fiscais e as fotos do serviço')
             ->assertSee('pede a sua senha atual');
 
-        $this->assertSame('2026-11-18', config('legal.privacy_version'));
+        $this->assertSame('2026-11-25', config('legal.privacy_version'));
     }
 
     /**
@@ -445,7 +449,11 @@ class AccountDeletionTest extends TestCase
             $attempts[] = [
                 'status' => $response->getStatusCode(),
                 'location' => $response->headers->get('Location'),
-                'body' => $response->getContent(),
+                // O nonce do CSP é sorteado a cada pedido (.ai/rules/security-headers.md) e aparece
+                // nas tags da página de erro do 429. Ele muda entre dois pedidos iguais, então não
+                // diz nada sobre existir a conta: sai da comparação para o oráculo seguir sendo o
+                // que o teste afirma.
+                'body' => preg_replace('/nonce="[^"]*"/', 'nonce="NONCE"', (string) $response->getContent()),
             ];
         }
 

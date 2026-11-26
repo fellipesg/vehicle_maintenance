@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Vehicle;
+use App\Services\Vehicle\VehicleOwnershipEndingService;
 use App\Support\VehiclePlateSearch;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -84,5 +87,23 @@ class VehicleController extends Controller
         $vehicle->load(['owners' => fn ($query) => $query->wherePivot('is_current_owner', true)]);
 
         return view('admin.vehicles.show', ['vehicle' => $vehicle]);
+    }
+
+    /**
+     * Encerra o vínculo de um dono atual com o veículo (VehicleOwnershipEndingService). O motivo é
+     * obrigatório: tirar um carro de uma conta precisa ter nome e razão, como ocultar uma OS.
+     */
+    public function endOwnership(Request $request, Vehicle $vehicle, User $user, VehicleOwnershipEndingService $ownershipEnding): RedirectResponse
+    {
+        $data = $request->validate(
+            ['ownership_ended_reason' => ['required', 'string', 'max:500']],
+            ['ownership_ended_reason.required' => 'Informe o motivo para encerrar o vínculo.'],
+        );
+
+        if (! $ownershipEnding->endByTeam($vehicle, $user, $request->user(), $data['ownership_ended_reason'])) {
+            return back()->with('error', "{$user->name} já não é proprietário atual deste veículo.");
+        }
+
+        return back()->with('success', "Vínculo de {$user->name} com o veículo encerrado.");
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\LimitsExecutionTime;
 use App\Mail\WorkshopProspectImportFinishedMail;
 use App\Models\User;
 use App\Services\Outreach\WorkshopProspectImporter;
@@ -17,6 +18,7 @@ use Throwable;
  */
 class ImportWorkshopProspectsCsv implements ShouldQueue
 {
+    use LimitsExecutionTime;
     use Queueable;
 
     public int $timeout = 300;
@@ -34,9 +36,7 @@ class ImportWorkshopProspectsCsv implements ShouldQueue
 
     public function handle(WorkshopProspectImporter $importer): void
     {
-        if (function_exists('set_time_limit')) {
-            set_time_limit($this->timeout);
-        }
+        $this->limitExecutionTimeToJobTimeout();
 
         try {
             $counts = $importer->importCsv($this->contents);

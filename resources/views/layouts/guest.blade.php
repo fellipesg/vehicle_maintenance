@@ -1,9 +1,20 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    @php
+        $seoTitle = \App\Support\DocumentTitle::compose($__env->yieldContent('title') ?: 'Entrar');
+        $seoDescription = trim($__env->yieldContent('meta_description'));
+        $seoCanonical = trim($__env->yieldContent('canonical'));
+        if ($seoCanonical === '') {
+            $seoCanonical = \App\Support\Seo\CanonicalUrl::forRequest();
+        }
+        $seoType = trim($__env->yieldContent('og_type')) ?: 'website';
+        $seoNoIndex = (bool) request()->attributes->get('seoNoIndex');
+    @endphp
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{!! \App\Support\DocumentTitle::compose($__env->yieldContent('title') ?: 'Entrar') !!}</title>
+    <title>{!! $seoTitle !!}</title>
+    @include('layouts.partials.seo-head')
     <x-brand-head-icons include-og-image />
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />

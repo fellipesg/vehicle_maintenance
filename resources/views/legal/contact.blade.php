@@ -2,10 +2,11 @@
 
 @section('title', 'Contato')
 
+@section('meta_description', 'Fale com o suporte do RevisaLog: dúvidas, ajuda com o histórico do veículo, parcerias com oficinas e lojistas e pedidos sobre dados pessoais (LGPD).')
+
 @push('head')
-    <meta name="description" content="Fale com o suporte do RevisaLog: dúvidas, ajuda com o histórico do veículo, parcerias com oficinas e lojistas e pedidos sobre dados pessoais (LGPD).">
     @if($turnstileSiteKey)
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        <script nonce="@cspNonce" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     @endif
 @endpush
 

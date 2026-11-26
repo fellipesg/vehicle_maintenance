@@ -5,7 +5,7 @@
     barra/sidebar fixa, então um overlay aberto é fechado (senão o fundo escuro e o bloqueio de
     rolagem ficariam na tela).
 --}}
-<script>
+<script nonce="@cspNonce">
     (() => {
         const breakpoints = { md: '(min-width: 48rem)', lg: '(min-width: 64rem)' };
         const overlays = Array.from(document.querySelectorAll('.hs-overlay[data-shell-overlay]'));

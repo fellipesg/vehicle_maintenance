@@ -129,10 +129,7 @@ class TwoFactorTest extends TestCase
         $user = $this->actingAsApiUser();
         $secret = app(TwoFactorService::class)->generateSecretKey();
 
-        $user->forceFill([
-            'two_factor_secret' => $secret,
-            'two_factor_confirmed_at' => null,
-        ])->save();
+        app(TwoFactorService::class)->beginSetup($user, $secret);
 
         $code = $this->google2fa->getCurrentOtp($secret);
 
@@ -153,10 +150,7 @@ class TwoFactorTest extends TestCase
         $user = $this->actingAsApiUser();
         $secret = app(TwoFactorService::class)->generateSecretKey();
 
-        $user->forceFill([
-            'two_factor_secret' => $secret,
-            'two_factor_confirmed_at' => null,
-        ])->save();
+        app(TwoFactorService::class)->beginSetup($user, $secret);
 
         $this->postJson('/api/v1/two-factor/confirm', [
             'code' => '000000',
@@ -265,13 +259,9 @@ class TwoFactorTest extends TestCase
         $secret = $twoFactorService->generateSecretKey();
         $recoveryCodes = $twoFactorService->generateRecoveryCodes();
 
-        $user->forceFill([
-            'two_factor_secret' => $secret,
-            'two_factor_confirmed_at' => now(),
-            'two_factor_recovery_codes' => json_encode(
-                $twoFactorService->hashRecoveryCodes($recoveryCodes),
-            ),
-        ])->save();
+        // O 2FA mora na identidade (App\Models\Identity), compartilhado pelas contas irmãs.
+        $twoFactorService->beginSetup($user, $secret);
+        $twoFactorService->confirmSetup($user, $twoFactorService->hashRecoveryCodes($recoveryCodes));
 
         return $user->fresh();
     }

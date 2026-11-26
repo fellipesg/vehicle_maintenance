@@ -12,6 +12,9 @@ use Illuminate\Validation\Rule;
  *
  * Trocar o e-mail pede a senha atual: o e-mail é o login e o destino do link de redefinição, então
  * uma sessão aberta (aparelho desbloqueado ou sessão roubada) não basta para tomar a conta.
+ *
+ * O e-mail é da identidade: trocá-lo aqui troca em todas as contas irmãs da pessoa
+ * (App\Models\Identity::changeEmailTo, chamado pelo AccountController).
  */
 class UpdateAccountRequest extends FormRequest
 {
@@ -27,7 +30,16 @@ class UpdateAccountRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user()?->id)],
+            // O unique é da **identidade**, não de `users`: com contas irmãs o mesmo e-mail aparece
+            // numa linha de `users` por papel, e um unique sobre `users` acusaria a própria pessoa
+            // (a irmã não é "outra conta") em qualquer salvamento de "Minha conta".
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('identities', 'email')->ignore($this->user()?->identity_id),
+            ],
             'phone' => ['nullable', 'string', 'regex:/^\d{10,11}$/'],
             // Sem troca de e-mail o campo é ignorado: senha preenchida pelo gerenciador não barra
             // quem só mudou o nome ou o telefone.

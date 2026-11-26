@@ -13,6 +13,10 @@ class RegisterRequest extends ApiFormRequest
     {
         return [
             'name' => 'required|string|max:255',
+            // `unique:users` de propósito: a API **não** cria conta irmã neste PR. Com identidade
+            // compartilhada o cadastro web aceita um e-mail que já tem outro papel (pedindo a senha
+            // da identidade); mudar isto aqui exige o app mandar o portal no login, senão a pessoa
+            // com dois papéis não escolhe por qual entra. Ver .ai/rules/identity.md.
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'user_type' => 'sometimes|in:user,workshop,garage',

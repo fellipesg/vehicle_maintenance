@@ -7,6 +7,7 @@ use App\Rules\Chassis;
 use App\Rules\UniqueRenavam;
 use App\Services\Crlv\CrlvParseResult;
 use App\Services\Maintenance\OwnerlessMaintenanceService;
+use App\Services\Vehicle\VehicleMileageService;
 use App\Services\Vehicle\VehicleOwnershipService;
 use App\Support\Vehicle\VehicleEntryFlow;
 use Illuminate\Http\RedirectResponse;
@@ -100,34 +101,11 @@ trait RegistersVehicleWithOwnership
     }
 
     /**
-     * Refaz o CRLV-e lido a partir da cópia guardada na sessão (CrlvParseResult::toPreview()).
-     *
      * @param  array<string, mixed>  $preview
      */
     protected function crlvFromPreview(array $preview): CrlvParseResult
     {
-        return new CrlvParseResult(
-            licensePlate: (string) $preview['license_plate'],
-            renavam: (string) $preview['renavam'],
-            brand: (string) $preview['brand'],
-            model: (string) $preview['model'],
-            year: (int) $preview['year'],
-            color: $preview['color'] ?? null,
-            chassis: $preview['chassis'] ?? null,
-            engine: $preview['engine'] ?? null,
-            motorization: $preview['motorization'] ?? null,
-            brandRaw: (string) ($preview['brand_raw'] ?? ''),
-            modelRaw: (string) ($preview['model_raw'] ?? ''),
-            brandMatched: (bool) ($preview['brand_matched'] ?? false),
-            modelMatched: (bool) ($preview['model_matched'] ?? false),
-            detranState: $preview['detran_state'] ?? null,
-            fuel: $preview['fuel'] ?? null,
-            crvNumber: $preview['crv_number'] ?? null,
-            exerciseYear: isset($preview['exercise_year']) ? (int) $preview['exercise_year'] : null,
-            manufacturingYear: isset($preview['manufacturing_year']) ? (int) $preview['manufacturing_year'] : null,
-            ownerName: $preview['owner_name'] ?? null,
-            ownerDocument: $preview['owner_document'] ?? null,
-        );
+        return CrlvParseResult::fromPreview($preview);
     }
 
     protected function registerVehicle(Request $request): RedirectResponse
@@ -159,6 +137,17 @@ trait RegistersVehicleWithOwnership
         }
 
         $data = $request->validate($this->vehicleValidationRules(), $this->vehicleValidationMessages());
+
+        // Teto de plausibilidade do hodômetro, aqui no passo Conferir: `max:9999999` é limite de
+        // coluna, não de realidade, e o número informado vira `odometer_at_registration` — o piso de
+        // toda OS seguinte e um termo do próprio teto (VehicleMileageService). O desvio para a
+        // procuração guarda esses dados na sessão e só grava depois do PDF, então recusar lá seria
+        // recusar depois de o lojista subir o documento.
+        app(VehicleMileageService::class)->assertOdometerKilometers(
+            (int) $data['current_kilometers'],
+            (int) $data['year'],
+        );
+
         $ownership = app(VehicleOwnershipService::class);
 
         try {

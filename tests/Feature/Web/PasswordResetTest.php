@@ -69,14 +69,17 @@ class PasswordResetTest extends TestCase
             ->assertSessionHas('status', PasswordResetController::LINK_REQUESTED_MESSAGE)
             ->assertSessionHasNoErrors();
 
-        Notification::assertSentTo($user, ResetPasswordNotification::class, function (ResetPasswordNotification $notification) use ($user): bool {
-            $mail = $notification->toMail($user);
+        // Quem recebe o link é a identidade (a senha é dela), e não uma das contas irmãs.
+        $identity = $user->identity;
+
+        Notification::assertSentTo($identity, ResetPasswordNotification::class, function (ResetPasswordNotification $notification) use ($identity): bool {
+            $mail = $notification->toMail($identity);
             $html = (string) $mail->render();
 
             return $mail->subject === 'Redefinir sua senha na RevisaLog'
                 && $mail->salutation === 'RevisaLog'
-                && $notification->resetUrl($user) === route('password.reset', ['token' => $notification->token, 'email' => 'maria@example.com'])
-                && Password::tokenExists($user, $notification->token)
+                && $notification->resetUrl($identity) === route('password.reset', ['token' => $notification->token, 'email' => 'maria@example.com'])
+                && Password::tokenExists($identity, $notification->token)
                 && str_contains($html, 'Olá, Maria!')
                 && str_contains($html, 'Criar nova senha')
                 && str_contains($html, 'O link vale por 60 minutos')
@@ -97,8 +100,8 @@ class PasswordResetTest extends TestCase
         $notification = new ResetPasswordNotification('token-de-teste');
 
         $this->assertInstanceOf(\Illuminate\Contracts\Queue\ShouldQueue::class, $notification);
-        $this->assertSame(['mail'], $notification->via($user));
-        $this->assertStringContainsString('RevisaLog', (string) $notification->toMail($user)->render());
+        $this->assertSame(['mail'], $notification->via($user->identity));
+        $this->assertStringContainsString('RevisaLog', (string) $notification->toMail($user->identity)->render());
     }
 
     public function test_unknown_email_gets_the_same_neutral_answer_and_no_email(): void
@@ -126,7 +129,7 @@ class PasswordResetTest extends TestCase
             ->assertSessionHas('status', PasswordResetController::LINK_REQUESTED_MESSAGE)
             ->assertSessionHasNoErrors();
 
-        Notification::assertSentToTimes($user, ResetPasswordNotification::class, 1);
+        Notification::assertSentToTimes($user->identity, ResetPasswordNotification::class, 1);
     }
 
     public function test_link_request_validates_the_email_in_portuguese(): void
@@ -164,7 +167,7 @@ class PasswordResetTest extends TestCase
     public function test_reset_page_shows_the_form_with_the_email_from_the_link(): void
     {
         $user = User::factory()->asUser()->create(['email' => 'dono@example.com']);
-        $token = Password::createToken($user);
+        $token = Password::createToken($user->identity);
 
         $this->get(route('password.reset', ['token' => $token, 'email' => 'dono@example.com']))
             ->assertOk()
@@ -194,7 +197,7 @@ class PasswordResetTest extends TestCase
         $user = User::factory()->asWorkshop()->create(['email' => 'oficina@example.com']);
         $oldRememberToken = $user->remember_token;
         $user->createToken(SanctumMobileToken::TOKEN_NAME, SanctumMobileToken::ABILITIES);
-        $token = Password::createToken($user);
+        $token = Password::createToken($user->identity);
 
         $this->post(route('password.update'), [
             'token' => $token,
@@ -210,10 +213,10 @@ class PasswordResetTest extends TestCase
 
         $this->assertTrue(Hash::check('senha-nova-123', $user->password));
         $this->assertNotSame($oldRememberToken, $user->remember_token);
-        $this->assertFalse(Password::tokenExists($user, $token));
+        $this->assertFalse(Password::tokenExists($user->identity, $token));
         $this->assertSame(0, $user->tokens()->count(), 'Os tokens do app saem com a senha antiga.');
         $this->assertGuest();
-        Event::assertDispatched(PasswordReset::class, fn (PasswordReset $event): bool => $event->user->is($user));
+        Event::assertDispatched(PasswordReset::class, fn (PasswordReset $event): bool => $event->user->is($user->identity));
 
         $this->post(route('login.submit', 'oficina'), [
             'email' => 'oficina@example.com',
@@ -232,7 +235,7 @@ class PasswordResetTest extends TestCase
         $this->flushSession();
 
         $this->post(route('password.update'), [
-            'token' => Password::createToken($user),
+            'token' => Password::createToken($user->identity),
             'email' => 'dono@example.com',
             'password' => 'senha-nova-123',
             'password_confirmation' => 'senha-nova-123',
@@ -251,7 +254,7 @@ class PasswordResetTest extends TestCase
     public function test_invalid_token_does_not_change_the_password(): void
     {
         $user = User::factory()->asUser()->create(['email' => 'dono@example.com']);
-        Password::createToken($user);
+        Password::createToken($user->identity);
 
         $this->from(route('password.reset', ['token' => 'token-errado', 'email' => 'dono@example.com']))
             ->post(route('password.update'), [
@@ -270,7 +273,7 @@ class PasswordResetTest extends TestCase
     {
         $owner = User::factory()->asUser()->create(['email' => 'dono@example.com']);
         User::factory()->asUser()->create(['email' => 'outro@example.com']);
-        $token = Password::createToken($owner);
+        $token = Password::createToken($owner->identity);
 
         $this->from(route('password.reset', ['token' => $token]))
             ->post(route('password.update'), [
@@ -287,7 +290,7 @@ class PasswordResetTest extends TestCase
     public function test_new_password_is_validated_in_portuguese(): void
     {
         $user = User::factory()->asUser()->create(['email' => 'dono@example.com']);
-        $token = Password::createToken($user);
+        $token = Password::createToken($user->identity);
 
         $this->from(route('password.reset', ['token' => $token]))
             ->post(route('password.update'), [
@@ -298,7 +301,7 @@ class PasswordResetTest extends TestCase
             ])
             ->assertSessionHasErrors(['password' => 'A senha deve ter no mínimo 8 caracteres.']);
 
-        $this->assertTrue(Password::tokenExists($user, $token));
+        $this->assertTrue(Password::tokenExists($user->identity, $token));
     }
 
     public function test_reset_submissions_are_throttled_per_device(): void

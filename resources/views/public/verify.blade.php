@@ -2,8 +2,19 @@
 
 @section('title', 'Conferir selo ou laudo')
 
+@php
+    $verifyDescription = 'Digite o código de verificação do RevisaLog para confirmar um serviço com Selo da oficina ou um laudo de vistoria cautelar.';
+@endphp
+
+@section('meta_description', $verifyDescription)
+
 @push('head')
-    <meta name="description" content="Digite o código de verificação do RevisaLog para confirmar um serviço com Selo da oficina ou um laudo de vistoria cautelar.">
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::webPage('Conferir selo ou laudo', $verifyDescription, \App\Support\Seo\CanonicalUrl::named('verification.lookup'))" />
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::breadcrumb([
+        ['name' => 'Início', 'url' => \App\Support\Seo\CanonicalUrl::home()],
+        ['name' => 'Conferir selo ou laudo', 'url' => \App\Support\Seo\CanonicalUrl::named('verification.lookup')],
+    ])" />
+    <x-seo.json-ld :data="\App\Support\Seo\StructuredData::faqPage(\App\Support\Seo\VerificationFaq::items())" />
 @endpush
 
 @section('content')
@@ -12,6 +23,7 @@
         eyebrow="Verificação pública RevisaLog"
         title="Conferir selo ou laudo"
         description="Digite o código para confirmar um serviço com Selo da oficina (RVL) ou um laudo de vistoria cautelar (LDO) registrado no RevisaLog."
+        :breadcrumbs="[['Início', \App\Support\Seo\CanonicalUrl::home()], ['Conferir selo ou laudo']]"
     />
 
     <div class="space-y-6">
@@ -22,6 +34,14 @@
                 'autofocus' => $typedCode === '',
             ])
         </x-ui.card>
+
+        <x-ui.card as="section" title="O que é o código" heading-level="h2">
+            <p class="text-sm leading-relaxed text-muted-foreground">{{ \App\Support\Seo\VerificationFaq::intro() }}</p>
+        </x-ui.card>
+
+        <x-ui.section title="Perguntas frequentes" id="faq">
+            <x-seo.faq-list :items="\App\Support\Seo\VerificationFaq::items()" class="mt-0" />
+        </x-ui.section>
 
         <x-ui.card as="section" title="Onde encontrar o código" heading-level="h2">
             <ul role="list" class="list-disc space-y-2 pl-5 text-sm text-muted-foreground">

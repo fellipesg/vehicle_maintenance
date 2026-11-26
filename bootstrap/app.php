@@ -34,7 +34,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Descadastro de um clique (RFC 8058): o provedor de e-mail faz o POST sem sessão; a URL
         // assinada protege. Quem leva a carga na query, e não no caminho, tem de vir como caminho
         // exato: 'convite/descadastrar/*' não casa com 'convite/descadastrar' (Str::is).
+        // O relatório de violação de CSP sai do navegador sem sessão e sem token.
         $middleware->validateCsrfTokens(except: [
+            'csp-report',
             'descadastrar/*',
             'convite/descadastrar',
             'oficinas/descadastrar',
@@ -53,8 +55,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.type' => \App\Http\Middleware\EnsureUserType::class,
             'garage.approved' => \App\Http\Middleware\EnsureGarageApproved::class,
             'workshop.approved' => \App\Http\Middleware\EnsureWorkshopApproved::class,
+            'noindex' => \App\Http\Middleware\NoIndex::class,
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
             'etag.vehicle_list' => \App\Http\Middleware\EtagForVehicleList::class,
+            'signup.step' => \App\Http\Middleware\EnsureSignupStep::class,
         ]);
 
         // Visitante que abre um link protegido vai ao login do portal da URL (/garagem → lojista),

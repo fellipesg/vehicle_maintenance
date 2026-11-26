@@ -36,11 +36,7 @@ class TwoFactorController extends Controller
 
         $secret = $this->twoFactorService->generateSecretKey();
 
-        $user->forceFill([
-            'two_factor_secret' => $secret,
-            'two_factor_confirmed_at' => null,
-            'two_factor_recovery_codes' => null,
-        ])->save();
+        $this->twoFactorService->beginSetup($user, $secret);
 
         return ApiResponse::success([
             'secret' => $secret,
@@ -67,12 +63,10 @@ class TwoFactorController extends Controller
 
         $recoveryCodes = $this->twoFactorService->generateRecoveryCodes();
 
-        $user->forceFill([
-            'two_factor_confirmed_at' => now(),
-            'two_factor_recovery_codes' => json_encode(
-                $this->twoFactorService->hashRecoveryCodes($recoveryCodes),
-            ),
-        ])->save();
+        $this->twoFactorService->confirmSetup(
+            $user,
+            $this->twoFactorService->hashRecoveryCodes($recoveryCodes),
+        );
 
         return ApiResponse::success([
             'recovery_codes' => $recoveryCodes,

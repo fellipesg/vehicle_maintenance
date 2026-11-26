@@ -3,6 +3,9 @@
     @foreach($staticUrls as $url)
     <url>
         <loc>{{ $url['loc'] }}</loc>
+        @if(! empty($url['lastmod']))
+        <lastmod>{{ $url['lastmod'] }}</lastmod>
+        @endif
         <changefreq>weekly</changefreq>
         <priority>{{ $url['priority'] }}</priority>
     </url>
@@ -18,7 +21,7 @@
     @foreach($posts as $post)
     <url>
         <loc>{{ route('blog.show', $post) }}</loc>
-        <lastmod>{{ $post->updated_at?->toAtomString() }}</lastmod>
+        <lastmod>{{ $post->modified_at?->toAtomString() }}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.7</priority>
     </url>

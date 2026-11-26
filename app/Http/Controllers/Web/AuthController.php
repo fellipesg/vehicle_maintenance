@@ -6,13 +6,15 @@ use App\Enums\Portal;
 use App\Enums\RegistrationSource;
 use App\Events\UserRegistered;
 use App\Http\Controllers\Controller;
+use App\Models\Identity;
 use App\Models\User;
-use App\Services\TenantService;
+use App\Rules\AvailableForUserType;
+use App\Rules\MatchesIdentityPassword;
+use App\Services\User\OwnerSignupService;
 use App\Support\PortalAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\View\View;
@@ -22,6 +24,12 @@ use Illuminate\View\View;
  * /login/admin, todas na view auth.login), cadastro público de proprietário e saída.
  *
  * O hub mostra só os 3 perfis públicos; o Painel Administrador abre só pela URL direta.
+ *
+ * A senha é da identidade (App\Models\Identity) e cada papel é uma conta irmã com o `tenant_id`
+ * dele. Como as 4 telas já recebem o portal na URL, o login confere a senha na identidade e loga a
+ * irmã **daquele** portal — por isso ele não usa Auth::attempt, que acharia a conta pelo e-mail e
+ * com contas irmãs não teria como escolher entre elas. O rate limit continua na rota
+ * (throttle:auth-web) e o 2FA segue só na API, como antes desta mudança.
  */
 class AuthController extends Controller
 {
@@ -47,6 +55,8 @@ class AuthController extends Controller
     public const REGISTERED_MESSAGE = 'Conta criada. Enviamos as boas-vindas para :email. Próximo passo: adicione seu veículo.';
 
     public const LOGGED_OUT_MESSAGE = 'Você saiu da sua conta.';
+
+    public function __construct(private OwnerSignupService $ownerSignup) {}
 
     public function showLoginHub(Request $request): View
     {
@@ -75,32 +85,23 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        $identity = Identity::query()->where('email', $credentials['email'])->first();
+
+        if ($identity === null || ! Hash::check($credentials['password'], (string) $identity->password)) {
             return back()->withErrors([
                 'credentials' => 'E-mail ou senha incorretos.',
             ])->onlyInput('email');
         }
 
-        $user = Auth::user();
+        $this->rehashIdentityPasswordIfNeeded($identity, $credentials['password']);
 
-        if (! $this->userMatchesPortal($user, self::LOGIN_PORTALS[$portal])) {
-            Auth::logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+        $user = $identity->accountFor(self::LOGIN_PORTALS[$portal]);
 
-            // Credenciais certas, porta errada: a mensagem nomeia a área da conta e o link leva
-            // direto para ela, com o e-mail preenchido.
-            $suggestedPortal = $user->portal();
-
-            return back()
-                ->withErrors(['email' => $this->wrongPortalMessage($suggestedPortal)])
-                ->with('suggested_portal', [
-                    'url' => route($suggestedPortal->loginRoute()),
-                    'label' => 'Ir para a '.$this->portalConfig($this->loginSlug($suggestedPortal))['title'],
-                ])
-                ->onlyInput('email');
+        if ($user === null) {
+            return $this->wrongPortalResponse($identity);
         }
 
+        Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
         return redirect()->to($this->redirectAfterLogin($request, $user, self::LOGIN_PORTALS[$portal]));
@@ -136,10 +137,20 @@ class AuthController extends Controller
                 : null,
         ]);
 
+        // O e-mail já pode ter identidade — a pessoa tem conta de oficina ou de loja e quer o
+        // perfil de proprietário. Nesse caso ela não escolhe senha nova: a senha é da identidade e
+        // o cadastro pede a dela (App\Rules\MatchesIdentityPassword). O que bloqueia o cadastro é
+        // o papel já existir, não o e-mail (App\Rules\AvailableForUserType).
+        $identity = Identity::query()
+            ->where('email', (string) $request->input('email'))
+            ->first();
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'email' => ['required', 'email', 'max:255', new AvailableForUserType(Portal::Owner->value)],
+            'password' => $identity === null
+                ? ['required', 'string', 'min:8', 'confirmed']
+                : ['required', 'string', new MatchesIdentityPassword($identity)],
             'phone' => ['nullable', 'string', 'min:10', 'max:11'],
             'document' => ['nullable', 'string', 'regex:/^(\d{11}|\d{14})$/'],
         ], [
@@ -148,21 +159,10 @@ class AuthController extends Controller
             'document.regex' => 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.',
         ]);
 
-        $user = DB::transaction(function () use ($data): User {
-            $user = User::create([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'password' => Hash::make($data['password']),
-                'user_type' => 'user',
-                'phone' => $data['phone'] ?? null,
-                'document' => $data['document'] ?? null,
-                'country' => 'Brasil',
-            ]);
-
-            (new TenantService)->createForUser($user);
-
-            return $user;
-        });
+        // Conta irmã entra na identidade que já existe, com a senha dela intocada; conta nova ganha
+        // a identidade dela ao ser gravada (App\Models\User::save). A criação é a mesma do cadastro
+        // em etapas (/cadastro), por isso mora num serviço.
+        $user = $this->ownerSignup->register($data, $identity);
 
         UserRegistered::dispatch($user, RegistrationSource::Web);
 
@@ -282,24 +282,76 @@ class AuthController extends Controller
     }
 
     /**
-     * O Admin é uma área extra de quem tem is_admin; os demais portais seguem o user_type da conta
-     * (os valores de Portal são os de users.user_type).
+     * Senha certa, porta errada: a mensagem nomeia as áreas que este e-mail abre e o link leva
+     * direto à primeira delas, com o e-mail preenchido. Com um papel só — o caso de toda a base de
+     * hoje — a frase é a mesma de sempre; com contas irmãs ela lista as áreas, que é justamente
+     * quando a pessoa precisa saber qual é qual.
+     *
+     * A sessão não é invalidada porque ninguém entrou: a senha foi conferida na identidade, sem
+     * logar conta nenhuma.
      */
-    private function userMatchesPortal(User $user, Portal $portal): bool
+    private function wrongPortalResponse(Identity $identity): RedirectResponse
     {
-        return $portal === Portal::Admin
-            ? $user->isAdmin()
-            : $user->user_type === $portal->value;
+        $portals = $identity->accessiblePortals();
+
+        // Identidade sem nenhuma conta não deveria existir (toda identidade nasce com um papel);
+        // se existir, não há área para sugerir e a resposta é a genérica.
+        if ($portals === []) {
+            return back()->withErrors([
+                'credentials' => 'E-mail ou senha incorretos.',
+            ])->onlyInput('email');
+        }
+
+        $suggestedPortal = $portals[0];
+
+        return back()
+            ->withErrors(['email' => $this->wrongPortalMessage($portals)])
+            ->with('suggested_portal', [
+                'url' => route($suggestedPortal->loginRoute()),
+                'label' => 'Ir para a '.$this->portalConfig($this->loginSlug($suggestedPortal))['title'],
+            ])
+            ->onlyInput('email');
     }
 
-    private function wrongPortalMessage(Portal $suggestedPortal): string
+    /**
+     * @param  non-empty-list<Portal>  $portals
+     */
+    private function wrongPortalMessage(array $portals): string
     {
-        return match ($suggestedPortal) {
+        if (count($portals) > 1) {
+            $titles = array_map(
+                fn (Portal $portal): string => $this->portalConfig($this->loginSlug($portal))['title'],
+                $portals,
+            );
+
+            $last = array_pop($titles);
+
+            return 'Este e-mail não tem perfil nesta área. Com ele você entra em: '
+                .implode(', ', $titles).' e '.$last.'.';
+        }
+
+        return match ($portals[0]) {
             Portal::Owner => 'Esta conta é de proprietário de veículo. Entre pela Área do Proprietário.',
             Portal::Dealer => 'Esta conta é de lojista. Entre pela Área do Lojista.',
             Portal::Workshop => 'Esta conta é de oficina. Entre pela Área da Oficina.',
             Portal::Admin => 'Esta conta é de administrador. Entre pelo Painel Administrador.',
         };
+    }
+
+    /**
+     * Mesma atualização de hash que o EloquentUserProvider fazia no Auth::attempt: senha gravada
+     * com um custo antigo é regravada no login. Sem isto, trocar o custo do bcrypt deixaria de
+     * valer para quem já tem conta.
+     */
+    private function rehashIdentityPasswordIfNeeded(Identity $identity, #[\SensitiveParameter] string $plainPassword): void
+    {
+        if (! config('hashing.rehash_on_login', true)) {
+            return;
+        }
+
+        if (Hash::needsRehash((string) $identity->password)) {
+            $identity->forceFill(['password' => $plainPassword])->save();
+        }
     }
 
     /**

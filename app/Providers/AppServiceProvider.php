@@ -28,6 +28,7 @@ use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -60,6 +61,13 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureLocale();
 
+        // `nonce="@cspNonce"` nos scripts inline. Fora de um pedido web (console, teste de view
+        // isolada) sai vazio, e um `nonce` vazio não muda o comportamento da tag.
+        Blade::directive(
+            'cspNonce',
+            fn (): string => "<?php echo e(\App\Support\Security\ContentSecurityPolicy::nonce() ?? ''); ?>",
+        );
+
         MaintenancePhotoUrls::registerLocalTemporaryUrls(Storage::disk('public'));
 
         Model::preventLazyLoading(! $this->app->isProduction());
@@ -91,6 +99,27 @@ class AppServiceProvider extends ServiceProvider
                         'email' => $this->tooManyAttemptsMessage($headers),
                     ]),
         ));
+
+        /*
+         * Cadastro em etapas (/cadastro). Dois baldes, porque as etapas são ataques diferentes:
+         * a etapa 1 diz se um e-mail tem conta (enumeração, teto por aparelho) e a etapa 2 recebe
+         * tentativas da senha de uma conta que já existe (adivinhação, teto por e-mail e aparelho).
+         * O e-mail vem da sessão do fluxo: o formulário da senha não o reenvia.
+         *
+         * Balde próprio e não o `auth-web`: ali a chave cai em 'login:<e-mail>|<ip>' fora dos
+         * caminhos conhecidos, e um cadastro passaria a gastar a cota de login daquele e-mail.
+         */
+        RateLimiter::for('signup', function (Request $request): array {
+            $limits = [Limit::perMinute(5)->by('signup-ip|'.$request->ip())];
+
+            if ($request->routeIs('signup.password.store')) {
+                $email = Str::lower((string) ($request->session()->get('signup')['email'] ?? ''));
+
+                $limits[] = Limit::perMinute(5)->by('signup-password|'.$email.'|'.$request->ip());
+            }
+
+            return $limits;
+        });
 
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by(
             (string) ($request->user()?->id ?: $request->ip()),
@@ -179,6 +208,12 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by('blog-comments|'.($request->user()?->id ?: $request->ip())),
             Limit::perDay(30)->by('blog-comments-daily|'.($request->user()?->id ?: $request->ip())),
         ]);
+
+        // Relatório de CSP: o navegador manda um por recurso bloqueado, sem sessão, então o balde
+        // é largo de propósito — o teto existe para o log não virar alvo, não para frear a página.
+        RateLimiter::for('csp-report', fn (Request $request) => Limit::perMinute(120)->by(
+            'csp-report|'.$request->ip(),
+        ));
 
         if ($this->app->runningInConsole()) {
             $this->describeAbuseGuards();

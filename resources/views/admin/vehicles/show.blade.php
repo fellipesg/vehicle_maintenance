@@ -43,6 +43,28 @@
                     </div>
                 @endif
             </dl>
+
+            {{--
+                Encerrar o vínculo é da equipe e pede motivo (App\Services\Vehicle\VehicleOwnershipEndingService):
+                o veículo sai da conta, o histórico fica no chassi e o ex-dono recebe um e-mail.
+            --}}
+            @foreach($vehicle->owners as $currentOwner)
+                <form method="POST"
+                      action="{{ route('admin.vehicles.end-ownership', [$vehicle, $currentOwner]) }}"
+                      class="mt-3 flex flex-wrap items-center gap-2"
+                      data-slot="admin-end-ownership"
+                      data-confirm="{{ $vehicleName }} sai da conta de {{ $currentOwner->name }}, que recebe um e-mail. O histórico de manutenções continua no veículo. Para devolver, a pessoa precisa vincular o veículo de novo."
+                      data-confirm-title="Encerrar o vínculo de {{ $currentOwner->name }}?"
+                      data-confirm-action-label="Encerrar vínculo"
+                      data-confirm-variant="danger">
+                    @csrf
+                    <x-ui.input name="ownership_ended_reason" placeholder="Motivo (obrigatório)" required maxlength="500" class="text-sm" :aria-label="'Motivo para encerrar o vínculo de '.$currentOwner->name" />
+                    <x-ui.button variant="danger" size="sm" type="submit" icon="x-mark" loading-label="Encerrando…">Encerrar vínculo</x-ui.button>
+                </form>
+            @endforeach
+            @error('ownership_ended_reason')
+                <p class="mt-1 text-sm text-danger">{{ $message }}</p>
+            @enderror
         </x-slot:notice>
     </x-vehicle.detail>
 @endsection

@@ -57,11 +57,13 @@ class AuthPagesGuidanceTest extends TestCase
 
     public function test_login_hub_separates_owner_signup_from_partners(): void
     {
+        // O cadastro aberto a quem escolhe o perfil é o em etapas (/cadastro): proprietário e
+        // oficina saem de lá. O lojista continua passando pela equipe.
         $this->get('/login')
             ->assertOk()
-            ->assertSee('Proprietário sem conta?')
-            ->assertSee('href="'.route('register').'"', false)
-            ->assertSee('Lojista ou oficina?')
+            ->assertSee('Sem conta?')
+            ->assertSee('href="'.route('signup.start').'"', false)
+            ->assertSee('Lojista?')
             ->assertSee('href="'.route('contact.show', ['assunto' => 'partnership']).'"', false)
             ->assertSee('Histórico dos seus veículos e manutenções.')
             ->assertDontSee('text-automotive-300', false)

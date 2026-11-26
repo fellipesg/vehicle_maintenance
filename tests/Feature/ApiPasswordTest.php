@@ -35,7 +35,8 @@ class ApiPasswordTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('message', PasswordResetController::LINK_REQUESTED_MESSAGE);
 
-        Notification::assertSentTo($user, ResetPasswordNotification::class);
+        // Quem recebe o link é a identidade: a senha é dela, compartilhada pelas contas irmãs.
+        Notification::assertSentTo($user->identity, ResetPasswordNotification::class);
     }
 
     public function test_forgot_answers_the_same_for_an_unknown_email(): void

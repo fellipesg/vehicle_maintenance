@@ -16,6 +16,12 @@ uso**. `TenantIsolationHasNoAmbientContextTest` falha se um escopo global aparec
 ## Procedência só via MaintenanceVerificationStamper
 registered_by_type, verified_at, verified_workshop_id e verification_code não são fillable. Selo (workshop) só quando o ator é oficina e workshop_id da manutenção é o da oficina. Código RVL-XXXX-XX gerado com retry. Manutenção verificada não é editável/apagável por não-oficina.
 
+E **nunca** sobre veículo que o tenant da própria oficina possui: `applyWorkshopSeal` é o gargalo
+único do selo e confere independência ali, com `App\Support\Vehicle\IssuerIndependence`. Cada
+chamador trata a recusa de um jeito (o `stamp` cai em declarada, o backfill pula, a fila de validação
+nem enfileira). A regra inteira, com o que ela decide sobre posse não verificada e consignação e com
+o que ela **não** cobre (duas contas do mesmo humano), está em `.ai/rules/issuer-independence.md`.
+
 ## O selo não espera o proprietário
 Oficina **aprovada** (`.ai/rules/garage.md`) sela a OS que registrou em **qualquer** veículo, com ou
 sem proprietário cadastrado, e o registro entra no histórico do chassi na hora. O histórico pertence
@@ -90,6 +96,131 @@ Toda mudança no que conta recalcula na hora: `dispute`, `withdrawDispute`, `dec
 (MaintenanceOwnerDecisionService) e `hide`/`restore` (MaintenancePublicVisibilityService). Sem isso o
 veículo fica com o km velho até a próxima gravação qualquer.
 
+## Hodômetro: toda leitura deixa linha em `vehicle_odometer_readings`
+O veículo tem **um** odômetro, e o km dele morava em quatro colunas de três tabelas
+(`vehicles.current_kilometers`, `vehicles.odometer_at_registration`, `maintenances.kilometers`,
+`vehicle_inspections.odometer_km`). Nenhuma delas é "a leitura": é por isso que o lembrete de revisão
+quase nunca dispara (o km corrente é o âncora) e que o teto de plausibilidade tinha furo.
+
+`vehicle_odometer_readings` é a fonte da verdade **do odômetro** — não da OS nem do laudo, que seguem
+donos dos dados deles. É uma **projeção de mão única**: a origem escreve na coluna dela, e a leitura
+acompanha. Quem escreve na tabela é só `App\Services\Vehicle\VehicleOdometerLog`, e cada
+`recordFrom*` é um **upsert pela origem** — corrigir o km de uma OS corrige a leitura dela em vez de
+empilhar uma segunda. O `unique` em `maintenance_id` e em `vehicle_inspection_id` garante isso no
+banco, não só no código (é também o que deixa o backfill rodar de novo sem medo).
+
+Quem alimenta são **observers de model**, não chamadas nos controllers: são seis superfícies gravando
+OS e três gravando hodômetro de cadastro, com assinaturas diferentes, e a projeção não pode depender
+de nenhuma delas lembrar.
+
+| Origem | Gancho | Conta para o hodômetro |
+| --- | --- | --- |
+| cadastro e edição do veículo | `VehicleObserver`, espelhando `odometer_at_registration` | sim |
+| OS | `MaintenanceObserver` | sim, menos contestada e suprimida |
+| laudo da cautelar | `VehicleInspectionObserver` | **nunca** |
+| relato do dono | `VehicleOdometerLog::recordOwnerReport`, nas três portas abaixo | sim, e move a coluna |
+
+Três detalhes que não são óbvios:
+
+- **`source` e `counts_toward_odometer` não são fillable**, nem as duas FKs de origem. Fillable,
+  qualquer `update()` de controller marcaria uma autodeclaração como leitura de oficina — e é dessa
+  distinção que depende o que pode alimentar taxa de rodagem e teto de plausibilidade.
+- **Contestação e supressão viram a chave, não apagam a linha** (`syncCounts`): a leitura continua no
+  histórico, com a marca, pelo mesmo motivo da seção anterior. O `MaintenanceObserver` separa os dois
+  casos — km/data/veículo regravam a leitura; `owner_disputed_at`/`hidden_by_user_id` só viram a
+  chave —, e é por isso que `dispute`, `withdrawDispute`, `decide`, `hide` e `restore` chegam à
+  projeção sem saber que ela existe.
+- **A leitura do cadastro nasce sem usuário**, de propósito: a coluna que ela espelha também não tem
+  um. Quem cadastrou está em `user_vehicles`; o "quem registrou" é das origens que têm autor.
+
+**A tabela já manda em `current_kilometers`.** `VehicleMileageService::refreshCurrentKilometers`
+grava o maior km entre as leituras que contam (`VehicleOdometerLog::highestCountedKilometers`): a
+coluna é valor derivado, cache de consulta, e não o dado. O antigo
+`applyMaintenanceKilometers($vehicle, $kilometers)` **deixou de existir** — ele recebia o número para
+não depender da ordem das escritas, e não precisa mais, porque os observers gravam a leitura dentro
+do save da origem, antes de qualquer chamador chegar ao recálculo. Parâmetro que ninguém precisa é
+parâmetro que volta a divergir.
+
+Duas consequências:
+
+- **O relato do proprietário move o hodômetro**, o que a fórmula antiga não permitia (ela só conhecia
+  cadastro e OS). Tela que o grave ainda não existe; o caminho, sim.
+- **Projeção vazia não é odômetro zero.** Veículo anterior aos observers, ou que o backfill ainda
+  não alcançou, não tem leitura nenhuma — e o recálculo **se cala** nesse caso (`$highest === 0` e
+  nenhuma leitura): deixa a coluna como está e espera o backfill, porque sobrescrever com zero
+  apagaria o único lugar onde o número daquele veículo existe. A condição é "nenhuma leitura", não
+  "maior km igual a zero": veículo cuja única OS foi contestada, sem hodômetro de cadastro, **vai**
+  a zero, porque aí zero é a resposta e não a ausência dela. As duas pontas estão travadas em
+  `VehicleOdometerFromReadingsTest`; mexer numa sem a outra transforma o conserto em coluna travada.
+  O backfill continua sendo o certo a fazer antes de subir — o que mudou é que esquecê-lo deixa o
+  número velho, e não um zero.
+
+Ler a tabela direto em tela, relatório, PDF ou API continua não acontecendo: ela alimenta a coluna, e
+as superfícies leem a coluna.
+
+### Quem digita hodômetro fora de uma OS grava leitura, não coluna
+
+São três portas, e todas gravavam `current_kilometers` na mão:
+
+| Porta | Onde |
+| --- | --- |
+| edição do veículo pela API | `Api\VehicleController::update` |
+| edição do veículo pela web | `Concerns\UpdatesVehicleDetails` |
+| proprietário assume o carro que a oficina criou pelo chassi | `VehicleOwnershipService::claimUnclaimedWorkshopVehicle` |
+
+Escrever a coluna ali deixou de funcionar no dia em que ela passou a ser derivada: na API o número
+era apagado pelo recálculo **na mesma requisição** (a resposta já saía com o valor antigo), e nas
+outras duas durava até a próxima OS. Agora as três gravam uma leitura `OwnerReport`, e a coluna sai
+dela como sai de qualquer outra — então o número digitado tem lastro.
+
+Três detalhes de quem for mexer nisso:
+
+- **Só grava quando muda.** Os formulários reenviam o campo inteiro a cada edição; trocar a cor não
+  é leitura de odômetro, e série temporal cheia de linhas idênticas é série que ninguém lê. A
+  comparação é contra `current_kilometers`, que é o que o formulário mostrava.
+- **Autodeclaração não puxa o odômetro para trás.** O relato entra no histórico, mas quem manda na
+  coluna é o maior km que conta: OS registrada acima do número declarado continua ganhando.
+- **Baixar o número na edição web é outra coisa**: conserta `odometer_at_registration` e, por
+  tabela, a leitura do cadastro (corrigida no lugar, não empilhada). O relato é gravado do mesmo
+  jeito — as duas afirmações são verdadeiras e cada uma tem a sua linha.
+
+`OwnerReport` é a origem de "alguém com acesso ao veículo digitou", e não literalmente "o dono": na
+API quem edita pode ser a loja em consignação. O nome ficou do caso principal.
+
+### O backfill é manual, e o `--check` é o portão
+
+`odometer:backfill-readings` alcança o histórico anterior aos observers. Ele **não** entra no deploy
+nem no `Schedule`: no deploy, acoplaria a liberação de código a uma varredura de todos os veículos
+sem ganhar nada (trocar o cálculo é outra liberação, decidida depois); no `Schedule`, um backfill que
+roda sozinho toda noite esconderia o dia em que passou a divergir. Ordem de uso: `--dry-run`, depois
+sem opção, depois `--check`.
+
+`--check` compara, veículo por veículo, `highestCountedKilometersFromColumns` com a fórmula antiga
+(`max(odometer_at_registration, maior km de OS que conta)`) e **sai com código de erro** se alguma
+divergir. É `FromColumns`, e não `highestCountedKilometers`, porque a fórmula do outro lado não
+conhece autodeclaração do dono: comparar a leitura dela faria o portão acusar divergência onde a
+projeção está certa, e portão que grita sozinho deixa de ser lido.
+
+**Portão que não conferiu nada não libera nada.** `--vehicle` com id que não casa com ninguém sai com
+erro, em vez de dizer "nenhuma divergência" sem ter olhado uma linha — a mesma aprovação vazia que
+`pint --test` dá dentro de `.claude/worktrees/**`. Banco sem veículo nenhum, esse sim, sai com
+sucesso: é um fato, não um engano. Enquanto ele não der zero, trocar o cálculo de `current_kilometers` mudaria o número de
+algum veículo sem ninguém saber qual. A comparação é contra a **fórmula**, não contra a coluna: a
+coluna pode estar velha por um registro anterior ao recálculo, e isso é relatado à parte
+(`vehicles:refresh-kilometers` resolve).
+
+Rodar de novo é seguro — cada leitura é upsert pela origem. Quem grava é o **mesmo**
+`VehicleOdometerLog` dos observers, de propósito: backfill que calcula por conta própria é backfill
+que discorda da produção.
+
+Comando de console guarda contador em propriedade: **zere no início do `handle`**. O console
+reaproveita a instância, então duas chamadas no mesmo processo somam os contadores da primeira —
+foi assim que um `--check` logo depois de outro relatou divergência já corrigida
+(`BackfillOdometerReadingsCommandTest`).
+
+A OS apagada leva a leitura dela pela **FK em cascata** (nenhum dos dois models usa `SoftDeletes`), e
+o gancho de `deleted` existe só para dizer isso.
+
 ## Hodômetro: quilometragem implausível é recusada na entrada
 `VehicleMileageService::assertMaintenanceKilometers` não confere só os registros vizinhos: acima
 deles vale o **teto de plausibilidade** derivado do ano do veículo
@@ -106,23 +237,66 @@ O teto é `PLAUSIBILITY_BASE_KILOMETERS` (50.000 km) + `PLAUSIBILITY_KILOMETERS_
 teto só pega quem digitou um dígito a mais, porque recusar um veículo real é pior que aceitar um
 número alto. **Não aperte a folga sem o caso de uso na mão.**
 
-Dois casos em que o teto **não** recusa um veículo real, os dois com teste
-(`tests/Feature/VehicleMileagePlausibilityTest.php`):
+### A folga de um ano foi revisada; ela não é o lugar de apertar
 
-- **veículo sem ano conhecido** (ano zero/nulo): não há teto nenhum — não há de onde derivar, e
-  chutar um ano seria recusar por chute;
-- **veículo que já roda acima do teto derivado do ano**, legitimamente (frota, caminhão, veículo antigo com rodagem
-  alta) ou não (erro ainda não suprimido): o teto fica um ano de folga **acima** do que o veículo já
-  registra (piso da data, `current_kilometers`, `odometer_at_registration`). Parar na leitura atual
-  deixaria a faixa vazia — o veículo não somaria nem um km — e seria exatamente recusar quem roda
-  muito, o que a regra existe para não fazer.
+A folga (`PLAUSIBILITY_KILOMETERS_PER_YEAR` acima do teto do ano) só existe para o veículo que **já
+está no topo da faixa do ano dele**: para qualquer veículo comum ela é invisível — num veículo de
+dois anos o teto é 350.000 km com ou sem ela, inclusive para um táxi com 160.000 km rodados. Quem a
+usa é só o caso extremo. Logo, encolhê-la **não ganha nada** contra erro de digitação (um dígito a
+mais é 10×, recusado em qualquer valor dessa ordem) e só recusa o veículo real de rodagem alta, que é
+exatamente o que a regra existe para não fazer. Medido antes de decidir; três alternativas foram
+descartadas:
 
-O guard é **uma** implementação no serviço: as quatro superfícies que gravam km
-(`StoreMaintenanceRequest`, `UpdateMaintenanceRequest`, formulário do proprietário e da oficina na
-web) chamam o serviço e não repetem a regra na validação. `max:9999999` continua lá só como limite
-de coluna. O teto entra na faixa que o formulário mostra: `MaintenanceMileageContext` manda o `year`
-e `resources/js/utils/maintenance-kilometers.js` espelha as duas constantes — mude os dois juntos
-(`.ai/rules/js.md`).
+- **folga sempre, sem olhar o veículo** (teto do ano + folga, plano): afrouxa o caso comum de
+  350.000 para 450.000 km num veículo de dois anos — justo o caso que o teto existe para pegar;
+- **sem folga nenhuma**: trava quem está no topo da faixa (faixa aceita vazia, o veículo não soma nem
+  um km até a virada do ano) e, pior, trava o laudo da vistoria cautelar de relatar a leitura que viu;
+- **teto crescendo dia a dia** (idade fracionária em vez do degrau anual), que acabaria com o degrau
+  e dispensaria a constante: o app roda em `UTC` (`config('app.timezone')`) e o espelho em JS usa a
+  data local do navegador, então os dois discordariam em ~274 km nas horas em que as duas datas
+  diferem — o teto mostrado no formulário deixaria de ser o teto do servidor, e
+  `OwnerPortalScriptsTest` ficaria intermitente. Só vale junto com mandar o teto já calculado no
+  `data-mileage`, o que muda o contrato do espelho.
+
+O que estava quebrado era a folga **acumular**, não o tamanho dela: o termo "já rodado" era
+ilimitado, cada leitura gravada somava mais um ano de folga e o cadastro sem teto fazia isso num
+único pedido. Hoje o teto é `[fromYear, fromYear + uma folga]` e para aí — `test_the_slack_does_not_compound_across_records`
+e `test_a_vehicle_well_inside_its_year_range_gets_no_extra_slack` travam as duas pontas.
+
+**Veículo sem ano conhecido** (ano zero/nulo) não tem teto nenhum — não há de onde derivar, e chutar
+um ano seria recusar por chute. É o único caso sem teto, e tem teste
+(`tests/Feature/VehicleMileagePlausibilityTest.php`).
+
+Para todos os outros o teto é função do ano e só dele: `[fromYear, fromYear + um ano de folga]`
+(`plausibilityCeilingFor`). A folga existe porque parar exatamente na leitura atual deixaria a faixa
+vazia — o veículo no topo da faixa do ano dele não somaria nem um km. O que o veículo **já registra**
+(piso da data, `current_kilometers`, `odometer_at_registration`) entra no cálculo **só até o teto do
+ano**: leitura implausível já gravada não amplia o teto.
+
+Esse recorte é o conserto de um defeito, não um aperto de folga. O termo "já rodado" era ilimitado,
+então cada leitura gravada subia o teto em mais um ano de folga — uma catraca. E como o hodômetro do
+**cadastro** não passava por teto nenhum, cadastrar um veículo do ano com 9.999.999 km levava o teto
+daquele chassi para além de qualquer `max:9999999`: o teto deixava de existir nas quatro superfícies
+de OS, para sempre. Um número que nunca passaria na validação não pode virar o piso que amplia a
+validação. O preço aceito é o veículo que roda mais de PLAUSIBILITY_KILOMETERS_PER_YEAR acima do teto
+do ano **dentro do mesmo ano-calendário**: ele espera a virada do ano (que sobe o teto) ou a correção
+do ano do cadastro.
+
+O guard é **uma** implementação no serviço, com duas portas de entrada. A OS chama
+`assertMaintenanceKilometers` nas quatro superfícies que gravam km (`StoreMaintenanceRequest`,
+`UpdateMaintenanceRequest`, formulário do proprietário e da oficina na web); o **hodômetro do
+veículo** chama `assertOdometerKilometers`, porque esse número não fica no cadastro — vira
+`odometer_at_registration`, o piso de toda OS seguinte e um termo do próprio teto. Hoje estão nessa
+segunda porta: cadastro e edição de veículo na web (`RegistersVehicleWithOwnership`,
+`UpdatesVehicleDetails`, nos dois portais), `POST`/`PUT /api/v1/vehicles`,
+`VehicleOwnershipService::registerNew` e `::claimUnclaimedWorkshopVehicle`, e
+`VehicleMileageService::registerOdometer`, que é o backstop de quem gravar hodômetro por um caminho
+novo — inclusive o veículo que a oficina cria pelo chassi junto com a OS
+(`WorkshopVehicleRegistrar`, com a chave de erro `kilometers`). Nenhuma delas repete a regra na
+validação; `max:9999999` continua lá só como limite de coluna. O teto entra na faixa que o formulário
+mostra: `MaintenanceMileageContext` manda o `year` e
+`resources/js/utils/maintenance-kilometers.js` espelha as duas constantes **e o recorte** — mude os
+dois juntos (`.ai/rules/js.md`).
 
 Teste que grava km alto **fixa o ano do veículo**. `VehicleFactory` sorteia
 `year` entre 2010 e o ano corrente, e o teto sai desse ano: com 300.000 km o teste passava no

@@ -47,10 +47,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{!! \App\Support\DocumentTitle::compose($__env->yieldContent('title') ?: 'Admin', 'Admin') !!}</title>
+    @if(request()->attributes->get('seoNoIndex'))
+        <meta name="robots" content="noindex, follow">
+    @endif
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />
     <x-brand-head-icons />
-    <script>
+    <script nonce="@cspNonce">
         // Sidebar recolhida (escolha salva por resources/js/ui/sidebar.js): aplicada antes da primeira
         // pintura, para a sidebar não abrir larga e encolher. Sem armazenamento, fica expandida.
         try {
@@ -209,7 +212,7 @@
     />
 
     @include('layouts.partials.shell-script')
-    <script>
+    <script nonce="@cspNonce">
         // Abaixo de md a sidebar abre como gaveta modal: enquanto está aberta, é anunciada como
         // diálogo. No desktop ela nunca abre por overlay e continua sendo o <aside> da página.
         (() => {

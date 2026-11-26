@@ -16,8 +16,8 @@
 @if ($measurementId !== '' && ($isPublicPage || $signedUp))
     {{-- Cookies de medição liberados (legítimo interesse, declarado na seção 9 da política de
          privacidade); cookies e sinais de anúncios ficam negados. IP é anonimizado por padrão no GA4. --}}
-    <script async src="https://www.googletagmanager.com/gtag/js?id={{ $measurementId }}"></script>
-    <script>
+    <script nonce="@cspNonce" async src="https://www.googletagmanager.com/gtag/js?id={{ $measurementId }}"></script>
+    <script nonce="@cspNonce">
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
         gtag('consent', 'default', { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });

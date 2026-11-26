@@ -216,10 +216,7 @@ class MaintenanceController extends Controller
 
             $processor->createInvoiceRecords($maintenance, $storedInvoices);
 
-            app(VehicleMileageService::class)->applyMaintenanceKilometers(
-                $vehicle->fresh(),
-                (int) $maintenance->kilometers,
-            );
+            app(VehicleMileageService::class)->refreshCurrentKilometers($vehicle->fresh());
 
             DB::commit();
 
