@@ -318,11 +318,18 @@ Route::middleware(['auth', 'noindex'])->group(function () {
             ->name('workshop-records.decide');
         // Contestar não exige CRLV-e: é a ação do dono sem o documento (ver o docblock de
         // MaintenanceOwnerDecisionService::dispute).
+        //
+        // As quatro rotas de contestação (OS e laudo) entram no balde `owner-disputes`, por conta:
+        // contestar manda e-mail para a caixa da oficina, e rota que dispara e-mail tem balde
+        // próprio (.ai/rules/abuse-guards.md). Um balde para as duas áreas de propósito — é a mesma
+        // política, como em `account-vehicle-search`.
         Route::post('/registros-de-oficinas/{maintenance}/contestar', [UserWorkshopRecordController::class, 'dispute'])
             ->whereNumber('maintenance')
+            ->middleware('throttle:owner-disputes')
             ->name('workshop-records.dispute');
         Route::delete('/registros-de-oficinas/{maintenance}/contestar', [UserWorkshopRecordController::class, 'withdrawDispute'])
             ->whereNumber('maintenance')
+            ->middleware('throttle:owner-disputes')
             ->name('workshop-records.dispute.withdraw');
 
         // Contestar um laudo é a resposta do dono a uma afirmação sobre o carro dele, e sai da aba
@@ -330,9 +337,11 @@ Route::middleware(['auth', 'noindex'])->group(function () {
         // (App\Services\Inspection\InspectionDisputeService).
         Route::post('/vistorias/{inspection}/contestar', [UserInspectionDisputeController::class, 'store'])
             ->whereNumber('inspection')
+            ->middleware('throttle:owner-disputes')
             ->name('inspections.dispute');
         Route::delete('/vistorias/{inspection}/contestar', [UserInspectionDisputeController::class, 'destroy'])
             ->whereNumber('inspection')
+            ->middleware('throttle:owner-disputes')
             ->name('inspections.dispute.withdraw');
     });
 

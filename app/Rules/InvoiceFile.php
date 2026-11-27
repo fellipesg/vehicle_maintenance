@@ -2,6 +2,7 @@
 
 namespace App\Rules;
 
+use App\Support\UploadedPdfFile;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Http\UploadedFile;
@@ -54,7 +55,7 @@ class InvoiceFile implements ValidationRule
         $path = $value->getRealPath() ?: $value->path();
 
         $matchesDeclaredType = $extension === 'pdf'
-            ? $this->isPdf($value, $path)
+            ? $this->isPdf($value)
             : $this->isXml($value, $path);
 
         if (! $matchesDeclaredType) {
@@ -64,10 +65,14 @@ class InvoiceFile implements ValidationRule
         }
     }
 
-    private function isPdf(UploadedFile $file, string $path): bool
+    /**
+     * O conteúdo PDF é decidido por App\Support\UploadedPdfFile, que é a mesma resposta usada pelo
+     * laudo da vistoria cautelar (App\Services\Inspection\VehicleInspectionService). Uma segunda
+     * cópia desta conta é como a segunda superfície passa a aceitar o que a primeira recusa.
+     */
+    private function isPdf(UploadedFile $file): bool
     {
-        return $this->mimeType($file) === 'application/pdf'
-            || $this->startsWithPdfHeader($path);
+        return UploadedPdfFile::matches($file);
     }
 
     private function isXml(UploadedFile $file, string $path): bool
@@ -87,17 +92,6 @@ class InvoiceFile implements ValidationRule
         } catch (\Throwable) {
             return '';
         }
-    }
-
-    private function startsWithPdfHeader(string $path): bool
-    {
-        if (! is_readable($path)) {
-            return false;
-        }
-
-        $header = @file_get_contents($path, false, null, 0, 5);
-
-        return is_string($header) && str_starts_with($header, '%PDF-');
     }
 
     /**

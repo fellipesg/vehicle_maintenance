@@ -9,6 +9,7 @@ use App\Http\Requests\Web\Workshop\UpdateVehicleInspectionRequest;
 use App\Models\VehicleInspection;
 use App\Policies\VehicleInspectionPolicy;
 use App\Services\Inspection\VehicleInspectionService;
+use App\Services\Maintenance\WorkshopRecordsArrivalNotifier;
 use App\Services\Vehicle\WorkshopVehicleRegistrar;
 use App\Support\Workshop\WorkshopVehicleStep;
 use Illuminate\Http\RedirectResponse;
@@ -114,24 +115,49 @@ class InspectionController extends Controller
             ]);
         }
 
-        $inspection = DB::transaction(function () use ($vehicle, $newVehicle, $chassis, $data, $request, $workshop): VehicleInspection {
-            // Veículo criado pelo chassi nasce **sem** hodômetro: a leitura do laudo é do laudo, e
-            // alimentar vehicles.current_kilometers com ela é o que .ai/rules/inspections.md proíbe.
-            $vehicle ??= app(WorkshopVehicleRegistrar::class)->register(
-                $request->user(),
-                $chassis,
-                (string) $newVehicle['brand'],
-                (string) $newVehicle['model'],
-                (int) $newVehicle['year'],
-            );
+        // O PDF sobe **antes** do laudo existir, e fora da transação (o I/O do storage não segura
+        // conexão aberta — .ai/rules/invoices.md). É o que torna a emissão retentável: a recusa do
+        // storage volta como erro de validação no formulário, com nenhum laudo emitido. Quando o
+        // arquivo era anexado depois do commit, a oficina via "não foi possível guardar o laudo"
+        // sobre um laudo que já tinha código e já estava no histórico do chassi, e a retentativa
+        // emitia o segundo.
+        $reportPath = $request->hasFile('report')
+            ? $this->inspections->storeReportFile($request->file('report'))
+            : null;
 
-            return $this->inspections->create($vehicle, $workshop, $request->user(), $data);
-        });
+        try {
+            $inspection = DB::transaction(function () use ($vehicle, $newVehicle, $chassis, $data, $request, $workshop, $reportPath): VehicleInspection {
+                // Veículo criado pelo chassi nasce **sem** hodômetro: a leitura do laudo é do laudo, e
+                // alimentar vehicles.current_kilometers com ela é o que .ai/rules/inspections.md proíbe.
+                $vehicle ??= app(WorkshopVehicleRegistrar::class)->register(
+                    $request->user(),
+                    $chassis,
+                    (string) $newVehicle['brand'],
+                    (string) $newVehicle['model'],
+                    (int) $newVehicle['year'],
+                );
 
-        // Fora da transação, como a nota fiscal da OS: o I/O do storage não segura conexão aberta.
-        if ($request->hasFile('report')) {
-            $inspection = $this->inspections->attachReport($inspection, $request->file('report'));
+                return $this->inspections->create(
+                    $vehicle,
+                    $workshop,
+                    $request->user(),
+                    $data,
+                    $reportPath,
+                    $reportPath === null ? null : $request->file('report')->getClientOriginalName(),
+                );
+            });
+        } catch (\Throwable $exception) {
+            // Nenhuma linha aponta para o arquivo: sem esta limpeza ele ficaria em `inspections/`
+            // para sempre (o varredor PurgePendingMaintenanceAttachments é só de fotos de OS).
+            $this->inspections->discardReportFile($reportPath);
+
+            throw $exception;
         }
+
+        // O dono atual precisa **saber** que existe um laudo sobre o carro dele: a contestação só
+        // vale com a descoberta do lado dela (.ai/rules/inspections.md). Mesmo notificador do
+        // registro de OS, e depois do commit, como no store da oficina.
+        app(WorkshopRecordsArrivalNotifier::class)->notifyOwnerOfInspection($inspection);
 
         return redirect()->route('workshop.inspections.show', $inspection)
             ->with('success', 'Laudo emitido. Código de conferência: '.$inspection->verification_code.'.');

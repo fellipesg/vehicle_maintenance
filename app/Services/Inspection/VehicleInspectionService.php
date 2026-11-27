@@ -13,6 +13,7 @@ use App\Services\Vehicle\VehicleMileageService;
 use App\Support\AppStorage;
 use App\Support\Inspection\InspectionFindings;
 use App\Support\Maintenance\VerificationCode;
+use App\Support\UploadedPdfFile;
 use App\Support\Vehicle\IssuerIndependence;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -44,10 +45,11 @@ class VehicleInspectionService
     private const CODE_ATTEMPTS = 30;
 
     /**
-     * Extensões aceitas para o laudo. O nome que o cliente envia nunca entra no caminho (LGPD: pode
-     * trazer nome e CPF), como em .ai/rules/models.md.
+     * A extensão do laudo gravado. É uma só, e sai do **conteúdo** conferido por
+     * App\Support\UploadedPdfFile — nunca do nome que o cliente enviou, que também nunca entra no
+     * caminho (LGPD: pode trazer nome e CPF), como em .ai/rules/models.md.
      */
-    private const ALLOWED_REPORT_EXTENSIONS = ['pdf'];
+    private const REPORT_EXTENSION = 'pdf';
 
     private const REPORT_PREFIX = 'inspections/';
 
@@ -57,12 +59,25 @@ class VehicleInspectionService
     ) {}
 
     /**
+     * O laudo nasce **com** o PDF já gravado, quando há: `$reportPath` vem de `storeReportFile`, que
+     * o controller chama antes de abrir a transação. Assim a emissão é uma só gravação — ou existe o
+     * laudo com o arquivo, ou não existe laudo —, e a oficina que vê "não foi possível guardar o
+     * laudo" pode simplesmente tentar de novo, sem criar o segundo documento. Antes o arquivo era
+     * anexado depois do commit, e a falha do storage deixava um laudo emitido, com código e no
+     * histórico do chassi, pedindo uma retentativa que duplicava.
+     *
      * @param  array{inspected_at: mixed, odometer_km?: mixed, verdict: mixed, findings?: mixed, summary?: mixed, valid_until?: mixed}  $data
      *
      * @throws ValidationException
      */
-    public function create(Vehicle $vehicle, Workshop $workshop, User $actor, array $data): VehicleInspection
-    {
+    public function create(
+        Vehicle $vehicle,
+        Workshop $workshop,
+        User $actor,
+        array $data,
+        ?string $reportPath = null,
+        ?string $reportOriginalName = null,
+    ): VehicleInspection {
         $verdict = $this->verdictFrom($data['verdict'] ?? null);
         $findings = InspectionFindings::normalize($data['findings'] ?? []);
         $odometer = $this->odometerFrom($data['odometer_km'] ?? null);
@@ -85,6 +100,8 @@ class VehicleInspectionService
             'verdict' => $verdict,
             'findings' => $findings,
             'verification_code' => $this->generateUniqueCode(),
+            'report_path' => $reportPath,
+            'report_original_name' => $reportPath === null ? null : $reportOriginalName,
         ])->save();
 
         return $inspection->fresh();
@@ -149,40 +166,89 @@ class VehicleInspectionService
     }
 
     /**
-     * Grava o laudo em PDF sob nome aleatório e troca o anterior. O arquivo antigo é apagado: é
-     * substituição pedida pelo emissor, não limpeza automática.
+     * Grava o PDF do laudo no storage e devolve o caminho, **sem** tocar no banco.
+     *
+     * É um passo separado de propósito, e é o que torna a emissão retentável: o controller grava o
+     * arquivo **antes** de criar o laudo, então uma recusa do storage devolve o formulário com erro
+     * e nenhum laudo emitido — em vez de deixar um laudo com código e no histórico do chassi, cuja
+     * retentativa criava o segundo. A alternativa, cercar o I/O com a transação, é justamente o que
+     * .ai/rules/invoices.md proíbe ("Os inserts das notas ficam fora de transação, de propósito":
+     * no pooler do Neon um erro engolido vira SQLSTATE 25P02 e esconde a falha real, e a transação
+     * ficaria aberta durante o I/O do S3/R2). A ordem aqui é a do `store` da API: arquivo primeiro,
+     * linha depois, e quem chamou apaga o arquivo se a linha não entrar.
+     *
+     * A extensão **não** vem do nome que o cliente enviou: `mimes:pdf` é a regra do FormRequest e
+     * protege só a tela que a declara, enquanto é este serviço que monta o caminho gravado. Um
+     * arquivo renomeado para `.pdf` passava a checagem daqui e ia para o storage com `.pdf`
+     * (App\Support\UploadedPdfFile, e .ai/rules/models.md: "A extensão também não é do cliente").
+     *
+     * @throws ValidationException
      */
-    public function attachReport(VehicleInspection $inspection, UploadedFile $file): VehicleInspection
+    public function storeReportFile(UploadedFile $file): string
     {
-        $extension = strtolower((string) $file->getClientOriginalExtension());
-
-        if (! in_array($extension, self::ALLOWED_REPORT_EXTENSIONS, true)) {
-            $extension = strtolower((string) $file->guessExtension());
-        }
-
-        $extension = preg_replace('/[^a-z0-9]/', '', $extension) ?? '';
-
-        if (! in_array($extension, self::ALLOWED_REPORT_EXTENSIONS, true)) {
+        if (! UploadedPdfFile::matches($file)) {
             throw ValidationException::withMessages([
                 'report' => 'O laudo deve ser um arquivo PDF.',
             ]);
         }
 
-        $fileName = Str::random(40).'.'.$extension;
+        $fileName = Str::random(40).'.'.self::REPORT_EXTENSION;
         $path = $file->storeAs(rtrim(self::REPORT_PREFIX, '/'), $fileName, AppStorage::diskName());
 
+        // As disks rodam com throw => false, então a recusa do storage volta `false` em vez de
+        // exceção — sem log nenhum. O `report()` é o que .ai/rules/invoices.md cobra em "Gravação
+        // recusada pelo storage nunca sai em silêncio": a oficina vê a mensagem, e nós vemos o
+        // porquê. Sem ele, um bucket fora do ar seria só "tente novamente" na tela.
         if (! is_string($path) || $path === '') {
+            report(new \RuntimeException(sprintf(
+                'Laudo de vistoria recusado pelo storage (disk %s, prefixo %s).',
+                AppStorage::diskName(),
+                self::REPORT_PREFIX,
+            )));
+
             throw ValidationException::withMessages([
                 'report' => 'Não foi possível guardar o laudo. Tente novamente.',
             ]);
         }
 
+        return $path;
+    }
+
+    /**
+     * Apaga um PDF de laudo que ficou sem linha no banco. Público porque quem grava o arquivo antes
+     * da linha (o `store` da oficina) é quem sabe que a linha não entrou.
+     */
+    public function discardReportFile(?string $path): void
+    {
+        $this->deleteReportFile($path);
+    }
+
+    /**
+     * Grava o laudo em PDF sob nome aleatório e troca o anterior. O arquivo antigo é apagado: é
+     * substituição pedida pelo emissor, não limpeza automática.
+     *
+     * O caminho novo é descartado se a gravação da linha falhar: `storeAs` bem-sucedido com `save()`
+     * falho deixava um objeto órfão em `inspections/` para sempre — o varredor
+     * `PurgePendingMaintenanceAttachments` é só de fotos de manutenção, e nenhuma rotina olha esse
+     * prefixo. Só o arquivo **novo** é apagado: o anterior continua apontado pela linha que não
+     * mudou, e apagá-lo deixaria a rota de download sem o que responder (é a mesma escolha de
+     * `createInvoiceRecordsOrDiscard`, que nunca apaga o arquivo de uma nota já gravada).
+     */
+    public function attachReport(VehicleInspection $inspection, UploadedFile $file): VehicleInspection
+    {
+        $path = $this->storeReportFile($file);
         $previous = $inspection->report_path;
 
-        $inspection->forceFill([
-            'report_path' => $path,
-            'report_original_name' => $file->getClientOriginalName(),
-        ])->save();
+        try {
+            $inspection->forceFill([
+                'report_path' => $path,
+                'report_original_name' => $file->getClientOriginalName(),
+            ])->save();
+        } catch (\Throwable $exception) {
+            $this->deleteReportFile($path);
+
+            throw $exception;
+        }
 
         $this->deleteReportFile($previous);
 

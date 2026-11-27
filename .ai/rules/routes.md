@@ -90,6 +90,13 @@ obtida assim **não** é verificada (`ownership_verified_at` nulo) e é recuper�
 esse atenuante que faz do teto de requisições a correção certa aqui, em vez de barrar o caso legítimo
 da oficina que cadastrou o carro de um cliente novo.
 
+## Rota de contestação entra no balde `owner-disputes`
+
+As quatro rotas de contestação do proprietário (OS e laudo de vistoria, contestar e retirar) levam
+`throttle:owner-disputes`, por conta: contestar dispara e-mail para a caixa da oficina. Um balde para
+as duas áreas, pela mesma razão de `account-vehicle-search` — é a mesma política. Os limites e o
+porquê estão em `.ai/rules/abuse-guards.md`.
+
 ## Rota que manda e-mail para o endereço digitado tem balde próprio
 
 Além do `throttle` por IP, essa rota precisa de um teto por destinatário, e nunca divide o balde com

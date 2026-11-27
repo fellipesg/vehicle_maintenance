@@ -35,6 +35,7 @@ The pin is one of two guards, not the only one: the rate-limit tests in `tests/F
 Production is Neon Postgres; `phpunit.xml` uses SQLite in memory and `phpunit.pgsql.xml` the compose Postgres. SQLite is the permissive one, so a test can only pass there and still be wrong:
 - it does not enforce the `enum` check constraints, so writing a value outside the enum (e.g. `service_category => 'unknown'`) fails only on Postgres. Exercise view fallbacks for unmapped values **in memory**, without persisting them.
 - it accepts loose types, so a boolean bound to a `bigint` column (`id != false`) fails only on Postgres.
+- it keeps the transaction usable after a refused statement. Postgres aborts the whole block, so in a `RefreshDatabase` test every query after the refusal — a `fresh()`, an `assertDatabaseHas` — comes back as `SQLSTATE 25P02` instead of the assertion you wrote. A test that *wants* a write to fail must therefore fail it **before** the SQL: throw from a model event (`Invoice::creating`, `VehicleInspection::saving`), as `InvoiceControllerTest` and `InspectionReportStorageFailureTest` do. Forcing it with a nonexistent column (`forceFill(['nao_existe' => 1])`) passes on SQLite and errors on Postgres.
 
 Both jobs must be green before merging.
 

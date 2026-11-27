@@ -133,6 +133,18 @@ montado com `getClientOriginalName()` (o nome fica em `report_original_name`), e
 arquivo anterior. Não entra pelo de nota (que é NF-e com parsing) nem pelo de foto (que é imagem com
 variantes).
 
+**A extensão sai do conteúdo, e a emissão é retentável.** `App\Support\UploadedPdfFile` (MIME por
+finfo ou cabeçalho `%PDF-`) é quem decide se é PDF, e `App\Rules\InvoiceFile` chama a mesma classe —
+o serviço confere por conta própria em vez de confiar no `mimes:pdf` do FormRequest, que protege só a
+tela que o declara. E `storeReportFile` é um passo separado de `create`: o `store` da oficina grava o
+arquivo **antes** de abrir a transação e passa o caminho para o laudo nascer completo, como no `store`
+da API. Era o contrário — laudo dentro da transação, `attachReport` fora —, e a recusa do storage
+mostrava "Não foi possível guardar o laudo" com o laudo **já emitido**, com código e no histórico do
+chassi: a retentativa criava o segundo. Cercar o I/O com a transação não é a alternativa
+(.ai/rules/invoices.md, "Os inserts das notas ficam fora de transação, de propósito"). Um `Throwable`
+depois do upload descarta o arquivo, e `attachReport` descarta o caminho novo se o `save()` falhar —
+nenhuma rotina varre `inspections/` (o `PurgePendingMaintenanceAttachments` é só de fotos).
+
 ## A tela da oficina começa pelo veículo, e a etapa 1 é a mesma da OS
 `/oficina/vistorias` (lista, nova, detalhe, edição) espelha a OS de propósito, e a etapa 1 — placa
 (`?license_plate=`) ou chassi (`?chassis=`) — é **código compartilhado**:
@@ -236,6 +248,14 @@ As duas escritas existem agora, e são serviços separados de propósito:
 `App\Services\Inspection\InspectionPublicVisibilityService` (suprimir / devolver). São as **únicas**
 escritas de `owner_disputed_*` e `hidden_*`, que não são fillable, como o veredito e os achados.
 
+**O dono é avisado na emissão.** `VehicleInspectionIssuedNotification` (mail + database + push, via
+`WorkshopRecordsArrivalNotifier::notifyOwnerOfInspection`, o mesmo notificador do registro de OS) sai
+no store da oficina, para o dono atual vinculado. Contestar é a alavanca de resposta; sem o aviso
+faltava a de **descoberta** — o proprietário só achava um "Reprovado" sobre o próprio carro se abrisse
+esta aba por iniciativa própria. Conta de lojista não recebe, e o aviso **não** confere
+`workshop_message_opt_outs`: aquele descadastro é das mensagens que a oficina escreve, e calar este
+tiraria em silêncio a chance de contestar (.ai/rules/notifications.md, `inspection_issued`).
+
 **Contestar marca e não esconde.** O laudo contestado continua na ficha, no PDF e na conferência
 pública, com a marca à vista: quem compra vê o laudo *e* vê que o dono discorda. Sumir com ele seria
 a alavanca que o produto tirou da mão do proprietário nas manutenções (.ai/rules/models.md). A ação
@@ -256,7 +276,9 @@ pedido de remoção que a empresa honre. Quem continua vendo é a oficina emisso
 
 **As duas colunas são independentes.** Suprimir não retira a contestação e devolver não a apaga —
 senão republicar um laudo apagaria em silêncio que o dono discordou dele. Laudo suprimido também não
-é contestável: contestar o que não se vê não faz sentido.
+é contestável **nem descontestável**: `dispute` e `withdrawDispute` conferem os dois `hiddenFrom`, e
+por um tempo só o primeiro conferia — o dono não podia contestar o que não vê, mas podia apagar a
+contestação que já estava lá, num documento que a equipe tirou de circulação para analisar.
 
 ## A supressão deixa rastro depois de desfeita: as colunas são interruptor, a trilha é histórico
 `hidden_from_public_at`, `hidden_by_user_id` e `hidden_reason` descrevem a supressão **corrente**, e
