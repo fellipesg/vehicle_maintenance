@@ -5,6 +5,47 @@ paths:
 
 # Policies
 
+## O isolamento não tem contexto ambiente, e não vai ter escopo global
+Quem separa uma conta da outra neste projeto são as policies deste diretório **mais** o scope de
+visibilidade da consulta (`Vehicle::maintenancesVisibleTo` e `::inspectionsVisibleTo`, o scope
+`visibleInHistoryTo` e os pares em memória `Maintenance::isVisibleInHistoryTo` e
+`VehicleInspection::isVisibleInHistoryTo`). Não existe `tenant` ambiente guardado pela requisição,
+não existe `app/Models/Scopes/`, nem `#[ScopedBy]`, nem `addGlobalScope` — e isso é escolha, não
+esquecimento. `TenantIsolationHasNoAmbientContextTest` tranca as duas metades, e a metade do
+middleware é verificada na pilha **resolvida** (global, grupos e aliases do kernel, não só o que
+a rota declara): `gatherMiddleware()` devolve `web`/`api` sem expandir, então um
+`$middleware->append(...)` passaria por baixo de uma checagem feita só por rota.
+
+`App\Support\TenantContext` e o middleware `tenant` existiam e foram **removidos**: `id()` e
+`tenant()` tinham zero leitores em `app/`, `tests/` e `resources/`, e o único escritor era o
+middleware, aplicado em `routes/web.php`, `routes/api.php` e `routes/api-two-factor.php` só para
+preencher um estático que ninguém lia. O custo não era desempenho, era leitura: quem achava a classe
+assumia isolamento automático e escrevia consulta confiando nele. Remover não mudou autorização
+nenhuma, justamente porque quem nega sempre foi a policy.
+
+Escopo global por tenant não entra no lugar, por quatro razões medidas:
+
+1. **`vehicles` não tem `tenant_id`**, de propósito: o histórico pertence ao chassi e atravessa
+   donos (`.ai/rules/models.md`, "O selo não espera o proprietário"). O objeto central do produto
+   não é escopável, então o escopo cobriria as folhas e deixaria a raiz aberta.
+2. **Nos models que têm `tenant_id`, `tenant_id = o meu` é a resposta errada.** `maintenances.tenant_id`
+   é **nulo** na OS de veículo sem dono (`OwnerlessMaintenanceService::tenantIdFor`), e a oficina autora
+   lê por `workshop_id` a OS que registrou em veículo de **qualquer** tenant. Um escopo global faria o
+   `findOrFail` de `Api\MaintenanceController::show` responder 404 para a oficina na OS dela, e sumiria
+   com a OS sem dono da fila de quem for assumir o carro.
+3. **A travessia é a maioria dos leitores, não a exceção**: admin (e `.ai/rules/admin.md` proíbe
+   escopar listagem de admin por tenant), busca pública e `/v/{código}` (sem autenticação), lojista
+   em consignação com histórico liberado (`VehiclePolicy::viewFullHistory`), mais 10 comandos de
+   console e 2 jobs que consultam esses models **sem requisição**.
+4. **Sem contexto, o escopo mente.** Fora de uma requisição não há tenant: o escopo devolveria zero
+   linha em silêncio (quebrando job, comando e página pública) ou viraria no-op em contexto nulo — e
+   aí não é garantia, é a mesma ilusão que o `TenantContext` era, agora dentro da consulta.
+
+Precisão a mais na consulta é bem-vinda **explícita e no ponto de uso** (como as duas restrições de
+`tenant_id` em `Vehicle`), nunca como padrão invisível. Se um dia o escopo global voltar à mesa, ele
+chega com a lista de quem atravessa na mão e com o comportamento sem contexto decidido antes da
+primeira linha.
+
 ## Workshop changes only the order it registered
 MaintenancePolicy::update/delete usa `Maintenance::isAuthoredByWorkshopId`: com selo é o `verified_workshop_id`; **sem** selo é o `workshop_id` junto com `registered_by_type` workshop — a OS de um período em que o selo dependia de vínculo provado com o veículo (ver "O selo não espera o proprietário" em models.md) continua sendo da oficina, que precisa poder corrigir e excluir o que registrou. A record that an owner or dealer declared citing the workshop (workshop_id, no seal) stays with whoever declared it; the workshop can view it but not change it, in the API (Flutter) and on the web. Other accounts change only declared records of their own tenant; a sealed record is never changed by them. Web controllers call Gate view first and redirect with a friendly error before Gate update, so the declared-but-cited case does not become a bare 403.
 

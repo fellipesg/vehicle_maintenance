@@ -5,6 +5,12 @@ paths:
 
 # Migrations
 
+## `vehicles` não tem `tenant_id`, e isso é desenho
+O veículo é compartilhado de propósito: o histórico pertence ao chassi e atravessa donos. Não
+adicione `tenant_id` a `vehicles` nem escopo global de tenant a `Vehicle` — o porquê, e o que
+fazer no lugar, estão em "O isolamento não tem contexto ambiente, e não vai ter escopo global"
+(`.ai/rules/policies.md`).
+
 ## Chassi como identidade e histórico de placas
 vehicles.chassis é único (nullable) e normalizado (uppercase, só alfanuméricos). Placa atual em vehicles.license_plate; trocas via VehiclePlateHistoryService gravam vehicle_plates. Busca pública/API: VehiclePlateSearch::findByIdentifier (chassi → RENAVAM → placa atual → placa histórica). Criação exige chassi (regra Chassis); legado null só até primeiro update.
 

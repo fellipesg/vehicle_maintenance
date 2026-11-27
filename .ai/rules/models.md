@@ -5,6 +5,14 @@ paths:
 
 # Models
 
+## Escopo global de tenant não entra em model nenhum
+Antes de pôr `#[ScopedBy]`, `addGlobalScope` ou qualquer filtro automático de `tenant_id` num model
+daqui, leia "O isolamento não tem contexto ambiente, e não vai ter escopo global" em
+`.ai/rules/policies.md`. Resumo: `maintenances.tenant_id` é nulo na OS sem dono e a oficina autora lê
+por `workshop_id` em qualquer tenant, então um escopo global faz o `findOrFail` da API responder 404
+para a oficina na própria OS. O isolamento é por policy mais scope de visibilidade **no ponto de
+uso**. `TenantIsolationHasNoAmbientContextTest` falha se um escopo global aparecer.
+
 ## Procedência só via MaintenanceVerificationStamper
 registered_by_type, verified_at, verified_workshop_id e verification_code não são fillable. Selo (workshop) só quando o ator é oficina e workshop_id da manutenção é o da oficina. Código RVL-XXXX-XX gerado com retry. Manutenção verificada não é editável/apagável por não-oficina.
 
