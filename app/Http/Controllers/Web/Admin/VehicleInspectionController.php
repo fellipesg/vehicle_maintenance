@@ -36,7 +36,7 @@ class VehicleInspectionController extends Controller
         $onlyHidden = $request->query('suprimidas') === '1';
 
         $inspections = VehicleInspection::query()
-            ->with(['vehicle', 'workshop', 'disputedBy', 'hiddenBy'])
+            ->with(['vehicle', 'workshop', 'disputedBy', 'hiddenBy', 'visibilityEvents.actor'])
             ->when($onlyDisputed, fn (Builder $query) => $query->whereNotNull('owner_disputed_at'))
             ->when($onlyHidden, fn (Builder $query) => $query->whereNotNull('hidden_from_public_at'))
             ->when($search !== '', fn (Builder $query) => $this->applySearch($query, $search))
@@ -69,9 +69,14 @@ class VehicleInspectionController extends Controller
         return back()->with('success', 'Laudo suprimido: fora do histórico e da conferência pública.');
     }
 
-    public function restore(VehicleInspection $inspection): RedirectResponse
+    /**
+     * Devolver também é ato com nome: o admin vai para a trilha
+     * (App\Models\InspectionVisibilityEvent), que esta ação acrescenta sem apagar a supressão
+     * anterior.
+     */
+    public function restore(Request $request, VehicleInspection $inspection): RedirectResponse
     {
-        $this->visibility->restore($inspection);
+        $this->visibility->restore($inspection, $request->user());
 
         return back()->with('success', 'Laudo de volta ao histórico e à conferência pública.');
     }

@@ -520,6 +520,21 @@ class Maintenance extends Model
     }
 
     /**
+     * A trilha de supressão desta OS, da mais antiga para a mais nova.
+     *
+     * `hiddenBy` acima e `hidden_reason` descrevem só a supressão **corrente**, e devolver a OS à
+     * consulta zera as duas — obrigatoriamente, porque scopeCountsTowardOdometer lê
+     * `hidden_by_user_id`. Esta relação é onde o histórico sobrevive a isso, e é o que a tela do
+     * admin mostra (App\Services\Maintenance\MaintenancePublicVisibilityService).
+     *
+     * @return HasMany<MaintenanceVisibilityEvent, $this>
+     */
+    public function visibilityEvents(): HasMany
+    {
+        return $this->hasMany(MaintenanceVisibilityEvent::class)->inOrder();
+    }
+
+    /**
      * Quem contestou o registro (o proprietário atual na época).
      */
     public function disputedBy(): BelongsTo

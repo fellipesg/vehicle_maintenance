@@ -128,7 +128,7 @@ class VehicleOdometerProjectionTest extends TestCase
 
         $this->assertFalse($this->maintenanceReading($maintenance)->counts_toward_odometer);
 
-        app(MaintenancePublicVisibilityService::class)->restore($maintenance->fresh());
+        app(MaintenancePublicVisibilityService::class)->restore($maintenance->fresh(), $admin);
 
         $this->assertTrue($this->maintenanceReading($maintenance)->counts_toward_odometer);
     }

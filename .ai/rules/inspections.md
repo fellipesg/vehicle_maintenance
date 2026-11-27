@@ -258,6 +258,46 @@ pedido de remoção que a empresa honre. Quem continua vendo é a oficina emisso
 senão republicar um laudo apagaria em silêncio que o dono discordou dele. Laudo suprimido também não
 é contestável: contestar o que não se vê não faz sentido.
 
+## A supressão deixa rastro depois de desfeita: as colunas são interruptor, a trilha é histórico
+`hidden_from_public_at`, `hidden_by_user_id` e `hidden_reason` descrevem a supressão **corrente**, e
+`restore()` zera as três — de propósito, porque elas afirmam "este laudo está fora do ar agora". Até
+a trilha existir, era só isso que havia: republicar apagava quem suprimiu e por quê, e não sobrava
+registro de que a supressão tinha existido. A exigência de um humano responsável, que o docblock do
+serviço descreve como a razão de a alavanca não ficar na mão de quem tem interesse em esconder, era
+exatamente o que o `restore()` apagava. Num produto cujo valor é procedência, é o buraco que só
+aparece quando alguém precisa auditar.
+
+Cada supressão e cada devolução gravam uma linha em `inspection_visibility_events`
+(`App\Models\InspectionVisibilityEvent`), com ator, motivo e horário, e a OS tem a trilha irmã
+`maintenance_visibility_events` (ver .ai/rules/models.md). Tabela de eventos, e não um par
+`restored_at`/`restored_by_user_id`: o histórico é uma **sequência**, e colunas guardariam só o
+último ciclo — suprimir de novo sobrescreveria o anterior, e suprimir → devolver → suprimir é
+justamente o caso em que a auditoria importa.
+
+São **duas** tabelas, não uma com relação polimórfica: cada trilha pende da sua entidade com chave
+estrangeira de verdade, então apagar o laudo leva a trilha dele e nenhuma linha fica órfã.
+`App\Enums\VisibilityEventAction` (`hidden` | `restored`) é compartilhado pelos dois lados, para que
+um não ganhe estado que o outro não tem.
+
+Quatro coisas que a trilha exige e que é fácil desfazer sem perceber:
+
+- **append-only**: `updating` e `deleting` são bloqueados no model. Trilha que se reescreve não é
+  prova; evento errado é seguido de outro, nunca corrigido;
+- **estado e evento na mesma transação** (e, na OS, o hodômetro junto): trilha que pode divergir do
+  estado é pior que trilha nenhuma, porque passa a ser consultada como prova;
+- **`restore()` exige o admin**, como `hide()`: devolver o ativo à circulação também é ato de gente.
+  Devolver o que não estava suprimido **não** grava evento — não houve transição, e inventá-la
+  encheria a trilha de atos que não aconteceram. Suprimir o que já está suprimido **grava**: a data
+  da primeira supressão é preservada (é quando o laudo saiu do ar), mas o ato é novo;
+- **`occurred_at` ao lado de `created_at`**: os eventos semeados pela migração carregam o
+  `hidden_from_public_at` original, que é anterior à linha existir.
+
+**Nada disso sai do admin.** A trilha aparece em `/admin/vistorias` e em `/admin/manutencoes`, que
+consultam direto e não passam pela redação (`<x-admin.visibility-trail>`, um componente para as duas
+telas). Não vai para superfície pública nem para a API: o comprador vê o laudo ou a ausência dele,
+não o nome de quem da equipe decidiu. Há teste de vazamento nas duas trilhas, e ele importa porque o
+laudo **devolvido** volta a aparecer em todas as superfícies.
+
 ## O que ainda não existe
 **Não** existe ainda: recurso de API, marcador na faixa de procedência, selo no estoque do
 lojista, o cartão "Este carro é seu?" na página pública (hoje só `/v/`,

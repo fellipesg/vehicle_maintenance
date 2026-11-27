@@ -28,6 +28,14 @@ recusando OS nova abaixo dele. Suprimir um registro é tirar de circulação o a
 motivo. Use para fraude confirmada e erro de chassi, não para acalmar um proprietário incomodado — é
 exatamente por isso que a alavanca saiu da mão dele.
 
+E tem **histórico**: cada supressão e cada devolução, dos dois lados (OS e laudo), gravam uma linha
+de trilha que `<x-admin.visibility-trail>` mostra na própria linha da tabela — um componente para as
+duas telas, porque a equipe lê uma esperando a outra. As colunas de estado são só o interruptor do
+estado corrente, e devolver o registro zera as três: sem a trilha, republicar apagava quem suprimiu e
+por quê. É aqui que o rastro aparece e **só** aqui — nada de trilha em superfície pública nem na API
+(ver .ai/rules/inspections.md, "A supressão deixa rastro depois de desfeita"). Quem devolve também
+vai para a trilha, então `restore()` recebe o `$request->user()`.
+
 ## Laudo contestado tem filtro, pendência e é aqui que se suprime
 `admin.inspections.index` (`/admin/vistorias`, menu Frota) é a lista de vistorias da plataforma
 inteira, com `?contestadas=1`, `?suprimidas=1` e busca por código, placa, chassi ou emissor. O

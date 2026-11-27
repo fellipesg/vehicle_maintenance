@@ -76,6 +76,28 @@ como policies.md exige.
 **Registros ocultados antes desta mudança continuam ocultos**: republicar na marra o que alguém
 exerceu como direito de oposição é decisão de produto e jurídico, não de migration.
 
+## A supressão da OS tem trilha, porque republicar zera as colunas
+`maintenance_visibility_events` (`App\Models\MaintenanceVisibilityEvent`) grava uma linha por
+supressão e por devolução, com ator, motivo e horário. O porquê, a forma (append-only, mesma
+transação, `restore()` exigindo o admin, `occurred_at` ao lado de `created_at`) e a regra de não
+vazar para fora do admin estão em .ai/rules/inspections.md, "A supressão deixa rastro depois de
+desfeita" — os dois serviços são irmãos e a trilha é a mesma dos dois lados de propósito.
+
+Aqui zerar as três colunas na devolução não é só coerente, é **obrigatório**:
+`scopeCountsTowardOdometer` (abaixo) lê `hidden_by_user_id`, então deixar o nome preso na coluna
+depois de republicar tiraria a OS da conta do hodômetro para sempre. E hoje são **dois** leitores da
+mesma coluna, não um: `VehicleOdometerLog::maintenanceCounts` espelha o scope para virar a chave
+`counts_toward_odometer` da leitura projetada (abaixo), e o `MaintenanceObserver` a chama justamente
+quando `hidden_by_user_id` muda. É por isso que o histórico precisava de tabela própria e não de
+`restored_at`/`restored_by_user_id` ao lado.
+
+**O backfill da migração não semeou as linhas do fluxo antigo.** Os eventos iniciais cobrem só o que
+tem `hidden_by_user_id` não nulo, isto é, supressão de equipe. OS ocultada pelo próprio proprietário
+(`hidden_from_public_at` com `hidden_by_user_id` nulo) nasce com trilha vazia: semear "a equipe
+suprimiu" nelas inventaria um ato que não houve, e é exatamente essa diferença que o hodômetro usa.
+No laudo o backfill não tem essa condição, porque `hidden_*` lá só é escrito pela equipe — a
+assimetria é dos dados, não de descuido.
+
 ## Hodômetro: sai da conta o que foi contestado e o que a equipe suprimiu
 `Maintenance::scopeCountsTowardOdometer` é o filtro de `VehicleMileageService` (apply, refresh e os
 limites de km) e deixa de fora duas coisas: **o que o proprietário contestou** (`owner_disputed_at`)
